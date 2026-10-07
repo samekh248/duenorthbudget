@@ -4,7 +4,7 @@ No screen in this spec writes categories, assignments, or transactions. None of 
 
 ## Panorama
 
-- Title text is `due north`, lowercase, Selawik Light 118sp, tracking −4%. It translates by [PanoramaMotion](../../../core/design/src/main/kotlin/app/duenorth/budget/design/PanoramaMotion.kt): across the span from the first section to the last, the title moves 15% of its own width, which is less than one section moves.
+- Title text is `budget`, lowercase, Selawik Light 118sp, tracking −4%. `due north` sits on the next line, directly under that title. The title stays fully on screen, including the descender. It translates by [PanoramaMotion](../../../core/design/src/main/kotlin/app/duenorth/budget/design/PanoramaMotion.kt): across the span from the first section to the last, the title moves 15% of its own width, which is less than one section moves, and never far enough to leave the screen.
 - Sections, in order: `budget`, `accounts`, `inbox`. The next section peeks 40dp from the right, including on the last section (the sections loop). A fling snaps to a section. Tapping the visible header of a section selects it.
 - `budget` shows the month (`october 2026`), the header label and amount from the file contract, and one row per expense group (name and available amount). No groups: `nothing to budget`.
 - `accounts` groups `on budget` above `off budget`. No accounts: `no accounts`.

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -41,7 +42,18 @@ class ShellContentTest {
         }
         compose.onNodeWithText("$0.00").assertIsDisplayed()
         compose.onNodeWithText(ShellCopy.NOTHING_TO_BUDGET).assertIsDisplayed()
-        compose.onNodeWithText("due north").assertIsDisplayed()
+        val root = compose.onNodeWithTag("panorama").fetchSemanticsNode().boundsInRoot
+        val title = compose.onNodeWithTag("panorama-title").fetchSemanticsNode().boundsInRoot
+        val subtitle = compose.onNodeWithTag("panorama-subtitle").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("panorama-title").assertTextEquals("budget")
+        compose.onNodeWithTag("panorama-subtitle").assertTextEquals("due north")
+        assertTrue("title left ${title.left}", title.left >= root.left - 1f)
+        assertTrue("title right ${title.right} > ${root.right}", title.right <= root.right + 1f)
+        assertTrue("title top ${title.top}", title.top >= root.top - 1f)
+        assertTrue("title bottom ${title.bottom}", title.bottom <= root.bottom + 1f)
+        val gap = subtitle.top - title.bottom
+        assertTrue("due north gap $gap", gap >= -1f && gap <= 8f * compose.density.density)
+        assertTrue("subtitle left ${subtitle.left}", subtitle.left >= title.left - 1f)
     }
 
     @Test

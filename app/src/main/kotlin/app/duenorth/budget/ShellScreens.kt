@@ -62,7 +62,8 @@ fun HomePanorama(
     var listGesture by remember { mutableStateOf(false) }
     LaunchedEffect(pagerGesture, listGesture) { onGesture(pagerGesture || listGesture) }
     MetroPanorama(
-        title = "due north",
+        title = "budget",
+        subtitle = "due north",
         sections =
             listOf(
                 PanoramaSection("budget") {

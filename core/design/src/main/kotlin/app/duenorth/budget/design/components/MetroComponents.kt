@@ -13,11 +13,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -42,6 +40,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -246,6 +245,7 @@ fun MetroPanorama(
     title: String,
     sections: List<PanoramaSection>,
     modifier: Modifier = Modifier,
+    subtitle: String = "",
     initialSection: Int = 0,
     onGesture: (Boolean) -> Unit = {},
 ) {
@@ -280,25 +280,45 @@ fun MetroPanorama(
         }
     }
 
-    Column(modifier.fillMaxSize().background(colors.background)) {
-        Box(Modifier.fillMaxWidth().height(112.dp).padding(top = 8.dp)) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .testTag("panorama"),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = MetroDimens.Gutter, top = 8.dp, end = MetroDimens.Gutter)
+                .onGloballyPositioned { titleWidth = it.size.width }
+                .graphicsLayer {
+                    val shift =
+                        PanoramaMotion.titleShiftPx(
+                            sectionPosition = (pager.currentPage - origin) + pager.currentPageOffsetFraction,
+                            sectionCount = count,
+                            titleWidthPx = titleWidth.toFloat(),
+                        )
+                    // Keep the whole title on screen. The raw shift can be larger than the gutter.
+                    translationX = shift.coerceIn(-MetroDimens.Gutter.toPx(), 0f)
+                },
+        ) {
             MetroText(
                 title,
                 type.panoramaTitle,
-                Modifier
-                    .wrapContentWidth(unbounded = true, align = Alignment.Start)
-                    .onGloballyPositioned { titleWidth = it.size.width }
-                    .graphicsLayer {
-                        translationX =
-                            PanoramaMotion.titleShiftPx(
-                                sectionPosition = (pager.currentPage - origin) + pager.currentPageOffsetFraction,
-                                sectionCount = count,
-                                titleWidthPx = titleWidth.toFloat(),
-                            )
-                    },
+                Modifier.testTag("panorama-title"),
                 maxLines = 1,
                 softWrap = false,
             )
+            if (subtitle.isNotEmpty()) {
+                MetroText(
+                    subtitle,
+                    type.subheader,
+                    Modifier.testTag("panorama-subtitle"),
+                    color = colors.secondary,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
         }
         HorizontalPager(
             state = pager,

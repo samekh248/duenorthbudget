@@ -13,7 +13,7 @@
 ### User Story 1 - See the month on the panorama (Priority: P1)
 
 A person opens the app and lands on a Metro 2 panorama of the open budget.
-The oversized "due north" title sits above the "budget" section. They see how
+The oversized "budget" title sits above the word "due north" and the "budget" section. They see how
 much is left to budget this month, and each category group with the amount
 still available. The next section peeks in from the right. Nothing on this
 screen waits for a network.
@@ -119,8 +119,9 @@ unchanged.
 ### Functional Requirements
 
 - **FR-001**: The home screen MUST be a Metro 2 panorama, as defined in the
-  constitution (Principle II), titled "due north", with the sections
-  "budget", "accounts", and "inbox".
+  constitution (Principle II), titled "budget", with "due north" directly
+  under that title, and the sections "budget", "accounts", and "inbox".
+  The title MUST stay fully on screen.
 - **FR-002**: The "budget" section MUST show the current month, the amount
   left to budget, and one row per category group with that group's available
   total.

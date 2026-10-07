@@ -8,7 +8,7 @@
 
 ## Summary
 
-The home screen is a Metro 2 panorama titled "due north" with the sections "budget", "accounts", and "inbox". It reads one Actual-shaped budget file already on the phone, shows that file's to-budget figure and each category group's available total, and never waits on a network. The person can start an empty budget, switch files without merging them, and keep a light, dark, or accent choice on the phone rather than inside the budget.
+The home screen is a Metro 2 panorama titled "budget", with "due north" directly under that title, and the sections "budget", "accounts", and "inbox". It reads one Actual-shaped budget file already on the phone, shows that file's to-budget figure and each category group's available total, and never waits on a network. The person can start an empty budget, switch files without merging them, and keep a light, dark, or accent choice on the phone rather than inside the budget.
 
 The UI is Jetpack Compose on foundation only (no Material widgets), with Selawik and the Due North Tasks type ramp. Envelope and tracking totals use Actual's published formulas. A refresh that arrives during a swipe is held until the finger lifts, so the row under the finger does not jump.
 

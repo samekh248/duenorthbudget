@@ -8,10 +8,12 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -56,7 +58,8 @@ data class MetroTypography(
                         fontWeight = MetroWeights.Light,
                         fontSize = 118.sp,
                         letterSpacing = (-0.04).em,
-                        lineHeight = 118.sp,
+                        lineHeight = TextUnit.Unspecified,
+                        platformStyle = PlatformTextStyle(includeFontPadding = true),
                     ),
                 sectionHeader =
                     TextStyle(
