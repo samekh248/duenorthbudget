@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-06
 
-**Status**: Draft
+**Status**: Approved
 
 **Input**: User description: "Android app based on Actual Budget, using the Metro 2 design. The person assigns and moves envelope money for a month. The screen must stay fluid."
 

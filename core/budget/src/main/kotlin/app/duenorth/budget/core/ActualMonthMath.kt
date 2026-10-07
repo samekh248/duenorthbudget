@@ -30,6 +30,7 @@ object ActualMonthMath {
         val headerLabel: String,
         val headerMinor: Long,
         val groupAvailable: Map<String, Long>,
+        val categoryAvailable: Map<String, Long> = emptyMap(),
     )
 
     fun project(
@@ -58,14 +59,39 @@ object ActualMonthMath {
         spent: Map<Pair<Int, String>, Long>,
         assignments: List<AssignmentFact>,
     ): Figures {
+        val dataMonths = HashSet<Int>()
+        dataMonths.addAll(spent.keys.map { it.first })
+        dataMonths.addAll(assignments.map { it.month })
+        val months = monthsThrough(dataMonths.minOrNull()?.let { minOf(it, target) } ?: target, target)
+        var previousLeft = HashMap<String, Long>()
+        var previousCarry = HashMap<String, Boolean>()
+        var currentLeft = HashMap<String, Long>()
+        for (month in months) {
+            val left = HashMap<String, Long>()
+            val carry = HashMap<String, Boolean>()
+            for (category in expense) {
+                val row = assignment(assignments, month, category.id)
+                val previous = previousLeft[category.id] ?: 0L
+                val carried = if (previousCarry[category.id] == true) previous else 0L
+                left[category.id] = row.amount + (spent[month to category.id] ?: 0L) + carried
+                carry[category.id] = row.carryover
+            }
+            previousLeft = left
+            previousCarry = carry
+            currentLeft = left
+        }
         val available = HashMap<String, Long>()
         for (category in expense) {
-            val balance = assignment(assignments, target, category.id).amount + (spent[target to category.id] ?: 0L)
-            available[category.groupId] = (available[category.groupId] ?: 0L) + balance
+            available[category.groupId] = (available[category.groupId] ?: 0L) + (currentLeft[category.id] ?: 0L)
         }
         val shown = groups.filter { !it.isIncome }.map { it.id }.toSet()
         val header = shown.sumOf { available[it] ?: 0L }
-        return Figures(ShellCopy.BALANCE, header, available.filterKeys { it in shown })
+        return Figures(
+            ShellCopy.BALANCE,
+            header,
+            available.filterKeys { it in shown },
+            currentLeft,
+        )
     }
 
     private fun envelope(
@@ -135,7 +161,12 @@ object ActualMonthMath {
             available[category.groupId] = (available[category.groupId] ?: 0L) + (currentLeft[category.id] ?: 0L)
         }
         val shown = groups.filter { !it.isIncome }.map { it.id }.toSet()
-        return Figures(ShellCopy.TO_BUDGET, toBudget, available.filterKeys { it in shown })
+        return Figures(
+            ShellCopy.TO_BUDGET,
+            toBudget,
+            available.filterKeys { it in shown },
+            currentLeft,
+        )
     }
 
     private fun assignment(

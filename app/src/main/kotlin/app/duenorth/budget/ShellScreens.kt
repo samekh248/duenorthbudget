@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
+import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
@@ -57,6 +58,11 @@ fun HomePanorama(
     initialSection: Int = 0,
     onGesture: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onGroup: (String) -> Unit = {},
+    onPreviousMonth: () -> Unit = {},
+    onNextMonth: () -> Unit = {},
+    onHold: () -> Unit = {},
+    onNewGroup: () -> Unit = {},
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
@@ -70,7 +76,15 @@ fun HomePanorama(
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
-                        BudgetSection(shell, onListGesture = { listGesture = it })
+                        BudgetSection(
+                            shell,
+                            onListGesture = { listGesture = it },
+                            onGroup = onGroup,
+                            onPreviousMonth = onPreviousMonth,
+                            onNextMonth = onNextMonth,
+                            onHold = onHold,
+                            onNewGroup = onNewGroup,
+                        )
                     }
                 },
                 PanoramaSection("accounts") {
@@ -99,13 +113,32 @@ fun BudgetSection(
     shell: MonthShell,
     onListGesture: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onGroup: (String) -> Unit = {},
+    onPreviousMonth: () -> Unit = {},
+    onNextMonth: () -> Unit = {},
+    onHold: () -> Unit = {},
+    onNewGroup: () -> Unit = {},
 ) {
     val list = rememberLazyListState()
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
-        MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            MetroText(
+                ShellCopy.PREVIOUS,
+                Metro.typography.caption,
+                Modifier.metroPress(onPreviousMonth).testTag("month-previous"),
+                color = Metro.colors.secondary,
+            )
+            MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+            MetroText(
+                ShellCopy.NEXT,
+                Metro.typography.caption,
+                Modifier.metroPress(onNextMonth).testTag("month-next"),
+                color = Metro.colors.secondary,
+            )
+        }
         MetroText(shell.headerLabel, Metro.typography.caption, color = Metro.colors.secondary)
         MetroText(
             MoneyFormat.format(shell.headerMinor, shell.currency),
@@ -113,15 +146,39 @@ fun BudgetSection(
             color = Metro.accent.text,
             modifier = Modifier.testTag("to-budget"),
         )
+        if (shell.headerMinor < 0) {
+            MetroText(ShellCopy.TO_BUDGET_NEGATIVE, Metro.typography.body, color = Metro.colors.secondary)
+        }
+        if (shell.mode == BudgetMode.ENVELOPE) {
+            if (shell.bufferedMinor != 0L) {
+                MetroText(
+                    ShellCopy.HELD + " " + MoneyFormat.format(shell.bufferedMinor, shell.currency),
+                    Metro.typography.caption,
+                    color = Metro.colors.secondary,
+                )
+            }
+            MetroText(
+                ShellCopy.HOLD,
+                Metro.typography.body,
+                Modifier.metroPress(onHold).testTag("hold"),
+                color = Metro.accent.text,
+            )
+        }
         if (shell.groups.isEmpty()) {
             MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.body, Modifier.padding(top = 12.dp))
         } else {
             LazyColumn(Modifier.weight(1f), state = list) {
                 items(shell.groups, key = { it.id }) { group ->
-                    GroupLine(group, shell)
+                    GroupLine(group, shell, onGroup)
                 }
             }
         }
+        MetroText(
+            ShellCopy.NEW_GROUP,
+            Metro.typography.body,
+            Modifier.metroPress(onNewGroup).padding(top = 8.dp).testTag("new-group"),
+            color = Metro.accent.text,
+        )
     }
 }
 
@@ -129,6 +186,7 @@ fun BudgetSection(
 private fun GroupLine(
     group: GroupRow,
     shell: MonthShell,
+    onGroup: (String) -> Unit,
 ) {
     Row(
         Modifier
@@ -143,7 +201,8 @@ private fun GroupLine(
             Modifier
                 .weight(1f)
                 .padding(end = 12.dp)
-                .testTag("group-name-${group.id}"),
+                .testTag("group-name-${group.id}")
+                .metroPress { onGroup(group.id) },
             maxLines = 3,
         )
         MetroText(

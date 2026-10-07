@@ -64,6 +64,22 @@ class ActualMonthMathTest {
     }
 
     @Test
+    fun trackingCarryoverRollsThePreviousLeftover() {
+        val figures =
+            ActualMonthMath.project(
+                mode = BudgetMode.TRACKING,
+                month = YearMonth.of(2026, 10),
+                groups = listOf(incomeGroup, living),
+                categories = listOf(salary, food, rent),
+                spentByCategoryMonth = mapOf((202609 to "c-food") to -4_000L),
+                assignments = listOf(ActualMonthMath.AssignmentFact(202609, "c-food", 10_000L, true)),
+                buffers = emptyMap(),
+            )
+        assertEquals(6_000L, figures.categoryAvailable["c-food"])
+        assertEquals(6_000L, figures.headerMinor)
+    }
+
+    @Test
     fun trackingDoesNotRollForward() {
         val figures =
             ActualMonthMath.project(
