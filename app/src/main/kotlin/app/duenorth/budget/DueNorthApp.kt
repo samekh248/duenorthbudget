@@ -9,8 +9,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -72,7 +75,9 @@ fun DueNorthApp(model: ShellViewModel) {
             Settings.Global.ANIMATOR_DURATION_SCALE,
             1f,
         )
-    val canBack = state.route != ShellRoute.Home && !(state.route == ShellRoute.Create && state.shell == null)
+    val canBack =
+        state.confirm != null ||
+            (state.route != ShellRoute.Home && !(state.route == ShellRoute.Create && state.shell == null))
     BackHandler(enabled = canBack) { model.back() }
     MetroTheme(
         darkTheme = dark,
@@ -90,44 +95,133 @@ fun DueNorthApp(model: ShellViewModel) {
                 AppBarButton(AppGlyph.Appearance, "appearance", model::showAppearance),
             )
         ShellChrome(buttons) { modifier ->
-            when (state.route) {
-                ShellRoute.Home ->
-                    HomePanorama(
-                        shell = state.shell,
-                        loading = state.loading,
-                        onGesture = model::setGesture,
-                        modifier = modifier,
+            Box(modifier) {
+                val fill = Modifier.fillMaxSize()
+                when (val route = state.route) {
+                    ShellRoute.Home ->
+                        HomePanorama(
+                            shell = state.shell,
+                            loading = state.loading,
+                            onGesture = model::setGesture,
+                            onAccount = model::openAccount,
+                            onInbox = model::openInbox,
+                            modifier = fill,
+                        )
+                    ShellRoute.Budgets ->
+                        BudgetsScreen(
+                            budgets = state.budgets,
+                            openId = state.settings.openBudgetId,
+                            onOpen = model::requestSwitch,
+                            onCreate = model::showCreate,
+                            modifier = fill,
+                        )
+                    ShellRoute.Create ->
+                        CreateBudgetScreen(
+                            error = state.createError,
+                            onCreate = model::create,
+                            modifier = fill,
+                        )
+                    ShellRoute.ConfirmSwitch ->
+                        ConfirmSwitchScreen(
+                            opening = state.switchTarget?.name.orEmpty(),
+                            leaving = openName,
+                            onOpen = model::confirmSwitch,
+                            onStay = model::cancelSwitch,
+                            modifier = fill,
+                        )
+                    ShellRoute.Appearance ->
+                        AppearanceScreen(
+                            themeMode = state.settings.themeMode,
+                            accentId = state.settings.accent,
+                            onTheme = model::setTheme,
+                            onAccent = model::setAccent,
+                            modifier = fill,
+                        )
+                    is ShellRoute.Register -> {
+                        val page = state.register
+                        if (page == null) {
+                            if (state.loading) Placeholder()
+                        } else {
+                            RegisterScreen(
+                                page = page,
+                                filter = state.registerFilter,
+                                onFilter = model::setRegisterFilter,
+                                onGesture = model::setRegisterGesture,
+                                onOpen = model::openEdit,
+                                onAdd = model::openNewTransaction,
+                                onTransfer = model::openTransfer,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.EditTransaction -> {
+                        val page = state.register
+                        if (page == null) {
+                            Placeholder()
+                        } else {
+                            TransactionForm(
+                                page = page,
+                                row = page.rows.firstOrNull { it.id == route.transactionId },
+                                initialDate = state.today,
+                                error = state.writeError,
+                                onSave = model::submitTransaction,
+                                onDelete = model::deleteTransaction,
+                                onSplit = model::openSplit,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.SplitTransaction -> {
+                        val page = state.register
+                        val row = page?.rows?.firstOrNull { it.id == route.transactionId }
+                        if (page == null || row == null) {
+                            Placeholder()
+                        } else {
+                            SplitForm(
+                                page = page,
+                                row = row,
+                                error = state.writeError,
+                                onSave = model::submitSplit,
+                                onUnsplit = model::unsplit,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.TransferMoney -> {
+                        val page = state.register
+                        if (page == null) {
+                            Placeholder()
+                        } else {
+                            TransferForm(
+                                page = page,
+                                initialDate = state.today,
+                                error = state.writeError,
+                                onSave = model::submitTransfer,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.PickCategory -> {
+                        val target = state.categoryTarget
+                        if (target == null) {
+                            if (state.loading) Placeholder()
+                        } else {
+                            CategoryPickerScreen(
+                                target = target,
+                                error = state.writeError,
+                                onPick = model::submitCategory,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                }
+                if (state.confirm != null) {
+                    ReconcileWarningScreen(
+                        onChange = model::confirmWrite,
+                        onKeep = model::dismissConfirm,
+                        modifier = fill,
                     )
-                ShellRoute.Budgets ->
-                    BudgetsScreen(
-                        budgets = state.budgets,
-                        openId = state.settings.openBudgetId,
-                        onOpen = model::requestSwitch,
-                        onCreate = model::showCreate,
-                        modifier = modifier,
-                    )
-                ShellRoute.Create ->
-                    CreateBudgetScreen(
-                        error = state.createError,
-                        onCreate = model::create,
-                        modifier = modifier,
-                    )
-                ShellRoute.ConfirmSwitch ->
-                    ConfirmSwitchScreen(
-                        opening = state.switchTarget?.name.orEmpty(),
-                        leaving = openName,
-                        onOpen = model::confirmSwitch,
-                        onStay = model::cancelSwitch,
-                        modifier = modifier,
-                    )
-                ShellRoute.Appearance ->
-                    AppearanceScreen(
-                        themeMode = state.settings.themeMode,
-                        accentId = state.settings.accent,
-                        onTheme = model::setTheme,
-                        onAccent = model::setAccent,
-                        modifier = modifier,
-                    )
+                }
             }
         }
     }

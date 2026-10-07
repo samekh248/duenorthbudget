@@ -22,6 +22,6 @@ Planning uses [GitHub Spec Kit](https://github.com/github/spec-kit).
 | [006 Reconcile and review](specs/006-reconcile-review/spec.md) | Statements, spending, net worth |
 | [007 Import transactions](specs/007-import-transactions/spec.md) | Files and existing bank connections |
 
-Spec 001 is implemented. The checks are in [quickstart.md](specs/001-metro-budget-shell/quickstart.md). Plan the next spec with `/speckit-plan`.
+Specs 001 and 003 are implemented. Their checks are in the feature quickstarts. Plan the next spec with `/speckit-plan`.
 
 Selawik is bundled under the SIL Open Font License (`core/design/src/main/assets/licenses/selawik_OFL.txt`).

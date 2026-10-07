@@ -2,6 +2,9 @@ package app.duenorth.budget.core
 
 object ActualSchema {
     const val VERSION = "1"
+    const val CARD_PAYMENT_PREFIX = "ccPayment:"
+
+    fun cardPaymentKey(accountId: String): String = CARD_PAYMENT_PREFIX + accountId
 
     val statements: List<String> =
         listOf(
@@ -17,6 +20,7 @@ object ActualSchema {
                 name TEXT NOT NULL,
                 offbudget INTEGER NOT NULL DEFAULT 0,
                 closed INTEGER NOT NULL DEFAULT 0,
+                type TEXT NOT NULL DEFAULT 'checking',
                 sort_order REAL NOT NULL DEFAULT 0,
                 tombstone INTEGER NOT NULL DEFAULT 0
             )
@@ -106,5 +110,12 @@ object ActualSchema {
                 listOf("dueNorthSchema", VERSION),
             )
         }
+    }
+
+    /** Adds columns introduced after the first phone files. Safe to call on every open. */
+    fun ensure(session: SqlSession) {
+        val names = session.query("PRAGMA table_info(accounts)").mapNotNull { it.str("name") }.toSet()
+        if (names.isEmpty() || "type" in names) return
+        session.exec("ALTER TABLE accounts ADD COLUMN type TEXT NOT NULL DEFAULT 'checking'")
     }
 }
