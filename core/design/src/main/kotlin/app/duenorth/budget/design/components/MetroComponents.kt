@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -46,6 +47,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.design.PanoramaMotion
 import app.duenorth.budget.design.theme.Metro
@@ -234,6 +236,17 @@ private fun AppGlyphIcon(glyph: AppGlyph) {
     }
 }
 
+/** Draws this child higher by [distance] and gives that space back to the parent. */
+private fun Modifier.pullUp(distance: Dp): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val dy = distance.roundToPx()
+        val height = (placeable.height - dy).coerceAtLeast(0)
+        layout(placeable.width, height) {
+            placeable.placeRelative(0, -dy)
+        }
+    }
+
 @Immutable
 class PanoramaSection(
     val header: String,
@@ -313,7 +326,10 @@ fun MetroPanorama(
                 MetroText(
                     subtitle,
                     type.subheader,
-                    Modifier.testTag("panorama-subtitle"),
+                    Modifier
+                        // The 118sp line box hangs below the letters. Sit the subtitle on that baseline.
+                        .pullUp(40.dp)
+                        .testTag("panorama-subtitle"),
                     color = colors.secondary,
                     maxLines = 1,
                     softWrap = false,

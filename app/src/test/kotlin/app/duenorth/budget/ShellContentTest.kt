@@ -49,10 +49,10 @@ class ShellContentTest {
         compose.onNodeWithTag("panorama-subtitle").assertTextEquals("due north")
         assertTrue("title left ${title.left}", title.left >= root.left - 1f)
         assertTrue("title right ${title.right} > ${root.right}", title.right <= root.right + 1f)
-        assertTrue("title top ${title.top}", title.top >= root.top - 1f)
+        assertTrue("title top ${title.top} root ${root.top}", title.top >= root.top - 1f)
         assertTrue("title bottom ${title.bottom}", title.bottom <= root.bottom + 1f)
-        val gap = subtitle.top - title.bottom
-        assertTrue("due north gap $gap", gap >= -1f && gap <= 8f * compose.density.density)
+        val tuckDp = (title.bottom - subtitle.top) / compose.density.density
+        assertTrue("due north should tuck under the title, ${tuckDp}dp", tuckDp in 34f..46f)
         assertTrue("subtitle left ${subtitle.left}", subtitle.left >= title.left - 1f)
     }
 
