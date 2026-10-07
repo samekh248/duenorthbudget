@@ -56,6 +56,8 @@ fun HomePanorama(
     loading: Boolean,
     initialSection: Int = 0,
     onGesture: (Boolean) -> Unit,
+    onAccount: (String) -> Unit = {},
+    onInbox: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
@@ -77,14 +79,19 @@ fun HomePanorama(
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
-                        AccountsSection(shell.accounts, shell, onListGesture = { listGesture = it })
+                        AccountsSection(
+                            shell.accounts,
+                            shell,
+                            onListGesture = { listGesture = it },
+                            onAccount = onAccount,
+                        )
                     }
                 },
                 PanoramaSection("inbox") {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
-                        InboxSection(shell, onListGesture = { listGesture = it })
+                        InboxSection(shell, onListGesture = { listGesture = it }, onInbox = onInbox)
                     }
                 },
             ),
@@ -161,6 +168,7 @@ fun AccountsSection(
     accounts: List<AccountRow>,
     shell: MonthShell,
     onListGesture: (Boolean) -> Unit,
+    onAccount: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (accounts.isEmpty()) {
@@ -180,11 +188,11 @@ fun AccountsSection(
     LazyColumn(modifier.fillMaxSize(), state = list) {
         if (onBudget.isNotEmpty()) {
             item { SectionLabel(ShellCopy.ON_BUDGET) }
-            items(onBudget, key = { it.id }) { AccountLine(it, shell) }
+            items(onBudget, key = { it.id }) { AccountLine(it, shell, onAccount) }
         }
         if (offBudget.isNotEmpty()) {
             item { SectionLabel(ShellCopy.OFF_BUDGET) }
-            items(offBudget, key = { it.id }) { AccountLine(it, shell) }
+            items(offBudget, key = { it.id }) { AccountLine(it, shell, onAccount) }
         }
     }
 }
@@ -193,12 +201,15 @@ fun AccountsSection(
 private fun AccountLine(
     account: AccountRow,
     shell: MonthShell,
+    onAccount: (String) -> Unit,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp),
+            .metroPress { onAccount(account.id) }
+            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp)
+            .testTag("account-${account.id}"),
         verticalAlignment = Alignment.Top,
     ) {
         MetroText(
@@ -219,6 +230,7 @@ private fun AccountLine(
 fun InboxSection(
     shell: MonthShell,
     onListGesture: (Boolean) -> Unit,
+    onInbox: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (shell.inbox.isEmpty()) {
@@ -234,7 +246,7 @@ fun InboxSection(
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
     LazyColumn(modifier.fillMaxSize(), state = list) {
-        items(shell.inbox, key = { it.id }) { row -> InboxLine(row, shell) }
+        items(shell.inbox, key = { it.id }) { row -> InboxLine(row, shell, onInbox) }
     }
 }
 
@@ -242,11 +254,13 @@ fun InboxSection(
 private fun InboxLine(
     row: InboxRow,
     shell: MonthShell,
+    onInbox: (String) -> Unit,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress { onInbox(row.id) }
             .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp),
         verticalAlignment = Alignment.Top,
     ) {

@@ -77,9 +77,64 @@ class BudgetLibrary(
         val database = File(dir, "db.sqlite")
         if (!database.exists()) return null
         return sessions.use(database) { session ->
+            ActualSchema.ensure(session)
             ShellReader.read(session, metadata, clock.today())
         }
     }
+
+    fun readRegister(
+        budgetId: String,
+        accountId: String,
+    ): RegisterPage? = open(budgetId) { RegisterBook(it).read(accountId) }
+
+    fun readCategoryTarget(
+        budgetId: String,
+        transactionId: String,
+    ): CategoryTarget? = open(budgetId) { RegisterBook(it).categoryTarget(transactionId) }
+
+    fun saveTransaction(
+        budgetId: String,
+        draft: TransactionDraft,
+    ): WriteResult = open(budgetId) { RegisterBook(it).save(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun setTransactionCategory(
+        budgetId: String,
+        transactionId: String,
+        categoryId: String?,
+        force: Boolean,
+    ): WriteResult =
+        open(budgetId) { RegisterBook(it).setCategory(transactionId, categoryId, force) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun deleteTransaction(
+        budgetId: String,
+        transactionId: String,
+        force: Boolean,
+    ): WriteResult =
+        open(budgetId) { RegisterBook(it).delete(transactionId, force) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun splitTransaction(
+        budgetId: String,
+        transactionId: String,
+        parts: List<SplitPart>,
+        force: Boolean,
+    ): WriteResult =
+        open(budgetId) { RegisterBook(it).split(transactionId, parts, force) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun unsplitTransaction(
+        budgetId: String,
+        transactionId: String,
+        force: Boolean,
+    ): WriteResult =
+        open(budgetId) { RegisterBook(it).unsplit(transactionId, force) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun transfer(
+        budgetId: String,
+        draft: TransferDraft,
+    ): WriteResult = open(budgetId) { RegisterBook(it).transfer(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun switchTo(id: String): Boolean {
         val target = summary(File(root, id)) ?: return false
@@ -87,6 +142,18 @@ class BudgetLibrary(
         if (settings.openBudgetId == target.id) return true
         save(settings.copy(openBudgetId = target.id))
         return true
+    }
+
+    private fun <T> open(
+        id: String,
+        block: (SqlSession) -> T,
+    ): T? {
+        val database = File(root, id).resolve("db.sqlite")
+        if (!database.isFile) return null
+        return sessions.use(database) { session ->
+            ActualSchema.ensure(session)
+            block(session)
+        }
     }
 
     private fun summary(dir: File): BudgetSummary? {
