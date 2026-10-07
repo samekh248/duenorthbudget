@@ -24,7 +24,8 @@ object PanoramaMotion {
                 val wrap = (cycle - span) / (sectionCount - span)
                 1f - wrap
             }
-        return -progress * titleWidthPx * TITLE_TRAVEL
+        val shift = progress * titleWidthPx * TITLE_TRAVEL
+        return if (shift == 0f) 0f else -shift
     }
 }
 
