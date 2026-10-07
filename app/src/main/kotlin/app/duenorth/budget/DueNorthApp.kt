@@ -16,6 +16,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.MotionPolicy
 import app.duenorth.budget.design.components.AppBarButton
@@ -96,6 +98,83 @@ fun DueNorthApp(model: ShellViewModel) {
                         shell = state.shell,
                         loading = state.loading,
                         onGesture = model::setGesture,
+                        modifier = modifier,
+                        onGroup = model::showGroup,
+                        onPreviousMonth = model::previousMonth,
+                        onNextMonth = model::nextMonth,
+                        onHold = model::showHold,
+                        onNewGroup = model::showAddGroup,
+                    )
+                is ShellRoute.Group -> {
+                    val route = state.route as ShellRoute.Group
+                    val page = state.page
+                    val categories = page?.categories?.filter { it.groupId == route.id }.orEmpty()
+                    val name =
+                        page
+                            ?.shell
+                            ?.groups
+                            ?.find { it.id == route.id }
+                            ?.name
+                            ?: page?.categories?.find { it.groupId == route.id }?.let { "group" }
+                            ?: ""
+                    GroupScreen(
+                        groupName = name,
+                        categories = categories,
+                        currency = page?.shell?.currency ?: Currencies.byCode("USD")!!,
+                        notice = state.notice,
+                        onListGesture = model::setGesture,
+                        onCategory = model::showCategory,
+                        onAssign = model::assign,
+                        onRename = { model.renameGroup(route.id, it) },
+                        onAdd = { model.addCategory(route.id, it) },
+                        onUp = { model.moveGroup(route.id, -1) },
+                        onDown = { model.moveGroup(route.id, 1) },
+                        onDelete = { model.deleteGroup(route.id) },
+                        onShow = { model.hideCategory(it, false) },
+                        modifier = modifier,
+                    )
+                }
+                is ShellRoute.Category -> {
+                    val route = state.route as ShellRoute.Category
+                    val page = state.page
+                    val category = page?.categories?.find { it.id == route.id }
+                    if (page == null || category == null) {
+                        Placeholder()
+                    } else {
+                        CategoryScreen(
+                            category = category,
+                            others = page.categories.filter { !it.hidden && it.id != category.id },
+                            currency = page.shell.currency,
+                            notice = state.notice,
+                            onAssign = { model.assign(category.id, it) },
+                            onMove = { otherId, text ->
+                                if (category.availableMinor < 0) {
+                                    model.move(otherId, category.id, text)
+                                } else {
+                                    model.move(category.id, otherId, text)
+                                }
+                            },
+                            onCarryover = { model.carryover(category.id, it) },
+                            onHide = { model.hideCategory(category.id, true) },
+                            onDelete = { model.deleteCategory(category.id) },
+                            modifier = modifier,
+                        )
+                    }
+                }
+                ShellRoute.Hold ->
+                    HoldScreen(
+                        held = state.shell?.bufferedMinor ?: 0L,
+                        currency = state.shell?.currency ?: Currencies.byCode("USD")!!,
+                        notice = state.notice,
+                        onHold = model::hold,
+                        onRelease = model::releaseHold,
+                        modifier = modifier,
+                    )
+                ShellRoute.AddGroup ->
+                    NameScreen(
+                        title = ShellCopy.NEW_GROUP,
+                        notice = state.notice,
+                        onSave = model::addGroup,
                         modifier = modifier,
                     )
                 ShellRoute.Budgets ->

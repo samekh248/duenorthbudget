@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.time.YearMonth
 import java.util.UUID
 
 class BudgetLibrary(
@@ -71,15 +72,27 @@ class BudgetLibrary(
         }
     }
 
-    fun readShell(id: String): MonthShell? {
+    fun readShell(id: String): MonthShell? = readBook(id)?.month(currentMonth())?.shell
+
+    fun readBook(id: String): BudgetBook? {
         val dir = File(root, id)
         val metadata = readMetadata(dir) ?: return null
         val database = File(dir, "db.sqlite")
         if (!database.exists()) return null
         return sessions.use(database) { session ->
-            ShellReader.read(session, metadata, clock.today())
+            BudgetBookStore.load(session, metadata)
         }
     }
+
+    fun saveBook(book: BudgetBook) {
+        val database = File(root, "${book.id}/db.sqlite")
+        if (!database.exists()) return
+        sessions.use(database) { session ->
+            BudgetBookStore.save(session, book)
+        }
+    }
+
+    fun currentMonth(): YearMonth = YearMonth.from(clock.today())
 
     fun switchTo(id: String): Boolean {
         val target = summary(File(root, id)) ?: return false

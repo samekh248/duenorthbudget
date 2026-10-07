@@ -58,6 +58,64 @@ object MoneyFormat {
     fun format(
         minor: Long,
         currency: CurrencySpec,
+    ): String = signed(minor, currency, withSymbol = true)
+
+    fun plain(
+        minor: Long,
+        currency: CurrencySpec,
+    ): String = signed(minor, currency, withSymbol = false)
+
+    /**
+     * Parses a decimal amount in [currency]. Returns minor units, or null when the text is not that amount.
+     */
+    fun parse(
+        text: String,
+        currency: CurrencySpec,
+    ): Long? {
+        var raw = text.trim().replace(" ", "").replace(",", "")
+        if (raw.isEmpty()) return null
+        var sign = 1L
+        when {
+            raw.startsWith("+") -> raw = raw.substring(1)
+            raw.startsWith("-") -> {
+                sign = -1
+                raw = raw.substring(1)
+            }
+        }
+        if (raw.isEmpty()) return null
+        val parts = raw.split('.')
+        if (parts.size > 2) return null
+        val whole = parts[0]
+        val fraction = if (parts.size == 2) parts[1] else ""
+        if (whole.any { !it.isDigit() } || fraction.any { !it.isDigit() }) return null
+        if (whole.isEmpty() && fraction.isEmpty()) return null
+        if (currency.decimals == 0) {
+            if (parts.size == 2) return null
+            val value = whole.toLongOrNull() ?: return null
+            return sign * value
+        }
+        if (fraction.length > currency.decimals) return null
+        val wholeValue = if (whole.isEmpty()) 0L else whole.toLongOrNull() ?: return null
+        val padded = fraction.padEnd(currency.decimals, '0')
+        val fractionValue = if (padded.isEmpty()) 0L else padded.toLongOrNull() ?: return null
+        val scale = scale(currency.decimals) ?: return null
+        val scaled =
+            try {
+                Math.addExact(Math.multiplyExact(wholeValue, scale), fractionValue)
+            } catch (_: ArithmeticException) {
+                return null
+            }
+        return try {
+            Math.multiplyExact(sign, scaled)
+        } catch (_: ArithmeticException) {
+            null
+        }
+    }
+
+    private fun signed(
+        minor: Long,
+        currency: CurrencySpec,
+        withSymbol: Boolean,
     ): String {
         val negative = minor < 0
         val absolute = if (minor == Long.MIN_VALUE) Long.MAX_VALUE else kotlin.math.abs(minor)
@@ -65,14 +123,30 @@ object MoneyFormat {
             if (currency.decimals == 0) {
                 group(absolute)
             } else {
-                var scale = 1L
-                repeat(currency.decimals) { scale *= 10 }
+                val scale = scale(currency.decimals) ?: 1L
                 val whole = absolute / scale
                 val fraction = (absolute % scale).toString().padStart(currency.decimals, '0')
-                group(whole) + "." + fraction
+                if (withSymbol) {
+                    group(whole) + "." + fraction
+                } else {
+                    whole.toString() + "." + fraction
+                }
             }
-        val body = currency.symbol + digits
+        val body = if (withSymbol) currency.symbol + digits else digits
         return if (negative) "-$body" else body
+    }
+
+    private fun scale(decimals: Int): Long? {
+        var scale = 1L
+        repeat(decimals) {
+            scale =
+                try {
+                    Math.multiplyExact(scale, 10L)
+                } catch (_: ArithmeticException) {
+                    return null
+                }
+        }
+        return scale
     }
 
     private fun group(value: Long): String {
@@ -140,6 +214,7 @@ data class MonthShell(
     val groups: List<GroupRow>,
     val accounts: List<AccountRow>,
     val inbox: List<InboxRow>,
+    val bufferedMinor: Long = 0,
 )
 
 object ShellCopy {
@@ -153,6 +228,33 @@ object ShellCopy {
     const val NOTHING_TO_CATEGORIZE = "nothing to categorize"
     const val ON_BUDGET = "on budget"
     const val OFF_BUDGET = "off budget"
+    const val ENTER_AMOUNT = "enter an amount"
+    const val NOT_ENOUGH_AVAILABLE = "not enough available"
+    const val NOT_ENOUGH_TO_HOLD = "not enough to hold"
+    const val MOVE_FIRST = "move the money or the history first"
+    const val TO_BUDGET_NEGATIVE = "to budget is negative"
+    const val HELD = "held for next month"
+    const val PREVIOUS = "previous"
+    const val NEXT = "next"
+    const val HOLD = "hold"
+    const val RELEASE = "release"
+    const val NEW_GROUP = "new group"
+    const val NEW_CATEGORY = "new category"
+    const val ROLLOVER = "rollover overspending"
+    const val STOP_ROLLOVER = "stop rollover"
+    const val HIDE = "hide"
+    const val SHOW = "show"
+    const val DELETE = "delete"
+    const val MOVE = "move"
+    const val COVER = "cover"
+    const val ASSIGN = "assign"
+    const val RENAME = "rename"
+    const val UP = "up"
+    const val DOWN = "down"
+    const val SPENT = "spent"
+    const val AVAILABLE = "available"
+    const val BUDGETED = "budgeted"
+    const val HIDDEN = "hidden"
 }
 
 sealed interface CreateResult {
