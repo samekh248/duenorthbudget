@@ -41,8 +41,9 @@ screens are drawn, the reference is Due North Tasks
 `docs/design/metro-mockups.svg` and the rules below. It replaces the first
 mockups (a dark pivot with no panorama).
 
-- The home screen is a panorama. An oversized lowercase "due north" title
-  scrolls sideways more slowly than the sections under it. The next section
+- The home screen is a panorama. An oversized lowercase "budget" title,
+  with "due north" directly under it, stays fully on screen and scrolls
+  sideways more slowly than the sections under it. The next section
   always peeks in from the right. Sections snap.
 - Secondary screens use a pivot where they need tabs. Every screen has a
   bottom application bar: round outlined icon buttons and an ellipsis (`•••`)
