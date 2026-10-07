@@ -329,6 +329,7 @@ fun MetroPanorama(
                     Modifier
                         // The 118sp line box hangs below the letters. Sit the subtitle on that baseline.
                         .pullUp(40.dp)
+                        .padding(start = 16.dp)
                         .testTag("panorama-subtitle"),
                     color = colors.secondary,
                     maxLines = 1,

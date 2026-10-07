@@ -53,7 +53,8 @@ class ShellContentTest {
         assertTrue("title bottom ${title.bottom}", title.bottom <= root.bottom + 1f)
         val tuckDp = (title.bottom - subtitle.top) / compose.density.density
         assertTrue("due north should tuck under the title, ${tuckDp}dp", tuckDp in 34f..46f)
-        assertTrue("subtitle left ${subtitle.left}", subtitle.left >= title.left - 1f)
+        val indentDp = (subtitle.left - title.left) / compose.density.density
+        assertTrue("due north should indent from the title, ${indentDp}dp", indentDp in 12f..20f)
     }
 
     @Test
