@@ -15,4 +15,14 @@ class MoneyFormatTest {
         assertEquals("¥1,500", MoneyFormat.format(1_500, yen))
         assertEquals("-¥40", MoneyFormat.format(-40, yen))
     }
+
+    @Test
+    fun parseScalesByCurrencyDecimals() {
+        assertEquals(2_500L, MoneyFormat.parse("25", 2))
+        assertEquals(2_500L, MoneyFormat.parse("25.00", 2))
+        assertEquals(2_550L, MoneyFormat.parse("25.5", 2))
+        assertEquals(25L, MoneyFormat.parse("25", 0))
+        assertEquals(null, MoneyFormat.parse("", 2))
+        assertEquals(null, MoneyFormat.parse("25.555", 2))
+    }
 }

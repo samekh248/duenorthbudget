@@ -3,18 +3,24 @@ package app.duenorth.budget
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.ShellCopy
+import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -95,6 +101,46 @@ class ShellContentTest {
         }
         compose.onNodeWithTag("group-name-g0").assertIsDisplayed()
         compose.onNodeWithTag("group-name-g299").assertDoesNotExist()
+    }
+
+    @Test
+    fun wrongBudgetPasswordShowsNoAmounts() {
+        compose.setContent {
+            val error = remember { mutableStateOf<String?>(null) }
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    BudgetPasswordScreen(
+                        error = error.value,
+                        askEachTime = true,
+                        onAskEachTime = {},
+                        onSubmit = {
+                            error.value = SyncCopy.PASSWORD_WRONG
+                        },
+                    )
+                }
+            }
+        }
+        compose.onNode(hasSetTextAction()).performTextInput("violet-quartz-991")
+        compose.onNodeWithTag("budget-unlock").performClick()
+        compose.onNodeWithText(SyncCopy.PASSWORD_WRONG).assertIsDisplayed()
+        compose.onNodeWithText("$40.00").assertDoesNotExist()
+        compose.onNodeWithText("Groceries").assertDoesNotExist()
+        compose.onNodeWithText("violet-quartz-991").assertDoesNotExist()
+    }
+
+    @Test
+    fun syncProgressStaysAThinBar() {
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp)) {
+                    SyncProgressBar(0.4f)
+                }
+            }
+        }
+        val bounds = compose.onNodeWithTag("sync-progress").fetchSemanticsNode().boundsInRoot
+        val heightDp = bounds.height / compose.density.density
+        assertTrue("progress bar is ${heightDp}dp", heightDp in 3f..5f)
+        compose.onNodeWithTag("sync-progress").assertIsDisplayed()
     }
 
     private fun sample(): MonthShell =

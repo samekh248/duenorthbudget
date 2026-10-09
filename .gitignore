@@ -13,3 +13,5 @@ captures/
 .kotlin/
 *.hprof
 .specify/feature.json
+.env*
+*.tmp

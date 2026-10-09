@@ -30,6 +30,69 @@ class BudgetLibrary(
         writeAtomically(phoneFile(), json.encodeToString(settings))
     }
 
+    fun updateSettings(block: (PhoneSettings) -> PhoneSettings) {
+        save(block(settings()))
+    }
+
+    fun <T> useDatabase(
+        id: String,
+        block: (SqlSession) -> T,
+    ): T? {
+        val database = File(File(root, id), "db.sqlite")
+        if (!database.isFile) return null
+        return sessions.use(database, block)
+    }
+
+    /**
+     * Replaces one budget directory after [bytes] open as sqlite.
+     * A failed check leaves every existing directory alone.
+     */
+    fun installDownloaded(
+        id: String,
+        name: String,
+        bytes: ByteArray,
+    ) {
+        require(id.isNotBlank() && !id.contains('/') && !id.contains('\\') && id != "." && id != "..")
+        val staging = File(root, ".$id.staging")
+        if (staging.exists()) staging.deleteRecursively()
+        staging.mkdirs()
+        val incoming = File(staging, "db.sqlite")
+        incoming.writeBytes(bytes)
+        try {
+            sessions.use(incoming) { session ->
+                SyncSchema.ensure(session)
+                session.query("SELECT COUNT(*) AS n FROM preferences")
+            }
+        } catch (error: Exception) {
+            staging.deleteRecursively()
+            throw error
+        }
+        val metadata = json.encodeToString(BudgetMetadata(id = id, budgetName = name.trim()))
+        writeAtomically(File(staging, "metadata.json"), metadata)
+        val dest = File(root, id)
+        if (!dest.exists()) {
+            Files.move(staging.toPath(), dest.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            return
+        }
+        val destDatabase = File(dest, "db.sqlite")
+        val backup = File(dest, "db.sqlite.previous")
+        if (destDatabase.exists()) {
+            Files.move(destDatabase.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        }
+        try {
+            Files.move(incoming.toPath(), destDatabase.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            writeAtomically(File(dest, "metadata.json"), metadata)
+            if (backup.exists()) backup.delete()
+            staging.deleteRecursively()
+        } catch (error: Exception) {
+            if (!destDatabase.exists() && backup.exists()) {
+                Files.move(backup.toPath(), destDatabase.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            }
+            staging.deleteRecursively()
+            throw error
+        }
+    }
+
     fun list(): List<BudgetSummary> {
         val dirs = root.listFiles { file -> file.isDirectory } ?: return emptyList()
         return dirs.mapNotNull { dir -> summary(dir) }.sortedWith(
@@ -54,6 +117,7 @@ class BudgetLibrary(
             )
             sessions.use(File(dir, "db.sqlite")) { session ->
                 ActualSchema.create(session)
+                SyncSchema.ensure(session)
                 session.exec(
                     "INSERT INTO preferences (id, value) VALUES (?, ?)",
                     listOf("budgetType", "envelope"),
