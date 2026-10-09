@@ -12,9 +12,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.temporal.TemporalAdjusters
 import java.util.UUID
 import kotlin.math.roundToLong
 
@@ -610,19 +608,4 @@ object ScheduleRecurrence {
         return false
     }
 
-    private fun dateCondStart(dateCond: JsonObject): String {
-        val value = dateCond["value"]
-        if (value is JsonPrimitive) return value.contentOrNull.orEmpty()
-        return value?.jsonObject?.get("start")?.jsonPrimitive?.contentOrNull.orEmpty()
-    }
-
-    private fun LocalDate.with(
-        startAdjust: Boolean,
-        block: (LocalDate) -> LocalDate,
-    ): LocalDate {
-        var date = block(this)
-        if (date.dayOfWeek == DayOfWeek.SATURDAY) date = date.with(TemporalAdjusters.next(DayOfWeek.MONDAY))
-        if (date.dayOfWeek == DayOfWeek.SUNDAY) date = date.with(TemporalAdjusters.next(DayOfWeek.MONDAY))
-        return date
-    }
 }
