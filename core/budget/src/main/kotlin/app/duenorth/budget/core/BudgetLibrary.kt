@@ -136,6 +136,60 @@ class BudgetLibrary(
         draft: TransferDraft,
     ): WriteResult = open(budgetId) { RegisterBook(it).transfer(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    fun readUpcomingSchedules(budgetId: String): List<UpcomingScheduleRow> =
+        open(budgetId) { SchedulesBook(it, clock).listUpcoming() } ?: emptyList()
+
+    fun postSchedule(
+        budgetId: String,
+        scheduleId: String,
+        forceDuplicate: Boolean = false,
+    ): ScheduleWriteResult =
+        open(budgetId) { SchedulesBook(it, clock).post(scheduleId, forceDuplicate) }
+            ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun skipSchedule(
+        budgetId: String,
+        scheduleId: String,
+    ): ScheduleWriteResult =
+        open(budgetId) { SchedulesBook(it, clock).skip(scheduleId) }
+            ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun createScheduleFromTransaction(
+        budgetId: String,
+        transactionId: String,
+        frequency: String,
+        nextDateIso: String,
+        occurrences: Int? = null,
+    ): ScheduleWriteResult =
+        open(budgetId) { SchedulesBook(it, clock).createFromTransaction(transactionId, frequency, nextDateIso, occurrences) }
+            ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun deleteSchedule(
+        budgetId: String,
+        scheduleId: String,
+    ): ScheduleWriteResult =
+        open(budgetId) { SchedulesBook(it, clock).delete(scheduleId) }
+            ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun listPayees(budgetId: String): List<PayeeRow> =
+        open(budgetId) { PayeeBook(it).list() } ?: emptyList()
+
+    fun renamePayee(
+        budgetId: String,
+        payeeId: String,
+        newName: String,
+        confirmMerge: Boolean = false,
+        rememberRule: Boolean = false,
+    ): PayeeWriteResult =
+        open(budgetId) { PayeeBook(it).rename(payeeId, newName, confirmMerge, rememberRule) }
+            ?: PayeeWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun setRuleEnabled(
+        budgetId: String,
+        ruleId: String,
+        enabled: Boolean,
+    ): Boolean = open(budgetId) { RulesBook(it).setEnabled(ruleId, enabled); true } ?: false
+
     fun switchTo(id: String): Boolean {
         val target = summary(File(root, id)) ?: return false
         val settings = settings()

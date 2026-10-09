@@ -92,6 +92,7 @@ fun DueNorthApp(model: ShellViewModel) {
         val buttons =
             listOf(
                 AppBarButton(AppGlyph.Budgets, "budgets", model::showBudgets),
+                AppBarButton(AppGlyph.More, "payees", model::showPayees),
                 AppBarButton(AppGlyph.Appearance, "appearance", model::showAppearance),
             )
         ShellChrome(buttons) { modifier ->
@@ -101,10 +102,13 @@ fun DueNorthApp(model: ShellViewModel) {
                     ShellRoute.Home ->
                         HomePanorama(
                             shell = state.shell,
+                            upcoming = state.upcoming,
                             loading = state.loading,
                             onGesture = model::setGesture,
                             onAccount = model::openAccount,
                             onInbox = model::openInbox,
+                            onPostSchedule = model::postSchedule,
+                            onSkipSchedule = model::skipSchedule,
                             modifier = fill,
                         )
                     ShellRoute.Budgets ->
@@ -137,6 +141,16 @@ fun DueNorthApp(model: ShellViewModel) {
                             onAccent = model::setAccent,
                             modifier = fill,
                         )
+                    ShellRoute.Payees ->
+                        PayeesScreen(
+                            payees = state.payees,
+                            error = state.writeError,
+                            mergeTarget = state.payeeMergeTarget,
+                            onRename = model::renamePayee,
+                            onConfirmMerge = model::confirmPayeeMerge,
+                            onCancelMerge = model::cancelPayeeMerge,
+                            modifier = fill,
+                        )
                     is ShellRoute.Register -> {
                         val page = state.register
                         if (page == null) {
@@ -167,6 +181,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSave = model::submitTransaction,
                                 onDelete = model::deleteTransaction,
                                 onSplit = model::openSplit,
+                                onSchedule = model::createScheduleFromTransaction,
                                 modifier = fill,
                             )
                         }
@@ -219,6 +234,13 @@ fun DueNorthApp(model: ShellViewModel) {
                     ReconcileWarningScreen(
                         onChange = model::confirmWrite,
                         onKeep = model::dismissConfirm,
+                        modifier = fill,
+                    )
+                }
+                if (state.scheduleDuplicateId != null) {
+                    ScheduleDuplicateScreen(
+                        onPostAnyway = model::confirmScheduleDuplicate,
+                        onCancel = model::cancelScheduleDuplicate,
                         modifier = fill,
                     )
                 }
