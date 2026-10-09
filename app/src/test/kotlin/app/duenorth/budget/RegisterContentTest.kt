@@ -50,6 +50,7 @@ class RegisterContentTest {
                         onOpen = {},
                         onAdd = {},
                         onTransfer = {},
+                        onReconcile = {},
                     )
                 }
             }
@@ -82,6 +83,7 @@ class RegisterContentTest {
                         onOpen = {},
                         onAdd = {},
                         onTransfer = {},
+                        onReconcile = {},
                     )
                 }
             }
@@ -107,6 +109,7 @@ class RegisterContentTest {
                         onOpen = {},
                         onAdd = {},
                         onTransfer = {},
+                        onReconcile = {},
                     )
                 }
             }

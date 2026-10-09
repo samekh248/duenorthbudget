@@ -33,7 +33,9 @@ import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
+import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.core.monthLabel
@@ -53,11 +55,16 @@ import app.duenorth.budget.design.theme.MetroDimens
 @Composable
 fun HomePanorama(
     shell: MonthShell?,
+    review: MonthReviewPage?,
+    netWorth: NetWorthPage?,
     loading: Boolean,
     initialSection: Int = 0,
     onGesture: (Boolean) -> Unit,
     onAccount: (String) -> Unit = {},
     onInbox: (String) -> Unit = {},
+    onPreviousReviewMonth: () -> Unit = {},
+    onReviewCategory: (String) -> Unit = {},
+    onNetWorthIncludeOffBudget: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
@@ -86,6 +93,22 @@ fun HomePanorama(
                             onAccount = onAccount,
                         )
                     }
+                },
+                PanoramaSection("review") {
+                    MonthReviewSection(
+                        review = review,
+                        loading = loading,
+                        onListGesture = { listGesture = it },
+                        onPreviousMonth = onPreviousReviewMonth,
+                        onCategory = onReviewCategory,
+                    )
+                },
+                PanoramaSection("net worth") {
+                    NetWorthSection(
+                        page = netWorth,
+                        loading = loading,
+                        onIncludeOffBudget = onNetWorthIncludeOffBudget,
+                    )
                 },
                 PanoramaSection("inbox") {
                     if (shell == null) {

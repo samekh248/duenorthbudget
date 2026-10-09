@@ -53,6 +53,7 @@ fun RegisterScreen(
     onOpen: (String) -> Unit,
     onAdd: () -> Unit,
     onTransfer: () -> Unit,
+    onReconcile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val rows = page.matching(filter)
@@ -82,6 +83,7 @@ fun RegisterScreen(
         )
         MetroButton("add", Modifier.padding(top = 12.dp), onClick = onAdd)
         MetroButton("transfer", Modifier.padding(top = 8.dp), onClick = onTransfer)
+        MetroButton("reconcile", Modifier.padding(top = 8.dp), onClick = onReconcile)
         if (rows.isEmpty()) {
             MetroText(RegisterCopy.NO_TRANSACTIONS, Metro.typography.body, Modifier.padding(top = 16.dp))
         } else {

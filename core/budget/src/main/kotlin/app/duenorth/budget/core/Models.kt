@@ -95,6 +95,7 @@ data class PhoneSettings(
     val openBudgetId: String? = null,
     val themeMode: String = "system",
     val accent: String = "magenta",
+    val netWorthIncludeOffBudget: Boolean = true,
 )
 
 @Serializable

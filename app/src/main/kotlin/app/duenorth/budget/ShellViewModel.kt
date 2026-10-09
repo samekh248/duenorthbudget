@@ -16,7 +16,14 @@ import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
+import app.duenorth.budget.core.CategoryMonthPage
+import app.duenorth.budget.core.MonthReviewPage
+import app.duenorth.budget.core.NetWorthPage
+import app.duenorth.budget.core.ReconcileFinishResult
+import app.duenorth.budget.core.ReconcilePage
+import app.duenorth.budget.core.ReconcileStartResult
 import app.duenorth.budget.core.WriteResult
+import java.time.YearMonth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +64,14 @@ sealed interface ShellRoute {
     data class PickCategory(
         val transactionId: String,
     ) : ShellRoute
+
+    data class Reconcile(
+        val accountId: String,
+    ) : ShellRoute
+
+    data class ReviewCategory(
+        val categoryId: String,
+    ) : ShellRoute
 }
 
 data class ShellUiState(
@@ -73,6 +88,12 @@ data class ShellUiState(
     val confirm: WriteResult.Confirm? = null,
     val switchTarget: BudgetSummary? = null,
     val today: String = RegisterEntry.todayIso(),
+    val reviewMonth: YearMonth = YearMonth.now(),
+    val monthReview: MonthReviewPage? = null,
+    val netWorth: NetWorthPage? = null,
+    val categoryMonth: CategoryMonthPage? = null,
+    val reconcile: ReconcilePage? = null,
+    val reconcileError: String? = null,
 )
 
 class ShellViewModel(
@@ -139,9 +160,15 @@ class ShellViewModel(
         }
         if (current.route == ShellRoute.Home) return false
         if (current.route == ShellRoute.Create && current.shell == null) return false
-        if (current.route.isRegisterFlow()) {
+        if (current.route.isRegisterFlow() || current.route.isHomeFlow()) {
             val previous = if (history.isEmpty()) ShellRoute.Home else history.removeLast()
-            _state.update { it.copy(route = previous, writeError = null) }
+            _state.update {
+                it.copy(
+                    route = previous,
+                    writeError = null,
+                    categoryMonth = if (previous == ShellRoute.Home) null else it.categoryMonth,
+                )
+            }
             return true
         }
         history.clear()
@@ -182,6 +209,104 @@ class ShellViewModel(
     fun openTransfer() {
         val accountId = openAccountId() ?: return
         push(ShellRoute.TransferMoney(accountId))
+    }
+
+    fun openReconcile() {
+        val accountId = openAccountId() ?: return
+        push(ShellRoute.Reconcile(accountId))
+        reloadReconcile(accountId)
+    }
+
+    fun startReconcile(
+        balanceText: String,
+        dateText: String,
+    ) {
+        val accountId = reconcileAccountId() ?: return
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            when (
+                val result =
+                    withContext(Dispatchers.IO) {
+                        library.startReconcile(budgetId, accountId, balanceText, dateText)
+                    }
+            ) {
+                is ReconcileStartResult.Started ->
+                    _state.update { it.copy(reconcile = result.page, reconcileError = null) }
+                is ReconcileStartResult.Rejected ->
+                    _state.update { it.copy(reconcileError = result.reason) }
+            }
+        }
+    }
+
+    fun toggleReconcileCleared(transactionId: String) {
+        val accountId = reconcileAccountId() ?: return
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            val page =
+                withContext(Dispatchers.IO) {
+                    library.toggleReconcileCleared(budgetId, accountId, transactionId)
+                }
+            if (page != null) _state.update { it.copy(reconcile = page) }
+        }
+    }
+
+    fun finishReconcile() {
+        val accountId = reconcileAccountId() ?: return
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            when (val result = withContext(Dispatchers.IO) { library.finishReconcile(budgetId, accountId) }) {
+                ReconcileFinishResult.Finished -> {
+                    history.clear()
+                    history.addLast(ShellRoute.Home)
+                    _state.update {
+                        it.copy(
+                            route = ShellRoute.Register(accountId),
+                            reconcile = null,
+                            reconcileError = null,
+                        )
+                    }
+                    apply(load(accountId), accountId)
+                }
+                is ReconcileFinishResult.Rejected ->
+                    _state.update { state -> state.copy(reconcileError = result.reason) }
+            }
+        }
+    }
+
+    fun cancelReconcile() {
+        val accountId = reconcileAccountId() ?: return
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { library.cancelReconcile(budgetId, accountId) }
+            history.removeLastOrNull()
+            _state.update {
+                it.copy(
+                    route = ShellRoute.Register(accountId),
+                    reconcile = null,
+                    reconcileError = null,
+                )
+            }
+        }
+    }
+
+    fun previousReviewMonth() {
+        _state.update { it.copy(reviewMonth = it.reviewMonth.minusMonths(1)) }
+        refreshReview()
+    }
+
+    fun openReviewCategory(categoryId: String) {
+        push(ShellRoute.ReviewCategory(categoryId))
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val month = _state.value.reviewMonth
+        viewModelScope.launch {
+            val page = withContext(Dispatchers.IO) { library.readCategoryMonth(budgetId, categoryId, month) }
+            _state.update { it.copy(categoryMonth = page) }
+        }
+    }
+
+    fun setNetWorthIncludeOffBudget(include: Boolean) {
+        saveSettings(_state.value.settings.copy(netWorthIncludeOffBudget = include))
+        refreshNetWorth()
     }
 
     fun setRegisterFilter(text: String) {
@@ -328,11 +453,44 @@ class ShellViewModel(
             is ShellRoute.EditTransaction -> route.accountId
             is ShellRoute.SplitTransaction -> route.accountId
             is ShellRoute.TransferMoney -> route.accountId
+            is ShellRoute.Reconcile -> route.accountId
             else ->
                 _state.value.register
                     ?.account
                     ?.id
         }
+
+    private fun reconcileAccountId(): String? =
+        when (val route = _state.value.route) {
+            is ShellRoute.Reconcile -> route.accountId
+            else -> openAccountId()
+        }
+
+    private fun reloadReconcile(accountId: String) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            val page = withContext(Dispatchers.IO) { library.readReconcile(budgetId, accountId) }
+            _state.update { it.copy(reconcile = page, reconcileError = null) }
+        }
+    }
+
+    private fun refreshReview() {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val month = _state.value.reviewMonth
+        viewModelScope.launch {
+            val review = withContext(Dispatchers.IO) { library.readMonthReview(budgetId, month) }
+            _state.update { it.copy(monthReview = review) }
+        }
+    }
+
+    private fun refreshNetWorth() {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val include = _state.value.settings.netWorthIncludeOffBudget
+        viewModelScope.launch {
+            val page = withContext(Dispatchers.IO) { library.readNetWorth(budgetId, include) }
+            _state.update { it.copy(netWorth = page) }
+        }
+    }
 
     private fun launchWrite(block: suspend (String) -> Unit) {
         if (writing) return
@@ -387,7 +545,16 @@ class ShellViewModel(
             withContext(Dispatchers.IO) {
                 if (budgetId != null && accountId != null) library.readRegister(budgetId, accountId) else null
             }
-        return Loaded(settings, budgets, shell, register)
+        val reviewMonth = _state.value.reviewMonth
+        val monthReview =
+            withContext(Dispatchers.IO) {
+                budgetId?.let { library.readMonthReview(it, reviewMonth) }
+            }
+        val netWorth =
+            withContext(Dispatchers.IO) {
+                budgetId?.let { library.readNetWorth(it, settings.netWorthIncludeOffBudget) }
+            }
+        return Loaded(settings, budgets, shell, register, monthReview, netWorth)
     }
 
     private fun apply(
@@ -410,6 +577,12 @@ class ShellViewModel(
                 } else {
                     current.route
                 }
+            val reviewMonth =
+                if (current.monthReview == null && loaded.shell != null) {
+                    loaded.shell.month
+                } else {
+                    current.reviewMonth
+                }
             current.copy(
                 loading = false,
                 settings = loaded.settings,
@@ -417,6 +590,9 @@ class ShellViewModel(
                 shell = shell,
                 register = register,
                 route = route,
+                reviewMonth = reviewMonth,
+                monthReview = loaded.monthReview,
+                netWorth = loaded.netWorth,
             )
         }
     }
@@ -426,13 +602,18 @@ class ShellViewModel(
             this is ShellRoute.EditTransaction ||
             this is ShellRoute.SplitTransaction ||
             this is ShellRoute.TransferMoney ||
+            this is ShellRoute.Reconcile ||
             this is ShellRoute.PickCategory
+
+    private fun ShellRoute.isHomeFlow(): Boolean = this is ShellRoute.ReviewCategory
 
     private data class Loaded(
         val settings: PhoneSettings,
         val budgets: List<BudgetSummary>,
         val shell: MonthShell?,
         val register: RegisterPage?,
+        val monthReview: MonthReviewPage?,
+        val netWorth: NetWorthPage?,
     )
 
     companion object {

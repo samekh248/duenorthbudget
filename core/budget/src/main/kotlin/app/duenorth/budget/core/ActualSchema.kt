@@ -22,6 +22,7 @@ object ActualSchema {
                 closed INTEGER NOT NULL DEFAULT 0,
                 type TEXT NOT NULL DEFAULT 'checking',
                 sort_order REAL NOT NULL DEFAULT 0,
+                last_reconciled TEXT,
                 tombstone INTEGER NOT NULL DEFAULT 0
             )
             """.trimIndent(),
@@ -115,7 +116,12 @@ object ActualSchema {
     /** Adds columns introduced after the first phone files. Safe to call on every open. */
     fun ensure(session: SqlSession) {
         val names = session.query("PRAGMA table_info(accounts)").mapNotNull { it.str("name") }.toSet()
-        if (names.isEmpty() || "type" in names) return
-        session.exec("ALTER TABLE accounts ADD COLUMN type TEXT NOT NULL DEFAULT 'checking'")
+        if (names.isEmpty()) return
+        if ("type" !in names) {
+            session.exec("ALTER TABLE accounts ADD COLUMN type TEXT NOT NULL DEFAULT 'checking'")
+        }
+        if ("last_reconciled" !in names) {
+            session.exec("ALTER TABLE accounts ADD COLUMN last_reconciled TEXT")
+        }
     }
 }
