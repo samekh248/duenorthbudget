@@ -44,4 +44,26 @@ class SqlRow(
     }
 
     fun bool(column: String): Boolean = long(column) != 0L
+
+    fun optionalBool(column: String): Boolean? {
+        val value = values[column] ?: return null
+        return when (value) {
+            is Boolean -> value
+            is Number -> value.toLong() != 0L
+            else -> {
+                val text = value.toString()
+                text.isNotEmpty() && text != "0"
+            }
+        }
+    }
+
+    fun double(column: String): Double {
+        val value = values[column] ?: return 0.0
+        return when (value) {
+            is Double -> value
+            is Float -> value.toDouble()
+            is Number -> value.toDouble()
+            else -> value.toString().toDoubleOrNull() ?: 0.0
+        }
+    }
 }

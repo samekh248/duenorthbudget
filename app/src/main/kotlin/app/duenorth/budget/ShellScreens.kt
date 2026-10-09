@@ -59,6 +59,8 @@ fun HomePanorama(
     loading: Boolean,
     initialSection: Int = 0,
     onGesture: (Boolean) -> Unit,
+    onAccount: (String) -> Unit = {},
+    onInbox: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onAssign: (() -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
@@ -86,7 +88,12 @@ fun HomePanorama(
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
-                        AccountsSection(shell.accounts, shell, onListGesture = { listGesture = it })
+                        AccountsSection(
+                            shell.accounts,
+                            shell,
+                            onListGesture = { listGesture = it },
+                            onAccount = onAccount,
+                        )
                     }
                 },
                 PanoramaSection("inbox") {
@@ -96,6 +103,7 @@ fun HomePanorama(
                         InboxSection(
                             shell,
                             onListGesture = { listGesture = it },
+                            onInbox = onInbox,
                             onAdd = onAddTransaction,
                         )
                     }
@@ -181,6 +189,7 @@ fun AccountsSection(
     accounts: List<AccountRow>,
     shell: MonthShell,
     onListGesture: (Boolean) -> Unit,
+    onAccount: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (accounts.isEmpty()) {
@@ -202,11 +211,11 @@ fun AccountsSection(
     LazyColumn(modifier.fillMaxSize(), state = list) {
         if (onBudget.isNotEmpty()) {
             item { SectionLabel(ShellCopy.ON_BUDGET) }
-            items(onBudget, key = { it.id }) { AccountLine(it, shell, arrivalModifier(it.id, arrivals)) }
+            items(onBudget, key = { it.id }) { AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals)) }
         }
         if (offBudget.isNotEmpty()) {
             item { SectionLabel(ShellCopy.OFF_BUDGET) }
-            items(offBudget, key = { it.id }) { AccountLine(it, shell, arrivalModifier(it.id, arrivals)) }
+            items(offBudget, key = { it.id }) { AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals)) }
         }
     }
 }
@@ -215,13 +224,16 @@ fun AccountsSection(
 private fun AccountLine(
     account: AccountRow,
     shell: MonthShell,
+    onAccount: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp),
+            .metroPress { onAccount(account.id) }
+            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp)
+            .testTag("account-${account.id}"),
         verticalAlignment = Alignment.Top,
     ) {
         MetroText(
@@ -242,6 +254,7 @@ private fun AccountLine(
 fun InboxSection(
     shell: MonthShell,
     onListGesture: (Boolean) -> Unit,
+    onInbox: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onAdd: (() -> Unit)? = null,
 ) {
@@ -261,7 +274,7 @@ fun InboxSection(
     Column(modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f), state = list) {
             items(shell.inbox, key = { it.id }) { row ->
-                InboxLine(row, shell, arrivalModifier(row.id, arrivals))
+                InboxLine(row, shell, onInbox, arrivalModifier(row.id, arrivals))
             }
         }
         if (onAdd != null) {
@@ -274,12 +287,14 @@ fun InboxSection(
 private fun InboxLine(
     row: InboxRow,
     shell: MonthShell,
+    onInbox: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress { onInbox(row.id) }
             .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp),
         verticalAlignment = Alignment.Top,
     ) {

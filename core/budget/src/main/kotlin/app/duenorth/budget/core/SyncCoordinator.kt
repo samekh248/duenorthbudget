@@ -58,11 +58,6 @@ data class BudgetConflict(
     val remoteText: String,
 )
 
-data class CategoryChoice(
-    val id: String,
-    val name: String,
-)
-
 interface SecretStore {
     fun get(key: String): String?
 
@@ -421,11 +416,20 @@ class SyncCoordinator(
             session
                 .query(
                     """
-                    SELECT id, name FROM categories
-                    WHERE IFNULL(tombstone, 0) = 0 AND IFNULL(is_income, 0) = 0
-                    ORDER BY sort_order, id
+                    SELECT c.id AS id, c.name AS name, COALESCE(g.name, '') AS group_name
+                    FROM categories c
+                    LEFT JOIN category_groups g ON g.id = c.cat_group
+                    WHERE IFNULL(c.tombstone, 0) = 0 AND IFNULL(c.is_income, 0) = 0
+                    ORDER BY g.sort_order, c.sort_order, c.id
                     """.trimIndent(),
-                ).map { CategoryChoice(it.str("id").orEmpty(), it.str("name").orEmpty()) }
+                ).map {
+                    CategoryChoice(
+                        id = it.str("id").orEmpty(),
+                        name = it.str("name").orEmpty(),
+                        groupName = it.str("group_name").orEmpty(),
+                        income = false,
+                    )
+                }
         } ?: emptyList()
 
     private fun upload(

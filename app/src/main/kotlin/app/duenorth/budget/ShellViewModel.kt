@@ -7,16 +7,24 @@ import app.duenorth.budget.core.BudgetConflict
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.CategoryChoice
+import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.EditResult
+import app.duenorth.budget.core.ForcedWrite
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.OpenResult
 import app.duenorth.budget.core.PhoneSettings
 import app.duenorth.budget.core.RefreshGate
+import app.duenorth.budget.core.RegisterEntry
+import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RemoteFile
+import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.SyncCoordinator
+import app.duenorth.budget.core.TransactionDraft
+import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.core.UnlockResult
 import app.duenorth.budget.core.UploadResult
+import app.duenorth.budget.core.WriteResult
 import app.duenorth.budget.core.syncFraction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +56,28 @@ sealed interface ShellRoute {
     data object Conflicts : ShellRoute
 
     data object ConfirmReplace : ShellRoute
+
+    data class Register(
+        val accountId: String,
+    ) : ShellRoute
+
+    data class EditTransaction(
+        val accountId: String,
+        val transactionId: String?,
+    ) : ShellRoute
+
+    data class SplitTransaction(
+        val accountId: String,
+        val transactionId: String,
+    ) : ShellRoute
+
+    data class TransferMoney(
+        val accountId: String,
+    ) : ShellRoute
+
+    data class PickCategory(
+        val transactionId: String,
+    ) : ShellRoute
 }
 
 data class ShellUiState(
@@ -56,8 +86,14 @@ data class ShellUiState(
     val settings: PhoneSettings = PhoneSettings(),
     val budgets: List<BudgetSummary> = emptyList(),
     val shell: MonthShell? = null,
+    val register: RegisterPage? = null,
+    val registerFilter: String = "",
+    val categoryTarget: CategoryTarget? = null,
     val createError: String? = null,
+    val writeError: String? = null,
+    val confirm: WriteResult.Confirm? = null,
     val switchTarget: BudgetSummary? = null,
+    val today: String = RegisterEntry.todayIso(),
     val serverError: String? = null,
     val remoteFiles: List<RemoteFile> = emptyList(),
     val syncing: Boolean = false,
@@ -78,9 +114,12 @@ class ShellViewModel(
     private val library: BudgetLibrary,
     private val sync: SyncCoordinator,
 ) : ViewModel() {
-    private val gate = RefreshGate<MonthShell>()
+    private val shellGate = RefreshGate<MonthShell>()
+    private val registerGate = RefreshGate<RegisterPage>()
+    private val history = ArrayDeque<ShellRoute>()
     private val _state = MutableStateFlow(ShellUiState())
     val state: StateFlow<ShellUiState> = _state.asStateFlow()
+    private var writing = false
 
     init {
         viewModelScope.launch {
@@ -98,24 +137,37 @@ class ShellViewModel(
 
     fun setGesture(active: Boolean) {
         if (active) {
-            gate.beginGesture()
+            shellGate.beginGesture()
             return
         }
-        if (!gate.gestureActive) return
-        gate.endGesture()
-        _state.update { it.copy(shell = gate.visible ?: it.shell) }
+        if (!shellGate.gestureActive) return
+        shellGate.endGesture()
+        _state.update { it.copy(shell = shellGate.visible ?: it.shell) }
+    }
+
+    fun setRegisterGesture(active: Boolean) {
+        if (active) {
+            registerGate.beginGesture()
+            return
+        }
+        if (!registerGate.gestureActive) return
+        registerGate.endGesture()
+        _state.update { it.copy(register = registerGate.visible ?: it.register) }
     }
 
     fun showBudgets() {
-        _state.update { it.copy(route = ShellRoute.Budgets) }
+        history.clear()
+        _state.update { it.copy(route = ShellRoute.Budgets, confirm = null, writeError = null) }
     }
 
     fun showCreate() {
-        _state.update { it.copy(route = ShellRoute.Create, createError = null) }
+        history.clear()
+        _state.update { it.copy(route = ShellRoute.Create, createError = null, confirm = null) }
     }
 
     fun showAppearance() {
-        _state.update { it.copy(route = ShellRoute.Appearance) }
+        history.clear()
+        _state.update { it.copy(route = ShellRoute.Appearance, confirm = null) }
     }
 
     fun showServer() {
@@ -161,15 +213,26 @@ class ShellViewModel(
     }
 
     fun back(): Boolean {
-        val route = _state.value.route
-        if (route == ShellRoute.Home) return false
-        if (route == ShellRoute.BudgetPassword && _state.value.locked) return false
-        if (route == ShellRoute.Create && _state.value.shell == null) return false
+        val current = _state.value
+        if (current.confirm != null) {
+            _state.update { it.copy(confirm = null) }
+            return true
+        }
+        if (current.route == ShellRoute.Home) return false
+        if (current.route == ShellRoute.BudgetPassword && current.locked) return false
+        if (current.route == ShellRoute.Create && current.shell == null) return false
+        if (current.route.isRegisterFlow()) {
+            val previous = if (history.isEmpty()) ShellRoute.Home else history.removeLast()
+            _state.update { it.copy(route = previous, writeError = null) }
+            return true
+        }
+        history.clear()
         _state.update {
             it.copy(
                 route = ShellRoute.Home,
                 createError = null,
                 switchTarget = null,
+                writeError = null,
                 passwordError = null,
                 editError = null,
                 serverError = null,
@@ -182,10 +245,127 @@ class ShellViewModel(
         val id = _state.value.settings.openBudgetId ?: return
         sync.lock(id)
         if (sync.needsPassword(id)) {
+            history.clear()
             _state.update {
-                it.copy(locked = true, shell = null, route = ShellRoute.BudgetPassword, passwordError = null)
+                it.copy(locked = true, shell = null, register = null, route = ShellRoute.BudgetPassword, passwordError = null)
             }
         }
+    }
+
+    fun openAccount(accountId: String) {
+        push(ShellRoute.Register(accountId))
+        _state.update { it.copy(registerFilter = "") }
+        viewModelScope.launch { apply(load(accountId), accountId) }
+    }
+
+    fun openInbox(transactionId: String) {
+        push(ShellRoute.PickCategory(transactionId))
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            val target = withContext(Dispatchers.IO) { library.readCategoryTarget(budgetId, transactionId) }
+            _state.update { it.copy(categoryTarget = target, loading = false) }
+        }
+    }
+
+    fun openNewTransaction() {
+        val accountId = openAccountId() ?: return
+        push(ShellRoute.EditTransaction(accountId, null))
+    }
+
+    fun openEdit(transactionId: String) {
+        val accountId = openAccountId() ?: return
+        push(ShellRoute.EditTransaction(accountId, transactionId))
+    }
+
+    fun openSplit(transactionId: String) {
+        val accountId = openAccountId() ?: return
+        push(ShellRoute.SplitTransaction(accountId, transactionId))
+    }
+
+    fun openTransfer() {
+        val accountId = openAccountId() ?: return
+        push(ShellRoute.TransferMoney(accountId))
+    }
+
+    fun setRegisterFilter(text: String) {
+        _state.update { it.copy(registerFilter = text) }
+    }
+
+    fun submitTransaction(draft: TransactionDraft) {
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.saveTransaction(id, draft) }
+            publish(result, draft.accountId, stayOnRegister = true)
+        }
+    }
+
+    fun submitTransfer(draft: TransferDraft) {
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.transfer(id, draft) }
+            publish(result, draft.fromAccountId, stayOnRegister = true)
+        }
+    }
+
+    fun submitSplit(
+        transactionId: String,
+        parts: List<SplitPart>,
+    ) {
+        val accountId = openAccountId() ?: return
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.splitTransaction(id, transactionId, parts, false) }
+            publish(result, accountId, stayOnRegister = true)
+        }
+    }
+
+    fun submitCategory(categoryId: String?) {
+        val target = _state.value.categoryTarget ?: return
+        launchWrite { id ->
+            val result =
+                withContext(Dispatchers.IO) {
+                    library.setTransactionCategory(id, target.transactionId, categoryId, false)
+                }
+            publish(result, target.accountId, stayOnRegister = false)
+        }
+    }
+
+    fun unsplit(transactionId: String) {
+        val accountId = openAccountId() ?: return
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.unsplitTransaction(id, transactionId, false) }
+            publish(result, accountId, stayOnRegister = true)
+        }
+    }
+
+    fun deleteTransaction(transactionId: String) {
+        val accountId = openAccountId() ?: return
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.deleteTransaction(id, transactionId, false) }
+            publish(result, accountId, stayOnRegister = true)
+        }
+    }
+
+    fun confirmWrite() {
+        val pending = _state.value.confirm ?: return
+        val accountId = openAccountId() ?: _state.value.categoryTarget?.accountId ?: return
+        val stay = _state.value.route !is ShellRoute.PickCategory
+        launchWrite { id ->
+            val result =
+                withContext(Dispatchers.IO) {
+                    when (val retry = pending.retry) {
+                        is ForcedWrite.Save -> library.saveTransaction(id, retry.draft)
+                        is ForcedWrite.Delete -> library.deleteTransaction(id, retry.transactionId, true)
+                        is ForcedWrite.Category ->
+                            library.setTransactionCategory(id, retry.transactionId, retry.categoryId, true)
+                        is ForcedWrite.Split -> library.splitTransaction(id, retry.transactionId, retry.parts, true)
+                        is ForcedWrite.Unsplit -> library.unsplitTransaction(id, retry.transactionId, true)
+                        is ForcedWrite.Transfer -> library.transfer(id, retry.draft)
+                    }
+                }
+            publish(result, accountId, stay)
+        }
+    }
+
+    fun dismissConfirm() {
+        _state.update { it.copy(confirm = null) }
     }
 
     fun create(
@@ -457,31 +637,119 @@ class ShellViewModel(
     }
 
     private suspend fun reload() {
-        val loaded =
-            withContext(Dispatchers.IO) {
-                val settings = library.settings()
-                val budgets = library.list()
-                val id = settings.openBudgetId
-                val locked = id != null && sync.needsPassword(id)
-                val shell = if (id == null || locked) null else library.readShell(id)
-                val status = if (id == null) "" else sync.status(id)
-                val conflicts = if (id == null || locked) emptyList() else sync.conflicts(id)
-                Loaded(settings, budgets, shell, locked, status, conflicts)
+        val accountId = (_state.value.route as? ShellRoute.Register)?.accountId
+        apply(load(accountId), accountId)
+    }
+
+    private fun push(route: ShellRoute) {
+        _state.update {
+            history.addLast(it.route)
+            it.copy(route = route, writeError = null, confirm = null)
+        }
+    }
+
+    private fun openAccountId(): String? =
+        when (val route = _state.value.route) {
+            is ShellRoute.Register -> route.accountId
+            is ShellRoute.EditTransaction -> route.accountId
+            is ShellRoute.SplitTransaction -> route.accountId
+            is ShellRoute.TransferMoney -> route.accountId
+            else ->
+                _state.value.register
+                    ?.account
+                    ?.id
+        }
+
+    private fun launchWrite(block: suspend (String) -> Unit) {
+        if (writing) return
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        writing = true
+        viewModelScope.launch {
+            try {
+                block(budgetId)
+            } finally {
+                writing = false
             }
-        if (loaded.shell != null) gate.offer(loaded.shell)
+        }
+    }
+
+    private suspend fun publish(
+        result: WriteResult,
+        accountId: String,
+        stayOnRegister: Boolean,
+    ) {
+        when (result) {
+            is WriteResult.Saved -> {
+                if (stayOnRegister) {
+                    history.clear()
+                    history.addLast(ShellRoute.Home)
+                    _state.update {
+                        it.copy(
+                            route = ShellRoute.Register(accountId),
+                            writeError = null,
+                            confirm = null,
+                            registerFilter = "",
+                        )
+                    }
+                } else {
+                    history.clear()
+                    _state.update {
+                        it.copy(route = ShellRoute.Home, writeError = null, confirm = null, categoryTarget = null)
+                    }
+                }
+                apply(load(accountId), accountId)
+            }
+            is WriteResult.Rejected -> _state.update { it.copy(writeError = result.reason, confirm = null) }
+            is WriteResult.Confirm -> _state.update { it.copy(confirm = result, writeError = null) }
+        }
+    }
+
+    private suspend fun load(accountId: String?): Loaded =
+        withContext(Dispatchers.IO) {
+            val settings = library.settings()
+            val budgets = library.list()
+            val budgetId = settings.openBudgetId
+            val locked = budgetId != null && sync.needsPassword(budgetId)
+            val shell = if (budgetId == null || locked) null else library.readShell(budgetId)
+            val register =
+                if (budgetId != null && accountId != null && !locked) {
+                    library.readRegister(budgetId, accountId)
+                } else {
+                    null
+                }
+            val status = if (budgetId == null) "" else sync.status(budgetId)
+            val conflicts = if (budgetId == null || locked) emptyList() else sync.conflicts(budgetId)
+            Loaded(settings, budgets, shell, register, locked, status, conflicts)
+        }
+
+    private fun apply(
+        loaded: Loaded,
+        accountId: String?,
+    ) {
+        if (loaded.shell != null) shellGate.offer(loaded.shell)
+        if (loaded.register != null) registerGate.offer(loaded.register)
         _state.update { current ->
-            val shell = if (gate.gestureActive) current.shell else loaded.shell
+            val shell = if (loaded.locked || shellGate.gestureActive) current.shell else loaded.shell
+            val visibleShell = if (loaded.locked) null else shell
+            val register =
+                when {
+                    loaded.locked -> null
+                    accountId == null -> current.register
+                    registerGate.gestureActive -> current.register
+                    else -> loaded.register
+                }
             val route =
                 when {
                     loaded.locked -> ShellRoute.BudgetPassword
-                    shell == null && current.route == ShellRoute.Home -> ShellRoute.Create
+                    visibleShell == null && current.route == ShellRoute.Home -> ShellRoute.Create
                     else -> current.route
                 }
             current.copy(
                 loading = false,
                 settings = loaded.settings,
                 budgets = loaded.budgets,
-                shell = shell,
+                shell = visibleShell,
+                register = register,
                 route = route,
                 locked = loaded.locked,
                 syncStatus = loaded.status,
@@ -492,10 +760,18 @@ class ShellViewModel(
         }
     }
 
+    private fun ShellRoute.isRegisterFlow(): Boolean =
+        this is ShellRoute.Register ||
+            this is ShellRoute.EditTransaction ||
+            this is ShellRoute.SplitTransaction ||
+            this is ShellRoute.TransferMoney ||
+            this is ShellRoute.PickCategory
+
     private data class Loaded(
         val settings: PhoneSettings,
         val budgets: List<BudgetSummary>,
         val shell: MonthShell?,
+        val register: RegisterPage?,
         val locked: Boolean,
         val status: String,
         val conflicts: List<BudgetConflict>,
