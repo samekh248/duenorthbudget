@@ -46,6 +46,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -96,6 +98,7 @@ fun MetroField(
     onValueChange: (String) -> Unit,
     hint: String,
     modifier: Modifier = Modifier,
+    conceal: Boolean = false,
 ) {
     val colors = Metro.colors
     val type = Metro.typography
@@ -114,6 +117,7 @@ fun MetroField(
             onValueChange = onValueChange,
             textStyle = type.body.copy(color = colors.foreground),
             cursorBrush = SolidColor(Metro.accent.fill),
+            visualTransformation = if (conceal) PasswordVisualTransformation() else VisualTransformation.None,
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -138,7 +142,7 @@ fun MetroButton(
     }
 }
 
-enum class AppGlyph { Budgets, Appearance, More }
+enum class AppGlyph { Budgets, Appearance, Sync, More }
 
 @Immutable
 data class AppBarButton(
@@ -174,7 +178,8 @@ fun MetroAppBar(
                                 .size(MetroDimens.TouchTarget)
                                 .border(2.dp, colors.foreground, CircleShape)
                                 .clip(CircleShape)
-                                .metroPress(button.onClick),
+                                .metroPress(button.onClick)
+                                .testTag("app-bar-${button.label}"),
                             contentAlignment = Alignment.Center,
                         ) {
                             AppGlyphIcon(button.glyph)
@@ -230,6 +235,14 @@ private fun AppGlyphIcon(glyph: AppGlyph) {
                     Offset(size.width / 2, size.height - 4.dp.toPx()),
                     strokeWidth = 1.6.dp.toPx(),
                 )
+            }
+            AppGlyph.Sync -> {
+                drawLine(color, Offset(4.dp.toPx(), 7.dp.toPx()), Offset(16.dp.toPx(), 7.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(13.dp.toPx(), 4.dp.toPx()), Offset(17.dp.toPx(), 7.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(13.dp.toPx(), 10.dp.toPx()), Offset(17.dp.toPx(), 7.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(18.dp.toPx(), 15.dp.toPx()), Offset(6.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(9.dp.toPx(), 12.dp.toPx()), Offset(5.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(9.dp.toPx(), 18.dp.toPx()), Offset(5.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.6.dp.toPx())
             }
             AppGlyph.More -> Unit
         }

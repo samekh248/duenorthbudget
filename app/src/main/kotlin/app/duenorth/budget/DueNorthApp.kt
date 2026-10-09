@@ -12,13 +12,19 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.HttpActualTransport
+import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.MotionPolicy
 import app.duenorth.budget.design.components.AppBarButton
@@ -45,15 +51,25 @@ class DueNorthApplication : Application() {
             )
         }
         library = BudgetLibrary(File(filesDir, "budgets"), AndroidSessionOpener(), BudgetClock.System)
+        sync =
+            SyncCoordinator(
+                library,
+                HttpActualTransport(),
+                AndroidSecretStore(this),
+                BudgetClock.System,
+            )
     }
+
+    lateinit var sync: SyncCoordinator
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val library = (application as DueNorthApplication).library
+        val application = application as DueNorthApplication
         setContent {
-            val model: ShellViewModel = viewModel(factory = ShellViewModel.factory(library))
+            val model: ShellViewModel =
+                viewModel(factory = ShellViewModel.factory(application.library, application.sync))
             DueNorthApp(model)
         }
     }
@@ -75,9 +91,22 @@ fun DueNorthApp(model: ShellViewModel) {
             Settings.Global.ANIMATOR_DURATION_SCALE,
             1f,
         )
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) model.onScreenLocked()
+            }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     val canBack =
         state.confirm != null ||
-            (state.route != ShellRoute.Home && !(state.route == ShellRoute.Create && state.shell == null))
+            (
+                state.route != ShellRoute.Home &&
+                    !(state.route == ShellRoute.Create && state.shell == null) &&
+                    !(state.route == ShellRoute.BudgetPassword && state.locked)
+            )
     BackHandler(enabled = canBack) { model.back() }
     MetroTheme(
         darkTheme = dark,
@@ -92,10 +121,11 @@ fun DueNorthApp(model: ShellViewModel) {
         val buttons =
             listOf(
                 AppBarButton(AppGlyph.Budgets, "budgets", model::showBudgets),
+                AppBarButton(AppGlyph.Sync, "sync", model::showServer),
                 AppBarButton(AppGlyph.More, "payees", model::showPayees),
                 AppBarButton(AppGlyph.Appearance, "appearance", model::showAppearance),
             )
-        ShellChrome(buttons) { modifier ->
+        ShellChrome(buttons, syncing = state.syncing, progress = state.syncProgress) { modifier ->
             Box(modifier) {
                 val fill = Modifier.fillMaxSize()
                 when (val route = state.route) {
@@ -110,6 +140,8 @@ fun DueNorthApp(model: ShellViewModel) {
                             onPostSchedule = model::postSchedule,
                             onSkipSchedule = model::skipSchedule,
                             modifier = fill,
+                            onAssign = if (state.shell == null) null else model::showAssign,
+                            onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
                         )
                     ShellRoute.Budgets ->
                         BudgetsScreen(
@@ -149,6 +181,57 @@ fun DueNorthApp(model: ShellViewModel) {
                             onRename = model::renamePayee,
                             onConfirmMerge = model::confirmPayeeMerge,
                             onCancelMerge = model::cancelPayeeMerge,
+                            modifier = fill,
+                        )
+                    ShellRoute.Server ->
+                        ServerScreen(
+                            address = state.settings.serverAddress.orEmpty(),
+                            signedIn = state.signedIn,
+                            files = state.remoteFiles,
+                            status = state.syncStatus,
+                            error = state.serverError,
+                            conflictCount = state.conflicts.size,
+                            onConflicts = model::showConflicts,
+                            onConnect = model::connect,
+                            onOpen = model::requestRemote,
+                            onReplace = model::requestReplace,
+                            onUpload = model::uploadNew,
+                            onSync = model::syncNow,
+                            onSignOut = model::signOut,
+                            modifier = fill,
+                        )
+                    ShellRoute.BudgetPassword ->
+                        BudgetPasswordScreen(
+                            error = state.passwordError,
+                            askEachTime = state.askEachTime,
+                            onAskEachTime = model::setAskEachTime,
+                            onSubmit = { password -> model.submitPassword(password, state.askEachTime) },
+                            modifier = fill,
+                        )
+                    ShellRoute.Assign ->
+                        AssignScreen(
+                            categories = state.categories,
+                            error = state.editError,
+                            onAssign = model::assign,
+                            modifier = fill,
+                        )
+                    ShellRoute.AddTransaction ->
+                        AddTransactionScreen(
+                            error = state.editError,
+                            onAdd = model::addTransaction,
+                            modifier = fill,
+                        )
+                    ShellRoute.Conflicts ->
+                        ConflictScreen(
+                            conflicts = state.conflicts,
+                            modifier = fill,
+                        )
+                    ShellRoute.ConfirmReplace ->
+                        ConfirmReplaceScreen(
+                            serverName = state.replaceFile?.name.orEmpty(),
+                            phoneName = openName,
+                            onReplace = model::confirmReplace,
+                            onKeep = model::cancelReplace,
                             modifier = fill,
                         )
                     is ShellRoute.Register -> {

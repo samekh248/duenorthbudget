@@ -1,5 +1,7 @@
 package app.duenorth.budget
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
@@ -63,6 +66,8 @@ fun HomePanorama(
     onPostSchedule: (String) -> Unit = {},
     onSkipSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    onAssign: (() -> Unit)? = null,
+    onAddTransaction: (() -> Unit)? = null,
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
@@ -76,7 +81,11 @@ fun HomePanorama(
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
-                        BudgetSection(shell, onListGesture = { listGesture = it })
+                        BudgetSection(
+                            shell,
+                            onListGesture = { listGesture = it },
+                            onAssign = onAssign,
+                        )
                     }
                 },
                 PanoramaSection("accounts") {
@@ -108,7 +117,12 @@ fun HomePanorama(
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
-                        InboxSection(shell, onListGesture = { listGesture = it }, onInbox = onInbox)
+                        InboxSection(
+                            shell,
+                            onListGesture = { listGesture = it },
+                            onInbox = onInbox,
+                            onAdd = onAddTransaction,
+                        )
                     }
                 },
             ),
@@ -123,8 +137,11 @@ fun BudgetSection(
     shell: MonthShell,
     onListGesture: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onAssign: (() -> Unit)? = null,
 ) {
     val list = rememberLazyListState()
+    val arrivals = remember { RowArrivals() }
+    arrivals.prime(shell.groups.map { it.id })
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
@@ -142,9 +159,12 @@ fun BudgetSection(
         } else {
             LazyColumn(Modifier.weight(1f), state = list) {
                 items(shell.groups, key = { it.id }) { group ->
-                    GroupLine(group, shell)
+                    GroupLine(group, shell, arrivalModifier(group.id, arrivals))
                 }
             }
+        }
+        if (onAssign != null) {
+            MetroButton("assign", Modifier.padding(bottom = 12.dp), onClick = onAssign)
         }
     }
 }
@@ -153,9 +173,10 @@ fun BudgetSection(
 private fun GroupLine(
     group: GroupRow,
     shell: MonthShell,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .padding(vertical = 8.dp),
@@ -200,16 +221,18 @@ fun AccountsSection(
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
+    val arrivals = remember { RowArrivals() }
+    arrivals.prime(accounts.map { it.id })
     val onBudget = accounts.filter { !it.offBudget }
     val offBudget = accounts.filter { it.offBudget }
     LazyColumn(modifier.fillMaxSize(), state = list) {
         if (onBudget.isNotEmpty()) {
             item { SectionLabel(ShellCopy.ON_BUDGET) }
-            items(onBudget, key = { it.id }) { AccountLine(it, shell, onAccount) }
+            items(onBudget, key = { it.id }) { AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals)) }
         }
         if (offBudget.isNotEmpty()) {
             item { SectionLabel(ShellCopy.OFF_BUDGET) }
-            items(offBudget, key = { it.id }) { AccountLine(it, shell, onAccount) }
+            items(offBudget, key = { it.id }) { AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals)) }
         }
     }
 }
@@ -219,9 +242,10 @@ private fun AccountLine(
     account: AccountRow,
     shell: MonthShell,
     onAccount: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onAccount(account.id) }
@@ -249,21 +273,30 @@ fun InboxSection(
     onListGesture: (Boolean) -> Unit,
     onInbox: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    onAdd: (() -> Unit)? = null,
 ) {
     if (shell.inbox.isEmpty()) {
-        MetroText(
-            ShellCopy.NOTHING_TO_CATEGORIZE,
-            Metro.typography.body,
-            modifier.padding(MetroDimens.Gutter),
-        )
+        Column(modifier.padding(MetroDimens.Gutter), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            MetroText(ShellCopy.NOTHING_TO_CATEGORIZE, Metro.typography.body)
+            if (onAdd != null) MetroButton("add", onClick = onAdd)
+        }
         return
     }
     val list = rememberLazyListState()
+    val arrivals = remember { RowArrivals() }
+    arrivals.prime(shell.inbox.map { it.id })
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
-    LazyColumn(modifier.fillMaxSize(), state = list) {
-        items(shell.inbox, key = { it.id }) { row -> InboxLine(row, shell, onInbox) }
+    Column(modifier.fillMaxSize()) {
+        LazyColumn(Modifier.weight(1f), state = list) {
+            items(shell.inbox, key = { it.id }) { row ->
+                InboxLine(row, shell, onInbox, arrivalModifier(row.id, arrivals))
+            }
+        }
+        if (onAdd != null) {
+            MetroButton("add", Modifier.padding(MetroDimens.Gutter), onClick = onAdd)
+        }
     }
 }
 
@@ -272,9 +305,10 @@ private fun InboxLine(
     row: InboxRow,
     shell: MonthShell,
     onInbox: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onInbox(row.id) }
@@ -485,11 +519,49 @@ private fun AccentGrid(
 @Composable
 fun ShellChrome(
     buttons: List<AppBarButton>,
+    syncing: Boolean = false,
+    progress: Float? = null,
     content: @Composable (Modifier) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(Metro.colors.background)) {
+        if (syncing) SyncProgressBar(progress)
         content(Modifier.weight(1f))
         MetroAppBar(buttons, expanded, { expanded = it })
     }
+}
+
+private class RowArrivals {
+    private var primed = false
+    private val seen = HashSet<String>()
+
+    fun prime(ids: List<String>) {
+        if (primed) return
+        seen.addAll(ids)
+        primed = true
+    }
+
+    fun isNew(id: String): Boolean = primed && id !in seen
+
+    fun saw(id: String) {
+        seen.add(id)
+    }
+}
+
+@Composable
+private fun arrivalModifier(
+    id: String,
+    arrivals: RowArrivals,
+): Modifier {
+    val animations = Metro.animations
+    val alpha = remember(id) { Animatable(if (arrivals.isNew(id) && animations) 0f else 1f) }
+    LaunchedEffect(id) {
+        if (alpha.value < 1f && animations) {
+            alpha.animateTo(1f, tween(160))
+        } else {
+            alpha.snapTo(1f)
+        }
+        arrivals.saw(id)
+    }
+    return Modifier.graphicsLayer { this.alpha = alpha.value }
 }
