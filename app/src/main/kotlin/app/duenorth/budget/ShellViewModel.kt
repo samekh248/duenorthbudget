@@ -18,12 +18,16 @@ import app.duenorth.budget.core.RefreshGate
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RemoteFile
+import app.duenorth.budget.core.PayeeRow
+import app.duenorth.budget.core.PayeeWriteResult
+import app.duenorth.budget.core.ScheduleWriteResult
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.core.UnlockResult
 import app.duenorth.budget.core.UploadResult
+import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.WriteResult
 import app.duenorth.budget.core.syncFraction
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +82,8 @@ sealed interface ShellRoute {
     data class PickCategory(
         val transactionId: String,
     ) : ShellRoute
+
+    data object Payees : ShellRoute
 }
 
 data class ShellUiState(
@@ -94,6 +100,10 @@ data class ShellUiState(
     val confirm: WriteResult.Confirm? = null,
     val switchTarget: BudgetSummary? = null,
     val today: String = RegisterEntry.todayIso(),
+    val upcoming: List<UpcomingScheduleRow> = emptyList(),
+    val payees: List<PayeeRow> = emptyList(),
+    val payeeMergeTarget: String? = null,
+    val scheduleDuplicateId: String? = null,
     val serverError: String? = null,
     val remoteFiles: List<RemoteFile> = emptyList(),
     val syncing: Boolean = false,
@@ -168,6 +178,91 @@ class ShellViewModel(
     fun showAppearance() {
         history.clear()
         _state.update { it.copy(route = ShellRoute.Appearance, confirm = null) }
+    }
+
+    fun showPayees() {
+        history.clear()
+        _state.update { it.copy(route = ShellRoute.Payees, writeError = null, payeeMergeTarget = null) }
+        viewModelScope.launch {
+            val budgetId = _state.value.settings.openBudgetId ?: return@launch
+            val rows = withContext(Dispatchers.IO) { library.listPayees(budgetId) }
+            _state.update { it.copy(payees = rows) }
+        }
+    }
+
+    fun postSchedule(scheduleId: String) {
+        launchSchedule(scheduleId, forceDuplicate = false)
+    }
+
+    fun confirmScheduleDuplicate() {
+        val id = _state.value.scheduleDuplicateId ?: return
+        _state.update { it.copy(scheduleDuplicateId = null) }
+        launchSchedule(id, forceDuplicate = true)
+    }
+
+    fun cancelScheduleDuplicate() {
+        _state.update { it.copy(scheduleDuplicateId = null) }
+    }
+
+    fun skipSchedule(scheduleId: String) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            when (withContext(Dispatchers.IO) { library.skipSchedule(budgetId, scheduleId) }) {
+                is ScheduleWriteResult.Skipped,
+                is ScheduleWriteResult.Posted,
+                -> refresh()
+                is ScheduleWriteResult.Rejected -> Unit
+                is ScheduleWriteResult.ConfirmDuplicate -> Unit
+            }
+        }
+    }
+
+    fun createScheduleFromTransaction(transactionId: String) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val next = _state.value.today
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                library.createScheduleFromTransaction(budgetId, transactionId, "monthly", next)
+            }
+            refresh()
+        }
+    }
+
+    fun renamePayee(
+        payeeId: String,
+        name: String,
+        confirmMerge: Boolean,
+        rememberRule: Boolean,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            when (
+                val result =
+                    withContext(Dispatchers.IO) {
+                        library.renamePayee(budgetId, payeeId, name, confirmMerge, rememberRule)
+                    }
+            ) {
+                is PayeeWriteResult.Saved -> {
+                    val rows = withContext(Dispatchers.IO) { library.listPayees(budgetId) }
+                    _state.update { it.copy(payees = rows, writeError = null, payeeMergeTarget = null) }
+                }
+                is PayeeWriteResult.Rejected ->
+                    _state.update { it.copy(writeError = result.reason) }
+                is PayeeWriteResult.ConfirmMerge ->
+                    _state.update { it.copy(payeeMergeTarget = result.targetId, writeError = null) }
+            }
+        }
+    }
+
+    fun confirmPayeeMerge(
+        payeeId: String,
+        name: String,
+    ) {
+        renamePayee(payeeId, name, confirmMerge = true, rememberRule = false)
+    }
+
+    fun cancelPayeeMerge() {
+        _state.update { it.copy(payeeMergeTarget = null) }
     }
 
     fun showServer() {
@@ -704,6 +799,26 @@ class ShellViewModel(
         }
     }
 
+    private fun launchSchedule(
+        scheduleId: String,
+        forceDuplicate: Boolean,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            when (
+                withContext(Dispatchers.IO) {
+                    library.postSchedule(budgetId, scheduleId, forceDuplicate)
+                }
+            ) {
+                is ScheduleWriteResult.Posted -> refresh()
+                is ScheduleWriteResult.ConfirmDuplicate ->
+                    _state.update { it.copy(scheduleDuplicateId = scheduleId) }
+                is ScheduleWriteResult.Rejected -> Unit
+                is ScheduleWriteResult.Skipped -> refresh()
+            }
+        }
+    }
+
     private suspend fun load(accountId: String?): Loaded =
         withContext(Dispatchers.IO) {
             val settings = library.settings()
@@ -711,6 +826,12 @@ class ShellViewModel(
             val budgetId = settings.openBudgetId
             val locked = budgetId != null && sync.needsPassword(budgetId)
             val shell = if (budgetId == null || locked) null else library.readShell(budgetId)
+            val upcoming =
+                if (budgetId == null || locked) {
+                    emptyList()
+                } else {
+                    library.readUpcomingSchedules(budgetId)
+                }
             val register =
                 if (budgetId != null && accountId != null && !locked) {
                     library.readRegister(budgetId, accountId)
@@ -719,7 +840,7 @@ class ShellViewModel(
                 }
             val status = if (budgetId == null) "" else sync.status(budgetId)
             val conflicts = if (budgetId == null || locked) emptyList() else sync.conflicts(budgetId)
-            Loaded(settings, budgets, shell, register, locked, status, conflicts)
+            Loaded(settings, budgets, shell, register, upcoming, locked, status, conflicts)
         }
 
     private fun apply(
@@ -750,6 +871,7 @@ class ShellViewModel(
                 budgets = loaded.budgets,
                 shell = visibleShell,
                 register = register,
+                upcoming = loaded.upcoming,
                 route = route,
                 locked = loaded.locked,
                 syncStatus = loaded.status,
@@ -772,6 +894,7 @@ class ShellViewModel(
         val budgets: List<BudgetSummary>,
         val shell: MonthShell?,
         val register: RegisterPage?,
+        val upcoming: List<UpcomingScheduleRow>,
         val locked: Boolean,
         val status: String,
         val conflicts: List<BudgetConflict>,

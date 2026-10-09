@@ -38,6 +38,7 @@ import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.ShellCopy
+import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.AppBarButton
@@ -56,11 +57,14 @@ import app.duenorth.budget.design.theme.MetroDimens
 @Composable
 fun HomePanorama(
     shell: MonthShell?,
+    upcoming: List<UpcomingScheduleRow>,
     loading: Boolean,
     initialSection: Int = 0,
     onGesture: (Boolean) -> Unit,
     onAccount: (String) -> Unit = {},
     onInbox: (String) -> Unit = {},
+    onPostSchedule: (String) -> Unit = {},
+    onSkipSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onAssign: (() -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
@@ -93,6 +97,19 @@ fun HomePanorama(
                             shell,
                             onListGesture = { listGesture = it },
                             onAccount = onAccount,
+                        )
+                    }
+                },
+                PanoramaSection("due") {
+                    if (shell == null) {
+                        if (loading) Placeholder()
+                    } else {
+                        DueSection(
+                            rows = upcoming,
+                            currency = shell.currency,
+                            onListGesture = { listGesture = it },
+                            onPost = onPostSchedule,
+                            onSkip = onSkipSchedule,
                         )
                     }
                 },

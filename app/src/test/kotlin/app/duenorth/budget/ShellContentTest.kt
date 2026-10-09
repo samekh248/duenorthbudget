@@ -42,7 +42,7 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    HomePanorama(shell, loading = false, onGesture = {}, modifier = Modifier)
+                    HomePanorama(shell, upcoming = emptyList(), loading = false, onGesture = {}, modifier = Modifier)
                 }
             }
         }

@@ -66,6 +66,7 @@ class ShellScreenshotTest {
                 Column(Modifier.width(390.dp).height(780.dp)) {
                     HomePanorama(
                         shell = shell,
+                        upcoming = emptyList(),
                         loading = false,
                         initialSection = section,
                         onGesture = {},
