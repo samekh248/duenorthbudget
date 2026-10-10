@@ -21,7 +21,9 @@ object ShellReader {
         session: SqlSession,
         metadata: BudgetMetadata,
         today: LocalDate,
+        viewMonth: YearMonth = YearMonth.from(today),
     ): MonthShell {
+        val detailed = loadDetailed(session, viewMonth)
         val preferences =
             session.query("SELECT id, value FROM preferences").associate { row ->
                 row.str("id").orEmpty() to row.str("value").orEmpty()
@@ -33,90 +35,9 @@ object ShellReader {
                 BudgetMode.ENVELOPE
             }
         val currency = Currencies.byCode(preferences["currency"].orEmpty()) ?: Currencies.byCode("USD")!!
-        val month = YearMonth.from(today)
-        val groups =
-            session.query(
-                """
-                SELECT id, name, is_income, sort_order
-                FROM category_groups
-                WHERE IFNULL(tombstone, 0) = 0
-                ORDER BY sort_order, id
-                """.trimIndent(),
-            )
-        val categories =
-            session.query(
-                """
-                SELECT id, is_income, cat_group
-                FROM categories
-                WHERE IFNULL(tombstone, 0) = 0
-                """.trimIndent(),
-            )
-        val spent = HashMap<Pair<Int, String>, Long>()
-        session
-            .query(
-                """
-                SELECT t.category AS category, t.date / 100 AS month, SUM(t.amount) AS spent
-                FROM transactions t
-                WHERE $alive
-                    AND t.category IS NOT NULL
-                    AND t.date IS NOT NULL
-                    AND NOT EXISTS (
-                        SELECT 1 FROM accounts off
-                        WHERE off.id = t.acct AND IFNULL(off.offbudget, 0) = 1
-                    )
-                GROUP BY t.category, t.date / 100
-                """.trimIndent(),
-            ).forEach { row ->
-                spent[row.long("month").toInt() to row.str("category").orEmpty()] = row.long("spent")
-            }
-        if (mode == BudgetMode.ENVELOPE) {
-            applyCardMoves(session, spent)
-        }
-        val table = if (mode == BudgetMode.ENVELOPE) "zero_budgets" else "reflect_budgets"
-        val assignments =
-            session.query(
-                "SELECT month, category, amount, carryover FROM $table",
-            )
-        val buffers =
-            if (mode == BudgetMode.ENVELOPE) {
-                session.query("SELECT id, buffered FROM zero_budget_months").associate { row ->
-                    row.long("id").toInt() to row.long("buffered")
-                }
-            } else {
-                emptyMap()
-            }
-        val figures =
-            ActualMonthMath.project(
-                mode = mode,
-                month = month,
-                groups =
-                    groups.map { row ->
-                        ActualMonthMath.GroupFact(
-                            id = row.str("id").orEmpty(),
-                            isIncome = row.bool("is_income"),
-                            sortOrder = row.long("sort_order").toDouble(),
-                        )
-                    },
-                categories =
-                    categories.map { row ->
-                        ActualMonthMath.CategoryFact(
-                            id = row.str("id").orEmpty(),
-                            groupId = row.str("cat_group").orEmpty(),
-                            isIncome = row.bool("is_income"),
-                        )
-                    },
-                spentByCategoryMonth = spent,
-                assignments =
-                    assignments.map { row ->
-                        ActualMonthMath.AssignmentFact(
-                            month = row.long("month").toInt(),
-                            categoryId = row.str("category").orEmpty(),
-                            amount = row.long("amount"),
-                            carryover = row.bool("carryover"),
-                        )
-                    },
-                buffers = buffers,
-            )
+        val month = viewMonth
+        val groups = detailed.groups
+        val figures = detailed.figures
         val accounts =
             session.query(
                 """
@@ -162,15 +83,30 @@ object ShellReader {
             month = month,
             headerLabel = figures.headerLabel,
             headerMinor = figures.headerMinor,
+            bufferedMinor = detailed.bufferedMinor,
             groups =
                 groups
                     .filter { !it.bool("is_income") }
                     .map { row ->
                         val id = row.str("id").orEmpty()
+                        val cats =
+                            detailed.categoryRows
+                                .filter { it.groupId == id }
+                                .map { cat ->
+                                    CategoryRow(
+                                        id = cat.id,
+                                        name = cat.name,
+                                        budgetedMinor = cat.budgetedMinor,
+                                        spentMinor = cat.spentMinor,
+                                        availableMinor = cat.availableMinor,
+                                        carryover = cat.carryover,
+                                    )
+                                }
                         GroupRow(
                             id = id,
                             name = row.str("name").orEmpty(),
                             availableMinor = figures.groupAvailable[id] ?: 0L,
+                            categories = cats,
                         )
                     },
             accounts =
@@ -193,6 +129,147 @@ object ShellReader {
                         amountMinor = row.long("amount"),
                     )
                 },
+        )
+    }
+
+    data class LoadedCategoryRow(
+        val id: String,
+        val name: String,
+        val groupId: String,
+        val budgetedMinor: Long,
+        val spentMinor: Long,
+        val availableMinor: Long,
+        val carryover: Boolean,
+    )
+
+    data class LoadedDetailed(
+        val figures: ActualMonthMath.Figures,
+        val categories: Map<String, ActualMonthMath.CategoryMonthStat>,
+        val bufferedMinor: Long,
+        val groups: List<SqlRow>,
+        val categoryRows: List<LoadedCategoryRow>,
+    )
+
+    fun loadDetailed(
+        session: SqlSession,
+        viewMonth: YearMonth,
+    ): LoadedDetailed {
+        val preferences =
+            session.query("SELECT id, value FROM preferences").associate { row ->
+                row.str("id").orEmpty() to row.str("value").orEmpty()
+            }
+        val mode =
+            if (preferences["budgetType"] == "tracking") {
+                BudgetMode.TRACKING
+            } else {
+                BudgetMode.ENVELOPE
+            }
+        val groups =
+            session.query(
+                """
+                SELECT id, name, is_income, sort_order
+                FROM category_groups
+                WHERE IFNULL(tombstone, 0) = 0
+                ORDER BY sort_order, id
+                """.trimIndent(),
+            )
+        val categories =
+            session.query(
+                """
+                SELECT id, name, is_income, cat_group, hidden, sort_order
+                FROM categories
+                WHERE IFNULL(tombstone, 0) = 0 AND IFNULL(hidden, 0) = 0
+                ORDER BY sort_order, id
+                """.trimIndent(),
+            )
+        val spent = HashMap<Pair<Int, String>, Long>()
+        session
+            .query(
+                """
+                SELECT t.category AS category, t.date / 100 AS month, SUM(t.amount) AS spent
+                FROM transactions t
+                WHERE $alive
+                    AND t.category IS NOT NULL
+                    AND t.date IS NOT NULL
+                    AND NOT EXISTS (
+                        SELECT 1 FROM accounts off
+                        WHERE off.id = t.acct AND IFNULL(off.offbudget, 0) = 1
+                    )
+                GROUP BY t.category, t.date / 100
+                """.trimIndent(),
+            ).forEach { row ->
+                spent[row.long("month").toInt() to row.str("category").orEmpty()] = row.long("spent")
+            }
+        if (mode == BudgetMode.ENVELOPE) {
+            applyCardMoves(session, spent)
+        }
+        val table = if (mode == BudgetMode.ENVELOPE) "zero_budgets" else "reflect_budgets"
+        val assignments =
+            session.query(
+                "SELECT month, category, amount, carryover FROM $table",
+            )
+        val buffers =
+            if (mode == BudgetMode.ENVELOPE) {
+                session.query("SELECT id, buffered FROM zero_budget_months").associate { row ->
+                    row.long("id").toInt() to row.long("buffered")
+                }
+            } else {
+                emptyMap()
+            }
+        val groupFacts =
+            groups.map { row ->
+                ActualMonthMath.GroupFact(
+                    id = row.str("id").orEmpty(),
+                    isIncome = row.bool("is_income"),
+                    sortOrder = row.long("sort_order").toDouble(),
+                )
+            }
+        val categoryFacts =
+            categories.map { row ->
+                ActualMonthMath.CategoryFact(
+                    id = row.str("id").orEmpty(),
+                    groupId = row.str("cat_group").orEmpty(),
+                    isIncome = row.bool("is_income"),
+                )
+            }
+        val detailed =
+            ActualMonthMath.projectDetailed(
+                mode = mode,
+                month = viewMonth,
+                groups = groupFacts,
+                categories = categoryFacts,
+                spentByCategoryMonth = spent,
+                assignments =
+                    assignments.map { row ->
+                        ActualMonthMath.AssignmentFact(
+                            month = row.long("month").toInt(),
+                            categoryId = row.str("category").orEmpty(),
+                            amount = row.long("amount"),
+                            carryover = row.bool("carryover"),
+                        )
+                    },
+                buffers = buffers,
+            )
+        val categoryRows =
+            categories.mapNotNull { row ->
+                val id = row.str("id").orEmpty()
+                val stat = detailed.categories[id] ?: return@mapNotNull null
+                LoadedCategoryRow(
+                    id = id,
+                    name = row.str("name").orEmpty(),
+                    groupId = row.str("cat_group").orEmpty(),
+                    budgetedMinor = stat.budgetedMinor,
+                    spentMinor = stat.spentMinor,
+                    availableMinor = stat.availableMinor,
+                    carryover = stat.carryover,
+                )
+            }
+        return LoadedDetailed(
+            figures = detailed.figures,
+            categories = detailed.categories,
+            bufferedMinor = detailed.bufferedMinor,
+            groups = groups,
+            categoryRows = categoryRows,
         )
     }
 

@@ -357,6 +357,113 @@ class SyncCoordinator(
         return EditResult.Saved
     }
 
+    fun moveCategory(
+        budgetId: String,
+        fromCategoryId: String,
+        toCategoryId: String,
+        month: YearMonth,
+        amountText: String,
+    ): EditResult {
+        val amount = MoneyFormat.parse(amountText, decimals(budgetId)) ?: return EditResult.Rejected(SyncCopy.ENTER_AMOUNT)
+        restoreClock(budgetId)
+        return library.useDatabase(budgetId) { session ->
+            when (
+                val outcome =
+                    EnvelopeBook(session, syncClock).moveAvailable(
+                        month.toActualMonth(),
+                        fromCategoryId,
+                        toCategoryId,
+                        amount,
+                    )
+            ) {
+                EnvelopeEditResult.Saved -> EditResult.Saved
+                is EnvelopeEditResult.Rejected -> EditResult.Rejected(outcome.reason)
+            }
+        } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
+    }
+
+    fun setCategoryCarryover(
+        budgetId: String,
+        categoryId: String,
+        month: YearMonth,
+        enabled: Boolean,
+    ): EditResult {
+        restoreClock(budgetId)
+        library.useDatabase(budgetId) { session ->
+            EnvelopeBook(session, syncClock).setCarryover(month.toActualMonth(), categoryId, enabled)
+        } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
+        return EditResult.Saved
+    }
+
+    fun releaseMonthHold(
+        budgetId: String,
+        month: YearMonth,
+    ): EditResult {
+        restoreClock(budgetId)
+        return library.useDatabase(budgetId) { session ->
+            when (
+                val outcome =
+                    EnvelopeBook(session, syncClock).setHold(month.toActualMonth(), 0L, Long.MAX_VALUE)
+            ) {
+                EnvelopeEditResult.Saved -> EditResult.Saved
+                is EnvelopeEditResult.Rejected -> EditResult.Rejected(outcome.reason)
+            }
+        } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
+    }
+
+    fun holdForNextMonth(
+        budgetId: String,
+        month: YearMonth,
+        amountText: String,
+    ): EditResult {
+        val amount = MoneyFormat.parse(amountText, decimals(budgetId)) ?: return EditResult.Rejected(SyncCopy.ENTER_AMOUNT)
+        restoreClock(budgetId)
+        return library.useDatabase(budgetId) { session ->
+            val header = ShellReader.loadDetailed(session, month).figures.headerMinor
+            when (
+                val outcome = EnvelopeBook(session, syncClock).setHold(month.toActualMonth(), amount, header)
+            ) {
+                EnvelopeEditResult.Saved -> EditResult.Saved
+                is EnvelopeEditResult.Rejected -> EditResult.Rejected(outcome.reason)
+            }
+        } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
+    }
+
+    fun addCategoryGroup(
+        budgetId: String,
+        name: String,
+    ): EditResult {
+        restoreClock(budgetId)
+        library.useDatabase(budgetId) { session ->
+            EnvelopeBook(session, syncClock).addGroup(name)
+        } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
+        return EditResult.Saved
+    }
+
+    fun addEnvelopeCategory(
+        budgetId: String,
+        groupId: String,
+        name: String,
+    ): EditResult {
+        restoreClock(budgetId)
+        library.useDatabase(budgetId) { session ->
+            EnvelopeBook(session, syncClock).addCategory(groupId, name)
+        } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
+        return EditResult.Saved
+    }
+
+    fun hideEnvelopeCategory(
+        budgetId: String,
+        categoryId: String,
+        hidden: Boolean,
+    ): EditResult {
+        restoreClock(budgetId)
+        library.useDatabase(budgetId) { session ->
+            EnvelopeBook(session, syncClock).hideCategory(categoryId, hidden)
+        } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
+        return EditResult.Saved
+    }
+
     fun addTransaction(
         budgetId: String,
         payee: String,

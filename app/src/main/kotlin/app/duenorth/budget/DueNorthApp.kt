@@ -145,7 +145,16 @@ fun DueNorthApp(model: ShellViewModel) {
                             onPostSchedule = model::postSchedule,
                             onSkipSchedule = model::skipSchedule,
                             modifier = fill,
-                            onAssign = if (state.shell == null) null else model::showAssign,
+                            onBudgetPreviousMonth =
+                                if (state.shell == null) {
+                                    null
+                                } else {
+                                    model::previousBudgetMonth
+                                },
+                            onBudgetNextMonth = if (state.shell == null) null else model::nextBudgetMonth,
+                            onBudgetCategory = if (state.shell == null) null else model::openCategoryBudget,
+                            onBudgetHold = if (state.shell == null) null else model::showHoldMonth,
+                            onBudgetManage = if (state.shell == null) null else model::showManageCategories,
                             onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
                         )
                     ShellRoute.Budgets ->
@@ -348,6 +357,64 @@ fun DueNorthApp(model: ShellViewModel) {
                             CategoryReviewScreen(
                                 page = page,
                                 onGesture = model::setGesture,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.CategoryBudget -> {
+                        val shell = state.shell
+                        if (shell == null) {
+                            Placeholder()
+                        } else {
+                            CategoryBudgetScreen(
+                                shell = shell,
+                                categoryId = route.categoryId,
+                                error = state.editError,
+                                onSave = model::saveCategoryBudget,
+                                onMove = model::openMoveCategory,
+                                onToggleCarryover = model::toggleCategoryCarryover,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.MoveCategory -> {
+                        val shell = state.shell
+                        if (shell == null) {
+                            Placeholder()
+                        } else {
+                            MoveCategoryScreen(
+                                shell = shell,
+                                fromCategoryId = route.fromCategoryId,
+                                error = state.editError,
+                                onSave = model::submitMoveCategory,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    ShellRoute.HoldMonth -> {
+                        val shell = state.shell
+                        if (shell == null) {
+                            Placeholder()
+                        } else {
+                            HoldMonthScreen(
+                                shell = shell,
+                                error = state.editError,
+                                onSave = model::submitHold,
+                                onRelease = model::releaseHold,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    ShellRoute.ManageCategories -> {
+                        val shell = state.shell
+                        if (shell == null) {
+                            Placeholder()
+                        } else {
+                            ManageCategoriesScreen(
+                                shell = shell,
+                                error = state.editError,
+                                onAddGroup = model::addCategoryGroup,
+                                onAddCategory = model::addEnvelopeCategory,
                                 modifier = fill,
                             )
                         }
