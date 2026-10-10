@@ -152,6 +152,12 @@ class BudgetLibrary(
         }
     }
 
+    fun readCategoryManage(budgetId: String): CategoryManagePage? =
+        open(budgetId) { session ->
+            ActualSchema.ensure(session)
+            ShellReader.loadCategoryManage(session)
+        }
+
     fun readRegister(
         budgetId: String,
         accountId: String,

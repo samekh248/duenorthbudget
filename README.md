@@ -22,9 +22,6 @@ Planning uses [GitHub Spec Kit](https://github.com/github/spec-kit).
 | [006 Reconcile and review](specs/006-reconcile-review/spec.md) | Statements, spending, net worth |
 | [007 Import transactions](specs/007-import-transactions/spec.md) | Files and existing bank connections |
 
-Specs 001, 003–007 are implemented on `main`. Spec 002 (envelope month) is largely
-implemented; remaining category-management and fluidity work is tracked in
-`specs/002-envelope-month/tasks.md` Phase 7 (Convergence). Feature quickstarts
-cover the shipped specs.
+Specs 001–007 are implemented on `main`. Feature quickstarts cover the shipped specs.
 
 Selawik is bundled under the SIL Open Font License (`core/design/src/main/assets/licenses/selawik_OFL.txt`).

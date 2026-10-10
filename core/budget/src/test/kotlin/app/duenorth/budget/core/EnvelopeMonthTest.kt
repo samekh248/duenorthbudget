@@ -46,6 +46,47 @@ class EnvelopeMonthTest {
     }
 
     @Test
+    fun renameHideReorderAndDeleteGroup() {
+        db { session, clock ->
+            val book = EnvelopeBook(session, clock)
+            book.renameGroup("g-exp", "Spending")
+            book.renameCategory("c-food", "Food")
+            book.hideCategory("c-fun", true)
+            val shell =
+                ShellReader.read(session, BudgetMetadata("h", "H"), LocalDate.of(2026, 10, 7))
+            assertEquals("Spending", shell.groups.first().name)
+            assertTrue(shell.groups.first().categories.none { it.id == "c-fun" })
+            val manage = ShellReader.loadCategoryManage(session)
+            assertEquals("Food", manage.groups.first().categories.first { it.id == "c-food" }.name)
+            assertTrue(manage.groups.first().categories.first { it.id == "c-fun" }.hidden)
+            assertEquals(EnvelopeEditResult.Saved, book.moveCategoryLater("c-food"))
+            assertEquals(EnvelopeEditResult.Saved, book.moveGroupEarlier("g-exp"))
+            session.exec(
+                """
+                INSERT INTO category_groups (id, name, is_income, sort_order, tombstone)
+                VALUES ('g-empty', 'Empty', 0, 99, 0)
+                """.trimIndent(),
+            )
+            assertEquals(EnvelopeEditResult.Saved, book.deleteGroup("g-empty"))
+            assertTrue(
+                book.deleteGroup("g-exp") is EnvelopeEditResult.Rejected,
+            )
+        }
+    }
+
+    fun hiddenCategoryStaysOutOfMonthView() {
+        db { session, clock ->
+            EnvelopeBook(session, clock).hideCategory("c-food", true)
+            val shell =
+                ShellReader.read(session, BudgetMetadata("h", "H"), LocalDate.of(2026, 10, 7))
+            assertTrue(shell.groups.first().categories.none { it.id == "c-food" })
+            EnvelopeBook(session, clock).hideCategory("c-food", false)
+            val restored =
+                ShellReader.read(session, BudgetMetadata("h", "H"), LocalDate.of(2026, 10, 7))
+            assertTrue(restored.groups.first().categories.any { it.id == "c-food" })
+        }
+    }
+
     fun holdLowersThisMonth() {
         db { session, clock ->
             val book = EnvelopeBook(session, clock)

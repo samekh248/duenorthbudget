@@ -44,10 +44,10 @@
 
 ## Phase 7: Convergence
 
-- [ ] T017 Expose `renameGroup` and `renameCategory` through `SyncCoordinator` and `BudgetLibrary`, with JVM coverage per FR-008 (missing)
-- [ ] T018 Extend `ManageCategoriesScreen` (or a detail route) so the person can rename groups and categories per FR-008 / US5 (missing)
-- [ ] T019 Wire `hideEnvelopeCategory` from `ShellViewModel` and add hide/unhide controls; confirm hidden categories leave the month view per FR-008 (partial)
-- [ ] T020 Implement reorder for groups and categories (`sort_order` updates in `EnvelopeBook`, sync APIs, drag or move-up/down UI) per FR-008 / US5 (missing)
-- [ ] T021 Add `deleteGroup` with `GROUP_STILL_USED` guard, expose delete for empty categories/groups in UI per FR-009 (missing)
-- [ ] T022 Show assign/move/hold results on the shell before IO returns (optimistic or in-memory month refresh) per FR-001, SC-001, and Constitution I (partial)
-- [ ] T023 Compose or JVM test: scroll a long category list while editing one budgeted amount without list jump per SC-004 (missing)
+- [X] T017 Expose `renameGroup` and `renameCategory` through `SyncCoordinator` and `BudgetLibrary`, with JVM coverage per FR-008 (missing)
+- [X] T018 Extend `ManageCategoriesScreen` (or a detail route) so the person can rename groups and categories per FR-008 / US5 (missing)
+- [X] T019 Wire `hideEnvelopeCategory` from `ShellViewModel` and add hide/unhide controls; confirm hidden categories leave the month view per FR-008 (partial)
+- [X] T020 Implement reorder for groups and categories (`sort_order` updates in `EnvelopeBook`, sync APIs, drag or move-up/down UI) per FR-008 / US5 (missing)
+- [X] T021 Add `deleteGroup` with `GROUP_STILL_USED` guard, expose delete for empty categories/groups in UI per FR-009 (missing)
+- [X] T022 Show assign/move/hold results on the shell before IO returns (optimistic or in-memory month refresh) per FR-001, SC-001, and Constitution I (partial)
+- [X] T023 Compose or JVM test: scroll a long category list while editing one budgeted amount without list jump per SC-004 (missing)

@@ -7,6 +7,7 @@ import app.duenorth.budget.core.BudgetConflict
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.CategoryChoice
+import app.duenorth.budget.core.CategoryManagePage
 import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.EditResult
@@ -17,7 +18,12 @@ import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
 import app.duenorth.budget.core.ParsedImportRow
 import app.duenorth.budget.core.PreviewRowStatus
+import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthShell
+import app.duenorth.budget.core.withBudgetedAssignment
+import app.duenorth.budget.core.withHold
+import app.duenorth.budget.core.withMoveAvailable
+import app.duenorth.budget.core.withReleaseHold
 import app.duenorth.budget.core.OpenResult
 import app.duenorth.budget.core.PhoneSettings
 import app.duenorth.budget.core.RefreshGate
@@ -173,6 +179,7 @@ data class ShellUiState(
     val importError: String? = null,
     val importFetchPending: Boolean = false,
     val registerBankLinked: Boolean = false,
+    val categoryManage: CategoryManagePage? = null,
 )
 
 class ShellViewModel(
@@ -387,13 +394,23 @@ class ShellViewModel(
 
     fun showManageCategories() {
         push(ShellRoute.ManageCategories)
-        _state.update { it.copy(editError = null) }
+        val budgetId = _state.value.shell?.budgetId ?: _state.value.settings.openBudgetId
+        if (budgetId == null) return
+        viewModelScope.launch {
+            val page = withContext(Dispatchers.IO) { sync.readCategoryManage(budgetId) }
+            _state.update { it.copy(editError = null, categoryManage = page) }
+        }
     }
 
     fun saveCategoryBudget(amountText: String) {
         val shell = _state.value.shell ?: return
         val categoryId = (_state.value.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
-        applyEnvelopeEdit {
+        val budgeted = MoneyFormat.parse(amountText, shell.currency.decimals)
+        if (budgeted == null) {
+            _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
+            return
+        }
+        applyEnvelopeEdit(optimistic = { it.withBudgetedAssignment(categoryId, budgeted) }) {
             sync.assign(shell.budgetId, categoryId, _state.value.budgetMonth, amountText)
         }
     }
@@ -416,21 +433,34 @@ class ShellViewModel(
             _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
             return
         }
-        applyEnvelopeEdit(stayOnRoute = false) {
+        val amount = MoneyFormat.parse(amountText, shell.currency.decimals)
+        if (amount == null || amount <= 0L) {
+            _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
+            return
+        }
+        applyEnvelopeEdit(
+            stayOnRoute = false,
+            optimistic = { it.withMoveAvailable(from, toCategoryId, amount) },
+        ) {
             sync.moveCategory(shell.budgetId, from, toCategoryId, _state.value.budgetMonth, amountText)
         }
     }
 
     fun submitHold(amountText: String) {
         val shell = _state.value.shell ?: return
-        applyEnvelopeEdit {
+        val amount = MoneyFormat.parse(amountText, shell.currency.decimals)
+        if (amount == null) {
+            _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
+            return
+        }
+        applyEnvelopeEdit(optimistic = { it.withHold(amount) }) {
             sync.holdForNextMonth(shell.budgetId, _state.value.budgetMonth, amountText)
         }
     }
 
     fun releaseHold() {
         val shell = _state.value.shell ?: return
-        applyEnvelopeEdit {
+        applyEnvelopeEdit(optimistic = { it.withReleaseHold() }) {
             sync.releaseMonthHold(shell.budgetId, _state.value.budgetMonth)
         }
     }
@@ -458,6 +488,56 @@ class ShellViewModel(
         applyEnvelopeEdit {
             sync.addEnvelopeCategory(budgetId, groupId, name)
         }
+    }
+
+    fun renameCategoryGroup(
+        groupId: String,
+        name: String,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        applyEnvelopeEdit { sync.renameCategoryGroup(budgetId, groupId, name) }
+    }
+
+    fun renameEnvelopeCategory(
+        categoryId: String,
+        name: String,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        applyEnvelopeEdit { sync.renameEnvelopeCategory(budgetId, categoryId, name) }
+    }
+
+    fun hideEnvelopeCategory(
+        categoryId: String,
+        hidden: Boolean,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        applyEnvelopeEdit { sync.hideEnvelopeCategory(budgetId, categoryId, hidden) }
+    }
+
+    fun deleteEnvelopeCategory(categoryId: String) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        applyEnvelopeEdit { sync.deleteEnvelopeCategory(budgetId, categoryId) }
+    }
+
+    fun deleteCategoryGroup(groupId: String) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        applyEnvelopeEdit { sync.deleteCategoryGroup(budgetId, groupId) }
+    }
+
+    fun moveCategoryGroupOrder(
+        groupId: String,
+        earlier: Boolean,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        applyEnvelopeEdit { sync.moveCategoryGroupOrder(budgetId, groupId, earlier) }
+    }
+
+    fun moveEnvelopeCategoryOrder(
+        categoryId: String,
+        earlier: Boolean,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        applyEnvelopeEdit { sync.moveEnvelopeCategoryOrder(budgetId, categoryId, earlier) }
     }
 
     fun showAddTransaction() {
@@ -1384,12 +1464,31 @@ class ShellViewModel(
 
     private fun applyEnvelopeEdit(
         stayOnRoute: Boolean = true,
+        optimistic: ((MonthShell) -> MonthShell)? = null,
         block: suspend () -> EditResult,
     ) {
         val budgetId = _state.value.shell?.budgetId ?: _state.value.settings.openBudgetId ?: return
+        val previousShell = _state.value.shell
+        if (optimistic != null && previousShell != null) {
+            _state.update { it.copy(shell = optimistic(previousShell), editError = null) }
+        }
         viewModelScope.launch {
             when (val result = withContext(Dispatchers.IO) { block() }) {
-                is EditResult.Rejected -> _state.update { it.copy(editError = result.reason) }
+                is EditResult.Rejected -> {
+                    val month = _state.value.budgetMonth
+                    val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
+                    _state.update { current ->
+                        current.copy(
+                            editError = result.reason,
+                            shell =
+                                if (shell != null && !shellGate.gestureActive) {
+                                    shell
+                                } else {
+                                    current.shell
+                                },
+                        )
+                    }
+                }
                 EditResult.Saved -> {
                     _state.update { it.copy(editError = null) }
                     val month = _state.value.budgetMonth
@@ -1399,6 +1498,10 @@ class ShellViewModel(
                         _state.update { current ->
                             current.copy(shell = if (shellGate.gestureActive) current.shell else shell)
                         }
+                    }
+                    if (_state.value.route is ShellRoute.ManageCategories) {
+                        val manage = withContext(Dispatchers.IO) { sync.readCategoryManage(budgetId) }
+                        _state.update { it.copy(categoryManage = manage) }
                     }
                     if (!stayOnRoute) back()
                     withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }

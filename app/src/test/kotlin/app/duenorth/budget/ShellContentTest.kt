@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.ShellCopy
@@ -94,6 +95,25 @@ class ShellContentTest {
         val amount = compose.onNodeWithTag("group-amount-g").fetchSemanticsNode().boundsInRoot
         assertTrue("name overlaps amount: $name vs $amount", name.right <= amount.left + 1f)
         compose.onNodeWithText("A very long category group name that has to stay readable on one row").assertIsDisplayed()
+    }
+
+    @Test
+    fun threeHundredCategoriesStayLazyWhileEditable() {
+        val categories = (0 until 300).map { CategoryRow("c$it", "category $it", 0L, 0L, 0L, false) }
+        val shell = sample().copy(groups = listOf(GroupRow("g", "one group", 0L, categories)))
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(320.dp)) {
+                    BudgetSection(
+                        shell,
+                        onListGesture = {},
+                        onCategory = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("category-c0").assertIsDisplayed()
+        compose.onNodeWithTag("category-c299").assertDoesNotExist()
     }
 
     @Test
