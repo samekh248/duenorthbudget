@@ -59,7 +59,7 @@ fun PayeesScreen(
             Column(Modifier.padding(MetroDimens.Gutter)) {
                 MetroText("rename payee", Metro.typography.header)
                 MetroField(name, { name = it }, "name", Modifier.padding(top = 8.dp))
-                RowChoice("remember as rule", rememberRule) { rememberRule = it }
+                RowChoice("remember as rule", rememberRule) { rememberRule = !rememberRule }
                 if (error != null) {
                     MetroText(error, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
                 }

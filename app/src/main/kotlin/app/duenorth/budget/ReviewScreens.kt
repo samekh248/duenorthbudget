@@ -136,7 +136,12 @@ fun NetWorthSection(
                 .testTag("net-worth-toggle"),
             color = Metro.accent.text,
         )
-        MetroText(ReviewCopy.TOTAL, Metro.typography.caption, color = Metro.colors.secondary, Modifier.padding(top = 8.dp))
+        MetroText(
+            ReviewCopy.TOTAL,
+            Metro.typography.caption,
+            Modifier.padding(top = 8.dp),
+            color = Metro.colors.secondary,
+        )
         MetroText(
             MoneyFormat.format(page.totalMinor, page.currency),
             Metro.typography.header,

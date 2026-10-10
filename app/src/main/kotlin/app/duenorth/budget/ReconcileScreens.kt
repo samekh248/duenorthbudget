@@ -89,13 +89,23 @@ fun ReconcileScreen(
             Metro.typography.subheader,
             modifier = Modifier.testTag("statement-amount"),
         )
-        MetroText(ReconcileCopy.CLEARED, Metro.typography.caption, color = Metro.colors.secondary, Modifier.padding(top = 8.dp))
+        MetroText(
+            ReconcileCopy.CLEARED,
+            Metro.typography.caption,
+            Modifier.padding(top = 8.dp),
+            color = Metro.colors.secondary,
+        )
         MetroText(
             MoneyFormat.format(page.clearedTotalMinor, page.currency),
             Metro.typography.subheader,
             modifier = Modifier.testTag("cleared-total"),
         )
-        MetroText(ReconcileCopy.DIFFERENCE, Metro.typography.caption, color = Metro.colors.secondary, Modifier.padding(top = 8.dp))
+        MetroText(
+            ReconcileCopy.DIFFERENCE,
+            Metro.typography.caption,
+            Modifier.padding(top = 8.dp),
+            color = Metro.colors.secondary,
+        )
         MetroText(
             MoneyFormat.format(page.differenceMinor, page.currency),
             Metro.typography.header,
@@ -103,7 +113,12 @@ fun ReconcileScreen(
             modifier = Modifier.testTag("reconcile-difference"),
         )
         if (error != null) {
-            MetroText(error, Metro.typography.body, color = Metro.accent.text, Modifier.padding(top = 8.dp))
+            MetroText(
+                error,
+                Metro.typography.body,
+                Modifier.padding(top = 8.dp),
+                color = Metro.accent.text,
+            )
         }
         LazyColumn(Modifier.weight(1f).padding(top = 12.dp), state = list) {
             items(page.rows, key = { it.id }) { row -> ReconcileLine(row, page, onToggle) }
