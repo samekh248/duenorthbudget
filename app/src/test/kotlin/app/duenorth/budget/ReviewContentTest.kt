@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.Currencies
@@ -24,7 +23,7 @@ import java.time.YearMonth
 @Config(sdk = [33])
 class ReviewContentTest {
     @get:Rule
-    val compose = createComposeRule()
+    val compose = createHostComposeRule()
 
     @Test
     fun monthReviewShowsIncomeAndCategories() {
