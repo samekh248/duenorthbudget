@@ -254,6 +254,53 @@ class BudgetLibrary(
         enabled: Boolean,
     ): Boolean = open(budgetId) { RulesBook(it).setEnabled(ruleId, enabled); true } ?: false
 
+    fun previewImportFile(
+        budgetId: String,
+        accountId: String,
+        bytes: ByteArray,
+        fileName: String,
+    ): Pair<ImportPreviewBundle?, String?> =
+        open(budgetId) { ImportBook(it, ids).previewFile(accountId, bytes, fileName) }
+            ?: (null to ShellCopy.NO_ACCOUNTS)
+
+    fun confirmImport(
+        budgetId: String,
+        accountId: String,
+        candidates: List<ParsedImportRow>,
+    ): ImportConfirmResult? =
+        open(budgetId) { ImportBook(it, ids).confirm(accountId, candidates) }
+
+    fun readImportReview(budgetId: String): ImportReviewPage? =
+        open(budgetId) { ImportBook(it, ids).readReview() }
+
+    fun finishImportReview(budgetId: String) {
+        open(budgetId) { ImportBook(it, ids).finishReview() }
+    }
+
+    fun setImportReviewCategory(
+        budgetId: String,
+        transactionId: String,
+        categoryId: String?,
+    ): WriteResult =
+        open(budgetId) { ImportBook(it, ids).setReviewCategory(transactionId, categoryId) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun bankLinked(
+        budgetId: String,
+        accountId: String,
+    ): Boolean = open(budgetId) { BankSyncBook(it, FakeBankSyncTransport(emptyList())).linkedAccount(accountId) != null } ?: false
+
+    fun previewBankFetch(
+        budgetId: String,
+        accountId: String,
+        serverAddress: String?,
+        token: String?,
+        transport: BankSyncTransport,
+        today: java.time.LocalDate,
+    ): Pair<ImportPreviewBundle?, String?> =
+        open(budgetId) { BankSyncBook(it, transport).previewFetch(accountId, serverAddress, token, today) }
+            ?: (null to ShellCopy.NO_ACCOUNTS)
+
     fun switchTo(id: String): Boolean {
         val target = summary(File(root, id)) ?: return false
         val settings = settings()

@@ -10,7 +10,13 @@ import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.EditResult
+import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.ForcedWrite
+import app.duenorth.budget.core.HttpBankSyncTransport
+import app.duenorth.budget.core.ImportPreview
+import app.duenorth.budget.core.ImportReviewPage
+import app.duenorth.budget.core.ParsedImportRow
+import app.duenorth.budget.core.PreviewRowStatus
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.OpenResult
 import app.duenorth.budget.core.PhoneSettings
@@ -83,6 +89,14 @@ sealed interface ShellRoute {
         val transactionId: String,
     ) : ShellRoute
 
+    data class ImportPreviewRoute(
+        val accountId: String,
+    ) : ShellRoute
+
+    data class ImportReviewRoute(
+        val accountId: String,
+    ) : ShellRoute
+
     data object Payees : ShellRoute
 }
 
@@ -118,11 +132,18 @@ data class ShellUiState(
     val editError: String? = null,
     val askEachTime: Boolean = true,
     val signedIn: Boolean = false,
+    val importPreview: ImportPreview? = null,
+    val importCandidates: List<ParsedImportRow> = emptyList(),
+    val importReview: ImportReviewPage? = null,
+    val importError: String? = null,
+    val importFetchPending: Boolean = false,
+    val registerBankLinked: Boolean = false,
 )
 
 class ShellViewModel(
     private val library: BudgetLibrary,
     private val sync: SyncCoordinator,
+    private val bankSyncTransport: BankSyncTransport = HttpBankSyncTransport(),
 ) : ViewModel() {
     private val shellGate = RefreshGate<MonthShell>()
     private val registerGate = RefreshGate<RegisterPage>()
@@ -351,6 +372,141 @@ class ShellViewModel(
         push(ShellRoute.Register(accountId))
         _state.update { it.copy(registerFilter = "") }
         viewModelScope.launch { apply(load(accountId), accountId) }
+    }
+
+    fun previewImportFile(
+        accountId: String,
+        bytes: ByteArray,
+        fileName: String,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            val (bundle, error) =
+                withContext(Dispatchers.IO) {
+                    library.previewImportFile(budgetId, accountId, bytes, fileName)
+                }
+            if (bundle == null) {
+                _state.update { it.copy(importError = error) }
+                return@launch
+            }
+            _state.update {
+                it.copy(
+                    route = ShellRoute.ImportPreviewRoute(accountId),
+                    importPreview = bundle.preview,
+                    importCandidates = bundle.candidates,
+                    importError = error,
+                )
+            }
+        }
+    }
+
+    fun confirmImport() {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val preview = _state.value.importPreview ?: return
+        val candidates = _state.value.importCandidates
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val book = library
+                val toAdd =
+                    preview.rows
+                        .filter { it.status == PreviewRowStatus.New }
+                        .map { candidates[it.index] }
+                book.confirmImport(budgetId, preview.accountId, toAdd)
+            }
+            push(ShellRoute.ImportReviewRoute(preview.accountId))
+            reloadReview(preview.accountId)
+            apply(load(preview.accountId), preview.accountId)
+        }
+    }
+
+    fun cancelImport() {
+        val accountId =
+            (_state.value.route as? ShellRoute.ImportPreviewRoute)?.accountId
+                ?: openAccountId()
+                ?: return
+        _state.update {
+            it.copy(
+                importPreview = null,
+                importCandidates = emptyList(),
+                importError = null,
+                route = ShellRoute.Register(accountId),
+            )
+        }
+    }
+
+    fun fetchBankTransactions(accountId: String) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val settings = _state.value.settings
+        _state.update { it.copy(importFetchPending = true, importError = null, syncProgress = 0.1f) }
+        viewModelScope.launch {
+            val (bundle, error) =
+                withContext(Dispatchers.IO) {
+                    library.previewBankFetch(
+                        budgetId,
+                        accountId,
+                        settings.serverAddress,
+                        sync.syncToken(),
+                        bankSyncTransport,
+                        java.time.LocalDate.now(),
+                    )
+                }
+            _state.update { it.copy(importFetchPending = false, syncProgress = null) }
+            if (bundle == null) {
+                _state.update { it.copy(importError = error) }
+                return@launch
+            }
+            _state.update {
+                it.copy(
+                    route = ShellRoute.ImportPreviewRoute(accountId),
+                    importPreview = bundle.preview,
+                    importCandidates = bundle.candidates,
+                    importError = null,
+                )
+            }
+        }
+    }
+
+    fun setImportReviewCategory(
+        transactionId: String,
+        categoryId: String?,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val accountId = _state.value.importReview?.accountId ?: return
+        viewModelScope.launch {
+            val result =
+                withContext(Dispatchers.IO) {
+                    library.setImportReviewCategory(budgetId, transactionId, categoryId)
+                }
+            when (result) {
+                is WriteResult.Rejected -> _state.update { it.copy(importError = result.reason) }
+                else -> reloadReview(accountId)
+            }
+            apply(load(accountId), accountId)
+        }
+    }
+
+    fun finishImportReview() {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val accountId = _state.value.importReview?.accountId ?: openAccountId() ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { library.finishImportReview(budgetId) }
+            _state.update {
+                it.copy(
+                    importReview = null,
+                    importPreview = null,
+                    importCandidates = emptyList(),
+                    importError = null,
+                    route = ShellRoute.Register(accountId),
+                )
+            }
+            apply(load(accountId), accountId)
+        }
+    }
+
+    private suspend fun reloadReview(accountId: String) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val review = withContext(Dispatchers.IO) { library.readImportReview(budgetId) }
+        _state.update { it.copy(importReview = review, importError = null) }
     }
 
     fun openInbox(transactionId: String) {
@@ -840,7 +996,12 @@ class ShellViewModel(
                 }
             val status = if (budgetId == null) "" else sync.status(budgetId)
             val conflicts = if (budgetId == null || locked) emptyList() else sync.conflicts(budgetId)
-            Loaded(settings, budgets, shell, register, upcoming, locked, status, conflicts)
+            val bankLinked =
+                budgetId != null &&
+                    accountId != null &&
+                    !locked &&
+                    library.bankLinked(budgetId, accountId)
+            Loaded(settings, budgets, shell, register, upcoming, locked, status, conflicts, bankLinked)
         }
 
     private fun apply(
@@ -878,6 +1039,7 @@ class ShellViewModel(
                 conflicts = loaded.conflicts,
                 remoteFiles = sync.remoteFiles,
                 signedIn = sync.signedIn(),
+                registerBankLinked = loaded.bankLinked,
             )
         }
     }
@@ -887,7 +1049,9 @@ class ShellViewModel(
             this is ShellRoute.EditTransaction ||
             this is ShellRoute.SplitTransaction ||
             this is ShellRoute.TransferMoney ||
-            this is ShellRoute.PickCategory
+            this is ShellRoute.PickCategory ||
+            this is ShellRoute.ImportPreviewRoute ||
+            this is ShellRoute.ImportReviewRoute
 
     private data class Loaded(
         val settings: PhoneSettings,
@@ -898,6 +1062,7 @@ class ShellViewModel(
         val locked: Boolean,
         val status: String,
         val conflicts: List<BudgetConflict>,
+        val bankLinked: Boolean = false,
     )
 
     companion object {

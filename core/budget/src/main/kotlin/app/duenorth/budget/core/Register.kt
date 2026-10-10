@@ -1005,6 +1005,64 @@ class RegisterBook(
     private fun nextSort(): Double =
         session.query("SELECT COALESCE(MAX(sort_order), 0) AS sort FROM transactions").first().double("sort") + 1.0
 
+    fun applyRulesForImport(draft: TransactionDraft): TransactionDraft =
+        applyRules(draft, draft.note?.trim()?.ifEmpty { null })
+
+    fun payeeIdForName(name: String): String = payeeFor(name)
+
+    fun nextSortOrder(): Double = nextSort()
+
+    fun insertImportedTransaction(
+        id: String,
+        accountId: String,
+        categoryId: String?,
+        amount: Long,
+        payeeId: String?,
+        note: String?,
+        date: Int,
+        financialId: String?,
+        importedPayee: String?,
+    ) {
+        val hasFinancial = transactionColumns().contains("financial_id")
+        if (!hasFinancial) {
+            insert(
+                id = id,
+                accountId = accountId,
+                categoryId = categoryId,
+                amount = amount,
+                payeeId = payeeId,
+                note = note,
+                date = date,
+                sort = nextSort(),
+            )
+            return
+        }
+        session.exec(
+            """
+            INSERT INTO transactions (
+                id, isParent, isChild, parent_id, acct, category, amount, description, notes, date,
+                starting_balance_flag, transferred_id, sort_order, cleared, reconciled, tombstone, schedule,
+                financial_id, imported_description
+            ) VALUES (?, 0, 0, NULL, ?, ?, ?, ?, ?, ?, 0, NULL, ?, 1, 0, 0, NULL, ?, ?)
+            """.trimIndent(),
+            listOf(
+                id,
+                accountId,
+                categoryId,
+                amount,
+                payeeId,
+                note,
+                date,
+                nextSort(),
+                financialId,
+                importedPayee,
+            ),
+        )
+    }
+
+    private fun transactionColumns(): Set<String> =
+        session.query("PRAGMA table_info(transactions)").mapNotNull { it.str("name") }.toSet()
+
     private fun categoryAlive(id: String): Boolean =
         session
             .query(

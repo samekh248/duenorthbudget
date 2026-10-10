@@ -28,6 +28,7 @@ import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.EntryResult
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MoneyParse
+import app.duenorth.budget.core.ImportCopy
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
@@ -53,6 +54,8 @@ fun RegisterScreen(
     onOpen: (String) -> Unit,
     onAdd: () -> Unit,
     onTransfer: () -> Unit,
+    onImportFile: (() -> Unit)? = null,
+    onFetch: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val rows = page.matching(filter)
@@ -82,6 +85,20 @@ fun RegisterScreen(
         )
         MetroButton("add", Modifier.padding(top = 12.dp), onClick = onAdd)
         MetroButton("transfer", Modifier.padding(top = 8.dp), onClick = onTransfer)
+        if (onImportFile != null) {
+            MetroButton(
+                ImportCopy.IMPORT_FILE,
+                Modifier.padding(top = 8.dp).testTag("register-import-file"),
+                onClick = onImportFile,
+            )
+        }
+        if (onFetch != null) {
+            MetroButton(
+                ImportCopy.FETCH,
+                Modifier.padding(top = 8.dp).testTag("register-fetch"),
+                onClick = onFetch,
+            )
+        }
         if (rows.isEmpty()) {
             MetroText(RegisterCopy.NO_TRANSACTIONS, Metro.typography.body, Modifier.padding(top = 16.dp))
         } else {

@@ -7,13 +7,18 @@ import android.os.StrictMode
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
@@ -78,6 +83,18 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun DueNorthApp(model: ShellViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var importAccountId by remember { mutableStateOf<String?>(null) }
+    val importLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            val accountId = importAccountId ?: return@rememberLauncherForActivityResult
+            if (uri == null) return@rememberLauncherForActivityResult
+            val bytes =
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: return@rememberLauncherForActivityResult
+            val name = uri.lastPathSegment?.substringAfterLast('/') ?: "import.qif"
+            model.previewImportFile(accountId, bytes, name)
+        }
     val systemDark = isSystemInDarkTheme()
     val dark =
         when (ThemeMode.fromStored(state.settings.themeMode)) {
@@ -125,7 +142,11 @@ fun DueNorthApp(model: ShellViewModel) {
                 AppBarButton(AppGlyph.More, "payees", model::showPayees),
                 AppBarButton(AppGlyph.Appearance, "appearance", model::showAppearance),
             )
-        ShellChrome(buttons, syncing = state.syncing, progress = state.syncProgress) { modifier ->
+        ShellChrome(
+            buttons,
+            syncing = state.syncing || state.importFetchPending,
+            progress = state.syncProgress,
+        ) { modifier ->
             Box(modifier) {
                 val fill = Modifier.fillMaxSize()
                 when (val route = state.route) {
@@ -247,6 +268,44 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onOpen = model::openEdit,
                                 onAdd = model::openNewTransaction,
                                 onTransfer = model::openTransfer,
+                                onImportFile = {
+                                    importAccountId = route.accountId
+                                    importLauncher.launch("*/*")
+                                },
+                                onFetch =
+                                    if (state.registerBankLinked) {
+                                        { model.fetchBankTransactions(route.accountId) }
+                                    } else {
+                                        null
+                                    },
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.ImportPreviewRoute -> {
+                        val preview = state.importPreview
+                        if (preview == null) {
+                            Placeholder()
+                        } else {
+                            ImportPreviewScreen(
+                                preview = preview,
+                                error = state.importError,
+                                onConfirm = model::confirmImport,
+                                onCancel = model::cancelImport,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.ImportReviewRoute -> {
+                        val review = state.importReview
+                        if (review == null) {
+                            Placeholder()
+                        } else {
+                            ImportReviewScreen(
+                                page = review,
+                                error = state.importError,
+                                onCategory = model::setImportReviewCategory,
+                                onDone = model::finishImportReview,
                                 modifier = fill,
                             )
                         }

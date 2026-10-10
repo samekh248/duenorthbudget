@@ -140,6 +140,8 @@ class SyncCoordinator(
 
     fun signedIn(): Boolean = !secrets.get(TOKEN).isNullOrBlank()
 
+    fun syncToken(): String? = secrets.get(TOKEN)
+
     fun connect(
         address: String,
         password: String,
