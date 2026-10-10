@@ -10,7 +10,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -35,7 +34,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [33])
 class RegisterContentTest {
     @get:Rule
-    val compose = createComposeRule()
+    val compose = createHostComposeRule()
 
     @Test
     fun newestRowBalanceAndOwedCredit() {
