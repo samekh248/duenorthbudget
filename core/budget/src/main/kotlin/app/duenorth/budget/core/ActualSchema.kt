@@ -151,6 +151,8 @@ object ActualSchema {
         ensureAccountType(session)
         ensureScheduleTables(session)
         ensureTransactionScheduleColumn(session)
+        ensureTransactionImportColumns(session)
+        ensureAccountBankColumns(session)
     }
 
     private fun ensureAccountType(session: SqlSession) {
@@ -215,5 +217,27 @@ object ActualSchema {
         val names = session.query("PRAGMA table_info(transactions)").mapNotNull { it.str("name") }.toSet()
         if (names.isEmpty() || "schedule" in names) return
         session.exec("ALTER TABLE transactions ADD COLUMN schedule TEXT")
+    }
+
+    private fun ensureTransactionImportColumns(session: SqlSession) {
+        val names = session.query("PRAGMA table_info(transactions)").mapNotNull { it.str("name") }.toSet()
+        if (names.isEmpty()) return
+        if ("financial_id" !in names) {
+            session.exec("ALTER TABLE transactions ADD COLUMN financial_id TEXT")
+        }
+        if ("imported_description" !in names) {
+            session.exec("ALTER TABLE transactions ADD COLUMN imported_description TEXT")
+        }
+    }
+
+    private fun ensureAccountBankColumns(session: SqlSession) {
+        val names = session.query("PRAGMA table_info(accounts)").mapNotNull { it.str("name") }.toSet()
+        if (names.isEmpty()) return
+        if ("account_id" !in names) {
+            session.exec("ALTER TABLE accounts ADD COLUMN account_id TEXT")
+        }
+        if ("account_sync_source" !in names) {
+            session.exec("ALTER TABLE accounts ADD COLUMN account_sync_source TEXT")
+        }
     }
 }
