@@ -132,11 +132,16 @@ fun DueNorthApp(model: ShellViewModel) {
                     ShellRoute.Home ->
                         HomePanorama(
                             shell = state.shell,
+                            review = state.monthReview,
+                            netWorth = state.netWorth,
                             upcoming = state.upcoming,
                             loading = state.loading,
                             onGesture = model::setGesture,
                             onAccount = model::openAccount,
                             onInbox = model::openInbox,
+                            onPreviousReviewMonth = model::previousReviewMonth,
+                            onReviewCategory = model::openReviewCategory,
+                            onNetWorthIncludeOffBudget = model::setNetWorthIncludeOffBudget,
                             onPostSchedule = model::postSchedule,
                             onSkipSchedule = model::skipSchedule,
                             modifier = fill,
@@ -247,6 +252,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onOpen = model::openEdit,
                                 onAdd = model::openNewTransaction,
                                 onTransfer = model::openTransfer,
+                                onReconcile = model::openReconcile,
                                 modifier = fill,
                             )
                         }
@@ -308,6 +314,40 @@ fun DueNorthApp(model: ShellViewModel) {
                                 target = target,
                                 error = state.writeError,
                                 onPick = model::submitCategory,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.Reconcile -> {
+                        val page = state.reconcile
+                        val register = state.register
+                        if (page == null) {
+                            ReconcileStartScreen(
+                                accountName = register?.account?.name.orEmpty(),
+                                error = state.reconcileError,
+                                onStart = model::startReconcile,
+                                modifier = fill,
+                            )
+                        } else {
+                            ReconcileScreen(
+                                page = page,
+                                error = state.reconcileError,
+                                onGesture = model::setRegisterGesture,
+                                onToggle = model::toggleReconcileCleared,
+                                onFinish = model::finishReconcile,
+                                onCancel = model::cancelReconcile,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.ReviewCategory -> {
+                        val page = state.categoryMonth
+                        if (page == null) {
+                            Placeholder()
+                        } else {
+                            CategoryReviewScreen(
+                                page = page,
+                                onGesture = model::setGesture,
                                 modifier = fill,
                             )
                         }

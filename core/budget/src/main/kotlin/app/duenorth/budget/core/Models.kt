@@ -120,6 +120,7 @@ data class PhoneSettings(
     val openBudgetId: String? = null,
     val themeMode: String = "system",
     val accent: String = "magenta",
+    val netWorthIncludeOffBudget: Boolean = true,
     val serverAddress: String? = null,
     val syncNode: String? = null,
     val askEachTime: List<String> = emptyList(),

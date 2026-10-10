@@ -55,6 +55,7 @@ class RegisterScreenshotTest {
                         onOpen = {},
                         onAdd = {},
                         onTransfer = {},
+                        onReconcile = {},
                         modifier = Modifier.weight(1f),
                     )
                     bar()
