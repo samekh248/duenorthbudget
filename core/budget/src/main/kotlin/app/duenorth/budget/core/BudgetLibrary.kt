@@ -136,14 +136,19 @@ class BudgetLibrary(
         }
     }
 
-    fun readShell(id: String): MonthShell? {
+    fun readShell(
+        id: String,
+        month: YearMonth? = null,
+    ): MonthShell? {
         val dir = File(root, id)
         val metadata = readMetadata(dir) ?: return null
         val database = File(dir, "db.sqlite")
         if (!database.exists()) return null
+        val viewMonth = month ?: YearMonth.from(clock.today())
         return sessions.use(database) { session ->
             ActualSchema.ensure(session)
-            ShellReader.read(session, metadata, clock.today())
+            SyncSchema.ensure(session)
+            ShellReader.read(session, metadata, clock.today(), viewMonth)
         }
     }
 

@@ -22,6 +22,7 @@ import app.duenorth.budget.core.PayeeRow
 import app.duenorth.budget.core.PayeeWriteResult
 import app.duenorth.budget.core.ScheduleWriteResult
 import app.duenorth.budget.core.SplitPart
+import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
@@ -98,6 +99,18 @@ sealed interface ShellRoute {
         val categoryId: String,
     ) : ShellRoute
 
+    data class CategoryBudget(
+        val categoryId: String,
+    ) : ShellRoute
+
+    data class MoveCategory(
+        val fromCategoryId: String,
+    ) : ShellRoute
+
+    data object HoldMonth : ShellRoute
+
+    data object ManageCategories : ShellRoute
+
     data object Payees : ShellRoute
 }
 
@@ -116,6 +129,7 @@ data class ShellUiState(
     val switchTarget: BudgetSummary? = null,
     val today: String = RegisterEntry.todayIso(),
     val reviewMonth: YearMonth = YearMonth.now(),
+    val budgetMonth: YearMonth = YearMonth.now(),
     val monthReview: MonthReviewPage? = null,
     val netWorth: NetWorthPage? = null,
     val categoryMonth: CategoryMonthPage? = null,
@@ -321,6 +335,107 @@ class ShellViewModel(
         viewModelScope.launch {
             val categories = if (id == null) emptyList() else withContext(Dispatchers.IO) { sync.categories(id) }
             _state.update { it.copy(route = ShellRoute.Assign, categories = categories, editError = null) }
+        }
+    }
+
+    fun previousBudgetMonth() {
+        _state.update { it.copy(budgetMonth = it.budgetMonth.minusMonths(1)) }
+        refreshBudgetShell()
+    }
+
+    fun nextBudgetMonth() {
+        _state.update { it.copy(budgetMonth = it.budgetMonth.plusMonths(1)) }
+        refreshBudgetShell()
+    }
+
+    fun openCategoryBudget(categoryId: String) {
+        push(ShellRoute.CategoryBudget(categoryId))
+        _state.update { it.copy(editError = null) }
+    }
+
+    fun openMoveCategory() {
+        val from = (_state.value.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
+        push(ShellRoute.MoveCategory(from))
+        _state.update { it.copy(editError = null) }
+    }
+
+    fun showHoldMonth() {
+        push(ShellRoute.HoldMonth)
+        _state.update { it.copy(editError = null) }
+    }
+
+    fun showManageCategories() {
+        push(ShellRoute.ManageCategories)
+        _state.update { it.copy(editError = null) }
+    }
+
+    fun saveCategoryBudget(amountText: String) {
+        val shell = _state.value.shell ?: return
+        val categoryId = (_state.value.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
+        applyEnvelopeEdit {
+            sync.assign(shell.budgetId, categoryId, _state.value.budgetMonth, amountText)
+        }
+    }
+
+    fun toggleCategoryCarryover(enabled: Boolean) {
+        val shell = _state.value.shell ?: return
+        val categoryId = (_state.value.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
+        applyEnvelopeEdit {
+            sync.setCategoryCarryover(shell.budgetId, categoryId, _state.value.budgetMonth, enabled)
+        }
+    }
+
+    fun submitMoveCategory(
+        toCategoryId: String,
+        amountText: String,
+    ) {
+        val shell = _state.value.shell ?: return
+        val from = (_state.value.route as? ShellRoute.MoveCategory)?.fromCategoryId ?: return
+        if (toCategoryId.isBlank()) {
+            _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
+            return
+        }
+        applyEnvelopeEdit(stayOnRoute = false) {
+            sync.moveCategory(shell.budgetId, from, toCategoryId, _state.value.budgetMonth, amountText)
+        }
+    }
+
+    fun submitHold(amountText: String) {
+        val shell = _state.value.shell ?: return
+        applyEnvelopeEdit {
+            sync.holdForNextMonth(shell.budgetId, _state.value.budgetMonth, amountText)
+        }
+    }
+
+    fun releaseHold() {
+        val shell = _state.value.shell ?: return
+        applyEnvelopeEdit {
+            sync.releaseMonthHold(shell.budgetId, _state.value.budgetMonth)
+        }
+    }
+
+    fun addCategoryGroup(name: String) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        if (name.isBlank()) {
+            _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
+            return
+        }
+        applyEnvelopeEdit {
+            sync.addCategoryGroup(budgetId, name)
+        }
+    }
+
+    fun addEnvelopeCategory(
+        groupId: String,
+        name: String,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        if (groupId.isBlank() || name.isBlank()) {
+            _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
+            return
+        }
+        applyEnvelopeEdit {
+            sync.addEnvelopeCategory(budgetId, groupId, name)
         }
     }
 
@@ -983,7 +1098,8 @@ class ShellViewModel(
             val budgets = library.list()
             val budgetId = settings.openBudgetId
             val locked = budgetId != null && sync.needsPassword(budgetId)
-            val shell = if (budgetId == null || locked) null else library.readShell(budgetId)
+            val viewMonth = _state.value.budgetMonth
+            val shell = if (budgetId == null || locked) null else library.readShell(budgetId, viewMonth)
             val upcoming =
                 if (budgetId == null || locked) {
                     emptyList()
@@ -1070,7 +1186,57 @@ class ShellViewModel(
             this is ShellRoute.Reconcile ||
             this is ShellRoute.PickCategory
 
-    private fun ShellRoute.isHomeFlow(): Boolean = this is ShellRoute.ReviewCategory
+    private fun ShellRoute.isHomeFlow(): Boolean =
+        this is ShellRoute.ReviewCategory ||
+            this is ShellRoute.CategoryBudget ||
+            this is ShellRoute.MoveCategory ||
+            this is ShellRoute.HoldMonth ||
+            this is ShellRoute.ManageCategories
+
+    private fun refreshBudgetShell() {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        if (_state.value.locked) return
+        viewModelScope.launch {
+            val month = _state.value.budgetMonth
+            val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) } ?: return@launch
+            shellGate.offer(shell)
+            _state.update { current ->
+                current.copy(shell = if (shellGate.gestureActive) current.shell else shell)
+            }
+        }
+    }
+
+    private fun applyEnvelopeEdit(
+        stayOnRoute: Boolean = true,
+        block: suspend () -> EditResult,
+    ) {
+        val budgetId = _state.value.shell?.budgetId ?: _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            when (val result = withContext(Dispatchers.IO) { block() }) {
+                is EditResult.Rejected -> _state.update { it.copy(editError = result.reason) }
+                EditResult.Saved -> {
+                    _state.update { it.copy(editError = null) }
+                    val month = _state.value.budgetMonth
+                    val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
+                    if (shell != null) {
+                        shellGate.offer(shell)
+                        _state.update { current ->
+                            current.copy(shell = if (shellGate.gestureActive) current.shell else shell)
+                        }
+                    }
+                    if (!stayOnRoute) back()
+                    withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }
+                    val refreshed = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
+                    if (refreshed != null) {
+                        shellGate.offer(refreshed)
+                        _state.update { current ->
+                            current.copy(shell = if (shellGate.gestureActive) current.shell else refreshed)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private data class Loaded(
         val settings: PhoneSettings,

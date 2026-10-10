@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MoneyFormat
@@ -73,7 +74,11 @@ fun HomePanorama(
     onPostSchedule: (String) -> Unit = {},
     onSkipSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
-    onAssign: (() -> Unit)? = null,
+    onBudgetPreviousMonth: (() -> Unit)? = null,
+    onBudgetNextMonth: (() -> Unit)? = null,
+    onBudgetCategory: ((String) -> Unit)? = null,
+    onBudgetHold: (() -> Unit)? = null,
+    onBudgetManage: (() -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
@@ -91,7 +96,11 @@ fun HomePanorama(
                         BudgetSection(
                             shell,
                             onListGesture = { listGesture = it },
-                            onAssign = onAssign,
+                            onPreviousMonth = onBudgetPreviousMonth,
+                            onNextMonth = onBudgetNextMonth,
+                            onCategory = onBudgetCategory,
+                            onHold = onBudgetHold,
+                            onManage = onBudgetManage,
                         )
                     }
                 },
@@ -160,7 +169,11 @@ fun BudgetSection(
     shell: MonthShell,
     onListGesture: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    onAssign: (() -> Unit)? = null,
+    onPreviousMonth: (() -> Unit)? = null,
+    onNextMonth: (() -> Unit)? = null,
+    onCategory: ((String) -> Unit)? = null,
+    onHold: (() -> Unit)? = null,
+    onManage: (() -> Unit)? = null,
 ) {
     val list = rememberLazyListState()
     val arrivals = remember { RowArrivals() }
@@ -177,17 +190,41 @@ fun BudgetSection(
             color = Metro.accent.text,
             modifier = Modifier.testTag("to-budget"),
         )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (onPreviousMonth != null) {
+                MetroButton(EnvelopeCopy.PREVIOUS, onClick = onPreviousMonth)
+            }
+            if (onNextMonth != null) {
+                MetroButton(EnvelopeCopy.NEXT, onClick = onNextMonth)
+            }
+        }
+        if (shell.bufferedMinor != 0L) {
+            MetroText(
+                "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
+                Metro.typography.caption,
+                color = Metro.colors.secondary,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
         if (shell.groups.isEmpty()) {
             MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.body, Modifier.padding(top = 12.dp))
         } else {
             LazyColumn(Modifier.weight(1f), state = list) {
-                items(shell.groups, key = { it.id }) { group ->
-                    GroupLine(group, shell, arrivalModifier(group.id, arrivals))
+                shell.groups.forEach { group ->
+                    item(key = "group-${group.id}") {
+                        GroupLine(group, shell, arrivalModifier(group.id, arrivals))
+                    }
+                    if (onCategory != null) {
+                        items(group.categories, key = { "cat-${it.id}" }) { category ->
+                            CategoryLine(category, shell, onCategory, arrivalModifier(category.id, arrivals))
+                        }
+                    }
                 }
             }
         }
-        if (onAssign != null) {
-            MetroButton("assign", Modifier.padding(bottom = 12.dp), onClick = onAssign)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (onHold != null) MetroButton(EnvelopeCopy.HOLD, onClick = onHold)
+            if (onManage != null) MetroButton(EnvelopeCopy.MANAGE, onClick = onManage)
         }
     }
 }

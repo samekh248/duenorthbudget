@@ -138,10 +138,20 @@ data class BudgetSummary(
     val currencyCode: String,
 )
 
+data class CategoryRow(
+    val id: String,
+    val name: String,
+    val budgetedMinor: Long,
+    val spentMinor: Long,
+    val availableMinor: Long,
+    val carryover: Boolean,
+)
+
 data class GroupRow(
     val id: String,
     val name: String,
     val availableMinor: Long,
+    val categories: List<CategoryRow> = emptyList(),
 )
 
 data class AccountRow(
@@ -166,6 +176,7 @@ data class MonthShell(
     val month: YearMonth,
     val headerLabel: String,
     val headerMinor: Long,
+    val bufferedMinor: Long = 0L,
     val groups: List<GroupRow>,
     val accounts: List<AccountRow>,
     val inbox: List<InboxRow>,
