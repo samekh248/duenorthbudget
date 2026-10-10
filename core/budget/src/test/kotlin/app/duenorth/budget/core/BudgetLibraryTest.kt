@@ -86,6 +86,20 @@ class BudgetLibraryTest {
         assertEquals("rent inserted above", gate.visible)
     }
 
+    @Test
+    fun syncInsertDuringScrollKeepsTheRowUnderTheFinger() {
+        val gate = RefreshGate<List<String>>()
+        val rows = (0 until 500).map { "row-$it" }
+        assertTrue(gate.offer(rows))
+        gate.beginGesture()
+        assertFalse(gate.offer(listOf("rent inserted above") + rows))
+        assertEquals("row-0", gate.visible!!.first())
+        assertEquals(500, gate.visible!!.size)
+        gate.endGesture()
+        assertEquals("rent inserted above", gate.visible!!.first())
+        assertEquals(501, gate.visible!!.size)
+    }
+
     private fun library(
         root: File,
         today: LocalDate = LocalDate.of(2026, 10, 7),

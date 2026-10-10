@@ -162,6 +162,7 @@ fun TransactionForm(
     onSave: (TransactionDraft) -> Unit,
     onDelete: (String) -> Unit,
     onSplit: (String) -> Unit,
+    onSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val draftId = remember(row?.id, page.account.id) { row?.id ?: UUID.randomUUID().toString() }
@@ -243,6 +244,7 @@ fun TransactionForm(
         if (row != null) {
             if (row.transferId == null) {
                 MetroButton("split", Modifier.padding(top = 8.dp)) { onSplit(row.id) }
+                MetroButton("schedule", Modifier.padding(top = 8.dp)) { onSchedule(row.id) }
             }
             MetroButton("delete", Modifier.padding(top = 8.dp)) { onDelete(row.id) }
         }

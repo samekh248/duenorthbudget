@@ -100,6 +100,7 @@ data class TransactionDraft(
     val categoryId: String?,
     val note: String?,
     val force: Boolean = false,
+    val scheduleId: String? = null,
 )
 
 data class TransferDraft(
@@ -476,15 +477,17 @@ class RegisterBook(
             val existing = find(draft.id)
             if (existing != null && existing.tombstone) return@write WriteResult.Saved
             if (existing == null) {
+                val ruled = applyRules(draft, note)
                 insert(
-                    id = draft.id,
-                    accountId = draft.accountId,
-                    categoryId = draft.categoryId,
-                    amount = draft.amountMinor,
-                    payeeId = payeeFor(draft.payee),
-                    note = note,
-                    date = draft.date,
+                    id = ruled.id,
+                    accountId = ruled.accountId,
+                    categoryId = ruled.categoryId,
+                    amount = ruled.amountMinor,
+                    payeeId = payeeFor(ruled.payee),
+                    note = ruled.note,
+                    date = ruled.date,
                     sort = nextSort(),
+                    scheduleId = ruled.scheduleId,
                 )
                 return@write WriteResult.Saved
             }
@@ -505,17 +508,50 @@ class RegisterBook(
             if (partner != null) {
                 return@write saveTransferSide(existing, partner, draft, note)
             }
+            val ruled = applyRules(draft, note)
             updateFields(
                 existing.id,
-                draft.accountId,
-                draft.categoryId,
-                draft.amountMinor,
-                payeeFor(draft.payee),
-                note,
-                draft.date,
+                ruled.accountId,
+                ruled.categoryId,
+                ruled.amountMinor,
+                payeeFor(ruled.payee),
+                ruled.note,
+                ruled.date,
             )
             WriteResult.Saved
         }
+    }
+
+    private fun applyRules(
+        draft: TransactionDraft,
+        note: String?,
+    ): TransactionDraft {
+        if (draft.scheduleId != null) return draft
+        val payeeId = payeeFor(draft.payee)
+        val view =
+            RuleTransactionView(
+                account = draft.accountId,
+                payee = payeeId,
+                payeeName = draft.payee.trim(),
+                category = draft.categoryId,
+                amount = draft.amountMinor,
+                notes = note,
+                dateIso = ScheduleDates.toIso(draft.date),
+            )
+        val ruled = RulesBook(session, ids).applyRules(view)
+        val payeeName =
+            ruled.payee?.let { id ->
+                session
+                    .query("SELECT name FROM payees WHERE id = ?", listOf(id))
+                    .firstOrNull()
+                    ?.str("name")
+            } ?: ruled.payeeName
+        return draft.copy(
+            payee = payeeName.ifBlank { draft.payee },
+            categoryId = ruled.category,
+            amountMinor = ruled.amount,
+            note = ruled.notes ?: note,
+        )
     }
 
     fun setCategory(
@@ -900,13 +936,14 @@ class RegisterBook(
         date: Int,
         transferId: String? = null,
         sort: Double,
+        scheduleId: String? = null,
     ) {
         session.exec(
             """
             INSERT INTO transactions (
                 id, isParent, isChild, parent_id, acct, category, amount, description, notes, date,
-                starting_balance_flag, transferred_id, sort_order, cleared, reconciled, tombstone
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 1, 0, 0)
+                starting_balance_flag, transferred_id, sort_order, cleared, reconciled, tombstone, schedule
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 1, 0, 0, ?)
             """.trimIndent(),
             listOf(
                 id,
@@ -921,6 +958,7 @@ class RegisterBook(
                 date,
                 transferId,
                 sort,
+                scheduleId,
             ),
         )
     }

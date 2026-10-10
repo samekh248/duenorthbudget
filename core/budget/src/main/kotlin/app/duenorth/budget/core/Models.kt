@@ -75,6 +75,31 @@ object MoneyFormat {
         return if (negative) "-$body" else body
     }
 
+    fun parse(
+        text: String,
+        decimals: Int,
+    ): Long? {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty() || trimmed == "-" || trimmed == "+") return null
+        val negative = trimmed.startsWith("-")
+        val body = trimmed.removePrefix("-").removePrefix("+")
+        val parts = body.split('.')
+        if (parts.size > 2) return null
+        if (parts[0].any { !it.isDigit() }) return null
+        if (parts.size == 2 && (parts[1].length > decimals || parts[1].any { !it.isDigit() })) return null
+        val whole = parts[0].ifEmpty { "0" }.toLongOrNull() ?: return null
+        var scale = 1L
+        repeat(decimals) { scale *= 10 }
+        val fraction =
+            if (decimals == 0 || parts.size == 1) {
+                0L
+            } else {
+                parts[1].padEnd(decimals, '0').toLongOrNull() ?: return null
+            }
+        val minor = whole * scale + fraction
+        return if (negative) -minor else minor
+    }
+
     private fun group(value: Long): String {
         val raw = value.toString()
         val out = StringBuilder()
@@ -96,6 +121,9 @@ data class PhoneSettings(
     val themeMode: String = "system",
     val accent: String = "magenta",
     val netWorthIncludeOffBudget: Boolean = true,
+    val serverAddress: String? = null,
+    val syncNode: String? = null,
+    val askEachTime: List<String> = emptyList(),
 )
 
 @Serializable

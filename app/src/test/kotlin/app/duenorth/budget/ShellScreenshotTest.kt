@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -11,6 +12,7 @@ import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MonthShell
+import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
@@ -47,6 +49,12 @@ class ShellScreenshotTest {
     @Test
     fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = 2)
 
+    @Test
+    fun serverLight() = serverSnap("server_light", dark = false)
+
+    @Test
+    fun serverDark() = serverSnap("server_dark", dark = true)
+
     private fun snap(
         name: String,
         dark: Boolean,
@@ -60,6 +68,7 @@ class ShellScreenshotTest {
                         shell = shell,
                         review = null,
                         netWorth = null,
+                        upcoming = emptyList(),
                         loading = false,
                         initialSection = section,
                         onGesture = {},
@@ -69,10 +78,36 @@ class ShellScreenshotTest {
                         buttons =
                             listOf(
                                 AppBarButton(AppGlyph.Budgets, "budgets") {},
+                                AppBarButton(AppGlyph.Sync, "sync") {},
                                 AppBarButton(AppGlyph.Appearance, "appearance") {},
                             ),
                         expanded = false,
                         onExpandedChange = {},
+                    )
+                }
+            }
+        }
+    }
+
+    private fun serverSnap(
+        name: String,
+        dark: Boolean,
+    ) {
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Box(Modifier.width(390.dp).height(780.dp)) {
+                    ServerScreen(
+                        address = "http://192.168.1.20:5006",
+                        signedIn = true,
+                        files = listOf(RemoteFile("file-home", "group-1", "Home", null)),
+                        status = "synced 3:04 pm",
+                        error = null,
+                        onConnect = { _, _ -> },
+                        onOpen = {},
+                        onReplace = {},
+                        onUpload = {},
+                        onSync = {},
+                        onSignOut = {},
                     )
                 }
             }

@@ -72,7 +72,8 @@ object ActualSchema {
                 sort_order REAL NOT NULL DEFAULT 0,
                 cleared INTEGER NOT NULL DEFAULT 1,
                 reconciled INTEGER NOT NULL DEFAULT 0,
-                tombstone INTEGER NOT NULL DEFAULT 0
+                tombstone INTEGER NOT NULL DEFAULT 0,
+                schedule TEXT
             )
             """.trimIndent(),
             """
@@ -99,8 +100,40 @@ object ActualSchema {
                 buffered INTEGER NOT NULL DEFAULT 0
             )
             """.trimIndent(),
+            """
+            CREATE TABLE rules (
+                id TEXT PRIMARY KEY,
+                stage TEXT,
+                conditions_op TEXT NOT NULL DEFAULT 'and',
+                conditions TEXT,
+                actions TEXT,
+                tombstone INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent(),
+            """
+            CREATE TABLE schedules (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                rule TEXT NOT NULL,
+                completed INTEGER NOT NULL DEFAULT 0,
+                posts_transaction INTEGER NOT NULL DEFAULT 0,
+                custom_upcoming_length TEXT,
+                tombstone INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent(),
+            """
+            CREATE TABLE schedules_next_date (
+                id TEXT PRIMARY KEY,
+                schedule_id TEXT NOT NULL,
+                local_next_date TEXT,
+                local_next_date_ts REAL,
+                base_next_date TEXT,
+                base_next_date_ts REAL
+            )
+            """.trimIndent(),
             "CREATE INDEX idx_transactions_acct ON transactions (acct)",
             "CREATE INDEX idx_transactions_category_date ON transactions (category, date)",
+            "CREATE INDEX idx_schedules_rule ON schedules (rule)",
         )
 
     fun create(session: SqlSession) {
@@ -113,8 +146,14 @@ object ActualSchema {
         }
     }
 
-    /** Adds columns introduced after the first phone files. Safe to call on every open. */
+    /** Adds columns and tables introduced after the first phone files. Safe to call on every open. */
     fun ensure(session: SqlSession) {
+        ensureAccountType(session)
+        ensureScheduleTables(session)
+        ensureTransactionScheduleColumn(session)
+    }
+
+    private fun ensureAccountType(session: SqlSession) {
         val names = session.query("PRAGMA table_info(accounts)").mapNotNull { it.str("name") }.toSet()
         if (names.isEmpty()) return
         if ("type" !in names) {
@@ -123,5 +162,58 @@ object ActualSchema {
         if ("last_reconciled" !in names) {
             session.exec("ALTER TABLE accounts ADD COLUMN last_reconciled TEXT")
         }
+    }
+
+    private fun ensureScheduleTables(session: SqlSession) {
+        val tables = session.query("SELECT name FROM sqlite_master WHERE type = 'table'").mapNotNull { it.str("name") }.toSet()
+        if ("rules" !in tables) {
+            session.exec(
+                """
+                CREATE TABLE rules (
+                    id TEXT PRIMARY KEY,
+                    stage TEXT,
+                    conditions_op TEXT NOT NULL DEFAULT 'and',
+                    conditions TEXT,
+                    actions TEXT,
+                    tombstone INTEGER NOT NULL DEFAULT 0
+                )
+                """.trimIndent(),
+            )
+        }
+        if ("schedules" !in tables) {
+            session.exec(
+                """
+                CREATE TABLE schedules (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    rule TEXT NOT NULL,
+                    completed INTEGER NOT NULL DEFAULT 0,
+                    posts_transaction INTEGER NOT NULL DEFAULT 0,
+                    custom_upcoming_length TEXT,
+                    tombstone INTEGER NOT NULL DEFAULT 0
+                )
+                """.trimIndent(),
+            )
+        }
+        if ("schedules_next_date" !in tables) {
+            session.exec(
+                """
+                CREATE TABLE schedules_next_date (
+                    id TEXT PRIMARY KEY,
+                    schedule_id TEXT NOT NULL,
+                    local_next_date TEXT,
+                    local_next_date_ts REAL,
+                    base_next_date TEXT,
+                    base_next_date_ts REAL
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
+    private fun ensureTransactionScheduleColumn(session: SqlSession) {
+        val names = session.query("PRAGMA table_info(transactions)").mapNotNull { it.str("name") }.toSet()
+        if (names.isEmpty() || "schedule" in names) return
+        session.exec("ALTER TABLE transactions ADD COLUMN schedule TEXT")
     }
 }
