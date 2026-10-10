@@ -9,7 +9,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasSetTextAction
-import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -35,7 +34,7 @@ import java.time.YearMonth
 @Config(sdk = [33])
 class ShellContentTest {
     @get:Rule
-    val compose = createComposeRule()
+    val compose = createHostComposeRule()
 
     @Test
     fun showsToBudgetAndEmptyNotes() {
