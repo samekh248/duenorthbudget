@@ -466,6 +466,75 @@ class SyncCoordinator(
         return EditResult.Saved
     }
 
+    fun renameCategoryGroup(
+        budgetId: String,
+        groupId: String,
+        name: String,
+    ): EditResult {
+        if (name.trim().isEmpty()) return EditResult.Rejected(EnvelopeCopy.ENTER_NAME)
+        restoreClock(budgetId)
+        library.useDatabase(budgetId) { session ->
+            EnvelopeBook(session, syncClock).renameGroup(groupId, name)
+        } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
+        return EditResult.Saved
+    }
+
+    fun renameEnvelopeCategory(
+        budgetId: String,
+        categoryId: String,
+        name: String,
+    ): EditResult {
+        if (name.trim().isEmpty()) return EditResult.Rejected(EnvelopeCopy.ENTER_NAME)
+        restoreClock(budgetId)
+        library.useDatabase(budgetId) { session ->
+            EnvelopeBook(session, syncClock).renameCategory(categoryId, name)
+        } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
+        return EditResult.Saved
+    }
+
+    fun deleteEnvelopeCategory(
+        budgetId: String,
+        categoryId: String,
+    ): EditResult = envelopeEdit(budgetId) { deleteCategory(categoryId) }
+
+    fun deleteCategoryGroup(
+        budgetId: String,
+        groupId: String,
+    ): EditResult = envelopeEdit(budgetId) { deleteGroup(groupId) }
+
+    fun moveCategoryGroupOrder(
+        budgetId: String,
+        groupId: String,
+        earlier: Boolean,
+    ): EditResult =
+        envelopeEdit(budgetId) {
+            if (earlier) moveGroupEarlier(groupId) else moveGroupLater(groupId)
+        }
+
+    fun moveEnvelopeCategoryOrder(
+        budgetId: String,
+        categoryId: String,
+        earlier: Boolean,
+    ): EditResult =
+        envelopeEdit(budgetId) {
+            if (earlier) moveCategoryEarlier(categoryId) else moveCategoryLater(categoryId)
+        }
+
+    fun readCategoryManage(budgetId: String): CategoryManagePage? = library.readCategoryManage(budgetId)
+
+    private fun envelopeEdit(
+        budgetId: String,
+        block: EnvelopeBook.() -> EnvelopeEditResult,
+    ): EditResult {
+        restoreClock(budgetId)
+        return library.useDatabase(budgetId) { session ->
+            when (val outcome = EnvelopeBook(session, syncClock).block()) {
+                EnvelopeEditResult.Saved -> EditResult.Saved
+                is EnvelopeEditResult.Rejected -> EditResult.Rejected(outcome.reason)
+            }
+        } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
+    }
+
     fun addTransaction(
         budgetId: String,
         payee: String,

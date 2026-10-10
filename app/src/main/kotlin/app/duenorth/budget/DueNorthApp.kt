@@ -465,15 +465,22 @@ fun DueNorthApp(model: ShellViewModel) {
                         }
                     }
                     ShellRoute.ManageCategories -> {
-                        val shell = state.shell
-                        if (shell == null) {
+                        val manage = state.categoryManage
+                        if (manage == null) {
                             Placeholder()
                         } else {
                             ManageCategoriesScreen(
-                                shell = shell,
+                                manage = manage,
                                 error = state.editError,
                                 onAddGroup = model::addCategoryGroup,
                                 onAddCategory = model::addEnvelopeCategory,
+                                onRenameGroup = model::renameCategoryGroup,
+                                onRenameCategory = model::renameEnvelopeCategory,
+                                onHideCategory = model::hideEnvelopeCategory,
+                                onDeleteCategory = model::deleteEnvelopeCategory,
+                                onDeleteGroup = model::deleteCategoryGroup,
+                                onMoveGroup = model::moveCategoryGroupOrder,
+                                onMoveCategory = model::moveEnvelopeCategoryOrder,
                                 modifier = fill,
                             )
                         }

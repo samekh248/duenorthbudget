@@ -345,4 +345,42 @@ object ShellReader {
             }
         }
     }
+
+    fun loadCategoryManage(session: SqlSession): CategoryManagePage {
+        val groups =
+            session.query(
+                """
+                SELECT id, name, sort_order FROM category_groups
+                WHERE IFNULL(tombstone, 0) = 0 AND IFNULL(is_income, 0) = 0
+                ORDER BY sort_order, id
+                """.trimIndent(),
+            )
+        val categories =
+            session.query(
+                """
+                SELECT id, name, cat_group, hidden, sort_order FROM categories
+                WHERE IFNULL(tombstone, 0) = 0
+                ORDER BY sort_order, id
+                """.trimIndent(),
+            )
+        val byGroup = categories.groupBy { it.str("cat_group").orEmpty() }
+        return CategoryManagePage(
+            groups =
+                groups.map { group ->
+                    val groupId = group.str("id").orEmpty()
+                    ManageGroupRow(
+                        id = groupId,
+                        name = group.str("name").orEmpty(),
+                        categories =
+                            (byGroup[groupId] ?: emptyList()).map { row ->
+                                ManageCategoryRow(
+                                    id = row.str("id").orEmpty(),
+                                    name = row.str("name").orEmpty(),
+                                    hidden = row.bool("hidden"),
+                                )
+                            },
+                    )
+                },
+        )
+    }
 }

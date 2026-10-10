@@ -15,7 +15,30 @@ object EnvelopeCopy {
     const val PREVIOUS = "previous month"
     const val NEXT = "next month"
     const val MANAGE = "categories"
+    const val RENAME = "rename"
+    const val HIDE = "hide"
+    const val SHOW = "show"
+    const val DELETE = "delete"
+    const val MOVE_UP = "move up"
+    const val MOVE_DOWN = "move down"
+    const val ENTER_NAME = "enter a name"
 }
+
+data class ManageCategoryRow(
+    val id: String,
+    val name: String,
+    val hidden: Boolean,
+)
+
+data class ManageGroupRow(
+    val id: String,
+    val name: String,
+    val categories: List<ManageCategoryRow>,
+)
+
+data class CategoryManagePage(
+    val groups: List<ManageGroupRow>,
+)
 
 sealed interface EnvelopeEditResult {
     data object Saved : EnvelopeEditResult
@@ -125,6 +148,91 @@ class EnvelopeBook(
     fun deleteCategory(categoryId: String): EnvelopeEditResult {
         if (hasCategoryActivity(categoryId)) return EnvelopeEditResult.Rejected(EnvelopeCopy.STILL_USED)
         SyncSchema.recordLocal(session, clock, "categories", categoryId, "tombstone", "1")
+        return EnvelopeEditResult.Saved
+    }
+
+    fun deleteGroup(groupId: String): EnvelopeEditResult {
+        val living =
+            session
+                .query(
+                    """
+                    SELECT COUNT(*) AS n FROM categories
+                    WHERE cat_group = ? AND IFNULL(tombstone, 0) = 0
+                    """.trimIndent(),
+                    listOf(groupId),
+                ).first()
+                .long("n")
+        if (living > 0L) return EnvelopeEditResult.Rejected(EnvelopeCopy.GROUP_STILL_USED)
+        SyncSchema.recordLocal(session, clock, "category_groups", groupId, "tombstone", "1")
+        return EnvelopeEditResult.Saved
+    }
+
+    fun moveGroupEarlier(groupId: String): EnvelopeEditResult = swapGroupOrder(groupId, earlier = true)
+
+    fun moveGroupLater(groupId: String): EnvelopeEditResult = swapGroupOrder(groupId, earlier = false)
+
+    fun moveCategoryEarlier(categoryId: String): EnvelopeEditResult = swapCategoryOrder(categoryId, earlier = true)
+
+    fun moveCategoryLater(categoryId: String): EnvelopeEditResult = swapCategoryOrder(categoryId, earlier = false)
+
+    private fun swapGroupOrder(
+        groupId: String,
+        earlier: Boolean,
+    ): EnvelopeEditResult {
+        val ordered =
+            session.query(
+                """
+                SELECT id, sort_order FROM category_groups
+                WHERE IFNULL(tombstone, 0) = 0 AND IFNULL(is_income, 0) = 0
+                ORDER BY sort_order, id
+                """.trimIndent(),
+            )
+        val index = ordered.indexOfFirst { it.str("id") == groupId }
+        if (index < 0) return EnvelopeEditResult.Rejected(EnvelopeCopy.ENTER_NAME)
+        val swapIndex = if (earlier) index - 1 else index + 1
+        if (swapIndex !in ordered.indices) return EnvelopeEditResult.Saved
+        return swapSort("category_groups", ordered[index], ordered[swapIndex])
+    }
+
+    private fun swapCategoryOrder(
+        categoryId: String,
+        earlier: Boolean,
+    ): EnvelopeEditResult {
+        val row =
+            session
+                .query(
+                    "SELECT id, cat_group, sort_order FROM categories WHERE id = ? AND IFNULL(tombstone, 0) = 0",
+                    listOf(categoryId),
+                ).firstOrNull()
+                ?: return EnvelopeEditResult.Rejected(EnvelopeCopy.ENTER_NAME)
+        val groupId = row.str("cat_group").orEmpty()
+        val ordered =
+            session.query(
+                """
+                SELECT id, sort_order FROM categories
+                WHERE cat_group = ? AND IFNULL(tombstone, 0) = 0
+                ORDER BY sort_order, id
+                """.trimIndent(),
+                listOf(groupId),
+            )
+        val index = ordered.indexOfFirst { it.str("id") == categoryId }
+        if (index < 0) return EnvelopeEditResult.Rejected(EnvelopeCopy.ENTER_NAME)
+        val swapIndex = if (earlier) index - 1 else index + 1
+        if (swapIndex !in ordered.indices) return EnvelopeEditResult.Saved
+        return swapSort("categories", ordered[index], ordered[swapIndex])
+    }
+
+    private fun swapSort(
+        table: String,
+        left: SqlRow,
+        right: SqlRow,
+    ): EnvelopeEditResult {
+        val leftId = left.str("id").orEmpty()
+        val rightId = right.str("id").orEmpty()
+        val leftOrder = left.double("sort_order")
+        val rightOrder = right.double("sort_order")
+        SyncSchema.recordLocal(session, clock, table, leftId, "sort_order", rightOrder.toString())
+        SyncSchema.recordLocal(session, clock, table, rightId, "sort_order", leftOrder.toString())
         return EnvelopeEditResult.Saved
     }
 
