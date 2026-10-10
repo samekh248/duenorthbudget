@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.time.YearMonth
 import java.util.UUID
 
 class BudgetLibrary(
@@ -199,6 +200,54 @@ class BudgetLibrary(
         budgetId: String,
         draft: TransferDraft,
     ): WriteResult = open(budgetId) { RegisterBook(it).transfer(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun readMonthReview(
+        budgetId: String,
+        month: YearMonth,
+    ): MonthReviewPage? = open(budgetId) { ReviewReader.monthReview(it, month) }
+
+    fun readCategoryMonth(
+        budgetId: String,
+        categoryId: String,
+        month: YearMonth,
+    ): CategoryMonthPage? = open(budgetId) { ReviewReader.categoryMonth(it, categoryId, month) }
+
+    fun readNetWorth(
+        budgetId: String,
+        includeOffBudget: Boolean,
+    ): NetWorthPage? = open(budgetId) { ReviewReader.netWorth(it, includeOffBudget) }
+
+    fun readReconcile(
+        budgetId: String,
+        accountId: String,
+    ): ReconcilePage? = open(budgetId) { ReconcileBook(it).read(accountId) }
+
+    fun startReconcile(
+        budgetId: String,
+        accountId: String,
+        balanceText: String,
+        dateText: String,
+    ): ReconcileStartResult =
+        open(budgetId) { ReconcileBook(it).start(accountId, balanceText, dateText) }
+            ?: ReconcileStartResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun toggleReconcileCleared(
+        budgetId: String,
+        accountId: String,
+        transactionId: String,
+    ): ReconcilePage? = open(budgetId) { ReconcileBook(it).toggleCleared(accountId, transactionId) }
+
+    fun finishReconcile(
+        budgetId: String,
+        accountId: String,
+    ): ReconcileFinishResult =
+        open(budgetId) { ReconcileBook(it).finish(accountId) }
+            ?: ReconcileFinishResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun cancelReconcile(
+        budgetId: String,
+        accountId: String,
+    ): Boolean = open(budgetId) { ReconcileBook(it).cancel(accountId) } ?: false
 
     fun readUpcomingSchedules(budgetId: String): List<UpcomingScheduleRow> =
         open(budgetId) { SchedulesBook(it, clock).listUpcoming() } ?: emptyList()
