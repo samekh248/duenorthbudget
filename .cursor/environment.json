@@ -1,0 +1,4 @@
+{
+  "name": "Due North Budget",
+  "install": "bash scripts/cloud-agent-install.sh"
+}
