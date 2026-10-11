@@ -36,6 +36,7 @@ import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
+import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
@@ -455,6 +456,7 @@ fun BudgetsScreen(
     openId: String?,
     onOpen: (String) -> Unit,
     onCreate: () -> Unit,
+    onSamples: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -480,6 +482,64 @@ fun BudgetsScreen(
             }
         }
         MetroOutlineButton("new budget", Modifier.padding(top = 12.dp), onClick = onCreate)
+        if (onSamples != null) {
+            MetroOutlineButton(
+                ShellCopy.SAMPLE_BUDGETS,
+                Modifier
+                    .padding(top = 8.dp)
+                    .testTag("sample-budgets"),
+                onClick = onSamples,
+            )
+        }
+    }
+}
+
+@Composable
+fun SampleBudgetsScreen(
+    samples: List<MockBudgetDataset>,
+    error: String?,
+    onChoose: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .padding(MetroDimens.Gutter)
+            .testTag("sample-budgets-screen"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        MetroText(ShellCopy.SAMPLE_BUDGETS, Metro.typography.header)
+        MetroText(
+            "debug builds only · loads a filled Actual file on this phone",
+            Metro.typography.caption,
+            color = Metro.colors.secondary,
+        )
+        if (error != null) {
+            MetroText(error, Metro.typography.body, color = Metro.accent.text)
+        }
+        LazyColumn(
+            Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            items(samples, key = { it.id }) { sample ->
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = MetroDimens.TouchTarget)
+                        .metroPress { onChoose(sample.id) }
+                        .padding(vertical = 10.dp)
+                        .testTag("sample-${sample.id}"),
+                ) {
+                    MetroText(sample.title, Metro.typography.subheader)
+                    MetroText(
+                        sample.summary,
+                        Metro.typography.caption,
+                        color = Metro.colors.secondary,
+                    )
+                }
+            }
+        }
     }
 }
 

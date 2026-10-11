@@ -40,11 +40,13 @@ import java.io.File
 
 class DueNorthApplication : Application() {
     lateinit var library: BudgetLibrary
+    var developerMode: Boolean = false
+        private set
 
     override fun onCreate() {
         super.onCreate()
-        val debuggable = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        if (debuggable) {
+        developerMode = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (developerMode) {
             StrictMode.setThreadPolicy(
                 StrictMode.ThreadPolicy
                     .Builder()
@@ -74,7 +76,14 @@ class MainActivity : ComponentActivity() {
         val application = application as DueNorthApplication
         setContent {
             val model: ShellViewModel =
-                viewModel(factory = ShellViewModel.factory(application.library, application.sync))
+                viewModel(
+                    factory =
+                        ShellViewModel.factory(
+                            application.library,
+                            application.sync,
+                            developerMode = application.developerMode,
+                        ),
+                )
             DueNorthApp(model)
         }
     }
@@ -184,6 +193,14 @@ fun DueNorthApp(model: ShellViewModel) {
                             openId = state.settings.openBudgetId,
                             onOpen = model::requestSwitch,
                             onCreate = model::showCreate,
+                            onSamples = if (state.developerMode) model::showSampleBudgets else null,
+                            modifier = fill,
+                        )
+                    ShellRoute.SampleBudgets ->
+                        SampleBudgetsScreen(
+                            samples = state.sampleBudgets,
+                            error = state.createError,
+                            onChoose = model::createSample,
                             modifier = fill,
                         )
                     ShellRoute.Create ->

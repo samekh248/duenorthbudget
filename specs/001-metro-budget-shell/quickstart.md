@@ -13,7 +13,7 @@ From the repo root:
 ./gradlew :core:budget:test :core:design:testDebugUnitTest :app:testDebugUnitTest :app:verifyRoborazziDebug
 ```
 
-`:core:budget:test` covers envelope and tracking figures, currency formatting, create, switch, and reopen. It does not draw.
+`:core:budget:test` covers envelope and tracking figures, currency formatting, create, switch, reopen, and debug sample-budget seeds. It does not draw.
 
 `:core:design:testDebugUnitTest` covers accent contrast, title parallax, and press feedback.
 
