@@ -36,10 +36,10 @@ Every screen MUST follow Metro 2, the Due North Light Panorama language, and
 MUST yield to Principle I when the two conflict.
 
 Metro 2 is the second Metro design for Due North, chosen for Due North Tasks
-on 2026-10-04 as design C. This repo has no mockups of its own. Until budget
-screens are drawn, the reference is Due North Tasks
-`docs/design/metro-mockups.svg` and the rules below. It replaces the first
-mockups (a dark pivot with no panorama).
+on 2026-10-04 as design C. Budget screens are drawn in
+`docs/design/metro-mockups.svg`. Surfaces that are not drawn there still
+follow Due North Tasks `docs/design/metro-mockups.svg` and the rules below.
+It replaces the first mockups (a dark pivot with no panorama).
 
 - The home screen is a panorama. An oversized lowercase "budget" title,
   with "due north" directly under it, stays fully on screen and scrolls
@@ -143,4 +143,7 @@ remove or redefine a principle. MINOR: add a principle or materially expand
 one. PATCH: wording only. Plans and reviews MUST check these principles. A
 violation is listed with a justification before the work proceeds.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-06
+**Version**: 1.0.1 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-11
+
+**Amendment 1.0.1**: Wording only. Budget screens now live in
+`docs/design/metro-mockups.svg`. The principles are unchanged.
