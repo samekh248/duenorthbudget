@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryManagePage
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.EnvelopeCopy
+import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.ManageCategoryRow
 import app.duenorth.budget.core.ManageGroupRow
 import app.duenorth.budget.core.MoneyFormat
@@ -298,6 +299,33 @@ private fun ManageCategoryLine(
             MetroButton(EnvelopeCopy.MOVE_DOWN, onClick = onMoveLater)
             MetroButton(if (category.hidden) EnvelopeCopy.SHOW else EnvelopeCopy.HIDE, onClick = onHide)
             MetroButton(EnvelopeCopy.DELETE, onClick = onDelete)
+        }
+    }
+}
+
+@Composable
+fun GroupCategoriesScreen(
+    shell: MonthShell,
+    group: GroupRow,
+    onCategory: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .padding(horizontal = MetroDimens.Gutter),
+    ) {
+        MetroText(group.name, Metro.typography.header)
+        MetroText(
+            MoneyFormat.format(group.availableMinor, shell.currency),
+            Metro.typography.subheader,
+            color = Metro.accent.text,
+        )
+        LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
+            items(group.categories, key = { it.id }) { category ->
+                CategoryLine(category, shell, onCategory)
+            }
         }
     }
 }

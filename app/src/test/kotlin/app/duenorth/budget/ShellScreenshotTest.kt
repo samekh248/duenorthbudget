@@ -122,11 +122,14 @@ class ShellScreenshotTest {
             currency = Currencies.byCode("USD")!!,
             month = YearMonth.of(2026, 10),
             headerLabel = "to budget",
-            headerMinor = 180_000,
+            headerMinor = 42_000,
+            bufferedMinor = 25_000,
             groups =
                 listOf(
-                    GroupRow("g-liv", "Living", 50_000),
-                    GroupRow("g-bills", "Bills", 12_000),
+                    GroupRow("g-bills", "Bills", 124_000),
+                    GroupRow("g-every", "Everyday", 18_640),
+                    GroupRow("g-food", "Food", -3_200),
+                    GroupRow("g-save", "Savings", 80_000),
                 ),
             accounts =
                 listOf(
