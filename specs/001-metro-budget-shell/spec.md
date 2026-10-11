@@ -185,8 +185,9 @@ unchanged.
 ## Assumptions
 
 - Metro 2 is the Due North Light Panorama language from Due North Tasks
-  (design C, mockups in that repo's `docs/design/metro-mockups.svg`). This
-  repo does not contain those files. Budget-specific drawings come later.
+  (design C). Budget drawings are in `docs/design/metro-mockups.svg`. The
+  tasks repo keeps the language reference for surfaces that are not drawn
+  here.
 - A budget can exist only on the phone. Connecting to an Actual server is a
   separate spec.
 - Category, assignment, and transaction editing are out of scope here. Tests
