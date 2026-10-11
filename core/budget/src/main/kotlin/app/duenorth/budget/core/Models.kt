@@ -186,6 +186,7 @@ object ShellCopy {
     const val NO_PAYEE = "no payee"
     const val ENTER_NAME = "enter a name"
     const val CHOOSE_CURRENCY = "choose a currency"
+    const val UNKNOWN_SAMPLE = "unknown sample"
     const val TO_BUDGET = "to budget"
     const val BALANCE = "balance"
     const val NOTHING_TO_BUDGET = "nothing to budget"
@@ -193,6 +194,7 @@ object ShellCopy {
     const val NOTHING_TO_CATEGORIZE = "nothing to categorize"
     const val ON_BUDGET = "on budget"
     const val OFF_BUDGET = "off budget"
+    const val SAMPLE_BUDGETS = "sample budgets"
 }
 
 sealed interface CreateResult {

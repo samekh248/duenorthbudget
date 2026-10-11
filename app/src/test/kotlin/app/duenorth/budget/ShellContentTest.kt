@@ -9,10 +9,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.Currencies
@@ -191,6 +193,57 @@ class ShellContentTest {
         val heightDp = bounds.height / compose.density.density
         assertTrue("progress bar is ${heightDp}dp", heightDp in 3f..5f)
         compose.onNodeWithTag("sync-progress").assertIsDisplayed()
+    }
+
+
+    @Test
+    fun sampleBudgetsScreenListsDatasets() {
+        compose.setContent {
+            MetroTheme {
+                SampleBudgetsScreen(
+                    samples = app.duenorth.budget.core.MockBudgets.all,
+                    error = null,
+                    onChoose = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("sample-budgets-screen").assertIsDisplayed()
+        compose.onNodeWithTag("sample-household").assertIsDisplayed()
+        compose.onNodeWithTag("sample-full-tour").assertIsDisplayed()
+        compose.onNodeWithTag("sample-wide").assertIsDisplayed()
+        compose.onNodeWithText(ShellCopy.SAMPLE_BUDGETS).assertIsDisplayed()
+    }
+
+    @Test
+    fun budgetsScreenHidesSamplesUnlessDeveloperMode() {
+        compose.setContent {
+            MetroTheme {
+                BudgetsScreen(
+                    budgets = emptyList(),
+                    openId = null,
+                    onOpen = {},
+                    onCreate = {},
+                    onSamples = null,
+                )
+            }
+        }
+        compose.onAllNodesWithTag("sample-budgets").assertCountEquals(0)
+    }
+
+    @Test
+    fun budgetsScreenShowsSamplesInDeveloperMode() {
+        compose.setContent {
+            MetroTheme {
+                BudgetsScreen(
+                    budgets = emptyList(),
+                    openId = null,
+                    onOpen = {},
+                    onCreate = {},
+                    onSamples = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("sample-budgets").assertIsDisplayed()
     }
 
     private fun sample(): MonthShell =

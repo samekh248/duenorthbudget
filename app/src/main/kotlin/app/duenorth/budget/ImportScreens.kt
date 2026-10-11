@@ -176,6 +176,6 @@ private fun ChoiceLine(
             .fillMaxWidth()
             .metroPress(onClick = onClick)
             .padding(vertical = 4.dp),
-        color = if (selected) Metro.accent.text else Metro.colors.primary,
+        color = if (selected) Metro.accent.text else Metro.colors.foreground,
     )
 }

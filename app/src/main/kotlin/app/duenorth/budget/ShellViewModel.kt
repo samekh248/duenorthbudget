@@ -16,6 +16,8 @@ import app.duenorth.budget.core.ForcedWrite
 import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
+import app.duenorth.budget.core.MockBudgetDataset
+import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.ParsedImportRow
 import app.duenorth.budget.core.PreviewRowStatus
 import app.duenorth.budget.core.MoneyFormat
@@ -136,6 +138,8 @@ sealed interface ShellRoute {
     data object ManageCategories : ShellRoute
 
     data object Payees : ShellRoute
+
+    data object SampleBudgets : ShellRoute
 }
 
 data class ShellUiState(
@@ -143,6 +147,8 @@ data class ShellUiState(
     val route: ShellRoute = ShellRoute.Home,
     val settings: PhoneSettings = PhoneSettings(),
     val budgets: List<BudgetSummary> = emptyList(),
+    val developerMode: Boolean = false,
+    val sampleBudgets: List<MockBudgetDataset> = emptyList(),
     val shell: MonthShell? = null,
     val register: RegisterPage? = null,
     val registerFilter: String = "",
@@ -190,11 +196,18 @@ class ShellViewModel(
     private val library: BudgetLibrary,
     private val sync: SyncCoordinator,
     private val bankSyncTransport: BankSyncTransport = HttpBankSyncTransport(),
+    private val developerMode: Boolean = false,
 ) : ViewModel() {
     private val shellGate = RefreshGate<MonthShell>()
     private val registerGate = RefreshGate<RegisterPage>()
     private val history = ArrayDeque<ShellRoute>()
-    private val _state = MutableStateFlow(ShellUiState())
+    private val _state =
+        MutableStateFlow(
+            ShellUiState(
+                developerMode = developerMode,
+                sampleBudgets = if (developerMode) MockBudgets.all else emptyList(),
+            ),
+        )
     val state: StateFlow<ShellUiState> = _state.asStateFlow()
     private var writing = false
 
@@ -240,6 +253,12 @@ class ShellViewModel(
     fun showCreate() {
         history.clear()
         _state.update { it.copy(route = ShellRoute.Create, createError = null, confirm = null) }
+    }
+
+    fun showSampleBudgets() {
+        if (!developerMode) return
+        history.clear()
+        _state.update { it.copy(route = ShellRoute.SampleBudgets, createError = null, confirm = null) }
     }
 
     fun showAppearance() {
@@ -963,6 +982,19 @@ class ShellViewModel(
         }
     }
 
+    fun createSample(datasetId: String) {
+        if (!developerMode) return
+        viewModelScope.launch {
+            when (val result = withContext(Dispatchers.IO) { library.createFromMock(datasetId) }) {
+                is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
+                is CreateResult.Created -> {
+                    _state.update { it.copy(createError = null, route = ShellRoute.Home) }
+                    reload()
+                }
+            }
+        }
+    }
+
     fun requestSwitch(id: String) {
         val target = _state.value.budgets.find { it.id == id } ?: return
         if (target.id == _state.value.settings.openBudgetId) {
@@ -1545,11 +1577,12 @@ class ShellViewModel(
         fun factory(
             library: BudgetLibrary,
             sync: SyncCoordinator,
+            developerMode: Boolean = false,
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     @Suppress("UNCHECKED_CAST")
-                    return ShellViewModel(library, sync) as T
+                    return ShellViewModel(library, sync, developerMode = developerMode) as T
                 }
             }
     }

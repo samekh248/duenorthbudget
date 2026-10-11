@@ -24,4 +24,8 @@ Planning uses [GitHub Spec Kit](https://github.com/github/spec-kit).
 
 Specs 001–007 are implemented on `main`. Feature quickstarts cover the shipped specs.
 
+### Debug sample budgets
+
+Debug builds expose **sample budgets** on the budgets screen. Pick one to create a filled Actual file on the phone (household, full tour, or wide month). Release builds hide the entry point.
+
 Selawik is bundled under the SIL Open Font License (`core/design/src/main/assets/licenses/selawik_OFL.txt`).
