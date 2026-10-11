@@ -98,15 +98,38 @@ class ShellContentTest {
     }
 
     @Test
+    fun budgetSectionShowsGroupsNotCategories() {
+        val categories = listOf(CategoryRow("c-food", "Groceries", 0L, 0L, 12_000L, false))
+        val shell =
+            sample().copy(
+                bufferedMinor = 25_000L,
+                groups = listOf(GroupRow("g", "Everyday", 12_000L, categories)),
+            )
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    BudgetSection(shell, onListGesture = {}, onGroup = {})
+                }
+            }
+        }
+        compose.onNodeWithTag("group-name-g").assertIsDisplayed()
+        compose.onNodeWithText("Everyday").assertIsDisplayed()
+        compose.onNodeWithTag("held-amount").assertIsDisplayed()
+        compose.onNodeWithTag("category-c-food").assertDoesNotExist()
+        compose.onNodeWithText("Groceries").assertDoesNotExist()
+    }
+
+    @Test
     fun threeHundredCategoriesStayLazyWhileEditable() {
         val categories = (0 until 300).map { CategoryRow("c$it", "category $it", 0L, 0L, 0L, false) }
-        val shell = sample().copy(groups = listOf(GroupRow("g", "one group", 0L, categories)))
+        val group = GroupRow("g", "one group", 0L, categories)
+        val shell = sample().copy(groups = listOf(group))
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(320.dp)) {
-                    BudgetSection(
-                        shell,
-                        onListGesture = {},
+                    GroupCategoriesScreen(
+                        shell = shell,
+                        group = group,
                         onCategory = {},
                     )
                 }

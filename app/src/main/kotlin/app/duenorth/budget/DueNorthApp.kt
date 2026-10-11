@@ -173,7 +173,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                     model::previousBudgetMonth
                                 },
                             onBudgetNextMonth = if (state.shell == null) null else model::nextBudgetMonth,
-                            onBudgetCategory = if (state.shell == null) null else model::openCategoryBudget,
+                            onBudgetGroup = if (state.shell == null) null else model::openGroupCategories,
                             onBudgetHold = if (state.shell == null) null else model::showHoldMonth,
                             onBudgetManage = if (state.shell == null) null else model::showManageCategories,
                             onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
@@ -416,6 +416,20 @@ fun DueNorthApp(model: ShellViewModel) {
                             CategoryReviewScreen(
                                 page = page,
                                 onGesture = model::setGesture,
+                                modifier = fill,
+                            )
+                        }
+                    }
+                    is ShellRoute.GroupCategories -> {
+                        val shell = state.shell
+                        val group = shell?.groups?.firstOrNull { it.id == route.groupId }
+                        if (shell == null || group == null) {
+                            Placeholder()
+                        } else {
+                            GroupCategoriesScreen(
+                                shell = shell,
+                                group = group,
+                                onCategory = model::openCategoryBudget,
                                 modifier = fill,
                             )
                         }

@@ -119,6 +119,10 @@ sealed interface ShellRoute {
         val categoryId: String,
     ) : ShellRoute
 
+    data class GroupCategories(
+        val groupId: String,
+    ) : ShellRoute
+
     data class CategoryBudget(
         val categoryId: String,
     ) : ShellRoute
@@ -374,6 +378,11 @@ class ShellViewModel(
     fun nextBudgetMonth() {
         _state.update { it.copy(budgetMonth = it.budgetMonth.plusMonths(1)) }
         refreshBudgetShell()
+    }
+
+    fun openGroupCategories(groupId: String) {
+        push(ShellRoute.GroupCategories(groupId))
+        _state.update { it.copy(editError = null) }
     }
 
     fun openCategoryBudget(categoryId: String) {
@@ -1444,6 +1453,7 @@ class ShellViewModel(
 
     private fun ShellRoute.isHomeFlow(): Boolean =
         this is ShellRoute.ReviewCategory ||
+            this is ShellRoute.GroupCategories ||
             this is ShellRoute.CategoryBudget ||
             this is ShellRoute.MoveCategory ||
             this is ShellRoute.HoldMonth ||

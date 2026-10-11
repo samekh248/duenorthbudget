@@ -49,6 +49,7 @@ import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroPanorama
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.PanoramaSection
@@ -76,7 +77,7 @@ fun HomePanorama(
     modifier: Modifier = Modifier,
     onBudgetPreviousMonth: (() -> Unit)? = null,
     onBudgetNextMonth: (() -> Unit)? = null,
-    onBudgetCategory: ((String) -> Unit)? = null,
+    onBudgetGroup: ((String) -> Unit)? = null,
     onBudgetHold: (() -> Unit)? = null,
     onBudgetManage: (() -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
@@ -98,7 +99,7 @@ fun HomePanorama(
                             onListGesture = { listGesture = it },
                             onPreviousMonth = onBudgetPreviousMonth,
                             onNextMonth = onBudgetNextMonth,
-                            onCategory = onBudgetCategory,
+                            onGroup = onBudgetGroup,
                             onHold = onBudgetHold,
                             onManage = onBudgetManage,
                         )
@@ -171,7 +172,7 @@ fun BudgetSection(
     modifier: Modifier = Modifier,
     onPreviousMonth: (() -> Unit)? = null,
     onNextMonth: (() -> Unit)? = null,
-    onCategory: ((String) -> Unit)? = null,
+    onGroup: ((String) -> Unit)? = null,
     onHold: (() -> Unit)? = null,
     onManage: (() -> Unit)? = null,
 ) {
@@ -190,12 +191,26 @@ fun BudgetSection(
             color = Metro.accent.text,
             modifier = Modifier.testTag("to-budget"),
         )
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (onPreviousMonth != null) {
-                MetroButton(EnvelopeCopy.PREVIOUS, onClick = onPreviousMonth)
+                MetroOutlineButton(EnvelopeCopy.PREVIOUS, onClick = onPreviousMonth)
             }
             if (onNextMonth != null) {
-                MetroButton(EnvelopeCopy.NEXT, onClick = onNextMonth)
+                MetroOutlineButton(EnvelopeCopy.NEXT, onClick = onNextMonth)
+            }
+        }
+        if (shell.groups.isEmpty()) {
+            MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.body, Modifier.padding(top = 12.dp).weight(1f))
+        } else {
+            LazyColumn(Modifier.weight(1f), state = list) {
+                items(shell.groups, key = { it.id }) { group ->
+                    GroupLine(
+                        group,
+                        shell,
+                        arrivalModifier(group.id, arrivals),
+                        onOpen = onGroup,
+                    )
+                }
             }
         }
         if (shell.bufferedMinor != 0L) {
@@ -203,28 +218,12 @@ fun BudgetSection(
                 "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
                 Metro.typography.caption,
                 color = Metro.colors.secondary,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = 8.dp).testTag("held-amount"),
             )
         }
-        if (shell.groups.isEmpty()) {
-            MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.body, Modifier.padding(top = 12.dp))
-        } else {
-            LazyColumn(Modifier.weight(1f), state = list) {
-                shell.groups.forEach { group ->
-                    item(key = "group-${group.id}") {
-                        GroupLine(group, shell, arrivalModifier(group.id, arrivals))
-                    }
-                    if (onCategory != null) {
-                        items(group.categories, key = { "cat-${it.id}" }) { category ->
-                            CategoryLine(category, shell, onCategory, arrivalModifier(category.id, arrivals))
-                        }
-                    }
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (onHold != null) MetroButton(EnvelopeCopy.HOLD, onClick = onHold)
-            if (onManage != null) MetroButton(EnvelopeCopy.MANAGE, onClick = onManage)
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (onHold != null) MetroOutlineButton(EnvelopeCopy.HOLD, onClick = onHold)
+            if (onManage != null) MetroOutlineButton(EnvelopeCopy.MANAGE, onClick = onManage)
         }
     }
 }
@@ -234,12 +233,15 @@ private fun GroupLine(
     group: GroupRow,
     shell: MonthShell,
     modifier: Modifier = Modifier,
+    onOpen: ((String) -> Unit)? = null,
 ) {
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .padding(vertical = 8.dp),
+            .then(if (onOpen != null) Modifier.metroPress { onOpen(group.id) } else Modifier)
+            .padding(vertical = 8.dp)
+            .testTag("group-${group.id}"),
         verticalAlignment = Alignment.Top,
     ) {
         MetroText(
@@ -477,7 +479,7 @@ fun BudgetsScreen(
                 )
             }
         }
-        MetroButton("new budget", onClick = onCreate)
+        MetroOutlineButton("new budget", Modifier.padding(top = 12.dp), onClick = onCreate)
     }
 }
 
@@ -498,8 +500,8 @@ fun ConfirmSwitchScreen(
     ) {
         MetroText("open $opening", Metro.typography.header)
         MetroText("leave $leaving on the phone", Metro.typography.subheader)
-        MetroButton("open", onClick = onOpen)
-        MetroButton("stay", onClick = onStay)
+        MetroOutlineButton("open", onClick = onOpen)
+        MetroOutlineButton("stay", onClick = onStay)
     }
 }
 

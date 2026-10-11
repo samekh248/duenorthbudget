@@ -142,6 +142,26 @@ fun MetroButton(
     }
 }
 
+/** Compact outlined action from the budget mockups (previous / hold / new budget). */
+@Composable
+fun MetroOutlineButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val colors = Metro.colors
+    Box(
+        modifier
+            .heightIn(min = MetroDimens.TouchTarget)
+            .border(2.dp, colors.foreground)
+            .metroPress(onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        MetroText(label, Metro.typography.body)
+    }
+}
+
 enum class AppGlyph { Budgets, Appearance, Sync, More }
 
 @Immutable
