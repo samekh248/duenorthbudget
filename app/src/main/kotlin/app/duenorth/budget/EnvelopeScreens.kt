@@ -283,7 +283,7 @@ private fun ManageCategoryLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick = onSelect)
-            .padding(start = 16.dp, vertical = 2.dp)
+            .padding(start = 16.dp, top = 2.dp, bottom = 2.dp)
             .testTag("manage-category-${category.id}"),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
