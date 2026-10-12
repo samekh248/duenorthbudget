@@ -78,58 +78,52 @@ data class MetroTypography(
                         fontWeight = MetroWeights.Semilight,
                         fontSize = 42.667.sp,
                     ),
-                // TitleTextBlockStyle: SemiBold, TextStyleLarge 18.14.
+                // Content is one step under the phone-kit sizes.
                 pageTitle =
                     TextStyle(
                         fontFamily = family,
                         fontWeight = MetroWeights.Semibold,
-                        fontSize = 18.14.sp,
+                        fontSize = 16.sp,
                     ),
-                // HeaderTextBlockStyle: SemiLight 57.5.
                 header =
                     TextStyle(
                         fontFamily = family,
                         fontWeight = MetroWeights.Semilight,
-                        fontSize = 57.5.sp,
+                        fontSize = 48.sp,
                     ),
-                // SubheaderTextBlockStyle: SemiLight 30, line height 33.
                 subheader =
                     TextStyle(
                         fontFamily = family,
                         fontWeight = MetroWeights.Semilight,
-                        fontSize = 30.sp,
-                        lineHeight = 33.sp,
+                        fontSize = 26.sp,
+                        lineHeight = 28.sp,
                     ),
-                // GroupHeaderTextBlockStyle: SemiLight 23.73, subtle.
                 groupHeader =
                     TextStyle(
                         fontFamily = family,
                         fontWeight = MetroWeights.Semilight,
-                        fontSize = 23.73.sp,
+                        fontSize = 20.sp,
                         letterSpacing = (-0.003).em,
                     ),
-                // BodyTextBlockStyle: Regular, TextStyleLarge 18.14, line height 24.
                 body =
                     TextStyle(
                         fontFamily = family,
                         fontWeight = MetroWeights.Regular,
-                        fontSize = 18.14.sp,
-                        lineHeight = 24.sp,
+                        fontSize = 16.sp,
+                        lineHeight = 22.sp,
                     ),
-                // ContentControlFontSize, the text-box size.
                 control =
                     TextStyle(
                         fontFamily = family,
                         fontWeight = MetroWeights.Regular,
-                        fontSize = 20.26.sp,
+                        fontSize = 18.sp,
                     ),
-                // ListViewItemSubheader / control header: SemiLight 16, line height 20.
                 caption =
                     TextStyle(
                         fontFamily = family,
                         fontWeight = MetroWeights.Semilight,
-                        fontSize = 16.sp,
-                        lineHeight = 20.sp,
+                        fontSize = 14.sp,
+                        lineHeight = 18.sp,
                     ),
             )
 

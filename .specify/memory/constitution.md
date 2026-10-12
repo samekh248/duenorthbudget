@@ -50,9 +50,9 @@ It replaces the first mockups (a dark pivot with no panorama).
   that expands labels and a menu.
 - Typography is the interface. Use a Segoe-style light and semilight sans
   (Selawik as the licensed stand-in). Page titles are oversized and lowercase.
-  The ramp follows the Windows Phone 8.1 phone-kit text styles: header 57.5
-  semilight, subheader 30 semilight, body 18.14, secondary text 16 semilight,
-  panorama sections extra-large semilight. The panorama wordmark stays the
+  Panorama sections stay extra-large semilight. Content text sits one step
+  under the phone-kit sizes: header 48 semilight, subheader 26 semilight,
+  body 16, secondary text 14 semilight. The panorama wordmark stays the
   Due North logo.
 - Content over chrome: no drop shadows, no gradients, no rounded cards, no
   elevation, no Material ripple. Flat color fills only.
