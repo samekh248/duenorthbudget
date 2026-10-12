@@ -251,6 +251,40 @@ class ShellContentTest {
     }
 
     @Test
+    fun categoryLedgerKeepsFiguresInColumns() {
+        val category = CategoryRow("c-food", "Groceries", 20_000L, 28_000L, -8_000L, false)
+        val group = GroupRow("g", "Food", -3_200L, listOf(category))
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    GroupCategoriesScreen(sample().copy(groups = listOf(group)), group, onCategory = {})
+                }
+            }
+        }
+        compose.onNodeWithTag("category-budgeted-c-food", useUnmergedTree = true).assertTextEquals("$200.00")
+        compose.onNodeWithTag("category-spent-c-food", useUnmergedTree = true).assertTextEquals("$280.00")
+        compose.onNodeWithTag("category-available-c-food", useUnmergedTree = true).assertTextEquals("-$80.00")
+        val name = compose.onNodeWithText("Groceries", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val budgeted = compose.onNodeWithTag("category-budgeted-c-food", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val spent = compose.onNodeWithTag("category-spent-c-food", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val available = compose.onNodeWithTag("category-available-c-food", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val headBudgeted = compose.onNodeWithTag("ledger-budgeted", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val headAvailable = compose.onNodeWithTag("ledger-available", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val rule = compose.onNodeWithTag("category-rule-c-food", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("name stays left of budgeted: $name vs $budgeted", name.right <= budgeted.left + 1f)
+        assertTrue("spent follows budgeted: $budgeted vs $spent", budgeted.right <= spent.left + 1f)
+        assertTrue("available follows spent: $spent vs $available", spent.right <= available.left + 1f)
+        assertTrue("budgeted column lines up: $budgeted vs $headBudgeted", kotlin.math.abs(budgeted.right - headBudgeted.right) <= 1f)
+        assertTrue(
+            "available column lines up: $available vs $headAvailable",
+            kotlin.math.abs(available.right - headAvailable.right) <= 1f,
+        )
+        assertTrue("rule starts at the figures: $rule vs $name", rule.left + 1f >= name.right)
+        assertTrue("rule ends with available: $rule vs $available", kotlin.math.abs(rule.right - available.right) <= 1f)
+        assertTrue("rule sits under the figures: $rule vs $available", rule.top >= available.top)
+    }
+
+    @Test
     fun threeHundredGroupsStayLazy() {
         val groups = (0 until 300).map { GroupRow("g$it", "group $it", 100L) }
         compose.setContent {

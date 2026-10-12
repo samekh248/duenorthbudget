@@ -2,10 +2,13 @@ package app.duenorth.budget
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,7 +20,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryManagePage
 import app.duenorth.budget.core.CategoryRow
@@ -339,7 +345,10 @@ fun GroupCategoriesScreen(
             Modifier.padding(top = MetroDimens.Gutter),
             color = Metro.accent.text,
         )
-        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
+        if (group.categories.isNotEmpty()) {
+            LedgerHeadings(Modifier.padding(top = MetroDimens.Grid))
+        }
+        LazyColumn(Modifier.weight(1f)) {
             items(group.categories, key = { it.id }) { category ->
                 CategoryLine(category, shell, onCategory)
             }
@@ -354,19 +363,82 @@ fun CategoryLine(
     onOpen: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    val money = shell.currency
+    Box(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onOpen(category.id) }
-            .padding(vertical = MetroDimens.Row)
             .testTag("category-${category.id}"),
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        MetroText(category.name, Metro.typography.body, Modifier.weight(1f), maxLines = 2)
-        MetroText(
-            MoneyFormat.format(category.availableMinor, shell.currency),
-            Metro.typography.body,
-        )
+        Row(
+            Modifier.fillMaxWidth().align(Alignment.CenterStart),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MetroText(
+                category.name,
+                Metro.typography.body,
+                Modifier.weight(LEDGER_NAME).padding(end = MetroDimens.Gutter),
+                maxLines = 2,
+            )
+            LedgerCell(
+                MoneyFormat.format(category.budgetedMinor, money),
+                Metro.typography.body,
+                Metro.colors.foreground,
+                "category-budgeted-${category.id}",
+            )
+            LedgerCell(
+                MoneyFormat.format(category.spentMinor, money),
+                Metro.typography.body,
+                Metro.colors.foreground,
+                "category-spent-${category.id}",
+            )
+            LedgerCell(
+                MoneyFormat.format(category.availableMinor, money),
+                Metro.typography.body,
+                Metro.accent.text,
+                "category-available-${category.id}",
+            )
+        }
+        Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter)) {
+            Spacer(Modifier.weight(LEDGER_NAME))
+            Box(
+                Modifier
+                    .weight(LEDGER_FIGURE * 3)
+                    .height(1.dp)
+                    .background(if (Metro.colors.isDark) Metro.colors.outline else Metro.colors.chrome)
+                    .testTag("category-rule-${category.id}"),
+            )
+        }
     }
 }
+
+@Composable
+private fun LedgerHeadings(modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+        Spacer(Modifier.weight(LEDGER_NAME))
+        LedgerCell("budgeted", Metro.typography.caption, Metro.colors.secondary, "ledger-budgeted")
+        LedgerCell("spent", Metro.typography.caption, Metro.colors.secondary, "ledger-spent")
+        LedgerCell("available", Metro.typography.caption, Metro.colors.secondary, "ledger-available")
+    }
+}
+
+@Composable
+private fun RowScope.LedgerCell(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    tag: String,
+) {
+    MetroText(
+        text,
+        style.copy(textAlign = TextAlign.End),
+        Modifier.weight(LEDGER_FIGURE).testTag(tag),
+        color = color,
+        maxLines = 1,
+        softWrap = false,
+    )
+}
+
+private const val LEDGER_NAME = 1.4f
+private const val LEDGER_FIGURE = 1f
