@@ -67,7 +67,7 @@ private fun DueLine(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp)
+            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
             .testTag("due-${row.id}"),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -86,7 +86,7 @@ private fun DueLine(
                 Modifier.widthIn(max = 148.dp),
             )
         }
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.padding(top = MetroDimens.Gutter), horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
             MetroButton(if (row.dueToday) "post" else "post early", Modifier.weight(1f)) { onPost(row.id) }
             MetroButton("skip", Modifier.weight(1f)) { onSkip(row.id) }
         }

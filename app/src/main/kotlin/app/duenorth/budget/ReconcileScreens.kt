@@ -13,11 +13,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,47 +83,51 @@ fun ReconcileScreen(
             .padding(horizontal = MetroDimens.Gutter),
     ) {
         MetroText(page.account.name, Metro.typography.header)
-        MetroText(ReconcileCopy.STATEMENT, Metro.typography.caption, color = Metro.colors.secondary)
-        MetroText(
-            MoneyFormat.format(page.statementMinor, page.currency),
-            Metro.typography.subheader,
-            modifier = Modifier.testTag("statement-amount"),
-        )
-        MetroText(
-            ReconcileCopy.CLEARED,
-            Metro.typography.caption,
-            Modifier.padding(top = 8.dp),
-            color = Metro.colors.secondary,
-        )
-        MetroText(
-            MoneyFormat.format(page.clearedTotalMinor, page.currency),
-            Metro.typography.subheader,
-            modifier = Modifier.testTag("cleared-total"),
-        )
-        MetroText(
-            ReconcileCopy.DIFFERENCE,
-            Metro.typography.caption,
-            Modifier.padding(top = 8.dp),
-            color = Metro.colors.secondary,
-        )
-        MetroText(
-            MoneyFormat.format(page.differenceMinor, page.currency),
-            Metro.typography.header,
-            color = Metro.accent.text,
-            modifier = Modifier.testTag("reconcile-difference"),
-        )
+        Column(Modifier.padding(top = MetroDimens.Gutter)) {
+            MetroText(ReconcileCopy.STATEMENT, Metro.typography.caption, color = Metro.colors.secondary)
+            MetroText(
+                MoneyFormat.format(page.statementMinor, page.currency),
+                Metro.typography.subheader,
+                modifier = Modifier.testTag("statement-amount"),
+            )
+        }
+        Column(Modifier.padding(top = MetroDimens.Grid)) {
+            MetroText(
+                ReconcileCopy.CLEARED,
+                Metro.typography.caption,
+                color = Metro.colors.secondary,
+            )
+            MetroText(
+                MoneyFormat.format(page.clearedTotalMinor, page.currency),
+                Metro.typography.subheader,
+                modifier = Modifier.testTag("cleared-total"),
+            )
+        }
+        Column(Modifier.padding(top = MetroDimens.Grid)) {
+            MetroText(
+                ReconcileCopy.DIFFERENCE,
+                Metro.typography.caption,
+                color = Metro.colors.secondary,
+            )
+            MetroText(
+                MoneyFormat.format(page.differenceMinor, page.currency),
+                Metro.typography.header,
+                color = Metro.accent.text,
+                modifier = Modifier.testTag("reconcile-difference"),
+            )
+        }
         if (error != null) {
             MetroText(
                 error,
                 Metro.typography.body,
-                Modifier.padding(top = 8.dp),
+                Modifier.padding(top = MetroDimens.Gutter),
                 color = Metro.accent.text,
             )
         }
-        LazyColumn(Modifier.weight(1f).padding(top = 12.dp), state = list) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid), state = list) {
             items(page.rows, key = { it.id }) { row -> ReconcileLine(row, page, onToggle) }
         }
-        MetroButton(ReconcileCopy.FINISH, Modifier.padding(vertical = 8.dp), onClick = onFinish)
+        MetroButton(ReconcileCopy.FINISH, Modifier.padding(top = MetroDimens.Grid, bottom = MetroDimens.Gutter), onClick = onFinish)
         MetroButton(ReconcileCopy.CANCEL, onClick = onCancel)
     }
 }
@@ -140,7 +144,7 @@ private fun ReconcileLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .then(if (canToggle) Modifier.metroPress { onToggle(row.id) } else Modifier)
-            .padding(vertical = 8.dp)
+            .padding(vertical = MetroDimens.Row)
             .testTag("reconcile-row-${row.id}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {

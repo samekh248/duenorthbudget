@@ -14,7 +14,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.PayeeRow
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroField
@@ -47,26 +46,26 @@ fun PayeesScreen(
                 MetroText(
                     "This name already exists. Confirm to merge transactions into the existing payee.",
                     Metro.typography.body,
-                    Modifier.padding(top = 8.dp),
+                    Modifier.padding(top = MetroDimens.Gutter),
                 )
-                MetroButton("merge", Modifier.padding(top = 12.dp)) {
+                MetroButton("merge", Modifier.padding(top = MetroDimens.Grid)) {
                     onConfirmMerge(editing!!.id, name)
                     editing = null
                 }
-                MetroButton("cancel", Modifier.padding(top = 8.dp)) { onCancelMerge() }
+                MetroButton("cancel", Modifier.padding(top = MetroDimens.Gutter)) { onCancelMerge() }
             }
         } else if (editing != null) {
             Column(Modifier.padding(MetroDimens.Gutter)) {
                 MetroText("rename payee", Metro.typography.header)
-                MetroField(name, { name = it }, "name", Modifier.padding(top = 8.dp))
+                MetroField(name, { name = it }, "name", Modifier.padding(top = MetroDimens.Grid))
                 RowChoice("remember as rule", rememberRule) { rememberRule = !rememberRule }
                 if (error != null) {
-                    MetroText(error, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
+                    MetroText(error, Metro.typography.body, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)
                 }
-                MetroButton("save", Modifier.padding(top = 12.dp)) {
+                MetroButton("save", Modifier.padding(top = MetroDimens.Grid)) {
                     onRename(editing!!.id, name, false, rememberRule)
                 }
-                MetroButton("cancel", Modifier.padding(top = 8.dp)) { editing = null }
+                MetroButton("cancel", Modifier.padding(top = MetroDimens.Gutter)) { editing = null }
             }
         } else {
             if (error != null) {
@@ -81,8 +80,7 @@ fun PayeesScreen(
                             .metroPress {
                                 editing = payee
                                 name = payee.name
-                            }
-                            .padding(horizontal = MetroDimens.Gutter, vertical = 10.dp),
+                            }.padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row),
                     ) {
                         MetroText(payee.name, Metro.typography.subheader)
                         MetroText(
@@ -107,7 +105,7 @@ private fun RowChoice(
         label,
         Metro.typography.body,
         Modifier
-            .padding(top = 8.dp)
+            .padding(top = MetroDimens.Gutter)
             .metroPress(onClick = onSelect),
         color = if (selected) Metro.accent.text else Metro.colors.secondary,
     )

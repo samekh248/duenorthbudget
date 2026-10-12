@@ -8,14 +8,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.RemoteFile
+import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
+import app.duenorth.budget.design.components.asScreenActions
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -44,6 +47,12 @@ class ShellScreenshotTest {
         )
 
     @Test
+    fun categoryLedgerLight() = categorySnap("category_ledger_light", dark = false)
+
+    @Test
+    fun categoryLedgerDark() = categorySnap("category_ledger_dark", dark = true)
+
+    @Test
     fun accountsLight() = snap("accounts_light", dark = false, shell = sample(), section = 1)
 
     @Test
@@ -70,19 +79,50 @@ class ShellScreenshotTest {
                         netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
+                        openMonth = shell.month,
+                        monthWindow = MonthWindow.around(shell.month),
                         initialSection = section,
                         onGesture = {},
                         modifier = Modifier.weight(1f),
                     )
                     MetroAppBar(
-                        buttons =
+                        actions =
                             listOf(
-                                AppBarButton(AppGlyph.Budgets, "budgets") {},
-                                AppBarButton(AppGlyph.Sync, "sync") {},
-                                AppBarButton(AppGlyph.Appearance, "appearance") {},
-                            ),
+                                AppBarButton(AppGlyph.Budgets, "budgets", onClick = {}),
+                                AppBarButton(AppGlyph.Sync, "sync", onClick = {}),
+                                AppBarButton(AppGlyph.Appearance, "appearance", onClick = {}),
+                            ).asScreenActions(),
                         expanded = false,
                         onExpandedChange = {},
+                    )
+                }
+            }
+        }
+    }
+
+    private fun categorySnap(
+        name: String,
+        dark: Boolean,
+    ) {
+        val group =
+            GroupRow(
+                "g-food",
+                "Food",
+                -3_200,
+                listOf(
+                    CategoryRow("c-groceries", "Groceries", 20_000, 28_000, -8_000, false),
+                    CategoryRow("c-dining", "Dining", 8_000, 4_800, 3_200, false),
+                    CategoryRow("c-coffee", "Coffee", 3_000, 3_000, 0, false),
+                    CategoryRow("c-house", "Household", 4_000, 2_400, 1_600, false),
+                ),
+            )
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    GroupCategoriesScreen(
+                        shell = sample().copy(groups = listOf(group)),
+                        group = group,
+                        onCategory = {},
                     )
                 }
             }

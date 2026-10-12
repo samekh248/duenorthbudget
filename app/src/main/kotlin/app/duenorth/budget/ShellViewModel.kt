@@ -3,55 +3,55 @@ package app.duenorth.budget
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetConflict
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CategoryManagePage
+import app.duenorth.budget.core.CategoryMonthPage
 import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.EditResult
-import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.ForcedWrite
 import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
 import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MockBudgets
-import app.duenorth.budget.core.ParsedImportRow
-import app.duenorth.budget.core.PreviewRowStatus
 import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
-import app.duenorth.budget.core.withBudgetedAssignment
-import app.duenorth.budget.core.withHold
-import app.duenorth.budget.core.withMoveAvailable
-import app.duenorth.budget.core.withReleaseHold
+import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.OpenResult
+import app.duenorth.budget.core.ParsedImportRow
+import app.duenorth.budget.core.PayeeRow
+import app.duenorth.budget.core.PayeeWriteResult
 import app.duenorth.budget.core.PhoneSettings
+import app.duenorth.budget.core.PreviewRowStatus
+import app.duenorth.budget.core.ReconcileFinishResult
+import app.duenorth.budget.core.ReconcilePage
+import app.duenorth.budget.core.ReconcileStartResult
 import app.duenorth.budget.core.RefreshGate
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RemoteFile
-import app.duenorth.budget.core.PayeeRow
-import app.duenorth.budget.core.PayeeWriteResult
 import app.duenorth.budget.core.ScheduleWriteResult
 import app.duenorth.budget.core.SplitPart
-import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.SyncCoordinator
+import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
-import app.duenorth.budget.core.CategoryMonthPage
-import app.duenorth.budget.core.MonthReviewPage
-import app.duenorth.budget.core.NetWorthPage
-import app.duenorth.budget.core.ReconcileFinishResult
-import app.duenorth.budget.core.ReconcilePage
-import app.duenorth.budget.core.ReconcileStartResult
 import app.duenorth.budget.core.UnlockResult
-import app.duenorth.budget.core.UploadResult
 import app.duenorth.budget.core.UpcomingScheduleRow
+import app.duenorth.budget.core.UploadResult
 import app.duenorth.budget.core.WriteResult
 import app.duenorth.budget.core.syncFraction
-import java.time.YearMonth
+import app.duenorth.budget.core.withBudgetedAssignment
+import app.duenorth.budget.core.withHold
+import app.duenorth.budget.core.withMoveAvailable
+import app.duenorth.budget.core.withReleaseHold
+import app.duenorth.budget.design.MonthWindow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,6 +59,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.YearMonth
 
 sealed interface ShellRoute {
     data object Home : ShellRoute
@@ -139,6 +140,8 @@ sealed interface ShellRoute {
 
     data object Payees : ShellRoute
 
+    data object Settings : ShellRoute
+
     data object SampleBudgets : ShellRoute
 }
 
@@ -158,8 +161,8 @@ data class ShellUiState(
     val confirm: WriteResult.Confirm? = null,
     val switchTarget: BudgetSummary? = null,
     val today: String = RegisterEntry.todayIso(),
-    val reviewMonth: YearMonth = YearMonth.now(),
-    val budgetMonth: YearMonth = YearMonth.now(),
+    val openMonth: YearMonth = YearMonth.now(),
+    val pinnedMonth: YearMonth? = null,
     val monthReview: MonthReviewPage? = null,
     val netWorth: NetWorthPage? = null,
     val categoryMonth: CategoryMonthPage? = null,
@@ -200,6 +203,7 @@ class ShellViewModel(
 ) : ViewModel() {
     private val shellGate = RefreshGate<MonthShell>()
     private val registerGate = RefreshGate<RegisterPage>()
+    private val months = OpenMonthStore()
     private val history = ArrayDeque<ShellRoute>()
     private val _state =
         MutableStateFlow(
@@ -232,7 +236,17 @@ class ShellViewModel(
         }
         if (!shellGate.gestureActive) return
         shellGate.endGesture()
-        _state.update { it.copy(shell = shellGate.visible ?: it.shell) }
+        val hit = months.flushPending(gestureActive = false)
+        _state.update {
+            it.copy(
+                shell = if (hit) months.shell ?: shellGate.visible ?: it.shell else shellGate.visible ?: it.shell,
+                monthReview = if (hit) months.review ?: it.monthReview else it.monthReview,
+                openMonth = months.openMonth,
+            )
+        }
+        if (!hit && months.pendingMonth == null && months.cached(months.openMonth) == null) {
+            loadOpenMonth(months.openMonth)
+        }
     }
 
     fun setRegisterGesture(active: Boolean) {
@@ -390,13 +404,83 @@ class ShellViewModel(
     }
 
     fun previousBudgetMonth() {
-        _state.update { it.copy(budgetMonth = it.budgetMonth.minusMonths(1)) }
-        refreshBudgetShell()
+        val previous = months.window.previous(months.openMonth) ?: return
+        selectOpenMonth(previous)
     }
 
     fun nextBudgetMonth() {
-        _state.update { it.copy(budgetMonth = it.budgetMonth.plusMonths(1)) }
-        refreshBudgetShell()
+        val next = months.window.next(months.openMonth) ?: return
+        selectOpenMonth(next)
+    }
+
+    fun goToCurrentMonth() {
+        selectOpenMonth(YearMonth.now())
+    }
+
+    fun selectOpenMonth(month: YearMonth) {
+        val gesture = shellGate.gestureActive
+        val pinned = _state.value.pinnedMonth
+        val hit = months.select(month, gesture)
+        _state.update {
+            it.copy(
+                openMonth = months.openMonth,
+                shell = if (hit && pinned == null) months.shell else it.shell,
+                monthReview = if (hit && pinned == null) months.review else it.monthReview,
+            )
+        }
+        if (!hit && !gesture && pinned == null) {
+            loadOpenMonth(month)
+        }
+    }
+
+    fun showSettings() {
+        history.clear()
+        _state.update { it.copy(route = ShellRoute.Settings, confirm = null) }
+    }
+
+    fun monthWindow(): MonthWindow = months.window
+
+    private fun editorMonth(): YearMonth = months.editorMonth(_state.value.pinnedMonth)
+
+    private fun loadOpenMonth(month: YearMonth) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        if (_state.value.locked) return
+        viewModelScope.launch {
+            val snapshot =
+                withContext(Dispatchers.IO) {
+                    val shell = library.readShell(budgetId, month) ?: return@withContext null
+                    val review = library.readMonthReview(budgetId, month)
+                    MonthSnapshot(month, shell, review)
+                } ?: return@launch
+            if (month != months.openMonth) return@launch
+            months.applyLoaded(snapshot, shellGate.gestureActive)
+            if (!shellGate.gestureActive && months.openMonth == month) {
+                shellGate.offer(snapshot.shell)
+                _state.update {
+                    it.copy(
+                        shell = months.shell,
+                        monthReview = months.review,
+                        openMonth = months.openMonth,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun warmMonthWindow() {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        if (_state.value.locked) return
+        months.rebuildWindow(YearMonth.now())
+        val windowMonths = months.window.months
+        viewModelScope.launch(Dispatchers.IO) {
+            for (month in windowMonths) {
+                if (_state.value.settings.openBudgetId != budgetId) return@launch
+                if (months.cached(month) != null) continue
+                val shell = library.readShell(budgetId, month) ?: continue
+                val review = library.readMonthReview(budgetId, month)
+                months.put(MonthSnapshot(month, shell, review))
+            }
+        }
     }
 
     fun openGroupCategories(groupId: String) {
@@ -439,7 +523,7 @@ class ShellViewModel(
             return
         }
         applyEnvelopeEdit(optimistic = { it.withBudgetedAssignment(categoryId, budgeted) }) {
-            sync.assign(shell.budgetId, categoryId, _state.value.budgetMonth, amountText)
+            sync.assign(shell.budgetId, categoryId, editorMonth(), amountText)
         }
     }
 
@@ -447,7 +531,7 @@ class ShellViewModel(
         val shell = _state.value.shell ?: return
         val categoryId = (_state.value.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
         applyEnvelopeEdit {
-            sync.setCategoryCarryover(shell.budgetId, categoryId, _state.value.budgetMonth, enabled)
+            sync.setCategoryCarryover(shell.budgetId, categoryId, editorMonth(), enabled)
         }
     }
 
@@ -470,7 +554,7 @@ class ShellViewModel(
             stayOnRoute = false,
             optimistic = { it.withMoveAvailable(from, toCategoryId, amount) },
         ) {
-            sync.moveCategory(shell.budgetId, from, toCategoryId, _state.value.budgetMonth, amountText)
+            sync.moveCategory(shell.budgetId, from, toCategoryId, editorMonth(), amountText)
         }
     }
 
@@ -482,14 +566,14 @@ class ShellViewModel(
             return
         }
         applyEnvelopeEdit(optimistic = { it.withHold(amount) }) {
-            sync.holdForNextMonth(shell.budgetId, _state.value.budgetMonth, amountText)
+            sync.holdForNextMonth(shell.budgetId, editorMonth(), amountText)
         }
     }
 
     fun releaseHold() {
         val shell = _state.value.shell ?: return
         applyEnvelopeEdit(optimistic = { it.withReleaseHold() }) {
-            sync.releaseMonthHold(shell.budgetId, _state.value.budgetMonth)
+            sync.releaseMonthHold(shell.budgetId, editorMonth())
         }
     }
 
@@ -583,12 +667,24 @@ class ShellViewModel(
         if (current.route == ShellRoute.Create && current.shell == null) return false
         if (current.route.isRegisterFlow() || current.route.isHomeFlow()) {
             val previous = if (history.isEmpty()) ShellRoute.Home else history.removeLast()
+            val leavePin =
+                previous == ShellRoute.Home ||
+                    !(
+                        previous is ShellRoute.GroupCategories ||
+                            previous is ShellRoute.CategoryBudget ||
+                            previous is ShellRoute.MoveCategory ||
+                            previous is ShellRoute.HoldMonth
+                    )
             _state.update {
                 it.copy(
                     route = previous,
                     writeError = null,
                     categoryMonth = if (previous == ShellRoute.Home) null else it.categoryMonth,
+                    pinnedMonth = if (leavePin) null else it.pinnedMonth,
                 )
+            }
+            if (leavePin && current.pinnedMonth != null && current.pinnedMonth != current.openMonth) {
+                selectOpenMonth(current.openMonth)
             }
             return true
         }
@@ -867,14 +963,13 @@ class ShellViewModel(
     }
 
     fun previousReviewMonth() {
-        _state.update { it.copy(reviewMonth = it.reviewMonth.minusMonths(1)) }
-        refreshReview()
+        previousBudgetMonth()
     }
 
     fun openReviewCategory(categoryId: String) {
         push(ShellRoute.ReviewCategory(categoryId))
         val budgetId = _state.value.settings.openBudgetId ?: return
-        val month = _state.value.reviewMonth
+        val month = _state.value.openMonth
         viewModelScope.launch {
             val page = withContext(Dispatchers.IO) { library.readCategoryMonth(budgetId, categoryId, month) }
             _state.update { it.copy(categoryMonth = page) }
@@ -1249,14 +1344,27 @@ class ShellViewModel(
     }
 
     private suspend fun reload() {
+        val calendar = YearMonth.now()
+        months.reset(calendar)
+        _state.update { it.copy(openMonth = calendar, pinnedMonth = null) }
         val accountId = (_state.value.route as? ShellRoute.Register)?.accountId
         apply(load(accountId), accountId)
     }
 
     private fun push(route: ShellRoute) {
+        val pins =
+            route is ShellRoute.GroupCategories ||
+                route is ShellRoute.CategoryBudget ||
+                route is ShellRoute.MoveCategory ||
+                route is ShellRoute.HoldMonth
         _state.update {
             history.addLast(it.route)
-            it.copy(route = route, writeError = null, confirm = null)
+            it.copy(
+                route = route,
+                writeError = null,
+                confirm = null,
+                pinnedMonth = if (pins) it.pinnedMonth ?: it.openMonth else it.pinnedMonth,
+            )
         }
     }
 
@@ -1289,7 +1397,7 @@ class ShellViewModel(
 
     private fun refreshReview() {
         val budgetId = _state.value.settings.openBudgetId ?: return
-        val month = _state.value.reviewMonth
+        val month = _state.value.openMonth
         viewModelScope.launch {
             val review = withContext(Dispatchers.IO) { library.readMonthReview(budgetId, month) }
             _state.update { it.copy(monthReview = review) }
@@ -1375,7 +1483,7 @@ class ShellViewModel(
             val budgets = library.list()
             val budgetId = settings.openBudgetId
             val locked = budgetId != null && sync.needsPassword(budgetId)
-            val viewMonth = _state.value.budgetMonth
+            val viewMonth = editorMonth()
             val shell = if (budgetId == null || locked) null else library.readShell(budgetId, viewMonth)
             val upcoming =
                 if (budgetId == null || locked) {
@@ -1389,7 +1497,7 @@ class ShellViewModel(
                 } else {
                     null
                 }
-            val reviewMonth = _state.value.reviewMonth
+            val reviewMonth = _state.value.openMonth
             val monthReview =
                 if (budgetId == null || locked) {
                     null
@@ -1450,8 +1558,14 @@ class ShellViewModel(
                 if (current.monthReview == null && loaded.shell != null) {
                     loaded.shell.month
                 } else {
-                    current.reviewMonth
+                    current.openMonth
                 }
+            if (visibleShell != null && !shellGate.gestureActive) {
+                months.applyLoaded(
+                    MonthSnapshot(visibleShell.month, visibleShell, loaded.monthReview),
+                    gestureActive = false,
+                )
+            }
             current.copy(
                 loading = false,
                 settings = loaded.settings,
@@ -1460,7 +1574,7 @@ class ShellViewModel(
                 register = register,
                 upcoming = loaded.upcoming,
                 route = route,
-                reviewMonth = reviewMonth,
+                openMonth = reviewMonth,
                 monthReview = loaded.monthReview,
                 netWorth = loaded.netWorth,
                 locked = loaded.locked,
@@ -1470,6 +1584,9 @@ class ShellViewModel(
                 signedIn = sync.signedIn(),
                 registerBankLinked = loaded.bankLinked,
             )
+        }
+        if (!loaded.locked && loaded.shell != null) {
+            warmMonthWindow()
         }
     }
 
@@ -1495,7 +1612,7 @@ class ShellViewModel(
         val budgetId = _state.value.settings.openBudgetId ?: return
         if (_state.value.locked) return
         viewModelScope.launch {
-            val month = _state.value.budgetMonth
+            val month = editorMonth()
             val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) } ?: return@launch
             shellGate.offer(shell)
             _state.update { current ->
@@ -1517,7 +1634,7 @@ class ShellViewModel(
         viewModelScope.launch {
             when (val result = withContext(Dispatchers.IO) { block() }) {
                 is EditResult.Rejected -> {
-                    val month = _state.value.budgetMonth
+                    val month = editorMonth()
                     val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
                     _state.update { current ->
                         current.copy(
@@ -1533,7 +1650,7 @@ class ShellViewModel(
                 }
                 EditResult.Saved -> {
                     _state.update { it.copy(editError = null) }
-                    val month = _state.value.budgetMonth
+                    val month = editorMonth()
                     val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
                     if (shell != null) {
                         shellGate.offer(shell)

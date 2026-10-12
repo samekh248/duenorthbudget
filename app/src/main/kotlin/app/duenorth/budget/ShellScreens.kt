@@ -27,13 +27,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.Currencies
-import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MockBudgetDataset
@@ -42,11 +50,12 @@ import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ShellCopy
-import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.ThemeMode
+import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.monthLabel
-import app.duenorth.budget.design.components.AppBarButton
+import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppGlyph
+import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroField
@@ -54,10 +63,12 @@ import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroPanorama
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.PanoramaSection
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import java.time.YearMonth
 
 @Composable
 fun HomePanorama(
@@ -66,21 +77,19 @@ fun HomePanorama(
     netWorth: NetWorthPage?,
     upcoming: List<UpcomingScheduleRow>,
     loading: Boolean,
+    openMonth: YearMonth,
+    monthWindow: MonthWindow,
     initialSection: Int = 0,
     onGesture: (Boolean) -> Unit,
     onAccount: (String) -> Unit = {},
     onInbox: (String) -> Unit = {},
-    onPreviousReviewMonth: () -> Unit = {},
     onReviewCategory: (String) -> Unit = {},
     onNetWorthIncludeOffBudget: (Boolean) -> Unit = {},
     onPostSchedule: (String) -> Unit = {},
     onSkipSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
-    onBudgetPreviousMonth: (() -> Unit)? = null,
-    onBudgetNextMonth: (() -> Unit)? = null,
+    onSelectMonth: (YearMonth) -> Unit = {},
     onBudgetGroup: ((String) -> Unit)? = null,
-    onBudgetHold: (() -> Unit)? = null,
-    onBudgetManage: (() -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
@@ -91,18 +100,34 @@ fun HomePanorama(
         subtitle = "due north",
         sections =
             listOf(
-                PanoramaSection("budget") {
+                PanoramaSection(
+                    "budget",
+                    headerBlock =
+                        if (shell == null) {
+                            null
+                        } else {
+                            { onActivate ->
+                                BudgetMonthTitle(
+                                    month = openMonth,
+                                    window = monthWindow,
+                                    onSelect = onSelectMonth,
+                                    onActivate = onActivate,
+                                    modifier =
+                                        Modifier.padding(
+                                            start = MetroDimens.Gutter,
+                                            bottom = MetroDimens.Grid,
+                                        ),
+                                )
+                            }
+                        },
+                ) {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
                         BudgetSection(
                             shell,
                             onListGesture = { listGesture = it },
-                            onPreviousMonth = onBudgetPreviousMonth,
-                            onNextMonth = onBudgetNextMonth,
                             onGroup = onBudgetGroup,
-                            onHold = onBudgetHold,
-                            onManage = onBudgetManage,
                         )
                     }
                 },
@@ -136,7 +161,6 @@ fun HomePanorama(
                         review = review,
                         loading = loading,
                         onListGesture = { listGesture = it },
-                        onPreviousMonth = onPreviousReviewMonth,
                         onCategory = onReviewCategory,
                     )
                 },
@@ -167,15 +191,184 @@ fun HomePanorama(
 }
 
 @Composable
+fun MonthControl(
+    month: YearMonth,
+    window: MonthWindow,
+    onSelect: (YearMonth) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val previous = window.previous(month)
+    val next = window.next(month)
+    val calendar = YearMonth.now()
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (previous != null) {
+                MonthIconButton(AppGlyph.ChevronLeft, "month-previous") { onSelect(previous) }
+            }
+            MetroText(
+                monthLabel(month),
+                Metro.typography.subheader,
+                Modifier
+                    .weight(1f)
+                    .metroPress { expanded = !expanded }
+                    .testTag("month-label"),
+            )
+            if (month != calendar) {
+                MonthIconButton(AppGlyph.Calendar, "month-current") { onSelect(calendar) }
+            }
+            if (next != null) {
+                MonthIconButton(AppGlyph.ChevronRight, "month-next") { onSelect(next) }
+            }
+        }
+        if (expanded) {
+            MonthOptions(month, window) {
+                onSelect(it)
+                expanded = false
+            }
+        }
+    }
+}
+
+/** View title for the budget section: "october 2026 budget", opened as the month list. */
+@Composable
+private fun BudgetMonthTitle(
+    month: YearMonth,
+    window: MonthWindow,
+    onSelect: (YearMonth) -> Unit,
+    onActivate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val phrase = "${monthLabel(month)} budget"
+    val style = Metro.typography.sectionHeader
+    Column(modifier.fillMaxWidth()) {
+        SubcomposeLayout(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = MetroDimens.TouchTarget)
+                .semantics { heading() }
+                .metroPress {
+                    onActivate()
+                    expanded = !expanded
+                }.testTag("month-label"),
+        ) { constraints ->
+            // Widths near Constraints.Infinity make this text measure about one pixel per character.
+            val loose = constraints.copy(minWidth = 0, minHeight = 0, maxWidth = 2_048)
+            val iconPx = 22.dp.roundToPx()
+            val gap = MetroDimens.Gutter.roundToPx()
+            val safety = 1.dp.roundToPx()
+            val maxW = constraints.maxWidth
+            val textAvail = (maxW - gap - iconPx - safety).coerceAtLeast(0)
+
+            fun textWidth(
+                id: String,
+                text: String,
+                textStyle: TextStyle,
+            ): Int =
+                subcompose(id) {
+                    MetroText(text, textStyle, Modifier.clearAndSetSemantics {}, maxLines = 1, softWrap = false)
+                }.first().measure(loose).width
+
+            val natural = textWidth("title-natural", phrase, style)
+            var scale = if (natural <= textAvail || natural == 0) 1f else textAvail.toFloat() / natural
+            val sized = textWidth("title-sized", phrase, style.at(scale))
+            if (sized > textAvail && sized > 0) {
+                scale *= (textAvail - safety).coerceAtLeast(0).toFloat() / sized
+            }
+            val title =
+                subcompose("title") {
+                    MetroText(phrase, style.at(scale), maxLines = 1, softWrap = false)
+                }.first().measure(loose)
+            val chevron =
+                subcompose("chevron") {
+                    Box(
+                        Modifier.graphicsLayer { rotationZ = if (expanded) 180f else 0f }.testTag("month-dropdown"),
+                    ) {
+                        AppGlyphIcon(AppGlyph.ChevronDown)
+                    }
+                }.first().measure(loose)
+            val height = maxOf(constraints.minHeight, title.height, chevron.height)
+            val width = if (maxW == Constraints.Infinity) title.width + gap + chevron.width + safety else maxW
+            layout(width, height) {
+                title.placeRelative(0, ((height - title.height) / 2).coerceAtLeast(0))
+                val iconX = (title.width + gap).coerceAtMost((width - chevron.width).coerceAtLeast(0))
+                chevron.placeRelative(iconX, ((height - chevron.height) / 2).coerceAtLeast(0))
+            }
+        }
+        if (expanded) {
+            MonthOptions(month, window) {
+                onSelect(it)
+                expanded = false
+            }
+        }
+    }
+}
+
+@Composable
+private fun MonthOptions(
+    month: YearMonth,
+    window: MonthWindow,
+    onSelect: (YearMonth) -> Unit,
+) {
+    LazyColumn(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = MetroDimens.Gutter)
+            .heightIn(max = 288.dp)
+            .testTag("month-list"),
+    ) {
+        items(window.months, key = { it.toString() }) { option ->
+            MetroText(
+                monthLabel(option),
+                Metro.typography.body,
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = MetroDimens.TouchTarget)
+                    .metroPress { onSelect(option) }
+                    .padding(vertical = MetroDimens.Row)
+                    .testTag("month-option-$option"),
+                color = if (option == month) Metro.accent.text else Metro.colors.foreground,
+            )
+        }
+    }
+}
+
+private fun TextStyle.at(scale: Float): TextStyle {
+    if (scale >= 0.999f) return this
+    var next = copy(fontSize = fontSize * scale)
+    if (lineHeight != TextUnit.Unspecified) next = next.copy(lineHeight = lineHeight * scale)
+    if (letterSpacing != TextUnit.Unspecified) next = next.copy(letterSpacing = letterSpacing * scale)
+    return next
+}
+
+@Composable
+private fun MonthIconButton(
+    glyph: AppGlyph,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(MetroDimens.TouchTarget)
+            .metroPress(onClick)
+            .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        AppGlyphIcon(glyph)
+    }
+}
+
+@Composable
 fun BudgetSection(
     shell: MonthShell,
     onListGesture: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    onPreviousMonth: (() -> Unit)? = null,
-    onNextMonth: (() -> Unit)? = null,
     onGroup: ((String) -> Unit)? = null,
-    onHold: (() -> Unit)? = null,
-    onManage: (() -> Unit)? = null,
 ) {
     val list = rememberLazyListState()
     val arrivals = remember { RowArrivals() }
@@ -184,26 +377,31 @@ fun BudgetSection(
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
-        MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
-        MetroText(shell.headerLabel, Metro.typography.caption, color = Metro.colors.secondary)
-        MetroText(
-            MoneyFormat.format(shell.headerMinor, shell.currency),
-            Metro.typography.header,
-            color = Metro.accent.text,
-            modifier = Modifier.testTag("to-budget"),
-        )
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (onPreviousMonth != null) {
-                MetroOutlineButton(EnvelopeCopy.PREVIOUS, onClick = onPreviousMonth)
-            }
-            if (onNextMonth != null) {
-                MetroOutlineButton(EnvelopeCopy.NEXT, onClick = onNextMonth)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            BudgetTotal(
+                label = shell.headerLabel,
+                amount = MoneyFormat.format(shell.headerMinor, shell.currency),
+                amountColor = Metro.accent.text,
+                amountTag = "to-budget",
+            )
+            if (shell.bufferedMinor != 0L) {
+                BudgetTotal(
+                    label = "held",
+                    amount = MoneyFormat.format(shell.bufferedMinor, shell.currency),
+                    amountColor = Metro.colors.secondary,
+                    amountTag = "held-amount",
+                    alignEnd = true,
+                )
             }
         }
         if (shell.groups.isEmpty()) {
-            MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.body, Modifier.padding(top = 12.dp).weight(1f))
+            MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.caption, Modifier.padding(top = MetroDimens.Grid).weight(1f))
         } else {
-            LazyColumn(Modifier.weight(1f), state = list) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid), state = list) {
                 items(shell.groups, key = { it.id }) { group ->
                     GroupLine(
                         group,
@@ -214,18 +412,27 @@ fun BudgetSection(
                 }
             }
         }
-        if (shell.bufferedMinor != 0L) {
-            MetroText(
-                "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
-                Metro.typography.caption,
-                color = Metro.colors.secondary,
-                modifier = Modifier.padding(top = 8.dp).testTag("held-amount"),
-            )
-        }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (onHold != null) MetroOutlineButton(EnvelopeCopy.HOLD, onClick = onHold)
-            if (onManage != null) MetroOutlineButton(EnvelopeCopy.MANAGE, onClick = onManage)
-        }
+    }
+}
+
+@Composable
+private fun BudgetTotal(
+    label: String,
+    amount: String,
+    amountColor: Color,
+    amountTag: String,
+    alignEnd: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    val align = if (alignEnd) TextAlign.End else TextAlign.Start
+    Column(modifier, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
+        MetroText(label, Metro.typography.caption.copy(textAlign = align), color = Metro.colors.secondary)
+        MetroText(
+            amount,
+            Metro.typography.subheader.copy(textAlign = align),
+            color = amountColor,
+            modifier = Modifier.testTag(amountTag),
+        )
     }
 }
 
@@ -241,13 +448,13 @@ private fun GroupLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .then(if (onOpen != null) Modifier.metroPress { onOpen(group.id) } else Modifier)
-            .padding(vertical = 8.dp)
+            .padding(vertical = MetroDimens.Row)
             .testTag("group-${group.id}"),
         verticalAlignment = Alignment.Top,
     ) {
         MetroText(
             group.name,
-            Metro.typography.subheader,
+            Metro.typography.groupHeader,
             Modifier
                 .weight(1f)
                 .padding(end = 12.dp)
@@ -256,7 +463,7 @@ private fun GroupLine(
         )
         MetroText(
             MoneyFormat.format(group.availableMinor, shell.currency),
-            Metro.typography.subheader,
+            Metro.typography.groupHeader,
             Modifier
                 .widthIn(max = 148.dp)
                 .testTag("group-amount-${group.id}"),
@@ -290,11 +497,11 @@ fun AccountsSection(
     val offBudget = accounts.filter { it.offBudget }
     LazyColumn(modifier.fillMaxSize(), state = list) {
         if (onBudget.isNotEmpty()) {
-            item { SectionLabel(ShellCopy.ON_BUDGET) }
+            item { SectionLabel(ShellCopy.ON_BUDGET, first = true) }
             items(onBudget, key = { it.id }) { AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals)) }
         }
         if (offBudget.isNotEmpty()) {
-            item { SectionLabel(ShellCopy.OFF_BUDGET) }
+            item { SectionLabel(ShellCopy.OFF_BUDGET, first = onBudget.isEmpty()) }
             items(offBudget, key = { it.id }) { AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals)) }
         }
     }
@@ -312,7 +519,7 @@ private fun AccountLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onAccount(account.id) }
-            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp)
+            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
             .testTag("account-${account.id}"),
         verticalAlignment = Alignment.Top,
     ) {
@@ -375,7 +582,7 @@ private fun InboxLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onInbox(row.id) }
-            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp),
+            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row),
         verticalAlignment = Alignment.Top,
     ) {
         MetroText(row.payee, Metro.typography.subheader, Modifier.weight(1f).padding(end = 12.dp), maxLines = 3)
@@ -388,11 +595,18 @@ private fun InboxLine(
 }
 
 @Composable
-private fun SectionLabel(text: String) {
+private fun SectionLabel(
+    text: String,
+    first: Boolean = false,
+) {
     MetroText(
         text,
-        Metro.typography.caption,
-        Modifier.padding(start = MetroDimens.Gutter, top = 16.dp, bottom = 4.dp),
+        Metro.typography.groupHeader,
+        Modifier.padding(
+            start = MetroDimens.Gutter,
+            top = if (first) 0.dp else MetroDimens.Grid,
+            bottom = MetroDimens.Row,
+        ),
         color = Metro.colors.secondary,
     )
 }
@@ -441,12 +655,15 @@ fun CreateBudgetScreen(
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress { currency = item.code }
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = MetroDimens.Row),
                     color = if (selected) Metro.accent.text else Metro.colors.foreground,
                 )
             }
         }
-        MetroButton("create budget") { onCreate(name, currency) }
+        RememberFormSave { onCreate(name, currency) }
+        if (!formSaveOnBar()) {
+            MetroButton("create budget") { onCreate(name, currency) }
+        }
     }
 }
 
@@ -466,7 +683,7 @@ fun BudgetsScreen(
             .padding(MetroDimens.Gutter),
     ) {
         MetroText("budgets", Metro.typography.header)
-        LazyColumn(Modifier.weight(1f)) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
             items(budgets, key = { it.id }) { budget ->
                 val open = budget.id == openId
                 MetroText(
@@ -476,7 +693,7 @@ fun BudgetsScreen(
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress { onOpen(budget.id) }
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = MetroDimens.Row),
                     color = if (open) Metro.accent.text else Metro.colors.foreground,
                 )
             }
@@ -486,7 +703,7 @@ fun BudgetsScreen(
             MetroOutlineButton(
                 ShellCopy.SAMPLE_BUDGETS,
                 Modifier
-                    .padding(top = 8.dp)
+                    .padding(top = MetroDimens.Gutter)
                     .testTag("sample-budgets"),
                 onClick = onSamples,
             )
@@ -507,7 +724,7 @@ fun SampleBudgetsScreen(
             .background(Metro.colors.background)
             .padding(MetroDimens.Gutter)
             .testTag("sample-budgets-screen"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
     ) {
         MetroText(ShellCopy.SAMPLE_BUDGETS, Metro.typography.header)
         MetroText(
@@ -518,17 +735,14 @@ fun SampleBudgetsScreen(
         if (error != null) {
             MetroText(error, Metro.typography.body, color = Metro.accent.text)
         }
-        LazyColumn(
-            Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Gutter)) {
             items(samples, key = { it.id }) { sample ->
                 Column(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress { onChoose(sample.id) }
-                        .padding(vertical = 10.dp)
+                        .padding(vertical = MetroDimens.Row)
                         .testTag("sample-${sample.id}"),
                 ) {
                     MetroText(sample.title, Metro.typography.subheader)
@@ -595,14 +809,14 @@ fun AppearanceScreen(
                     .fillMaxWidth()
                     .heightIn(min = MetroDimens.TouchTarget)
                     .metroPress { onTheme(mode.stored()) }
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = MetroDimens.Row),
                 color = if (selected) Metro.accent.text else Metro.colors.foreground,
             )
         }
         MetroText(
             "accent",
             Metro.typography.caption,
-            Modifier.padding(top = 12.dp, bottom = 8.dp),
+            Modifier.padding(top = MetroDimens.Grid, bottom = MetroDimens.Gutter),
             color = Metro.colors.secondary,
         )
         AccentGrid(accentId, onAccent)
@@ -615,9 +829,9 @@ private fun AccentGrid(
     onAccent: (String) -> Unit,
 ) {
     val accents = Accent.entries
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
         accents.chunked(5).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
                 row.forEach { accent ->
                     val fill = accent.fill(Metro.colors.isDark)
                     Box(
@@ -640,7 +854,7 @@ private fun AccentGrid(
 
 @Composable
 fun ShellChrome(
-    buttons: List<AppBarButton>,
+    actions: List<ScreenAction>,
     syncing: Boolean = false,
     progress: Float? = null,
     content: @Composable (Modifier) -> Unit,
@@ -649,8 +863,50 @@ fun ShellChrome(
     Column(Modifier.fillMaxSize().background(Metro.colors.background)) {
         if (syncing) SyncProgressBar(progress)
         content(Modifier.weight(1f))
-        MetroAppBar(buttons, expanded, { expanded = it })
+        MetroAppBar(actions, expanded, { expanded = it })
     }
+}
+
+@Composable
+fun SettingsScreen(
+    onBudgets: () -> Unit,
+    onAppearance: () -> Unit,
+    onSync: () -> Unit,
+    onPayees: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .padding(MetroDimens.Gutter)
+            .testTag("settings-screen"),
+    ) {
+        MetroText("settings", Metro.typography.header)
+        Column(Modifier.padding(top = MetroDimens.Grid)) {
+            SettingsRow("budgets", onBudgets)
+            SettingsRow("appearance", onAppearance)
+            SettingsRow("sync", onSync)
+            SettingsRow("payees", onPayees)
+        }
+    }
+}
+
+@Composable
+private fun SettingsRow(
+    label: String,
+    onClick: () -> Unit,
+) {
+    MetroText(
+        label,
+        Metro.typography.subheader,
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress(onClick)
+            .padding(vertical = MetroDimens.Row)
+            .testTag("settings-$label"),
+    )
 }
 
 private class RowArrivals {

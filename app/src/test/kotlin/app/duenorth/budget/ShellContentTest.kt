@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasSetTextAction
@@ -14,15 +15,15 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetMode
-import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.CategoryRow
+import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -30,6 +31,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.time.YearMonth
 
 @RunWith(RobolectricTestRunner::class)
@@ -50,6 +52,8 @@ class ShellContentTest {
                         netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
+                        openMonth = shell?.month ?: YearMonth.of(2026, 10),
+                        monthWindow = MonthWindow.around(YearMonth.of(2026, 10)),
                         onGesture = {},
                         modifier = Modifier,
                     )
@@ -74,6 +78,89 @@ class ShellContentTest {
     }
 
     @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun budgetTitleIsTheMonthDropdown() {
+        val shell = sample().copy(budgetName = "Home")
+        val openMonth = mutableStateOf(shell.month)
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    HomePanorama(
+                        shell = shell,
+                        review = null,
+                        netWorth = null,
+                        upcoming = emptyList(),
+                        loading = false,
+                        openMonth = openMonth.value,
+                        monthWindow = MonthWindow.around(shell.month),
+                        onGesture = {},
+                        onSelectMonth = { openMonth.value = it },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("budget-name").assertDoesNotExist()
+        compose.onNodeWithText("Home").assertDoesNotExist()
+        compose.onNodeWithTag("month-previous").assertDoesNotExist()
+        compose.onNodeWithTag("month-next").assertDoesNotExist()
+        compose.onNodeWithText("october 2026 budget").assertIsDisplayed()
+        val density = compose.density.density
+        val title = compose.onNodeWithText("october 2026 budget", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val dropdown = compose.onNodeWithTag("month-dropdown", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val root = compose.onNodeWithTag("panorama").fetchSemanticsNode().boundsInRoot
+        val titleDp = title.height / density
+        assertTrue("title stays a section heading, ${titleDp}dp", titleDp >= 36f)
+        assertTrue("dropdown follows the title: $title vs $dropdown", dropdown.left + 1f >= title.right)
+        assertTrue(
+            "dropdown shares the title row: $title vs $dropdown",
+            dropdown.top < title.bottom && title.top < dropdown.bottom,
+        )
+        assertTrue("dropdown stays inside the page", dropdown.right <= root.right - 40f * density + 1f)
+        compose.onNodeWithTag("to-budget").assertIsDisplayed()
+        compose.onNodeWithTag("month-label").performClick()
+        compose.onNodeWithTag("month-list").assertIsDisplayed()
+        compose.onNodeWithTag("month-option-2024-10").performClick()
+        compose.onNodeWithText("october 2024 budget").assertIsDisplayed()
+        compose.onNodeWithTag("month-list").assertDoesNotExist()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun groupTextIsSmallerThanTheTotals() {
+        val shell =
+            sample().copy(
+                headerMinor = 42_000,
+                groups = listOf(GroupRow("g", "Bills", 124_000)),
+            )
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(420.dp)) {
+                    BudgetSection(shell, onListGesture = {})
+                }
+            }
+        }
+        val total =
+            compose
+                .onNodeWithTag("to-budget")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        val name =
+            compose
+                .onNodeWithTag("group-name-g")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        val amount =
+            compose
+                .onNodeWithTag("group-amount-g")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertTrue("group name is smaller than to-budget: $name vs $total", name < total)
+        assertTrue("group amount is smaller than to-budget: $amount vs $total", amount < total)
+    }
+
+    @Test
     fun longNameStaysBesideTheAmount() {
         val shell =
             sample().copy(
@@ -89,7 +176,10 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(420.dp)) {
-                    BudgetSection(shell, onListGesture = {})
+                    BudgetSection(
+                        shell,
+                        onListGesture = {},
+                    )
                 }
             }
         }
@@ -110,13 +200,32 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    BudgetSection(shell, onListGesture = {}, onGroup = {})
+                    BudgetSection(
+                        shell,
+                        onListGesture = {},
+                        onGroup = {},
+                    )
                 }
             }
         }
-        compose.onNodeWithTag("group-name-g").assertIsDisplayed()
-        compose.onNodeWithText("Everyday").assertIsDisplayed()
-        compose.onNodeWithTag("held-amount").assertIsDisplayed()
+        compose.onNodeWithTag("group-g").assertIsDisplayed()
+        compose.onNodeWithText("Everyday", substring = true).assertIsDisplayed()
+        compose.onNodeWithTag("held-amount").assertTextEquals("$250.00")
+        val toBudget = compose.onNodeWithTag("to-budget").fetchSemanticsNode().boundsInRoot
+        val held = compose.onNodeWithTag("held-amount").fetchSemanticsNode().boundsInRoot
+        val heldLabel = compose.onNodeWithText("held").fetchSemanticsNode().boundsInRoot
+        val toLabel = compose.onNodeWithText("to budget").fetchSemanticsNode().boundsInRoot
+        val row = compose.onNodeWithTag("group-g").fetchSemanticsNode().boundsInRoot
+        assertTrue("held shares the to-budget row: $toBudget vs $held", held.top < toBudget.bottom && toBudget.top < held.bottom)
+        assertTrue("held is on the right: $held vs $row", held.right >= row.right - 1f && held.left > (toBudget.right + row.right) / 2f)
+        assertTrue("held caption is right aligned: $heldLabel vs $held", kotlin.math.abs(heldLabel.right - held.right) <= 1f)
+        assertTrue("held caption ends with the figure: $heldLabel vs $held", heldLabel.left > held.left + 1f)
+        assertTrue(
+            "held label sits on the caption: $heldLabel vs $toLabel",
+            heldLabel.top < toLabel.bottom && toLabel.top < heldLabel.bottom,
+        )
+        assertTrue("held label sits above its amount: $heldLabel vs $held", heldLabel.bottom <= held.top + 1f)
+        assertTrue("to-budget stays on the left: $toBudget vs $row", toBudget.left <= row.left + 1f)
         compose.onNodeWithTag("category-c-food").assertDoesNotExist()
         compose.onNodeWithText("Groceries").assertDoesNotExist()
     }
@@ -142,12 +251,51 @@ class ShellContentTest {
     }
 
     @Test
+    fun categoryLedgerKeepsFiguresInColumns() {
+        val category = CategoryRow("c-food", "Groceries", 20_000L, 28_000L, -8_000L, false)
+        val group = GroupRow("g", "Food", -3_200L, listOf(category))
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    GroupCategoriesScreen(sample().copy(groups = listOf(group)), group, onCategory = {})
+                }
+            }
+        }
+        compose.onNodeWithTag("category-budgeted-c-food", useUnmergedTree = true).assertTextEquals("$200.00")
+        compose.onNodeWithTag("category-spent-c-food", useUnmergedTree = true).assertTextEquals("$280.00")
+        compose.onNodeWithTag("category-available-c-food", useUnmergedTree = true).assertTextEquals("-$80.00")
+        val name = compose.onNodeWithText("Groceries", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val budgeted = compose.onNodeWithTag("category-budgeted-c-food", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val spent = compose.onNodeWithTag("category-spent-c-food", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val available = compose.onNodeWithTag("category-available-c-food", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val headBudgeted = compose.onNodeWithTag("ledger-budgeted", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val headAvailable = compose.onNodeWithTag("ledger-available", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val rule = compose.onNodeWithTag("category-rule-c-food", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("name stays left of budgeted: $name vs $budgeted", name.right <= budgeted.left + 1f)
+        assertTrue("spent follows budgeted: $budgeted vs $spent", budgeted.right <= spent.left + 1f)
+        assertTrue("available follows spent: $spent vs $available", spent.right <= available.left + 1f)
+        assertTrue("budgeted column lines up: $budgeted vs $headBudgeted", kotlin.math.abs(budgeted.right - headBudgeted.right) <= 1f)
+        assertTrue(
+            "available column lines up: $available vs $headAvailable",
+            kotlin.math.abs(available.right - headAvailable.right) <= 1f,
+        )
+        assertTrue("rule starts at the figures: $rule vs $name", rule.left + 1f >= name.right)
+        assertTrue("rule ends with available: $rule vs $available", kotlin.math.abs(rule.right - available.right) <= 1f)
+        assertTrue("rule sits under the figures: $rule vs $available", rule.top >= available.top)
+    }
+
+    @Test
     fun threeHundredGroupsStayLazy() {
         val groups = (0 until 300).map { GroupRow("g$it", "group $it", 100L) }
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(320.dp)) {
-                    BudgetSection(sample().copy(groups = groups), onListGesture = {})
+                    BudgetSection(
+                        sample().copy(
+                            groups = groups,
+                        ),
+                        onListGesture = {},
+                    )
                 }
             }
         }
@@ -194,7 +342,6 @@ class ShellContentTest {
         assertTrue("progress bar is ${heightDp}dp", heightDp in 3f..5f)
         compose.onNodeWithTag("sync-progress").assertIsDisplayed()
     }
-
 
     @Test
     fun sampleBudgetsScreenListsDatasets() {

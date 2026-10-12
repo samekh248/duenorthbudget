@@ -50,15 +50,19 @@ It replaces the first mockups (a dark pivot with no panorama).
   that expands labels and a menu.
 - Typography is the interface. Use a Segoe-style light and semilight sans
   (Selawik as the licensed stand-in). Page titles are oversized and lowercase.
-  The type ramp matches Due North Tasks research note R2 as of 2026-10-06.
+  Panorama sections stay extra-large semilight. Content text sits one step
+  under the phone-kit sizes: header 48 semilight, subheader 26 semilight,
+  body 16, secondary text 14 semilight. The panorama wordmark stays the
+  Due North logo.
 - Content over chrome: no drop shadows, no gradients, no rounded cards, no
   elevation, no Material ripple. Flat color fills only.
-- Light (white, near-black text) and dark (pure black) MUST both exist. The
+- Light (white, black text) and dark (pure black) MUST both exist. The
   app follows the phone's setting unless the person overrides it. One accent
-  drives highlights and tiles: magenta by default (`#B0005E` on light,
-  `#F0389A` on dark). The person may pick another Windows Phone 8.1 accent,
-  plus light orange and coral. Each accent has a light-theme and a dark-theme
-  value.
+  drives highlights and tiles. The default swatch is Windows Phone magenta
+  (`#D80073`). Accent text is `#B0005E` on light and `#F0389A` on dark so it
+  stays at 4.5:1. The person may pick another Windows Phone 8.1 accent,
+  plus light orange and coral. A swatch that misses 4.5:1 keeps a separate
+  text color.
 - Motion is part of the language: turnstile page transitions, tilt on press,
   continuum (the tapped row flies into the next page), and slide-in list
   stagger. Skip or shorten a motion that would drop frames (Principle I).

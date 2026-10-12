@@ -16,7 +16,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.ImportCopy
 import app.duenorth.budget.core.ImportPreview
@@ -57,13 +56,12 @@ fun ImportPreviewScreen(
         if (error != null) {
             MetroText(error, Metro.typography.body, color = Metro.accent.text)
         }
-        LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
             items(preview.rows, key = { it.index }) { row ->
                 PreviewRowLine(row, preview)
             }
         }
-        MetroButton(ImportCopy.CONFIRM, Modifier.padding(top = 8.dp), onClick = onConfirm)
-        MetroButton(ImportCopy.CANCEL, Modifier.padding(top = 8.dp), onClick = onCancel)
+        // save/cancel live on the application bar
     }
 }
 
@@ -75,7 +73,7 @@ private fun PreviewRowLine(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = MetroDimens.Row),
     ) {
         Column(Modifier.weight(1f)) {
             MetroText(row.payee, Metro.typography.body, maxLines = 2)
@@ -123,12 +121,12 @@ fun ImportReviewScreen(
         if (error != null) {
             MetroText(error, Metro.typography.body, color = Metro.accent.text)
         }
-        LazyColumn(Modifier.weight(1f).padding(top = 8.dp), state = listState) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid), state = listState) {
             items(page.rows, key = { it.id }) { row ->
                 ReviewRowEditor(row, page.categories, page, onCategory)
             }
         }
-        MetroButton(ImportCopy.DONE, Modifier.padding(top = 8.dp), onClick = onDone)
+        MetroButton(ImportCopy.DONE, Modifier.padding(top = MetroDimens.Grid), onClick = onDone)
     }
 }
 
@@ -144,7 +142,7 @@ private fun ReviewRowEditor(
         Modifier
             .fillMaxWidth()
             .metroPress { expanded = !expanded }
-            .padding(vertical = 8.dp)
+            .padding(vertical = MetroDimens.Row)
             .testTag("import-review-row-${row.id}"),
     ) {
         MetroText(row.payee, Metro.typography.body, maxLines = 2)
@@ -175,7 +173,7 @@ private fun ChoiceLine(
         Modifier
             .fillMaxWidth()
             .metroPress(onClick = onClick)
-            .padding(vertical = 4.dp),
+            .padding(vertical = MetroDimens.Row),
         color = if (selected) Metro.accent.text else Metro.colors.foreground,
     )
 }

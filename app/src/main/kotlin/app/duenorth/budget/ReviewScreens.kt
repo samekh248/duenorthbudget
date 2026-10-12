@@ -39,7 +39,6 @@ fun MonthReviewSection(
     review: MonthReviewPage?,
     loading: Boolean,
     onListGesture: (Boolean) -> Unit,
-    onPreviousMonth: () -> Unit,
     onCategory: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -54,8 +53,10 @@ fun MonthReviewSection(
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         MetroText(monthLabel(review.month), Metro.typography.caption, color = Metro.colors.secondary)
         MetroText(ReviewCopy.SPENDING, Metro.typography.header)
-        MetroButton(ReviewCopy.PREVIOUS_MONTH, Modifier.padding(vertical = 8.dp), onClick = onPreviousMonth)
-        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.fillMaxWidth().padding(top = MetroDimens.Grid, bottom = MetroDimens.Row),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             MetroText(ReviewCopy.INCOME, Metro.typography.subheader, Modifier.weight(1f))
             MetroText(
                 MoneyFormat.format(review.incomeMinor, review.currency),
@@ -64,7 +65,7 @@ fun MonthReviewSection(
             )
         }
         if (review.categories.isEmpty()) {
-            MetroText("no spending", Metro.typography.body, Modifier.padding(top = 12.dp))
+            MetroText("no spending", Metro.typography.body, Modifier.padding(top = MetroDimens.Grid))
         } else {
             LazyColumn(Modifier.weight(1f), state = list) {
                 items(review.categories, key = { it.id }) { row ->
@@ -86,7 +87,7 @@ private fun ReviewCategoryLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onCategory(row.id) }
-            .padding(vertical = 8.dp)
+            .padding(vertical = MetroDimens.Row)
             .testTag("review-category-${row.id}"),
         verticalAlignment = Alignment.Top,
     ) {
@@ -119,7 +120,7 @@ fun NetWorthSection(
         }
         val empty = page.onBudgetMinor == 0L && page.offBudgetMinor == 0L
         if (empty) {
-            MetroText(ReviewCopy.NO_ACCOUNTS, Metro.typography.body, Modifier.padding(top = 12.dp))
+            MetroText(ReviewCopy.NO_ACCOUNTS, Metro.typography.body, Modifier.padding(top = MetroDimens.Grid))
             MetroText(MoneyFormat.format(0, page.currency), Metro.typography.header, Modifier.testTag("net-worth-total"))
             return
         }
@@ -132,14 +133,14 @@ fun NetWorthSection(
             Modifier
                 .heightIn(min = MetroDimens.TouchTarget)
                 .metroPress { onIncludeOffBudget(!include) }
-                .padding(vertical = 12.dp)
+                .padding(top = MetroDimens.Grid, bottom = MetroDimens.Row)
                 .testTag("net-worth-toggle"),
             color = Metro.accent.text,
         )
         MetroText(
             ReviewCopy.TOTAL,
             Metro.typography.caption,
-            Modifier.padding(top = 8.dp),
+            Modifier.padding(top = MetroDimens.Grid),
             color = Metro.colors.secondary,
         )
         MetroText(
@@ -157,7 +158,7 @@ private fun NetWorthLine(
     amountMinor: Long,
     page: NetWorthPage,
 ) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(vertical = MetroDimens.Row), verticalAlignment = Alignment.CenterVertically) {
         MetroText(label, Metro.typography.subheader, Modifier.weight(1f))
         MetroText(MoneyFormat.format(amountMinor, page.currency), Metro.typography.subheader)
     }
@@ -180,13 +181,15 @@ fun CategoryReviewScreen(
             .padding(horizontal = MetroDimens.Gutter),
     ) {
         MetroText(page.categoryName, Metro.typography.header)
-        MetroText(monthLabel(page.month), Metro.typography.caption, color = Metro.colors.secondary)
-        MetroText(
-            MoneyFormat.format(-abs(page.totalMinor), page.currency),
-            Metro.typography.subheader,
-            Modifier.testTag("category-review-total"),
-        )
-        LazyColumn(Modifier.weight(1f).padding(top = 12.dp), state = list) {
+        Column(Modifier.padding(top = MetroDimens.Gutter)) {
+            MetroText(monthLabel(page.month), Metro.typography.caption, color = Metro.colors.secondary)
+            MetroText(
+                MoneyFormat.format(-abs(page.totalMinor), page.currency),
+                Metro.typography.subheader,
+                Modifier.testTag("category-review-total"),
+            )
+        }
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid), state = list) {
             items(page.rows, key = { it.id }) { row -> CategoryReviewLine(row, page) }
         }
     }
@@ -201,7 +204,7 @@ private fun CategoryReviewLine(
         Modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .padding(vertical = 8.dp),
+            .padding(vertical = MetroDimens.Row),
         verticalAlignment = Alignment.Top,
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {

@@ -118,6 +118,7 @@ class RegisterContentTest {
     }
 
     @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
     fun blankPayeeIsRefusedOnTheForm() {
         compose.setContent {
             MetroTheme {
