@@ -95,7 +95,7 @@ fun MoveCategoryScreen(
             .padding(MetroDimens.Gutter),
     ) {
         MetroText("${EnvelopeCopy.MOVE} from ${from.name}", Metro.typography.header)
-        MetroField(amount, { amount = it }, "amount", Modifier.padding(vertical = 8.dp))
+        MetroField(amount, { amount = it }, "amount", Modifier.padding(vertical = MetroDimens.Gutter))
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
         LazyColumn(Modifier.weight(1f)) {
             items(targets, key = { it.id }) { target ->
@@ -106,7 +106,7 @@ fun MoveCategoryScreen(
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress { toId = target.id }
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = MetroDimens.Row),
                     color = if (toId == target.id) Metro.accent.text else Metro.colors.foreground,
                 )
             }
@@ -175,7 +175,14 @@ fun ManageCategoriesScreen(
 ) {
     var groupName by remember { mutableStateOf("") }
     var categoryName by remember { mutableStateOf("") }
-    var groupId by remember { mutableStateOf(manage.groups.firstOrNull()?.id.orEmpty()) }
+    var groupId by remember {
+        mutableStateOf(
+            manage.groups
+                .firstOrNull()
+                ?.id
+                .orEmpty(),
+        )
+    }
     var selectedGroupId by remember { mutableStateOf<String?>(null) }
     var selectedCategoryId by remember { mutableStateOf<String?>(null) }
     var renameText by remember { mutableStateOf("") }
@@ -184,7 +191,7 @@ fun ManageCategoriesScreen(
             .fillMaxSize()
             .background(Metro.colors.background)
             .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
     ) {
         MetroText(EnvelopeCopy.MANAGE, Metro.typography.header)
         MetroField(groupName, { groupName = it }, "new group")
@@ -256,7 +263,7 @@ private fun ManageGroupLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick = onSelect)
-            .padding(vertical = 4.dp)
+            .padding(vertical = MetroDimens.Row)
             .testTag("manage-group-${group.id}"),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -267,7 +274,7 @@ private fun ManageGroupLine(
             Modifier.weight(1f),
             color = if (selected) Metro.accent.text else Metro.colors.foreground,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
             MetroButton(EnvelopeCopy.MOVE_UP, onClick = onMoveEarlier)
             MetroButton(EnvelopeCopy.MOVE_DOWN, onClick = onMoveLater)
             MetroButton(EnvelopeCopy.DELETE, onClick = onDelete)
@@ -292,7 +299,7 @@ private fun ManageCategoryLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick = onSelect)
-            .padding(start = 16.dp, top = 2.dp, bottom = 2.dp)
+            .padding(start = MetroDimens.Gutter, top = MetroDimens.Row, bottom = MetroDimens.Row)
             .testTag("manage-category-${category.id}"),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -303,7 +310,7 @@ private fun ManageCategoryLine(
             Modifier.weight(1f),
             color = if (selected) Metro.accent.text else Metro.colors.foreground,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
             MetroButton(EnvelopeCopy.MOVE_UP, onClick = onMoveEarlier)
             MetroButton(EnvelopeCopy.MOVE_DOWN, onClick = onMoveLater)
             MetroButton(if (category.hidden) EnvelopeCopy.SHOW else EnvelopeCopy.HIDE, onClick = onHide)
@@ -329,9 +336,10 @@ fun GroupCategoriesScreen(
         MetroText(
             MoneyFormat.format(group.availableMinor, shell.currency),
             Metro.typography.subheader,
+            Modifier.padding(top = MetroDimens.Gutter),
             color = Metro.accent.text,
         )
-        LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
             items(group.categories, key = { it.id }) { category ->
                 CategoryLine(category, shell, onCategory)
             }
@@ -351,7 +359,7 @@ fun CategoryLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onOpen(category.id) }
-            .padding(start = 16.dp, top = 4.dp, bottom = 4.dp)
+            .padding(vertical = MetroDimens.Row)
             .testTag("category-${category.id}"),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

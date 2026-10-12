@@ -4,12 +4,12 @@ import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
-import java.time.YearMonth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.YearMonth
 
 class OpenMonthTest {
     private val october = YearMonth.of(2026, 10)

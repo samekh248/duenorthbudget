@@ -3,56 +3,55 @@ package app.duenorth.budget
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetConflict
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CategoryManagePage
+import app.duenorth.budget.core.CategoryMonthPage
 import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.EditResult
-import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.ForcedWrite
 import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
 import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MockBudgets
-import app.duenorth.budget.core.ParsedImportRow
-import app.duenorth.budget.core.PreviewRowStatus
 import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
-import app.duenorth.budget.core.withBudgetedAssignment
-import app.duenorth.budget.core.withHold
-import app.duenorth.budget.core.withMoveAvailable
-import app.duenorth.budget.core.withReleaseHold
+import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.OpenResult
+import app.duenorth.budget.core.ParsedImportRow
+import app.duenorth.budget.core.PayeeRow
+import app.duenorth.budget.core.PayeeWriteResult
 import app.duenorth.budget.core.PhoneSettings
+import app.duenorth.budget.core.PreviewRowStatus
+import app.duenorth.budget.core.ReconcileFinishResult
+import app.duenorth.budget.core.ReconcilePage
+import app.duenorth.budget.core.ReconcileStartResult
 import app.duenorth.budget.core.RefreshGate
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RemoteFile
-import app.duenorth.budget.core.PayeeRow
-import app.duenorth.budget.core.PayeeWriteResult
 import app.duenorth.budget.core.ScheduleWriteResult
 import app.duenorth.budget.core.SplitPart
-import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.SyncCoordinator
+import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
-import app.duenorth.budget.core.CategoryMonthPage
-import app.duenorth.budget.core.MonthReviewPage
-import app.duenorth.budget.core.NetWorthPage
-import app.duenorth.budget.core.ReconcileFinishResult
-import app.duenorth.budget.core.ReconcilePage
-import app.duenorth.budget.core.ReconcileStartResult
 import app.duenorth.budget.core.UnlockResult
-import app.duenorth.budget.core.UploadResult
 import app.duenorth.budget.core.UpcomingScheduleRow
+import app.duenorth.budget.core.UploadResult
 import app.duenorth.budget.core.WriteResult
 import app.duenorth.budget.core.syncFraction
+import app.duenorth.budget.core.withBudgetedAssignment
+import app.duenorth.budget.core.withHold
+import app.duenorth.budget.core.withMoveAvailable
+import app.duenorth.budget.core.withReleaseHold
 import app.duenorth.budget.design.MonthWindow
-import java.time.YearMonth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -60,6 +59,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.YearMonth
 
 sealed interface ShellRoute {
     data object Home : ShellRoute
@@ -965,7 +965,6 @@ class ShellViewModel(
     fun previousReviewMonth() {
         previousBudgetMonth()
     }
-
 
     fun openReviewCategory(categoryId: String) {
         push(ShellRoute.ReviewCategory(categoryId))

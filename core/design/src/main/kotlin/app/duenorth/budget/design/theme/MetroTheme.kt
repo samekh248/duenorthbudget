@@ -256,8 +256,21 @@ object Metro {
 }
 
 object MetroDimens {
+    /** Left edge for type and controls. */
     val Gutter = 12.dp
+
+    /** Air between clusters that are read apart: title, control, figure, list. */
     val Grid = 24.dp
+
+    /**
+     * Vertical padding on one data row.
+     * Neighboring rows then leave one grid step between them.
+     */
+    val Row = 12.dp
+
+    /** Gap between icon buttons, clear of the ellipsis. */
+    val ControlGap = 16.dp
+
     val TouchTarget = 48.dp
     val Peek = 40.dp
     val AppBar = 72.dp

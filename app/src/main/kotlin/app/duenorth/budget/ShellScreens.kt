@@ -41,8 +41,8 @@ import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ShellCopy
-import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.ThemeMode
+import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppGlyph
@@ -178,7 +178,7 @@ fun MonthControl(
     Column(modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (previous != null) {
@@ -203,7 +203,8 @@ fun MonthControl(
             LazyColumn(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 240.dp)
+                    .padding(top = MetroDimens.Gutter)
+                    .heightIn(max = 288.dp)
                     .testTag("month-list"),
             ) {
                 items(window.months, key = { it.toString() }) { option ->
@@ -216,7 +217,7 @@ fun MonthControl(
                             .metroPress {
                                 onSelect(option)
                                 expanded = false
-                            }.padding(vertical = 8.dp)
+                            }.padding(vertical = MetroDimens.Row)
                             .testTag("month-option-$option"),
                         color = if (option == month) Metro.accent.text else Metro.colors.foreground,
                     )
@@ -268,26 +269,28 @@ fun BudgetSection(
             maxLines = 1,
             softWrap = false,
         )
-        MonthControl(openMonth, monthWindow, onSelectMonth, Modifier.padding(top = 4.dp))
-        MetroText(shell.headerLabel, Metro.typography.caption, color = Metro.colors.secondary)
-        MetroText(
-            MoneyFormat.format(shell.headerMinor, shell.currency),
-            Metro.typography.header,
-            color = Metro.accent.text,
-            modifier = Modifier.testTag("to-budget"),
-        )
-        if (shell.bufferedMinor != 0L) {
+        MonthControl(openMonth, monthWindow, onSelectMonth, Modifier.padding(top = MetroDimens.Grid))
+        Column(Modifier.padding(top = MetroDimens.Grid)) {
+            MetroText(shell.headerLabel, Metro.typography.caption, color = Metro.colors.secondary)
             MetroText(
-                "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
-                Metro.typography.caption,
-                color = Metro.colors.secondary,
-                modifier = Modifier.padding(top = 8.dp).testTag("held-amount"),
+                MoneyFormat.format(shell.headerMinor, shell.currency),
+                Metro.typography.header,
+                color = Metro.accent.text,
+                modifier = Modifier.testTag("to-budget"),
             )
+            if (shell.bufferedMinor != 0L) {
+                MetroText(
+                    "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
+                    Metro.typography.caption,
+                    color = Metro.colors.secondary,
+                    modifier = Modifier.padding(top = MetroDimens.Gutter).testTag("held-amount"),
+                )
+            }
         }
         if (shell.groups.isEmpty()) {
-            MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.body, Modifier.padding(top = 12.dp).weight(1f))
+            MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.body, Modifier.padding(top = MetroDimens.Grid).weight(1f))
         } else {
-            LazyColumn(Modifier.fillMaxWidth().weight(1f), state = list) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid), state = list) {
                 items(shell.groups, key = { it.id }) { group ->
                     GroupLine(
                         group,
@@ -313,7 +316,7 @@ private fun GroupLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .then(if (onOpen != null) Modifier.metroPress { onOpen(group.id) } else Modifier)
-            .padding(vertical = 8.dp)
+            .padding(vertical = MetroDimens.Row)
             .testTag("group-${group.id}"),
         verticalAlignment = Alignment.Top,
     ) {
@@ -362,11 +365,11 @@ fun AccountsSection(
     val offBudget = accounts.filter { it.offBudget }
     LazyColumn(modifier.fillMaxSize(), state = list) {
         if (onBudget.isNotEmpty()) {
-            item { SectionLabel(ShellCopy.ON_BUDGET) }
+            item { SectionLabel(ShellCopy.ON_BUDGET, first = true) }
             items(onBudget, key = { it.id }) { AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals)) }
         }
         if (offBudget.isNotEmpty()) {
-            item { SectionLabel(ShellCopy.OFF_BUDGET) }
+            item { SectionLabel(ShellCopy.OFF_BUDGET, first = onBudget.isEmpty()) }
             items(offBudget, key = { it.id }) { AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals)) }
         }
     }
@@ -384,7 +387,7 @@ private fun AccountLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onAccount(account.id) }
-            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp)
+            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
             .testTag("account-${account.id}"),
         verticalAlignment = Alignment.Top,
     ) {
@@ -447,7 +450,7 @@ private fun InboxLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onInbox(row.id) }
-            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp),
+            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row),
         verticalAlignment = Alignment.Top,
     ) {
         MetroText(row.payee, Metro.typography.subheader, Modifier.weight(1f).padding(end = 12.dp), maxLines = 3)
@@ -460,11 +463,18 @@ private fun InboxLine(
 }
 
 @Composable
-private fun SectionLabel(text: String) {
+private fun SectionLabel(
+    text: String,
+    first: Boolean = false,
+) {
     MetroText(
         text,
         Metro.typography.caption,
-        Modifier.padding(start = MetroDimens.Gutter, top = 16.dp, bottom = 4.dp),
+        Modifier.padding(
+            start = MetroDimens.Gutter,
+            top = if (first) 0.dp else MetroDimens.Grid,
+            bottom = MetroDimens.Row,
+        ),
         color = Metro.colors.secondary,
     )
 }
@@ -513,7 +523,7 @@ fun CreateBudgetScreen(
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress { currency = item.code }
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = MetroDimens.Row),
                     color = if (selected) Metro.accent.text else Metro.colors.foreground,
                 )
             }
@@ -541,7 +551,7 @@ fun BudgetsScreen(
             .padding(MetroDimens.Gutter),
     ) {
         MetroText("budgets", Metro.typography.header)
-        LazyColumn(Modifier.weight(1f)) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
             items(budgets, key = { it.id }) { budget ->
                 val open = budget.id == openId
                 MetroText(
@@ -551,7 +561,7 @@ fun BudgetsScreen(
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress { onOpen(budget.id) }
-                        .padding(vertical = 10.dp),
+                        .padding(vertical = MetroDimens.Row),
                     color = if (open) Metro.accent.text else Metro.colors.foreground,
                 )
             }
@@ -561,7 +571,7 @@ fun BudgetsScreen(
             MetroOutlineButton(
                 ShellCopy.SAMPLE_BUDGETS,
                 Modifier
-                    .padding(top = 8.dp)
+                    .padding(top = MetroDimens.Gutter)
                     .testTag("sample-budgets"),
                 onClick = onSamples,
             )
@@ -582,7 +592,7 @@ fun SampleBudgetsScreen(
             .background(Metro.colors.background)
             .padding(MetroDimens.Gutter)
             .testTag("sample-budgets-screen"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
     ) {
         MetroText(ShellCopy.SAMPLE_BUDGETS, Metro.typography.header)
         MetroText(
@@ -593,17 +603,14 @@ fun SampleBudgetsScreen(
         if (error != null) {
             MetroText(error, Metro.typography.body, color = Metro.accent.text)
         }
-        LazyColumn(
-            Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Gutter)) {
             items(samples, key = { it.id }) { sample ->
                 Column(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress { onChoose(sample.id) }
-                        .padding(vertical = 10.dp)
+                        .padding(vertical = MetroDimens.Row)
                         .testTag("sample-${sample.id}"),
                 ) {
                     MetroText(sample.title, Metro.typography.subheader)
@@ -670,14 +677,14 @@ fun AppearanceScreen(
                     .fillMaxWidth()
                     .heightIn(min = MetroDimens.TouchTarget)
                     .metroPress { onTheme(mode.stored()) }
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = MetroDimens.Row),
                 color = if (selected) Metro.accent.text else Metro.colors.foreground,
             )
         }
         MetroText(
             "accent",
             Metro.typography.caption,
-            Modifier.padding(top = 12.dp, bottom = 8.dp),
+            Modifier.padding(top = MetroDimens.Grid, bottom = MetroDimens.Gutter),
             color = Metro.colors.secondary,
         )
         AccentGrid(accentId, onAccent)
@@ -690,9 +697,9 @@ private fun AccentGrid(
     onAccent: (String) -> Unit,
 ) {
     val accents = Accent.entries
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
         accents.chunked(5).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
                 row.forEach { accent ->
                     val fill = accent.fill(Metro.colors.isDark)
                     Box(
@@ -742,13 +749,14 @@ fun SettingsScreen(
             .background(Metro.colors.background)
             .padding(MetroDimens.Gutter)
             .testTag("settings-screen"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         MetroText("settings", Metro.typography.header)
-        SettingsRow("budgets", onBudgets)
-        SettingsRow("appearance", onAppearance)
-        SettingsRow("sync", onSync)
-        SettingsRow("payees", onPayees)
+        Column(Modifier.padding(top = MetroDimens.Grid)) {
+            SettingsRow("budgets", onBudgets)
+            SettingsRow("appearance", onAppearance)
+            SettingsRow("sync", onSync)
+            SettingsRow("payees", onPayees)
+        }
     }
 }
 
@@ -764,7 +772,7 @@ private fun SettingsRow(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick)
-            .padding(vertical = 8.dp)
+            .padding(vertical = MetroDimens.Row)
             .testTag("settings-$label"),
     )
 }

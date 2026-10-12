@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasSetTextAction
@@ -14,16 +15,15 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.unit.dp
-import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.core.BudgetMode
-import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.CategoryRow
+import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -92,7 +92,13 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(420.dp)) {
-                    BudgetSection(shell, openMonth = shell.month, monthWindow = MonthWindow.around(shell.month), onListGesture = {}, onSelectMonth = {})
+                    BudgetSection(
+                        shell,
+                        openMonth = shell.month,
+                        monthWindow = MonthWindow.around(shell.month),
+                        onListGesture = {},
+                        onSelectMonth = {},
+                    )
                 }
             }
         }
@@ -113,7 +119,14 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    BudgetSection(shell, openMonth = shell.month, monthWindow = MonthWindow.around(shell.month), onListGesture = {}, onSelectMonth = {}, onGroup = {})
+                    BudgetSection(
+                        shell,
+                        openMonth = shell.month,
+                        monthWindow = MonthWindow.around(shell.month),
+                        onListGesture = {},
+                        onSelectMonth = {},
+                        onGroup = {},
+                    )
                 }
             }
         }
@@ -150,7 +163,15 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(320.dp)) {
-                    BudgetSection(sample().copy(groups = groups), openMonth = YearMonth.of(2026, 10), monthWindow = MonthWindow.around(YearMonth.of(2026, 10)), onListGesture = {}, onSelectMonth = {})
+                    BudgetSection(
+                        sample().copy(
+                            groups = groups,
+                        ),
+                        openMonth = YearMonth.of(2026, 10),
+                        monthWindow = MonthWindow.around(YearMonth.of(2026, 10)),
+                        onListGesture = {},
+                        onSelectMonth = {},
+                    )
                 }
             }
         }
@@ -197,7 +218,6 @@ class ShellContentTest {
         assertTrue("progress bar is ${heightDp}dp", heightDp in 3f..5f)
         compose.onNodeWithTag("sync-progress").assertIsDisplayed()
     }
-
 
     @Test
     fun sampleBudgetsScreenListsDatasets() {

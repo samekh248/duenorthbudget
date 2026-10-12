@@ -8,12 +8,12 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -50,9 +50,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -218,11 +218,14 @@ fun MetroAppBar(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = MetroDimens.AppBar)
-                .padding(vertical = 8.dp),
+                .padding(vertical = MetroDimens.Gutter),
         ) {
             Row(
-                Modifier.align(Alignment.Center),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(end = 56.dp),
+                horizontalArrangement = Arrangement.spacedBy(MetroDimens.ControlGap, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 primary.forEach { action ->
@@ -264,8 +267,7 @@ fun MetroAppBar(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = MetroDimens.Gutter, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                    .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Gutter),
             ) {
                 secondary.forEach { action ->
                     Box(
@@ -274,7 +276,7 @@ fun MetroAppBar(
                             .heightIn(min = MetroDimens.TouchTarget)
                             .metroPress(action.run)
                             .testTag("app-bar-menu-${action.id}")
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = MetroDimens.Gutter),
                         contentAlignment = Alignment.CenterStart,
                     ) {
                         Row(
@@ -469,7 +471,10 @@ fun MetroPanorama(
     val density = LocalDensity.current
     val stepPx =
         remember(type.subheader, density) {
-            measurer.measure(text = "due", style = type.subheader).size.width.toFloat()
+            measurer
+                .measure(text = "due", style = type.subheader)
+                .size.width
+                .toFloat()
         }
     var titleBlockWidth by remember { mutableIntStateOf(0) }
     var titleScale by remember { mutableFloatStateOf(1f) }
@@ -520,16 +525,22 @@ fun MetroPanorama(
                     stepPx = stepPx,
                     motionEnabled = animations,
                 )
+            // One logo: the title and "due north" stay locked and shift together.
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(start = with(density) { inset.toDp() }.coerceAtLeast(MetroDimens.Gutter), top = 8.dp, end = MetroDimens.Gutter)
-                    .onGloballyPositioned { titleBlockWidth = it.size.width }
+                    .padding(
+                        start = with(density) { inset.toDp() }.coerceAtLeast(MetroDimens.Gutter),
+                        top = 8.dp,
+                        end = MetroDimens.Gutter,
+                    ).onGloballyPositioned { titleBlockWidth = it.size.width }
                     .graphicsLayer {
                         translationX = shift
                         scaleX = titleScale
                         scaleY = titleScale
-                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                        transformOrigin =
+                            androidx.compose.ui.graphics
+                                .TransformOrigin(0f, 0f)
                     },
             ) {
                 MetroText(
@@ -568,7 +579,7 @@ fun MetroPanorama(
                     section.header,
                     type.sectionHeader,
                     Modifier
-                        .padding(start = MetroDimens.Gutter)
+                        .padding(start = MetroDimens.Gutter, bottom = MetroDimens.Grid)
                         .semantics { heading() }
                         .metroPress { goTo(index) }
                         .heightIn(min = MetroDimens.TouchTarget),

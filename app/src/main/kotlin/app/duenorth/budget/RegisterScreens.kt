@@ -26,9 +26,9 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.EntryResult
+import app.duenorth.budget.core.ImportCopy
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MoneyParse
-import app.duenorth.budget.core.ImportCopy
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
@@ -68,33 +68,35 @@ fun RegisterScreen(
             .padding(horizontal = MetroDimens.Gutter),
     ) {
         MetroText(page.account.name, Metro.typography.header, maxLines = 2)
-        MetroText(ShellCopy.BALANCE, Metro.typography.caption, color = Metro.colors.secondary)
-        MetroText(
-            MoneyFormat.format(page.balanceMinor, page.currency),
-            Metro.typography.header,
-            color = Metro.accent.text,
-            modifier = Modifier.testTag("register-balance"),
-        )
-        if (owed) {
-            MetroText(RegisterCopy.OWED, Metro.typography.caption, color = Metro.colors.secondary)
+        Column(Modifier.padding(top = MetroDimens.Gutter)) {
+            MetroText(ShellCopy.BALANCE, Metro.typography.caption, color = Metro.colors.secondary)
+            MetroText(
+                MoneyFormat.format(page.balanceMinor, page.currency),
+                Metro.typography.header,
+                color = Metro.accent.text,
+                modifier = Modifier.testTag("register-balance"),
+            )
+            if (owed) {
+                MetroText(RegisterCopy.OWED, Metro.typography.caption, color = Metro.colors.secondary)
+            }
         }
         MetroField(
             value = filter,
             onValueChange = onFilter,
             hint = "payee",
-            modifier = Modifier.padding(top = 12.dp).testTag("payee-filter"),
+            modifier = Modifier.padding(top = MetroDimens.Grid).testTag("payee-filter"),
         )
         if (onFetch != null) {
             MetroButton(
                 ImportCopy.FETCH,
-                Modifier.padding(top = 8.dp).testTag("register-fetch"),
+                Modifier.padding(top = MetroDimens.Gutter).testTag("register-fetch"),
                 onClick = onFetch,
             )
         }
         if (rows.isEmpty()) {
-            MetroText(RegisterCopy.NO_TRANSACTIONS, Metro.typography.body, Modifier.padding(top = 16.dp))
+            MetroText(RegisterCopy.NO_TRANSACTIONS, Metro.typography.body, Modifier.padding(top = MetroDimens.Grid))
         } else {
-            RegisterList(rows, page, onGesture, onOpen, Modifier.weight(1f).padding(top = 8.dp))
+            RegisterList(rows, page, onGesture, onOpen, Modifier.weight(1f).padding(top = MetroDimens.Grid))
         }
     }
 }
@@ -129,7 +131,7 @@ private fun RegisterLine(
         Modifier
             .fillMaxWidth()
             .metroPress { onOpen(row.id) }
-            .padding(vertical = 8.dp)
+            .padding(vertical = MetroDimens.Row)
             .testTag("register-row-${row.id}"),
     ) {
         Row(verticalAlignment = Alignment.Top) {
@@ -150,7 +152,7 @@ private fun RegisterLine(
         }
         row.parts.forEach { part ->
             Row(
-                Modifier.fillMaxWidth().padding(start = 12.dp, top = 4.dp),
+                Modifier.fillMaxWidth().padding(start = MetroDimens.Gutter, top = MetroDimens.Gutter),
                 verticalAlignment = Alignment.Top,
             ) {
                 MetroText(part.categoryName, Metro.typography.body, Modifier.weight(1f), maxLines = 2)
@@ -295,7 +297,7 @@ fun SplitForm(
         if (shown != null) {
             MetroText(shown, Metro.typography.body, color = Metro.accent.text)
         }
-        LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
             items(lines.size) { index ->
                 SplitLineEditor(
                     index = index,
@@ -311,7 +313,7 @@ fun SplitForm(
                 )
             }
         }
-        MetroButton("add part", Modifier.padding(top = 8.dp)) {
+        MetroButton("add part", Modifier.padding(top = MetroDimens.Grid)) {
             lines = lines + ("" to "")
         }
         val commitSplit = {
@@ -325,10 +327,10 @@ fun SplitForm(
         }
         RememberFormSave(commitSplit)
         if (!formSaveOnBar()) {
-            MetroButton("save", Modifier.padding(top = 8.dp), onClick = commitSplit)
+            MetroButton("save", Modifier.padding(top = MetroDimens.Grid), onClick = commitSplit)
         }
         if (row.parent) {
-            MetroButton("one category", Modifier.padding(top = 8.dp)) { onUnsplit(row.id) }
+            MetroButton("one category", Modifier.padding(top = MetroDimens.Grid)) { onUnsplit(row.id) }
         }
     }
 }
@@ -342,9 +344,9 @@ private fun SplitLineEditor(
     onAmount: (String) -> Unit,
     onCategory: (String) -> Unit,
 ) {
-    Column(Modifier.padding(top = 12.dp)) {
+    Column(Modifier.padding(top = MetroDimens.Grid)) {
         MetroText("part ${index + 1}", Metro.typography.caption, color = Metro.colors.secondary)
-        MetroField(amount, onAmount, "amount", Modifier.padding(top = 4.dp))
+        MetroField(amount, onAmount, "amount", Modifier.padding(top = MetroDimens.Gutter))
         categories.forEach { category ->
             ChoiceLine(category.name, category.id == categoryId) { onCategory(category.id) }
         }
@@ -376,14 +378,14 @@ fun TransferForm(
             .padding(MetroDimens.Gutter),
     ) {
         MetroText("transfer", Metro.typography.header)
-        MetroField(date, { date = it }, "date", Modifier.padding(top = 12.dp))
-        MetroField(amount, { amount = it }, "amount", Modifier.padding(top = 8.dp))
-        MetroField(note, { note = it }, "note", Modifier.padding(top = 8.dp))
+        MetroField(date, { date = it }, "date", Modifier.padding(top = MetroDimens.Grid))
+        MetroField(amount, { amount = it }, "amount", Modifier.padding(top = MetroDimens.Gutter))
+        MetroField(note, { note = it }, "note", Modifier.padding(top = MetroDimens.Gutter))
         val shown = localError ?: error
         if (shown != null) {
-            MetroText(shown, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
+            MetroText(shown, Metro.typography.body, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)
         }
-        LazyColumn(Modifier.weight(1f).padding(top = 8.dp)) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
             items(others, key = { it.id }) { account ->
                 ChoiceLine(account.name, account.id == toId) { toId = account.id }
             }
@@ -392,7 +394,7 @@ fun TransferForm(
                     MetroText(
                         "category",
                         Metro.typography.caption,
-                        Modifier.padding(top = 12.dp),
+                        Modifier.padding(top = MetroDimens.Grid, bottom = MetroDimens.Gutter),
                         color = Metro.colors.secondary,
                     )
                 }
@@ -424,7 +426,7 @@ fun TransferForm(
         }
         RememberFormSave(commitTransfer)
         if (!formSaveOnBar()) {
-            MetroButton("save", Modifier.padding(top = 8.dp), onClick = commitTransfer)
+            MetroButton("save", Modifier.padding(top = MetroDimens.Grid), onClick = commitTransfer)
         }
     }
 }
@@ -449,9 +451,9 @@ fun CategoryPickerScreen(
             color = Metro.accent.text,
         )
         if (error != null) {
-            MetroText(error, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
+            MetroText(error, Metro.typography.body, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)
         }
-        LazyColumn(Modifier.weight(1f).padding(top = 12.dp)) {
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
             item { ChoiceLine(RegisterCopy.NO_CATEGORY, false) { onPick(null) } }
             items(target.categories, key = { it.id }) { category ->
                 ChoiceLine(category.name, false) { onPick(category.id) }
@@ -488,7 +490,7 @@ private fun DirectionChoice(
     MetroText(
         label,
         Metro.typography.subheader,
-        Modifier.heightIn(min = MetroDimens.TouchTarget).metroPress(onClick).padding(vertical = 8.dp),
+        Modifier.heightIn(min = MetroDimens.TouchTarget).metroPress(onClick).padding(vertical = MetroDimens.Row),
         color = if (selected) Metro.accent.text else Metro.colors.foreground,
     )
 }
@@ -506,7 +508,7 @@ private fun ChoiceLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = MetroDimens.Row),
         color = if (selected) Metro.accent.text else Metro.colors.foreground,
         maxLines = 2,
     )

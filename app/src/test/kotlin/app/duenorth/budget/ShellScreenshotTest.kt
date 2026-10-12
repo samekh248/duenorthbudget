@@ -13,11 +13,11 @@ import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.RemoteFile
+import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.asScreenActions
-import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test

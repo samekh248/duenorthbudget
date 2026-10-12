@@ -96,7 +96,7 @@ fun ServerScreen(
             }
             LazyColumn(Modifier.weight(1f)) {
                 items(files, key = { it.fileId }) { file ->
-                    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(vertical = MetroDimens.Row)) {
                         MetroText(
                             file.name,
                             Metro.typography.subheader,
@@ -109,7 +109,7 @@ fun ServerScreen(
                         MetroText(
                             "replace ${file.name}",
                             Metro.typography.caption,
-                            Modifier.metroPress { onReplace(file) }.padding(bottom = 8.dp),
+                            Modifier.metroPress { onReplace(file) }.padding(bottom = MetroDimens.Gutter),
                             color = Metro.colors.secondary,
                         )
                     }
@@ -227,7 +227,7 @@ fun AssignScreen(
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress { selected = category.id }
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = MetroDimens.Row),
                     color = if (category.id == selected) Metro.accent.text else Metro.colors.foreground,
                 )
             }
