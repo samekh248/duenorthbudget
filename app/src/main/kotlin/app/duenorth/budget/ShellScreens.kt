@@ -105,17 +105,16 @@ fun HomePanorama(
                             null
                         } else {
                             { onActivate ->
-                                MonthControl(
+                                BudgetMonthTitle(
                                     month = openMonth,
                                     window = monthWindow,
                                     onSelect = onSelectMonth,
+                                    onActivate = onActivate,
                                     modifier =
                                         Modifier.padding(
                                             start = MetroDimens.Gutter,
                                             bottom = MetroDimens.Grid,
                                         ),
-                                    heading = "budget",
-                                    onHeading = onActivate,
                                 )
                             }
                         },
@@ -195,217 +194,145 @@ fun MonthControl(
     window: MonthWindow,
     onSelect: (YearMonth) -> Unit,
     modifier: Modifier = Modifier,
-    heading: String? = null,
-    onHeading: () -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
     val previous = window.previous(month)
     val next = window.next(month)
     val calendar = YearMonth.now()
-    val label = monthLabel(month)
     Column(modifier.fillMaxWidth()) {
-        if (heading == null) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (previous != null) {
-                    MonthIconButton(AppGlyph.ChevronLeft, "month-previous") { onSelect(previous) }
-                }
-                MetroText(
-                    label,
-                    Metro.typography.subheader,
-                    Modifier
-                        .weight(1f)
-                        .metroPress { expanded = !expanded }
-                        .testTag("month-label"),
-                )
-                if (month != calendar) {
-                    MonthIconButton(AppGlyph.Calendar, "month-current") { onSelect(calendar) }
-                }
-                if (next != null) {
-                    MonthIconButton(AppGlyph.ChevronRight, "month-next") { onSelect(next) }
-                }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (previous != null) {
+                MonthIconButton(AppGlyph.ChevronLeft, "month-previous") { onSelect(previous) }
             }
-        } else {
-            HeadingMonthRow(
-                heading = heading,
-                onHeading = onHeading,
-                label = label,
-                onLabel = { expanded = !expanded },
-                onPrevious = previous?.let { { onSelect(it) } },
-                onCalendar = if (month != calendar) ({ onSelect(calendar) }) else null,
-                onNext = next?.let { { onSelect(it) } },
+            MetroText(
+                monthLabel(month),
+                Metro.typography.subheader,
+                Modifier
+                    .weight(1f)
+                    .metroPress { expanded = !expanded }
+                    .testTag("month-label"),
             )
+            if (month != calendar) {
+                MonthIconButton(AppGlyph.Calendar, "month-current") { onSelect(calendar) }
+            }
+            if (next != null) {
+                MonthIconButton(AppGlyph.ChevronRight, "month-next") { onSelect(next) }
+            }
         }
         if (expanded) {
-            LazyColumn(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = MetroDimens.Gutter)
-                    .heightIn(max = 288.dp)
-                    .testTag("month-list"),
-            ) {
-                items(window.months, key = { it.toString() }) { option ->
-                    MetroText(
-                        monthLabel(option),
-                        Metro.typography.body,
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = MetroDimens.TouchTarget)
-                            .metroPress {
-                                onSelect(option)
-                                expanded = false
-                            }.padding(vertical = MetroDimens.Row)
-                            .testTag("month-option-$option"),
-                        color = if (option == month) Metro.accent.text else Metro.colors.foreground,
-                    )
-                }
+            MonthOptions(month, window) {
+                onSelect(it)
+                expanded = false
             }
         }
     }
 }
 
-/**
- * Section word on the left, month cluster pinned to the right of the same line.
- * The word keeps the section size until the month would drop below body text.
- * Chevrons stay a full touch target.
- */
+/** View title for the budget section: "october 2026 budget", opened as the month list. */
 @Composable
-private fun HeadingMonthRow(
-    heading: String,
-    onHeading: () -> Unit,
-    label: String,
-    onLabel: () -> Unit,
-    onPrevious: (() -> Unit)?,
-    onCalendar: (() -> Unit)?,
-    onNext: (() -> Unit)?,
+private fun BudgetMonthTitle(
+    month: YearMonth,
+    window: MonthWindow,
+    onSelect: (YearMonth) -> Unit,
+    onActivate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val titleStyle = Metro.typography.sectionHeader
-    val labelStyle = Metro.typography.subheader
-    SubcomposeLayout(modifier.fillMaxWidth().heightIn(min = MetroDimens.TouchTarget)) { constraints ->
-        // Widths near Constraints.Infinity make this text measure about one pixel per character.
-        val loose = constraints.copy(minWidth = 0, minHeight = 0, maxWidth = 2_048)
-        val buttonPx = MetroDimens.TouchTarget.roundToPx()
-        val buttonsW = buttonPx * listOfNotNull(onPrevious, onCalendar, onNext).size
-        val safety = 1.dp.roundToPx()
-        val maxW = constraints.maxWidth
+    var expanded by remember { mutableStateOf(false) }
+    val phrase = "${monthLabel(month)} budget"
+    val style = Metro.typography.sectionHeader
+    Column(modifier.fillMaxWidth()) {
+        SubcomposeLayout(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = MetroDimens.TouchTarget)
+                .semantics { heading() }
+                .metroPress {
+                    onActivate()
+                    expanded = !expanded
+                }.testTag("month-label"),
+        ) { constraints ->
+            // Widths near Constraints.Infinity make this text measure about one pixel per character.
+            val loose = constraints.copy(minWidth = 0, minHeight = 0, maxWidth = 2_048)
+            val iconPx = 22.dp.roundToPx()
+            val gap = MetroDimens.Gutter.roundToPx()
+            val safety = 1.dp.roundToPx()
+            val maxW = constraints.maxWidth
+            val textAvail = (maxW - gap - iconPx - safety).coerceAtLeast(0)
 
-        fun textWidth(
-            id: String,
-            text: String,
-            style: TextStyle,
-        ): Int =
-            subcompose(id) {
-                MetroText(text, style, Modifier.clearAndSetSemantics {}, maxLines = 1, softWrap = false)
-            }.first().measure(loose).width
+            fun textWidth(
+                id: String,
+                text: String,
+                textStyle: TextStyle,
+            ): Int =
+                subcompose(id) {
+                    MetroText(text, textStyle, Modifier.clearAndSetSemantics {}, maxLines = 1, softWrap = false)
+                }.first().measure(loose).width
 
-        val naturalTitle = textWidth("title-natural", heading, titleStyle)
-        val naturalLabel = textWidth("label-natural", label, labelStyle)
-        val textAvail = (maxW - buttonsW - safety).coerceAtLeast(0)
-        val minLabel = 16f / labelStyle.fontSize.value
-        var (titleScale, labelScale) =
-            headingScales(
-                titleW = naturalTitle,
-                labelW = naturalLabel,
-                textAvail = textAvail,
-                minLabel = minLabel,
-            )
-        val sizedTitle = textWidth("title-sized", heading, titleStyle.at(titleScale))
-        val sizedLabel = textWidth("label-sized", label, labelStyle.at(labelScale))
-        val used = sizedTitle + sizedLabel
-        if (used > textAvail && used > 0) {
-            val fix = (textAvail - safety).coerceAtLeast(0).toFloat() / used
-            titleScale *= fix
-            labelScale *= fix
+            val natural = textWidth("title-natural", phrase, style)
+            var scale = if (natural <= textAvail || natural == 0) 1f else textAvail.toFloat() / natural
+            val sized = textWidth("title-sized", phrase, style.at(scale))
+            if (sized > textAvail && sized > 0) {
+                scale *= (textAvail - safety).coerceAtLeast(0).toFloat() / sized
+            }
+            val title =
+                subcompose("title") {
+                    MetroText(phrase, style.at(scale), maxLines = 1, softWrap = false)
+                }.first().measure(loose)
+            val chevron =
+                subcompose("chevron") {
+                    Box(
+                        Modifier.graphicsLayer { rotationZ = if (expanded) 180f else 0f }.testTag("month-dropdown"),
+                    ) {
+                        AppGlyphIcon(AppGlyph.ChevronDown)
+                    }
+                }.first().measure(loose)
+            val height = maxOf(constraints.minHeight, title.height, chevron.height)
+            val width = if (maxW == Constraints.Infinity) title.width + gap + chevron.width + safety else maxW
+            layout(width, height) {
+                title.placeRelative(0, ((height - title.height) / 2).coerceAtLeast(0))
+                val iconX = (title.width + gap).coerceAtMost((width - chevron.width).coerceAtLeast(0))
+                chevron.placeRelative(iconX, ((height - chevron.height) / 2).coerceAtLeast(0))
+            }
         }
-        val title =
-            subcompose("title") {
-                MetroText(
-                    heading,
-                    titleStyle.at(titleScale),
-                    Modifier
-                        .semantics { heading() }
-                        .metroPress(onHeading)
-                        .testTag("section-heading"),
-                    maxLines = 1,
-                    softWrap = false,
-                )
-            }.first().measure(loose)
-        val month =
-            subcompose("month") {
-                Box(
-                    Modifier
-                        .heightIn(min = MetroDimens.TouchTarget)
-                        .metroPress(onLabel)
-                        .testTag("month-label"),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    MetroText(label, labelStyle.at(labelScale), maxLines = 1, softWrap = false)
-                }
-            }.first().measure(loose)
-
-        fun button(
-            id: String,
-            glyph: AppGlyph,
-            tag: String,
-            onClick: () -> Unit,
-        ) = subcompose(id) { MonthIconButton(glyph, tag, onClick) }.first().measure(loose)
-
-        val prev = onPrevious?.let { button("prev", AppGlyph.ChevronLeft, "month-previous", it) }
-        val calendar = onCalendar?.let { button("calendar", AppGlyph.Calendar, "month-current", it) }
-        val next = onNext?.let { button("next", AppGlyph.ChevronRight, "month-next", it) }
-        val clusterW = (prev?.width ?: 0) + month.width + (calendar?.width ?: 0) + (next?.width ?: 0)
-        val height =
-            maxOf(
-                constraints.minHeight,
-                title.height,
-                month.height,
-                prev?.height ?: 0,
-                calendar?.height ?: 0,
-                next?.height ?: 0,
-            )
-        val width = if (maxW == Constraints.Infinity) title.width + clusterW + safety else maxW
-        layout(width, height) {
-            fun yOf(itemHeight: Int) = ((height - itemHeight) / 2).coerceAtLeast(0)
-            title.placeRelative(0, yOf(title.height))
-            var x = (width - clusterW).coerceAtLeast(title.width)
-            prev?.let {
-                it.placeRelative(x, yOf(it.height))
-                x += it.width
+        if (expanded) {
+            MonthOptions(month, window) {
+                onSelect(it)
+                expanded = false
             }
-            month.placeRelative(x, yOf(month.height))
-            x += month.width
-            calendar?.let {
-                it.placeRelative(x, yOf(it.height))
-                x += it.width
-            }
-            next?.let { it.placeRelative(x, yOf(it.height)) }
         }
     }
 }
 
-private fun headingScales(
-    titleW: Int,
-    labelW: Int,
-    textAvail: Int,
-    minLabel: Float,
-): Pair<Float, Float> {
-    val natural = titleW + labelW
-    if (natural <= textAvail || titleW == 0 || labelW == 0) return 1f to 1f
-    val uniform = textAvail.toFloat() / natural
-    val titleRoom = textAvail.toFloat() - labelW * minLabel
-    if (titleRoom >= titleW.toFloat()) {
-        val labelScale = (textAvail - titleW).toFloat() / labelW
-        return 1f to labelScale.coerceIn(minLabel, 1f)
-    }
-    val titleCandidate = titleRoom / titleW.toFloat()
-    return if (titleRoom > 0f && titleCandidate >= uniform) {
-        titleCandidate to minLabel
-    } else {
-        uniform.coerceAtLeast(0.01f) to uniform.coerceAtLeast(0.01f)
+@Composable
+private fun MonthOptions(
+    month: YearMonth,
+    window: MonthWindow,
+    onSelect: (YearMonth) -> Unit,
+) {
+    LazyColumn(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = MetroDimens.Gutter)
+            .heightIn(max = 288.dp)
+            .testTag("month-list"),
+    ) {
+        items(window.months, key = { it.toString() }) { option ->
+            MetroText(
+                monthLabel(option),
+                Metro.typography.body,
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = MetroDimens.TouchTarget)
+                    .metroPress { onSelect(option) }
+                    .padding(vertical = MetroDimens.Row)
+                    .testTag("month-option-$option"),
+                color = if (option == month) Metro.accent.text else Metro.colors.foreground,
+            )
+        }
     }
 }
 

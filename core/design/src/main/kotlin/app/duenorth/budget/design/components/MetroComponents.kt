@@ -201,6 +201,7 @@ enum class AppGlyph {
     Cancel,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     Calendar,
 }
 
@@ -368,6 +369,7 @@ object AppGlyphInk {
             AppGlyph.Cancel -> 2
             AppGlyph.ChevronLeft -> 2
             AppGlyph.ChevronRight -> 2
+            AppGlyph.ChevronDown -> 2
             AppGlyph.Calendar -> 3
         }
 
@@ -462,6 +464,10 @@ object AppGlyphInk {
             AppGlyph.ChevronRight -> {
                 drawLine(color, Offset(9.dp.toPx(), 5.dp.toPx()), Offset(15.dp.toPx(), 11.dp.toPx()), strokeWidth = 1.8.dp.toPx())
                 drawLine(color, Offset(15.dp.toPx(), 11.dp.toPx()), Offset(9.dp.toPx(), 17.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+            }
+            AppGlyph.ChevronDown -> {
+                drawLine(color, Offset(5.dp.toPx(), 8.dp.toPx()), Offset(11.dp.toPx(), 14.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+                drawLine(color, Offset(11.dp.toPx(), 14.dp.toPx()), Offset(17.dp.toPx(), 8.dp.toPx()), strokeWidth = 1.8.dp.toPx())
             }
             AppGlyph.Calendar -> {
                 drawRect(

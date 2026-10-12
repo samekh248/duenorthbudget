@@ -80,8 +80,9 @@ class ShellContentTest {
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     @Config(sdk = [33], qualifiers = "w411dp-h891dp")
-    fun budgetHeadingSharesTheMonthRow() {
+    fun budgetTitleIsTheMonthDropdown() {
         val shell = sample().copy(budgetName = "Home")
+        val openMonth = mutableStateOf(shell.month)
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
@@ -91,33 +92,37 @@ class ShellContentTest {
                         netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
-                        openMonth = shell.month,
+                        openMonth = openMonth.value,
                         monthWindow = MonthWindow.around(shell.month),
                         onGesture = {},
+                        onSelectMonth = { openMonth.value = it },
                     )
                 }
             }
         }
         compose.onNodeWithTag("budget-name").assertDoesNotExist()
         compose.onNodeWithText("Home").assertDoesNotExist()
+        compose.onNodeWithTag("month-previous").assertDoesNotExist()
+        compose.onNodeWithTag("month-next").assertDoesNotExist()
+        compose.onNodeWithText("october 2026 budget").assertIsDisplayed()
         val density = compose.density.density
-        val heading = compose.onNodeWithTag("section-heading").fetchSemanticsNode().boundsInRoot
-        val month = compose.onNodeWithTag("month-label").fetchSemanticsNode().boundsInRoot
-        val previous = compose.onNodeWithTag("month-previous").fetchSemanticsNode().boundsInRoot
-        val next = compose.onNodeWithTag("month-next").fetchSemanticsNode().boundsInRoot
+        val title = compose.onNodeWithText("october 2026 budget", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val dropdown = compose.onNodeWithTag("month-dropdown", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val root = compose.onNodeWithTag("panorama").fetchSemanticsNode().boundsInRoot
-        assertTrue("heading shares the month row: $heading vs $month", month.top < heading.bottom && heading.top < month.bottom)
-        assertTrue("month sits to the right of the word: $heading vs $month", month.left + 1f >= heading.right)
-        assertTrue("previous sits to the right of the word: $heading vs $previous", previous.left + 1f >= heading.right)
-        assertTrue("next follows the month: $month vs $next", next.left + 1f >= month.right)
-        val headingDp = heading.height / density
-        val monthDp = month.width / density
-        assertTrue("heading stays a section title, ${headingDp}dp", headingDp >= 48f)
-        assertTrue("month label stays readable, ${monthDp}dp", monthDp >= 80f)
-        assertTrue("next stays inside the page", next.right <= root.right + 1f)
+        val titleDp = title.height / density
+        assertTrue("title stays a section heading, ${titleDp}dp", titleDp >= 36f)
+        assertTrue("dropdown follows the title: $title vs $dropdown", dropdown.left + 1f >= title.right)
+        assertTrue(
+            "dropdown shares the title row: $title vs $dropdown",
+            dropdown.top < title.bottom && title.top < dropdown.bottom,
+        )
+        assertTrue("dropdown stays inside the page", dropdown.right <= root.right - 40f * density + 1f)
         compose.onNodeWithTag("to-budget").assertIsDisplayed()
         compose.onNodeWithTag("month-label").performClick()
         compose.onNodeWithTag("month-list").assertIsDisplayed()
+        compose.onNodeWithTag("month-option-2024-10").performClick()
+        compose.onNodeWithText("october 2024 budget").assertIsDisplayed()
+        compose.onNodeWithTag("month-list").assertDoesNotExist()
     }
 
     @Test
