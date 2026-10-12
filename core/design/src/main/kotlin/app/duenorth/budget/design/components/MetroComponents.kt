@@ -503,6 +503,7 @@ private fun Modifier.pullUp(distance: Dp): Modifier =
 @Immutable
 class PanoramaSection(
     val header: String,
+    val headerBlock: (@Composable (onActivate: () -> Unit) -> Unit)? = null,
     val content: @Composable () -> Unit,
 )
 
@@ -631,17 +632,22 @@ fun MetroPanorama(
             val index = sectionOf(page)
             val section = sections[index]
             Column(Modifier.fillMaxSize()) {
-                MetroText(
-                    section.header,
-                    type.sectionHeader,
-                    Modifier
-                        .padding(start = MetroDimens.Gutter, bottom = MetroDimens.Grid)
-                        .semantics { heading() }
-                        .metroPress { goTo(index) }
-                        .heightIn(min = MetroDimens.TouchTarget),
-                    maxLines = 1,
-                    softWrap = false,
-                )
+                val block = section.headerBlock
+                if (block != null) {
+                    block { goTo(index) }
+                } else {
+                    MetroText(
+                        section.header,
+                        type.sectionHeader,
+                        Modifier
+                            .padding(start = MetroDimens.Gutter, bottom = MetroDimens.Grid)
+                            .semantics { heading() }
+                            .metroPress { goTo(index) }
+                            .heightIn(min = MetroDimens.TouchTarget),
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     section.content()
                 }

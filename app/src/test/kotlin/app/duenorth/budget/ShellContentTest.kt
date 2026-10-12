@@ -77,6 +77,48 @@ class ShellContentTest {
     }
 
     @Test
+    fun budgetHeadingSharesTheMonthRow() {
+        val shell = sample().copy(budgetName = "Home")
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    HomePanorama(
+                        shell = shell,
+                        review = null,
+                        netWorth = null,
+                        upcoming = emptyList(),
+                        loading = false,
+                        openMonth = shell.month,
+                        monthWindow = MonthWindow.around(shell.month),
+                        onGesture = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("budget-name").assertDoesNotExist()
+        compose.onNodeWithText("Home").assertDoesNotExist()
+        val density = compose.density.density
+        val heading = compose.onNodeWithTag("section-heading").fetchSemanticsNode().boundsInRoot
+        val month = compose.onNodeWithTag("month-label").fetchSemanticsNode().boundsInRoot
+        val previous = compose.onNodeWithTag("month-previous").fetchSemanticsNode().boundsInRoot
+        val next = compose.onNodeWithTag("month-next").fetchSemanticsNode().boundsInRoot
+        val root = compose.onNodeWithTag("panorama").fetchSemanticsNode().boundsInRoot
+        assertTrue("heading shares the month row: $heading vs $month", month.top < heading.bottom && heading.top < month.bottom)
+        assertTrue("month sits to the right of the word: $heading vs $month", month.left + 1f >= heading.right)
+        assertTrue("previous sits to the right of the word: $heading vs $previous", previous.left + 1f >= heading.right)
+        assertTrue("next follows the month: $month vs $next", next.left + 1f >= month.right)
+        val headingDp = heading.height / density
+        val monthDp = month.width / density
+        assertTrue("heading stays a section title, ${headingDp}dp", headingDp >= 40f)
+        assertTrue("month label stays readable, ${monthDp}dp", monthDp >= 80f)
+        assertTrue("next stays inside the page", next.right <= root.right + 1f)
+        compose.onNodeWithTag("to-budget").assertIsDisplayed()
+        compose.onNodeWithTag("month-label").performClick()
+        compose.onNodeWithTag("month-list").assertIsDisplayed()
+        compose.onNodeWithTag("month-option-2026-10").assertIsDisplayed()
+    }
+
+    @Test
     fun longNameStaysBesideTheAmount() {
         val shell =
             sample().copy(
@@ -94,10 +136,7 @@ class ShellContentTest {
                 Box(Modifier.width(390.dp).height(420.dp)) {
                     BudgetSection(
                         shell,
-                        openMonth = shell.month,
-                        monthWindow = MonthWindow.around(shell.month),
                         onListGesture = {},
-                        onSelectMonth = {},
                     )
                 }
             }
@@ -121,10 +160,7 @@ class ShellContentTest {
                 Box(Modifier.width(390.dp).height(640.dp)) {
                     BudgetSection(
                         shell,
-                        openMonth = shell.month,
-                        monthWindow = MonthWindow.around(shell.month),
                         onListGesture = {},
-                        onSelectMonth = {},
                         onGroup = {},
                     )
                 }
@@ -167,10 +203,7 @@ class ShellContentTest {
                         sample().copy(
                             groups = groups,
                         ),
-                        openMonth = YearMonth.of(2026, 10),
-                        monthWindow = MonthWindow.around(YearMonth.of(2026, 10)),
                         onListGesture = {},
-                        onSelectMonth = {},
                     )
                 }
             }
