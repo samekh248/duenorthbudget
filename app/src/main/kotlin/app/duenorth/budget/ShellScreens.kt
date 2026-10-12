@@ -376,19 +376,21 @@ fun BudgetSection(
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         MetroText(shell.headerLabel, Metro.typography.caption, color = Metro.colors.secondary)
-        MetroText(
-            MoneyFormat.format(shell.headerMinor, shell.currency),
-            Metro.typography.header,
-            color = Metro.accent.text,
-            modifier = Modifier.testTag("to-budget"),
-        )
-        if (shell.bufferedMinor != 0L) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             MetroText(
-                "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
-                Metro.typography.caption,
-                color = Metro.colors.secondary,
-                modifier = Modifier.padding(top = MetroDimens.Gutter).testTag("held-amount"),
+                MoneyFormat.format(shell.headerMinor, shell.currency),
+                Metro.typography.subheader,
+                color = Metro.accent.text,
+                modifier = Modifier.alignByBaseline().testTag("to-budget"),
             )
+            if (shell.bufferedMinor != 0L) {
+                MetroText(
+                    "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
+                    Metro.typography.caption,
+                    color = Metro.colors.secondary,
+                    modifier = Modifier.padding(start = MetroDimens.Gutter).alignByBaseline().testTag("held-amount"),
+                )
+            }
         }
         if (shell.groups.isEmpty()) {
             MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.body, Modifier.padding(top = MetroDimens.Grid).weight(1f))
