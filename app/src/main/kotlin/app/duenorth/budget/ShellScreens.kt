@@ -399,7 +399,7 @@ fun BudgetSection(
             }
         }
         if (shell.groups.isEmpty()) {
-            MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.body, Modifier.padding(top = MetroDimens.Grid).weight(1f))
+            MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.caption, Modifier.padding(top = MetroDimens.Grid).weight(1f))
         } else {
             LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid), state = list) {
                 items(shell.groups, key = { it.id }) { group ->
@@ -454,7 +454,7 @@ private fun GroupLine(
     ) {
         MetroText(
             group.name,
-            Metro.typography.subheader,
+            Metro.typography.groupHeader,
             Modifier
                 .weight(1f)
                 .padding(end = 12.dp)
@@ -463,7 +463,7 @@ private fun GroupLine(
         )
         MetroText(
             MoneyFormat.format(group.availableMinor, shell.currency),
-            Metro.typography.subheader,
+            Metro.typography.groupHeader,
             Modifier
                 .widthIn(max = 148.dp)
                 .testTag("group-amount-${group.id}"),

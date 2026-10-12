@@ -126,6 +126,41 @@ class ShellContentTest {
     }
 
     @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun groupTextIsSmallerThanTheTotals() {
+        val shell =
+            sample().copy(
+                headerMinor = 42_000,
+                groups = listOf(GroupRow("g", "Bills", 124_000)),
+            )
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(420.dp)) {
+                    BudgetSection(shell, onListGesture = {})
+                }
+            }
+        }
+        val total =
+            compose
+                .onNodeWithTag("to-budget")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        val name =
+            compose
+                .onNodeWithTag("group-name-g")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        val amount =
+            compose
+                .onNodeWithTag("group-amount-g")
+                .fetchSemanticsNode()
+                .boundsInRoot.height
+        assertTrue("group name is smaller than to-budget: $name vs $total", name < total)
+        assertTrue("group amount is smaller than to-budget: $amount vs $total", amount < total)
+    }
+
+    @Test
     fun longNameStaysBesideTheAmount() {
         val shell =
             sample().copy(
