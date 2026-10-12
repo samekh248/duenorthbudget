@@ -34,7 +34,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -56,9 +55,12 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.duenorth.budget.design.PanoramaMotion
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.MetroFonts
+import app.duenorth.budget.design.theme.MetroWeights
 import kotlinx.coroutines.launch
 
 @Composable
@@ -83,7 +85,7 @@ fun MetroText(
 @Composable
 fun Modifier.metroPress(onClick: () -> Unit): Modifier {
     val animations = Metro.animations
-    val pressedColor = Metro.colors.chrome
+    val pressedColor = if (Metro.colors.isDark) Color(0x73FFFFFF) else Color(0x40000000)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     return this
@@ -106,21 +108,24 @@ fun MetroField(
     conceal: Boolean = false,
 ) {
     val colors = Metro.colors
-    val type = Metro.typography
+    val field = if (colors.isDark) Color.White else Color(0xFFBFBFBF)
+    val ink = Color.Black
+    val hintColor = if (colors.isDark) Color(0xFF909090) else Color(0xFF8F8F8F)
     Box(
         modifier
             .fillMaxWidth()
-            .border(1.dp, colors.outline)
+            .background(field)
             .heightIn(min = MetroDimens.TouchTarget)
-            .padding(horizontal = MetroDimens.Gutter, vertical = 12.dp),
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.CenterStart,
     ) {
         if (value.isEmpty()) {
-            MetroText(hint, type.body, color = colors.secondary)
+            MetroText(hint, Metro.typography.control, color = hintColor)
         }
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            textStyle = type.body.copy(color = colors.foreground),
+            textStyle = Metro.typography.control.copy(color = ink),
             cursorBrush = SolidColor(Metro.accent.fill),
             visualTransformation = if (conceal) PasswordVisualTransformation() else VisualTransformation.None,
             modifier = Modifier.fillMaxWidth(),
@@ -134,17 +139,7 @@ fun MetroButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val accent = Metro.accent
-    Box(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .background(accent.fill)
-            .metroPress(onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        MetroText(label, Metro.typography.body, color = accent.onFill)
-    }
+    MetroActionButton(label, modifier.fillMaxWidth(), onClick)
 }
 
 /** Compact outlined action from the budget mockups (previous / hold / new budget). */
@@ -154,16 +149,39 @@ fun MetroOutlineButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    MetroActionButton(label, modifier, onClick)
+}
+
+@Composable
+private fun MetroActionButton(
+    label: String,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
     val colors = Metro.colors
+    val accent = Metro.accent
+    val animations = Metro.animations
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
     Box(
         modifier
-            .heightIn(min = MetroDimens.TouchTarget)
-            .border(2.dp, colors.foreground)
-            .metroPress(onClick)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .heightIn(min = MetroDimens.ButtonMin)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ).graphicsLayer { rotationZ = if (pressed && animations) 2.5f else 0f }
+            .border(MetroDimens.Stroke, colors.foreground)
+            .background(if (pressed) accent.fill else Color.Transparent)
+            .padding(horizontal = 9.5.dp, vertical = 3.5.dp),
         contentAlignment = Alignment.Center,
     ) {
-        MetroText(label, Metro.typography.body)
+        MetroText(
+            label,
+            Metro.typography.body.copy(fontWeight = MetroWeights.Semibold),
+            color = if (pressed) Color.White else colors.foreground,
+        )
     }
 }
 
@@ -217,8 +235,7 @@ fun MetroAppBar(
         Box(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = MetroDimens.AppBar)
-                .padding(vertical = MetroDimens.Gutter),
+                .heightIn(min = MetroDimens.AppBar),
         ) {
             Row(
                 Modifier
@@ -229,27 +246,12 @@ fun MetroAppBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 primary.forEach { action ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            Modifier
-                                .size(MetroDimens.TouchTarget)
-                                .border(2.dp, colors.foreground, CircleShape)
-                                .clip(CircleShape)
-                                .metroPress(action.run)
-                                .testTag("app-bar-${action.id}"),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            AppGlyphIcon(action.glyph)
-                        }
-                        if (expanded) {
-                            MetroText(action.label, Metro.typography.caption)
-                        }
-                    }
+                    AppBarIcon(action, expanded)
                 }
             }
             Box(
                 Modifier
-                    .align(Alignment.TopEnd)
+                    .align(Alignment.CenterEnd)
                     .size(width = 56.dp, height = MetroDimens.TouchTarget)
                     .testTag("app-bar-ellipsis")
                     .clickable(
@@ -260,7 +262,7 @@ fun MetroAppBar(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                MetroText("•••", Metro.typography.subheader)
+                MetroText("•••", EllipsisLabel, color = colors.foreground)
             }
         }
         if (expanded && secondary.isNotEmpty()) {
@@ -289,6 +291,58 @@ fun MetroAppBar(
                     }
                 }
             }
+        }
+    }
+}
+
+private val AppBarLabel =
+    TextStyle(
+        fontFamily = MetroFonts.family,
+        fontWeight = MetroWeights.Regular,
+        fontSize = 9.5.sp,
+    )
+
+private val EllipsisLabel =
+    TextStyle(
+        fontFamily = MetroFonts.family,
+        fontWeight = MetroWeights.Semilight,
+        fontSize = 20.sp,
+    )
+
+@Composable
+private fun AppBarIcon(
+    action: ScreenAction,
+    expanded: Boolean,
+) {
+    val colors = Metro.colors
+    val animations = Metro.animations
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            Modifier
+                .size(MetroDimens.TouchTarget)
+                .testTag("app-bar-${action.id}")
+                .clickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = action.run,
+                ).graphicsLayer { rotationZ = if (pressed && animations) 2.5f else 0f },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .size(MetroDimens.AppBarIcon)
+                    .border(MetroDimens.Stroke, colors.foreground, CircleShape)
+                    .background(if (pressed) colors.foreground else Color.Transparent, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                AppGlyphIcon(action.glyph, if (pressed) colors.background else colors.foreground)
+            }
+        }
+        if (expanded) {
+            MetroText(action.label, AppBarLabel, color = colors.foreground)
         }
     }
 }
@@ -426,8 +480,10 @@ object AppGlyphInk {
 }
 
 @Composable
-fun AppGlyphIcon(glyph: AppGlyph) {
-    val color = Metro.colors.foreground
+fun AppGlyphIcon(
+    glyph: AppGlyph,
+    color: Color = Metro.colors.foreground,
+) {
     Canvas(Modifier.size(22.dp)) {
         with(AppGlyphInk) { draw(glyph, color) }
     }
@@ -470,9 +526,9 @@ fun MetroPanorama(
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val stepPx =
-        remember(type.subheader, density) {
+        remember(type.logoSubtitle, density) {
             measurer
-                .measure(text = "due", style = type.subheader)
+                .measure(text = "due", style = type.logoSubtitle)
                 .size.width
                 .toFloat()
         }
@@ -553,7 +609,7 @@ fun MetroPanorama(
                 if (subtitle.isNotEmpty()) {
                     MetroText(
                         subtitle,
-                        type.subheader,
+                        type.logoSubtitle,
                         Modifier
                             .pullUp(40.dp)
                             .padding(start = 16.dp)

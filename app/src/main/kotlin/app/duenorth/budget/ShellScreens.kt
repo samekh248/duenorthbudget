@@ -469,7 +469,7 @@ private fun SectionLabel(
 ) {
     MetroText(
         text,
-        Metro.typography.caption,
+        Metro.typography.groupHeader,
         Modifier.padding(
             start = MetroDimens.Gutter,
             top = if (first) 0.dp else MetroDimens.Grid,
