@@ -21,8 +21,11 @@ Planning uses [GitHub Spec Kit](https://github.com/github/spec-kit).
 | [005 Schedules, rules, and payees](specs/005-schedules-rules/spec.md) | Due items, rules, and payee cleanup |
 | [006 Reconcile and review](specs/006-reconcile-review/spec.md) | Statements, spending, net worth |
 | [007 Import transactions](specs/007-import-transactions/spec.md) | Files and existing bank connections |
+| [008 Streamlined controls](specs/008-streamlined-controls/spec.md) | Month selection, working icons, actions, title lag |
+| [009 Settings and instance](specs/009-settings-home/spec.md) | Server choice, budget file, formatting, recovery |
+| [010 Actual parity](specs/010-actual-parity/spec.md) | Remaining Actual behaviors on the same file |
 
-Specs 001–007 are implemented on `main`. Feature quickstarts cover the shipped specs.
+Specs 001–007 are implemented on `main`. Specs 008–010 are specified and not built yet. Feature quickstarts cover the shipped specs.
 
 ### Debug sample budgets
 
