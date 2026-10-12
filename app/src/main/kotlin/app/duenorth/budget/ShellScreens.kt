@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -376,7 +377,11 @@ fun BudgetSection(
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
-        Row(verticalAlignment = Alignment.Top) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
             BudgetTotal(
                 label = shell.headerLabel,
                 amount = MoneyFormat.format(shell.headerMinor, shell.currency),
@@ -389,7 +394,7 @@ fun BudgetSection(
                     amount = MoneyFormat.format(shell.bufferedMinor, shell.currency),
                     amountColor = Metro.colors.secondary,
                     amountTag = "held-amount",
-                    modifier = Modifier.padding(start = MetroDimens.Gutter),
+                    alignEnd = true,
                 )
             }
         }
@@ -416,13 +421,15 @@ private fun BudgetTotal(
     amount: String,
     amountColor: Color,
     amountTag: String,
+    alignEnd: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier) {
-        MetroText(label, Metro.typography.caption, color = Metro.colors.secondary)
+    val align = if (alignEnd) TextAlign.End else TextAlign.Start
+    Column(modifier, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
+        MetroText(label, Metro.typography.caption.copy(textAlign = align), color = Metro.colors.secondary)
         MetroText(
             amount,
-            Metro.typography.subheader,
+            Metro.typography.subheader.copy(textAlign = align),
             color = amountColor,
             modifier = Modifier.testTag(amountTag),
         )

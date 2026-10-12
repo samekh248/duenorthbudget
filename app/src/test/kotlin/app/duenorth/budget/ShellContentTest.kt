@@ -180,13 +180,17 @@ class ShellContentTest {
         val held = compose.onNodeWithTag("held-amount").fetchSemanticsNode().boundsInRoot
         val heldLabel = compose.onNodeWithText("held").fetchSemanticsNode().boundsInRoot
         val toLabel = compose.onNodeWithText("to budget").fetchSemanticsNode().boundsInRoot
-        assertTrue("held sits beside to-budget: $toBudget vs $held", held.left + 1f >= toBudget.right)
+        val row = compose.onNodeWithTag("group-g").fetchSemanticsNode().boundsInRoot
         assertTrue("held shares the to-budget row: $toBudget vs $held", held.top < toBudget.bottom && toBudget.top < held.bottom)
+        assertTrue("held is on the right: $held vs $row", held.right >= row.right - 1f && held.left > (toBudget.right + row.right) / 2f)
+        assertTrue("held caption is right aligned: $heldLabel vs $held", kotlin.math.abs(heldLabel.right - held.right) <= 1f)
+        assertTrue("held caption ends with the figure: $heldLabel vs $held", heldLabel.left > held.left + 1f)
         assertTrue(
             "held label sits on the caption: $heldLabel vs $toLabel",
             heldLabel.top < toLabel.bottom && toLabel.top < heldLabel.bottom,
         )
         assertTrue("held label sits above its amount: $heldLabel vs $held", heldLabel.bottom <= held.top + 1f)
+        assertTrue("to-budget stays on the left: $toBudget vs $row", toBudget.left <= row.left + 1f)
         compose.onNodeWithTag("category-c-food").assertDoesNotExist()
         compose.onNodeWithText("Groceries").assertDoesNotExist()
     }
