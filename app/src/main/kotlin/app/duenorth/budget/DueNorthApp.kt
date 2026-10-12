@@ -10,9 +10,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -22,6 +25,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import app.duenorth.budget.design.theme.Metro
+import app.duenorth.budget.design.theme.MetroDimens
+import java.time.YearMonth
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -475,12 +481,19 @@ fun DueNorthApp(model: ShellViewModel) {
                         if (shell == null || group == null) {
                             Placeholder()
                         } else {
-                            GroupCategoriesScreen(
-                                shell = shell,
-                                group = group,
-                                onCategory = model::openCategoryBudget,
+                            EditorWithMonth(
+                                openMonth = state.openMonth,
+                                monthWindow = model.monthWindow(),
+                                onSelectMonth = model::selectOpenMonth,
                                 modifier = fill,
-                            )
+                            ) { inner ->
+                                GroupCategoriesScreen(
+                                    shell = shell,
+                                    group = group,
+                                    onCategory = model::openCategoryBudget,
+                                    modifier = inner,
+                                )
+                            }
                         }
                     }
                     is ShellRoute.CategoryBudget -> {
@@ -488,15 +501,22 @@ fun DueNorthApp(model: ShellViewModel) {
                         if (shell == null) {
                             Placeholder()
                         } else {
-                            CategoryBudgetScreen(
-                                shell = shell,
-                                categoryId = route.categoryId,
-                                error = state.editError,
-                                onSave = model::saveCategoryBudget,
-                                onMove = model::openMoveCategory,
-                                onToggleCarryover = model::toggleCategoryCarryover,
+                            EditorWithMonth(
+                                openMonth = state.openMonth,
+                                monthWindow = model.monthWindow(),
+                                onSelectMonth = model::selectOpenMonth,
                                 modifier = fill,
-                            )
+                            ) { inner ->
+                                CategoryBudgetScreen(
+                                    shell = shell,
+                                    categoryId = route.categoryId,
+                                    error = state.editError,
+                                    onSave = model::saveCategoryBudget,
+                                    onMove = model::openMoveCategory,
+                                    onToggleCarryover = model::toggleCategoryCarryover,
+                                    modifier = inner,
+                                )
+                            }
                         }
                     }
                     is ShellRoute.MoveCategory -> {
@@ -504,13 +524,20 @@ fun DueNorthApp(model: ShellViewModel) {
                         if (shell == null) {
                             Placeholder()
                         } else {
-                            MoveCategoryScreen(
-                                shell = shell,
-                                fromCategoryId = route.fromCategoryId,
-                                error = state.editError,
-                                onSave = model::submitMoveCategory,
+                            EditorWithMonth(
+                                openMonth = state.openMonth,
+                                monthWindow = model.monthWindow(),
+                                onSelectMonth = model::selectOpenMonth,
                                 modifier = fill,
-                            )
+                            ) { inner ->
+                                MoveCategoryScreen(
+                                    shell = shell,
+                                    fromCategoryId = route.fromCategoryId,
+                                    error = state.editError,
+                                    onSave = model::submitMoveCategory,
+                                    modifier = inner,
+                                )
+                            }
                         }
                     }
                     ShellRoute.HoldMonth -> {
@@ -518,13 +545,20 @@ fun DueNorthApp(model: ShellViewModel) {
                         if (shell == null) {
                             Placeholder()
                         } else {
-                            HoldMonthScreen(
-                                shell = shell,
-                                error = state.editError,
-                                onSave = model::submitHold,
-                                onRelease = model::releaseHold,
+                            EditorWithMonth(
+                                openMonth = state.openMonth,
+                                monthWindow = model.monthWindow(),
+                                onSelectMonth = model::selectOpenMonth,
                                 modifier = fill,
-                            )
+                            ) { inner ->
+                                HoldMonthScreen(
+                                    shell = shell,
+                                    error = state.editError,
+                                    onSave = model::submitHold,
+                                    onRelease = model::releaseHold,
+                                    modifier = inner,
+                                )
+                            }
                         }
                     }
                     ShellRoute.ManageCategories -> {
@@ -565,6 +599,27 @@ fun DueNorthApp(model: ShellViewModel) {
                 }
             }
             }
+        }
+    }
+}
+
+@Composable
+private fun EditorWithMonth(
+    openMonth: YearMonth,
+    monthWindow: app.duenorth.budget.design.MonthWindow,
+    onSelectMonth: (YearMonth) -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable (Modifier) -> Unit,
+) {
+    Column(modifier.fillMaxSize().background(Metro.colors.background)) {
+        MonthControl(
+            month = openMonth,
+            window = monthWindow,
+            onSelect = onSelectMonth,
+            modifier = Modifier.padding(horizontal = MetroDimens.Gutter, vertical = 4.dp),
+        )
+        Box(Modifier.weight(1f).fillMaxSize()) {
+            content(Modifier.fillMaxSize())
         }
     }
 }
