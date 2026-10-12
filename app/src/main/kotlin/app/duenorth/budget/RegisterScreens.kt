@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -194,6 +196,7 @@ fun TransactionForm(
     Column(
         modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .background(Metro.colors.background)
             .padding(MetroDimens.Gutter),
     ) {
@@ -217,16 +220,10 @@ fun TransactionForm(
                 Modifier.padding(top = 12.dp, bottom = 4.dp),
                 color = Metro.colors.secondary,
             )
-            LazyColumn(Modifier.weight(1f)) {
-                item {
-                    ChoiceLine(RegisterCopy.NO_CATEGORY, categoryId == null) { categoryId = null }
-                }
-                items(page.categories, key = { it.id }) { category ->
-                    ChoiceLine(category.name, category.id == categoryId) { categoryId = category.id }
-                }
+            ChoiceLine(RegisterCopy.NO_CATEGORY, categoryId == null) { categoryId = null }
+            page.categories.forEach { category ->
+                ChoiceLine(category.name, category.id == categoryId) { categoryId = category.id }
             }
-        } else {
-            Column(Modifier.weight(1f)) {}
         }
         val commit = {
             when (
