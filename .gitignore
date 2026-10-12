@@ -1,14 +1,19 @@
 .gradle/
 build/
+out/
 local.properties
 *.iml
 .idea/
+.vscode/
 .DS_Store
+Thumbs.db
 captures/
 *.apk
 !releases/*.apk
 *.ap_
 *.aab
+*.class
+*.jar
 .cxx/
 *.log
 .kotlin/
@@ -16,3 +21,4 @@ captures/
 .specify/feature.json
 .env*
 *.tmp
+*.swp

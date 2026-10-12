@@ -16,6 +16,7 @@ import app.duenorth.budget.core.RegisterRow
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
+import app.duenorth.budget.design.components.asScreenActions
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -90,11 +91,11 @@ class RegisterScreenshotTest {
     @Composable
     private fun bar() {
         MetroAppBar(
-            buttons =
+            actions =
                 listOf(
-                    AppBarButton(AppGlyph.Budgets, "budgets") {},
-                    AppBarButton(AppGlyph.Appearance, "appearance") {},
-                ),
+                    AppBarButton(AppGlyph.Budgets, "budgets", onClick = {}),
+                    AppBarButton(AppGlyph.Appearance, "appearance", onClick = {}),
+                ).asScreenActions(),
             expanded = false,
             onExpandedChange = {},
         )

@@ -154,9 +154,15 @@ fun BudgetPasswordScreen(
                 .testTag("ask-each-time"),
             color = if (askEachTime) Metro.accent.text else Metro.colors.foreground,
         )
-        MetroButton("open", Modifier.testTag("budget-unlock")) {
+        val unlock = {
             onSubmit(password)
             password = ""
+        }
+        RememberFormSave(unlock)
+        if (!formSaveOnBar()) {
+            MetroButton("open", Modifier.testTag("budget-unlock"), onClick = unlock)
+        } else {
+            Box(Modifier.testTag("budget-unlock")) {}
         }
     }
 }
@@ -226,7 +232,12 @@ fun AssignScreen(
                 )
             }
         }
-        MetroButton("assign", Modifier.testTag("assign-save")) { onAssign(selected, amount) }
+        RememberFormSave { onAssign(selected, amount) }
+        if (!formSaveOnBar()) {
+            MetroButton("assign", Modifier.testTag("assign-save")) { onAssign(selected, amount) }
+        } else {
+            Box(Modifier.testTag("assign-save")) {}
+        }
     }
 }
 
@@ -249,7 +260,12 @@ fun AddTransactionScreen(
         MetroField(payee, { payee = it }, "payee", Modifier.testTag("spend-payee"))
         MetroField(amount, { amount = it }, "amount", Modifier.testTag("spend-amount"))
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        MetroButton("add", Modifier.testTag("spend-save")) { onAdd(payee, amount) }
+        RememberFormSave { onAdd(payee, amount) }
+        if (!formSaveOnBar()) {
+            MetroButton("add", Modifier.testTag("spend-save")) { onAdd(payee, amount) }
+        } else {
+            Box(Modifier.testTag("spend-save")) {}
+        }
     }
 }
 

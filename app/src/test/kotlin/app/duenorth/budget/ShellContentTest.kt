@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.CategoryRow
@@ -50,6 +51,8 @@ class ShellContentTest {
                         netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
+                        openMonth = shell?.month ?: YearMonth.of(2026, 10),
+                        monthWindow = MonthWindow.around(YearMonth.of(2026, 10)),
                         onGesture = {},
                         modifier = Modifier,
                     )
@@ -89,7 +92,7 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(420.dp)) {
-                    BudgetSection(shell, onListGesture = {})
+                    BudgetSection(shell, openMonth = shell.month, monthWindow = MonthWindow.around(shell.month), onListGesture = {}, onSelectMonth = {})
                 }
             }
         }
@@ -110,12 +113,12 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    BudgetSection(shell, onListGesture = {}, onGroup = {})
+                    BudgetSection(shell, openMonth = shell.month, monthWindow = MonthWindow.around(shell.month), onListGesture = {}, onSelectMonth = {}, onGroup = {})
                 }
             }
         }
-        compose.onNodeWithTag("group-name-g").assertIsDisplayed()
-        compose.onNodeWithText("Everyday").assertIsDisplayed()
+        compose.onNodeWithTag("group-g").assertIsDisplayed()
+        compose.onNodeWithText("Everyday", substring = true).assertIsDisplayed()
         compose.onNodeWithTag("held-amount").assertIsDisplayed()
         compose.onNodeWithTag("category-c-food").assertDoesNotExist()
         compose.onNodeWithText("Groceries").assertDoesNotExist()
@@ -147,7 +150,7 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(320.dp)) {
-                    BudgetSection(sample().copy(groups = groups), onListGesture = {})
+                    BudgetSection(sample().copy(groups = groups), openMonth = YearMonth.of(2026, 10), monthWindow = MonthWindow.around(YearMonth.of(2026, 10)), onListGesture = {}, onSelectMonth = {})
                 }
             }
         }

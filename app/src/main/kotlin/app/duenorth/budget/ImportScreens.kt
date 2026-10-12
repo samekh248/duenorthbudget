@@ -62,8 +62,7 @@ fun ImportPreviewScreen(
                 PreviewRowLine(row, preview)
             }
         }
-        MetroButton(ImportCopy.CONFIRM, Modifier.padding(top = 8.dp), onClick = onConfirm)
-        MetroButton(ImportCopy.CANCEL, Modifier.padding(top = 8.dp), onClick = onCancel)
+        // save/cancel live on the application bar
     }
 }
 

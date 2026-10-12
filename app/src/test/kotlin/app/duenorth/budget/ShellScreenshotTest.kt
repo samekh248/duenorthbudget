@@ -16,6 +16,8 @@ import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
+import app.duenorth.budget.design.components.asScreenActions
+import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -70,17 +72,19 @@ class ShellScreenshotTest {
                         netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
+                        openMonth = shell.month,
+                        monthWindow = MonthWindow.around(shell.month),
                         initialSection = section,
                         onGesture = {},
                         modifier = Modifier.weight(1f),
                     )
                     MetroAppBar(
-                        buttons =
+                        actions =
                             listOf(
-                                AppBarButton(AppGlyph.Budgets, "budgets") {},
-                                AppBarButton(AppGlyph.Sync, "sync") {},
-                                AppBarButton(AppGlyph.Appearance, "appearance") {},
-                            ),
+                                AppBarButton(AppGlyph.Budgets, "budgets", onClick = {}),
+                                AppBarButton(AppGlyph.Sync, "sync", onClick = {}),
+                                AppBarButton(AppGlyph.Appearance, "appearance", onClick = {}),
+                            ).asScreenActions(),
                         expanded = false,
                         onExpandedChange = {},
                     )

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -37,15 +39,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -162,23 +167,52 @@ fun MetroOutlineButton(
     }
 }
 
-enum class AppGlyph { Budgets, Appearance, Sync, More }
+enum class AppGlyph {
+    Budgets,
+    Appearance,
+    Sync,
+    Payees,
+    Hold,
+    Categories,
+    Add,
+    Settings,
+    Transfer,
+    Reconcile,
+    Import,
+    Save,
+    Cancel,
+    ChevronLeft,
+    ChevronRight,
+    Calendar,
+}
+
+@Immutable
+data class ScreenAction(
+    val id: String,
+    val glyph: AppGlyph,
+    val label: String,
+    val primary: Boolean = true,
+    val run: () -> Unit,
+)
 
 @Immutable
 data class AppBarButton(
     val glyph: AppGlyph,
     val label: String,
     val onClick: () -> Unit,
+    val id: String = label,
 )
 
 @Composable
 fun MetroAppBar(
-    buttons: List<AppBarButton>,
+    actions: List<ScreenAction>,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Metro.colors
+    val primary = actions.filter { it.primary }
+    val secondary = actions.filter { !it.primary }
     Column(modifier.fillMaxWidth().background(colors.chrome)) {
         Box(
             Modifier
@@ -188,24 +222,24 @@ fun MetroAppBar(
         ) {
             Row(
                 Modifier.align(Alignment.Center),
-                horizontalArrangement = Arrangement.spacedBy(28.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                buttons.forEach { button ->
+                primary.forEach { action ->
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
                             Modifier
                                 .size(MetroDimens.TouchTarget)
                                 .border(2.dp, colors.foreground, CircleShape)
                                 .clip(CircleShape)
-                                .metroPress(button.onClick)
-                                .testTag("app-bar-${button.label}"),
+                                .metroPress(action.run)
+                                .testTag("app-bar-${action.id}"),
                             contentAlignment = Alignment.Center,
                         ) {
-                            AppGlyphIcon(button.glyph)
+                            AppGlyphIcon(action.glyph)
                         }
                         if (expanded) {
-                            MetroText(button.label, Metro.typography.caption)
+                            MetroText(action.label, Metro.typography.caption)
                         }
                     }
                 }
@@ -214,6 +248,7 @@ fun MetroAppBar(
                 Modifier
                     .align(Alignment.TopEnd)
                     .size(width = 56.dp, height = MetroDimens.TouchTarget)
+                    .testTag("app-bar-ellipsis")
                     .clickable(
                         interactionSource = null,
                         indication = null,
@@ -225,14 +260,68 @@ fun MetroAppBar(
                 MetroText("•••", Metro.typography.subheader)
             }
         }
+        if (expanded && secondary.isNotEmpty()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = MetroDimens.Gutter, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                secondary.forEach { action ->
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = MetroDimens.TouchTarget)
+                            .metroPress(action.run)
+                            .testTag("app-bar-menu-${action.id}")
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            AppGlyphIcon(action.glyph)
+                            MetroText(action.label, Metro.typography.body)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
-@Composable
-private fun AppGlyphIcon(glyph: AppGlyph) {
-    val color = Metro.colors.foreground
-    Canvas(Modifier.size(22.dp)) {
+fun List<AppBarButton>.asScreenActions(): List<ScreenAction> =
+    map { ScreenAction(id = it.id, glyph = it.glyph, label = it.label, primary = true, run = it.onClick) }
+
+object AppGlyphInk {
+    fun strokeCount(glyph: AppGlyph): Int =
+        when (glyph) {
+            AppGlyph.Budgets -> 3
+            AppGlyph.Appearance -> 3
+            AppGlyph.Sync -> 6
+            AppGlyph.Payees -> 2
+            AppGlyph.Hold -> 2
+            AppGlyph.Categories -> 3
+            AppGlyph.Add -> 2
+            AppGlyph.Settings -> 2
+            AppGlyph.Transfer -> 4
+            AppGlyph.Reconcile -> 2
+            AppGlyph.Import -> 3
+            AppGlyph.Save -> 2
+            AppGlyph.Cancel -> 2
+            AppGlyph.ChevronLeft -> 2
+            AppGlyph.ChevronRight -> 2
+            AppGlyph.Calendar -> 3
+        }
+
+    fun DrawScope.draw(
+        glyph: AppGlyph,
+        color: Color,
+    ) {
         val stroke = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Square)
+        val w = size.width
+        val h = size.height
         when (glyph) {
             AppGlyph.Budgets -> {
                 drawRect(
@@ -248,13 +337,8 @@ private fun AppGlyphIcon(glyph: AppGlyph) {
             }
             AppGlyph.Appearance -> {
                 drawCircle(color, radius = 5.dp.toPx(), style = stroke)
-                drawLine(color, Offset(size.width / 2, 1.dp.toPx()), Offset(size.width / 2, 4.dp.toPx()), strokeWidth = 1.6.dp.toPx())
-                drawLine(
-                    color,
-                    Offset(size.width / 2, size.height - 1.dp.toPx()),
-                    Offset(size.width / 2, size.height - 4.dp.toPx()),
-                    strokeWidth = 1.6.dp.toPx(),
-                )
+                drawLine(color, Offset(w / 2, 1.dp.toPx()), Offset(w / 2, 4.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(w / 2, h - 1.dp.toPx()), Offset(w / 2, h - 4.dp.toPx()), strokeWidth = 1.6.dp.toPx())
             }
             AppGlyph.Sync -> {
                 drawLine(color, Offset(4.dp.toPx(), 7.dp.toPx()), Offset(16.dp.toPx(), 7.dp.toPx()), strokeWidth = 1.6.dp.toPx())
@@ -264,8 +348,86 @@ private fun AppGlyphIcon(glyph: AppGlyph) {
                 drawLine(color, Offset(9.dp.toPx(), 12.dp.toPx()), Offset(5.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.6.dp.toPx())
                 drawLine(color, Offset(9.dp.toPx(), 18.dp.toPx()), Offset(5.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.6.dp.toPx())
             }
-            AppGlyph.More -> Unit
+            AppGlyph.Payees -> {
+                drawCircle(color, radius = 3.5.dp.toPx(), center = Offset(w / 2, 7.dp.toPx()), style = stroke)
+                drawLine(color, Offset(5.dp.toPx(), 18.dp.toPx()), Offset(17.dp.toPx(), 18.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+            }
+            AppGlyph.Hold -> {
+                drawLine(color, Offset(7.dp.toPx(), 5.dp.toPx()), Offset(7.dp.toPx(), 17.dp.toPx()), strokeWidth = 2.2.dp.toPx())
+                drawLine(color, Offset(15.dp.toPx(), 5.dp.toPx()), Offset(15.dp.toPx(), 17.dp.toPx()), strokeWidth = 2.2.dp.toPx())
+            }
+            AppGlyph.Categories -> {
+                drawRect(
+                    color,
+                    topLeft = Offset(4.dp.toPx(), 5.dp.toPx()),
+                    size =
+                        androidx.compose.ui.geometry
+                            .Size(14.dp.toPx(), 12.dp.toPx()),
+                    style = stroke,
+                )
+                drawLine(color, Offset(4.dp.toPx(), 9.dp.toPx()), Offset(18.dp.toPx(), 9.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(4.dp.toPx(), 13.dp.toPx()), Offset(18.dp.toPx(), 13.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+            }
+            AppGlyph.Add -> {
+                drawLine(color, Offset(w / 2, 4.dp.toPx()), Offset(w / 2, 18.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+                drawLine(color, Offset(4.dp.toPx(), h / 2), Offset(18.dp.toPx(), h / 2), strokeWidth = 1.8.dp.toPx())
+            }
+            AppGlyph.Settings -> {
+                drawCircle(color, radius = 3.dp.toPx(), style = stroke)
+                drawCircle(color, radius = 8.dp.toPx(), style = stroke)
+            }
+            AppGlyph.Transfer -> {
+                drawLine(color, Offset(4.dp.toPx(), 8.dp.toPx()), Offset(16.dp.toPx(), 8.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(13.dp.toPx(), 5.dp.toPx()), Offset(17.dp.toPx(), 8.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(18.dp.toPx(), 14.dp.toPx()), Offset(6.dp.toPx(), 14.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(9.dp.toPx(), 17.dp.toPx()), Offset(5.dp.toPx(), 14.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+            }
+            AppGlyph.Reconcile -> {
+                drawLine(color, Offset(5.dp.toPx(), 11.dp.toPx()), Offset(9.dp.toPx(), 16.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+                drawLine(color, Offset(9.dp.toPx(), 16.dp.toPx()), Offset(17.dp.toPx(), 6.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+            }
+            AppGlyph.Import -> {
+                drawLine(color, Offset(w / 2, 4.dp.toPx()), Offset(w / 2, 14.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(7.dp.toPx(), 11.dp.toPx()), Offset(w / 2, 15.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(15.dp.toPx(), 11.dp.toPx()), Offset(w / 2, 15.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+            }
+            AppGlyph.Save -> {
+                drawLine(color, Offset(5.dp.toPx(), 11.dp.toPx()), Offset(9.dp.toPx(), 16.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+                drawLine(color, Offset(9.dp.toPx(), 16.dp.toPx()), Offset(17.dp.toPx(), 6.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+            }
+            AppGlyph.Cancel -> {
+                drawLine(color, Offset(6.dp.toPx(), 6.dp.toPx()), Offset(16.dp.toPx(), 16.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+                drawLine(color, Offset(16.dp.toPx(), 6.dp.toPx()), Offset(6.dp.toPx(), 16.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+            }
+            AppGlyph.ChevronLeft -> {
+                drawLine(color, Offset(13.dp.toPx(), 5.dp.toPx()), Offset(7.dp.toPx(), 11.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+                drawLine(color, Offset(7.dp.toPx(), 11.dp.toPx()), Offset(13.dp.toPx(), 17.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+            }
+            AppGlyph.ChevronRight -> {
+                drawLine(color, Offset(9.dp.toPx(), 5.dp.toPx()), Offset(15.dp.toPx(), 11.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+                drawLine(color, Offset(15.dp.toPx(), 11.dp.toPx()), Offset(9.dp.toPx(), 17.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+            }
+            AppGlyph.Calendar -> {
+                drawRect(
+                    color,
+                    topLeft = Offset(4.dp.toPx(), 6.dp.toPx()),
+                    size =
+                        androidx.compose.ui.geometry
+                            .Size(14.dp.toPx(), 12.dp.toPx()),
+                    style = stroke,
+                )
+                drawLine(color, Offset(4.dp.toPx(), 10.dp.toPx()), Offset(18.dp.toPx(), 10.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(8.dp.toPx(), 4.dp.toPx()), Offset(8.dp.toPx(), 8.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+            }
         }
+    }
+}
+
+@Composable
+fun AppGlyphIcon(glyph: AppGlyph) {
+    val color = Metro.colors.foreground
+    Canvas(Modifier.size(22.dp)) {
+        with(AppGlyphInk) { draw(glyph, color) }
     }
 }
 
@@ -303,7 +465,14 @@ fun MetroPanorama(
     val type = Metro.typography
     val colors = Metro.colors
     val animations = Metro.animations
-    var titleWidth by remember { mutableIntStateOf(0) }
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val stepPx =
+        remember(type.subheader, density) {
+            measurer.measure(text = "due", style = type.subheader).size.width.toFloat()
+        }
+    var titleBlockWidth by remember { mutableIntStateOf(0) }
+    var titleScale by remember { mutableFloatStateOf(1f) }
 
     LaunchedEffect(pager) {
         snapshotFlow { pager.isScrollInProgress }.collect { onGesture(it) }
@@ -332,49 +501,65 @@ fun MetroPanorama(
             .background(colors.background)
             .testTag("panorama"),
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = MetroDimens.Gutter, top = 8.dp, end = MetroDimens.Gutter)
-                .onGloballyPositioned { titleWidth = it.size.width }
-                .graphicsLayer {
-                    val shift =
-                        PanoramaMotion.titleShiftPx(
-                            sectionPosition = (pager.currentPage - origin) + pager.currentPageOffsetFraction,
-                            sectionCount = count,
-                            titleWidthPx = titleWidth.toFloat(),
-                        )
-                    // Keep the whole title on screen. The raw shift can be larger than the gutter.
-                    translationX = shift.coerceIn(-MetroDimens.Gutter.toPx(), 0f)
-                },
-        ) {
-            MetroText(
-                title,
-                type.panoramaTitle,
-                Modifier.testTag("panorama-title"),
-                maxLines = 1,
-                softWrap = false,
-            )
-            if (subtitle.isNotEmpty()) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val viewport = constraints.maxWidth.toFloat()
+            val inset = stepPx.coerceAtLeast(0f)
+            val available = (viewport - inset).coerceAtLeast(1f)
+            val measured = titleBlockWidth.toFloat()
+            titleScale =
+                if (measured > available && measured > 0f) {
+                    (available / measured).coerceIn(0.35f, 1f)
+                } else {
+                    1f
+                }
+            val pagePosition = (pager.currentPage - origin) + pager.currentPageOffsetFraction
+            val shift =
+                PanoramaMotion.titleShiftPx(
+                    pagePosition = pagePosition,
+                    sectionCount = count,
+                    stepPx = stepPx,
+                    motionEnabled = animations,
+                )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = with(density) { inset.toDp() }.coerceAtLeast(MetroDimens.Gutter), top = 8.dp, end = MetroDimens.Gutter)
+                    .onGloballyPositioned { titleBlockWidth = it.size.width }
+                    .graphicsLayer {
+                        translationX = shift
+                        scaleX = titleScale
+                        scaleY = titleScale
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                    },
+            ) {
                 MetroText(
-                    subtitle,
-                    type.subheader,
-                    Modifier
-                        // The 118sp line box hangs below the letters. Sit the subtitle on that baseline.
-                        .pullUp(40.dp)
-                        .padding(start = 16.dp)
-                        .testTag("panorama-subtitle"),
-                    color = colors.secondary,
+                    title,
+                    type.panoramaTitle,
+                    Modifier.testTag("panorama-title"),
                     maxLines = 1,
                     softWrap = false,
                 )
+                if (subtitle.isNotEmpty()) {
+                    MetroText(
+                        subtitle,
+                        type.subheader,
+                        Modifier
+                            .pullUp(40.dp)
+                            .padding(start = 16.dp)
+                            .testTag("panorama-subtitle"),
+                        color = colors.secondary,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
             }
         }
         HorizontalPager(
             state = pager,
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(end = MetroDimens.Peek),
+            contentPadding = PaddingValues(end = if (count > 1) MetroDimens.Peek else 0.dp),
             beyondViewportPageCount = 1,
+            userScrollEnabled = count > 1,
         ) { page ->
             val index = sectionOf(page)
             val section = sections[index]

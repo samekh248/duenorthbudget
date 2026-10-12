@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.Currencies
-import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MockBudgetDataset
@@ -45,8 +44,9 @@ import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.core.monthLabel
-import app.duenorth.budget.design.components.AppBarButton
+import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppGlyph
+import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroField
@@ -54,10 +54,12 @@ import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroPanorama
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.PanoramaSection
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import java.time.YearMonth
 
 @Composable
 fun HomePanorama(
@@ -66,21 +68,19 @@ fun HomePanorama(
     netWorth: NetWorthPage?,
     upcoming: List<UpcomingScheduleRow>,
     loading: Boolean,
+    openMonth: YearMonth,
+    monthWindow: MonthWindow,
     initialSection: Int = 0,
     onGesture: (Boolean) -> Unit,
     onAccount: (String) -> Unit = {},
     onInbox: (String) -> Unit = {},
-    onPreviousReviewMonth: () -> Unit = {},
     onReviewCategory: (String) -> Unit = {},
     onNetWorthIncludeOffBudget: (Boolean) -> Unit = {},
     onPostSchedule: (String) -> Unit = {},
     onSkipSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
-    onBudgetPreviousMonth: (() -> Unit)? = null,
-    onBudgetNextMonth: (() -> Unit)? = null,
+    onSelectMonth: (YearMonth) -> Unit = {},
     onBudgetGroup: ((String) -> Unit)? = null,
-    onBudgetHold: (() -> Unit)? = null,
-    onBudgetManage: (() -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
@@ -97,12 +97,11 @@ fun HomePanorama(
                     } else {
                         BudgetSection(
                             shell,
+                            openMonth = openMonth,
+                            monthWindow = monthWindow,
                             onListGesture = { listGesture = it },
-                            onPreviousMonth = onBudgetPreviousMonth,
-                            onNextMonth = onBudgetNextMonth,
+                            onSelectMonth = onSelectMonth,
                             onGroup = onBudgetGroup,
-                            onHold = onBudgetHold,
-                            onManage = onBudgetManage,
                         )
                     }
                 },
@@ -136,7 +135,6 @@ fun HomePanorama(
                         review = review,
                         loading = loading,
                         onListGesture = { listGesture = it },
-                        onPreviousMonth = onPreviousReviewMonth,
                         onCategory = onReviewCategory,
                     )
                 },
@@ -167,15 +165,93 @@ fun HomePanorama(
 }
 
 @Composable
+fun MonthControl(
+    month: YearMonth,
+    window: MonthWindow,
+    onSelect: (YearMonth) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val previous = window.previous(month)
+    val next = window.next(month)
+    val calendar = YearMonth.now()
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (previous != null) {
+                MonthIconButton(AppGlyph.ChevronLeft, "month-previous") { onSelect(previous) }
+            }
+            MetroText(
+                monthLabel(month),
+                Metro.typography.subheader,
+                Modifier
+                    .weight(1f)
+                    .metroPress { expanded = !expanded }
+                    .testTag("month-label"),
+            )
+            if (month != calendar) {
+                MonthIconButton(AppGlyph.Calendar, "month-current") { onSelect(calendar) }
+            }
+            if (next != null) {
+                MonthIconButton(AppGlyph.ChevronRight, "month-next") { onSelect(next) }
+            }
+        }
+        if (expanded) {
+            LazyColumn(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 240.dp)
+                    .testTag("month-list"),
+            ) {
+                items(window.months, key = { it.toString() }) { option ->
+                    MetroText(
+                        monthLabel(option),
+                        Metro.typography.body,
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = MetroDimens.TouchTarget)
+                            .metroPress {
+                                onSelect(option)
+                                expanded = false
+                            }.padding(vertical = 8.dp)
+                            .testTag("month-option-$option"),
+                        color = if (option == month) Metro.accent.text else Metro.colors.foreground,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MonthIconButton(
+    glyph: AppGlyph,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(MetroDimens.TouchTarget)
+            .metroPress(onClick)
+            .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        AppGlyphIcon(glyph)
+    }
+}
+
+@Composable
 fun BudgetSection(
     shell: MonthShell,
+    openMonth: YearMonth,
+    monthWindow: MonthWindow,
     onListGesture: (Boolean) -> Unit,
+    onSelectMonth: (YearMonth) -> Unit,
     modifier: Modifier = Modifier,
-    onPreviousMonth: (() -> Unit)? = null,
-    onNextMonth: (() -> Unit)? = null,
     onGroup: ((String) -> Unit)? = null,
-    onHold: (() -> Unit)? = null,
-    onManage: (() -> Unit)? = null,
 ) {
     val list = rememberLazyListState()
     val arrivals = remember { RowArrivals() }
@@ -184,7 +260,15 @@ fun BudgetSection(
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
-        MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+        MetroText(
+            shell.budgetName,
+            Metro.typography.caption,
+            Modifier.testTag("budget-name"),
+            color = Metro.colors.secondary,
+            maxLines = 1,
+            softWrap = false,
+        )
+        MonthControl(openMonth, monthWindow, onSelectMonth, Modifier.padding(top = 4.dp))
         MetroText(shell.headerLabel, Metro.typography.caption, color = Metro.colors.secondary)
         MetroText(
             MoneyFormat.format(shell.headerMinor, shell.currency),
@@ -192,18 +276,18 @@ fun BudgetSection(
             color = Metro.accent.text,
             modifier = Modifier.testTag("to-budget"),
         )
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (onPreviousMonth != null) {
-                MetroOutlineButton(EnvelopeCopy.PREVIOUS, onClick = onPreviousMonth)
-            }
-            if (onNextMonth != null) {
-                MetroOutlineButton(EnvelopeCopy.NEXT, onClick = onNextMonth)
-            }
+        if (shell.bufferedMinor != 0L) {
+            MetroText(
+                "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
+                Metro.typography.caption,
+                color = Metro.colors.secondary,
+                modifier = Modifier.padding(top = 8.dp).testTag("held-amount"),
+            )
         }
         if (shell.groups.isEmpty()) {
             MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.body, Modifier.padding(top = 12.dp).weight(1f))
         } else {
-            LazyColumn(Modifier.weight(1f), state = list) {
+            LazyColumn(Modifier.fillMaxWidth().weight(1f), state = list) {
                 items(shell.groups, key = { it.id }) { group ->
                     GroupLine(
                         group,
@@ -213,18 +297,6 @@ fun BudgetSection(
                     )
                 }
             }
-        }
-        if (shell.bufferedMinor != 0L) {
-            MetroText(
-                "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
-                Metro.typography.caption,
-                color = Metro.colors.secondary,
-                modifier = Modifier.padding(top = 8.dp).testTag("held-amount"),
-            )
-        }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (onHold != null) MetroOutlineButton(EnvelopeCopy.HOLD, onClick = onHold)
-            if (onManage != null) MetroOutlineButton(EnvelopeCopy.MANAGE, onClick = onManage)
         }
     }
 }
@@ -446,7 +518,10 @@ fun CreateBudgetScreen(
                 )
             }
         }
-        MetroButton("create budget") { onCreate(name, currency) }
+        RememberFormSave { onCreate(name, currency) }
+        if (!formSaveOnBar()) {
+            MetroButton("create budget") { onCreate(name, currency) }
+        }
     }
 }
 
@@ -640,7 +715,7 @@ private fun AccentGrid(
 
 @Composable
 fun ShellChrome(
-    buttons: List<AppBarButton>,
+    actions: List<ScreenAction>,
     syncing: Boolean = false,
     progress: Float? = null,
     content: @Composable (Modifier) -> Unit,
@@ -649,8 +724,49 @@ fun ShellChrome(
     Column(Modifier.fillMaxSize().background(Metro.colors.background)) {
         if (syncing) SyncProgressBar(progress)
         content(Modifier.weight(1f))
-        MetroAppBar(buttons, expanded, { expanded = it })
+        MetroAppBar(actions, expanded, { expanded = it })
     }
+}
+
+@Composable
+fun SettingsScreen(
+    onBudgets: () -> Unit,
+    onAppearance: () -> Unit,
+    onSync: () -> Unit,
+    onPayees: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .padding(MetroDimens.Gutter)
+            .testTag("settings-screen"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        MetroText("settings", Metro.typography.header)
+        SettingsRow("budgets", onBudgets)
+        SettingsRow("appearance", onAppearance)
+        SettingsRow("sync", onSync)
+        SettingsRow("payees", onPayees)
+    }
+}
+
+@Composable
+private fun SettingsRow(
+    label: String,
+    onClick: () -> Unit,
+) {
+    MetroText(
+        label,
+        Metro.typography.subheader,
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress(onClick)
+            .padding(vertical = 8.dp)
+            .testTag("settings-$label"),
+    )
 }
 
 private class RowArrivals {

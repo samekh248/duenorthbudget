@@ -45,7 +45,6 @@ class ReviewContentTest {
                         review = review,
                         loading = false,
                         onListGesture = {},
-                        onPreviousMonth = {},
                         onCategory = {},
                     )
                 }

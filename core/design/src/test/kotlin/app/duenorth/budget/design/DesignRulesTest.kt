@@ -20,15 +20,17 @@ class DesignRulesTest {
     }
 
     @Test
-    fun titleMovesSlowerThanTheSection() {
-        val width = 800f
-        val start = PanoramaMotion.titleShiftPx(0f, 3, width)
-        val next = PanoramaMotion.titleShiftPx(1f, 3, width)
-        val titleDelta = next - start
-        val sectionDelta = -1000f
-        assertTrue(titleDelta < 0f)
-        assertTrue(abs(titleDelta) < abs(sectionDelta))
-        assertEquals(0f, start)
+    fun titleMovesByStepBetweenAdjacentPages() {
+        val step = 40f
+        val even = PanoramaMotion.titleShiftPx(0f, 6, step, motionEnabled = true)
+        val odd = PanoramaMotion.titleShiftPx(1f, 6, step, motionEnabled = true)
+        val mid = PanoramaMotion.titleShiftPx(0.5f, 6, step, motionEnabled = true)
+        assertEquals(0f, even)
+        assertEquals(-step, odd)
+        assertEquals(-step / 2f, mid)
+        assertTrue(abs(odd - even) <= step + 0.01f)
+        assertEquals(0f, PanoramaMotion.titleShiftPx(1f, 6, step, motionEnabled = false))
+        assertEquals(0f, PanoramaMotion.titleShiftPx(1f, 1, step, motionEnabled = true))
     }
 
     @Test

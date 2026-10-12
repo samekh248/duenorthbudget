@@ -14,6 +14,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,8 +33,6 @@ import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.MotionPolicy
-import app.duenorth.budget.design.components.AppBarButton
-import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.MetroTheme
 import java.io.File
@@ -134,6 +133,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     !(state.route == ShellRoute.BudgetPassword && state.locked)
             )
     BackHandler(enabled = canBack) { model.back() }
+    val formSaveHost = rememberFormSaveHost()
     MetroTheme(
         darkTheme = dark,
         accent = Accent.fromId(state.settings.accent),
@@ -144,18 +144,49 @@ fun DueNorthApp(model: ShellViewModel) {
                 .find { it.id == state.settings.openBudgetId }
                 ?.name
                 .orEmpty()
-        val buttons =
-            listOf(
-                AppBarButton(AppGlyph.Budgets, "budgets", model::showBudgets),
-                AppBarButton(AppGlyph.Sync, "sync", model::showServer),
-                AppBarButton(AppGlyph.More, "payees", model::showPayees),
-                AppBarButton(AppGlyph.Appearance, "appearance", model::showAppearance),
-            )
+        val handlers =
+            remember(state.route, importAccountId) {
+                ScreenBarHandlers(
+                    onAdd = {
+                        when (state.route) {
+                            is ShellRoute.Register -> model.openNewTransaction()
+                            else -> model.showAddTransaction()
+                        }
+                    },
+                    onHold = model::showHoldMonth,
+                    onCategories = model::showManageCategories,
+                    onSettings = model::showSettings,
+                    onTransfer = model::openTransfer,
+                    onReconcile = model::openReconcile,
+                    onImport = {
+                        val accountId =
+                            (state.route as? ShellRoute.Register)?.accountId ?: return@ScreenBarHandlers
+                        importAccountId = accountId
+                        importLauncher.launch("*/*")
+                    },
+                    onSave = {
+                        when (state.route) {
+                            is ShellRoute.ImportPreviewRoute -> model.confirmImport()
+                            is ShellRoute.Reconcile -> model.finishReconcile()
+                            else -> formSaveHost.save()
+                        }
+                    },
+                    onCancel = {
+                        when (state.route) {
+                            is ShellRoute.ImportPreviewRoute -> model.cancelImport()
+                            is ShellRoute.Reconcile -> model.cancelReconcile()
+                            else -> model.back()
+                        }
+                    },
+                )
+            }
+        val actions = ScreenBar.forState(state, handlers)
         ShellChrome(
-            buttons,
+            actions,
             syncing = state.syncing || state.importFetchPending,
             progress = state.syncProgress,
         ) { modifier ->
+            CompositionLocalProvider(LocalFormSaveHost provides formSaveHost) {
             Box(modifier) {
                 val fill = Modifier.fillMaxSize()
                 when (val route = state.route) {
@@ -166,26 +197,27 @@ fun DueNorthApp(model: ShellViewModel) {
                             netWorth = state.netWorth,
                             upcoming = state.upcoming,
                             loading = state.loading,
+                            openMonth = state.openMonth,
+                            monthWindow = model.monthWindow(),
                             onGesture = model::setGesture,
                             onAccount = model::openAccount,
                             onInbox = model::openInbox,
-                            onPreviousReviewMonth = model::previousReviewMonth,
                             onReviewCategory = model::openReviewCategory,
                             onNetWorthIncludeOffBudget = model::setNetWorthIncludeOffBudget,
                             onPostSchedule = model::postSchedule,
                             onSkipSchedule = model::skipSchedule,
                             modifier = fill,
-                            onBudgetPreviousMonth =
-                                if (state.shell == null) {
-                                    null
-                                } else {
-                                    model::previousBudgetMonth
-                                },
-                            onBudgetNextMonth = if (state.shell == null) null else model::nextBudgetMonth,
+                            onSelectMonth = model::selectOpenMonth,
                             onBudgetGroup = if (state.shell == null) null else model::openGroupCategories,
-                            onBudgetHold = if (state.shell == null) null else model::showHoldMonth,
-                            onBudgetManage = if (state.shell == null) null else model::showManageCategories,
                             onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
+                        )
+                    ShellRoute.Settings ->
+                        SettingsScreen(
+                            onBudgets = model::showBudgets,
+                            onAppearance = model::showAppearance,
+                            onSync = model::showServer,
+                            onPayees = model::showPayees,
+                            modifier = fill,
                         )
                     ShellRoute.Budgets ->
                         BudgetsScreen(
@@ -531,6 +563,7 @@ fun DueNorthApp(model: ShellViewModel) {
                         modifier = fill,
                     )
                 }
+            }
             }
         }
     }

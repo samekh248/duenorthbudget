@@ -84,16 +84,6 @@ fun RegisterScreen(
             hint = "payee",
             modifier = Modifier.padding(top = 12.dp).testTag("payee-filter"),
         )
-        MetroButton("add", Modifier.padding(top = 12.dp), onClick = onAdd)
-        MetroButton("transfer", Modifier.padding(top = 8.dp), onClick = onTransfer)
-        MetroButton("reconcile", Modifier.padding(top = 8.dp), onClick = onReconcile)
-        if (onImportFile != null) {
-            MetroButton(
-                ImportCopy.IMPORT_FILE,
-                Modifier.padding(top = 8.dp).testTag("register-import-file"),
-                onClick = onImportFile,
-            )
-        }
         if (onFetch != null) {
             MetroButton(
                 ImportCopy.FETCH,
@@ -236,7 +226,7 @@ fun TransactionForm(
         } else {
             Column(Modifier.weight(1f)) {}
         }
-        MetroButton("save", Modifier.padding(top = 8.dp)) {
+        val commit = {
             when (
                 val parsed =
                     RegisterEntry.transaction(
@@ -257,6 +247,10 @@ fun TransactionForm(
                 }
                 is EntryResult.Rejected -> localError = parsed.reason
             }
+        }
+        RememberFormSave(commit)
+        if (!formSaveOnBar()) {
+            MetroButton("save", Modifier.padding(top = 8.dp), onClick = commit)
         }
         if (row != null) {
             if (row.transferId == null) {
@@ -320,7 +314,7 @@ fun SplitForm(
         MetroButton("add part", Modifier.padding(top = 8.dp)) {
             lines = lines + ("" to "")
         }
-        MetroButton("save", Modifier.padding(top = 8.dp)) {
+        val commitSplit = {
             when (val parsed = RegisterEntry.split(row.amountMinor, page.currency.decimals, lines)) {
                 is EntryResult.Ok -> {
                     localError = null
@@ -328,6 +322,10 @@ fun SplitForm(
                 }
                 is EntryResult.Rejected -> localError = parsed.reason
             }
+        }
+        RememberFormSave(commitSplit)
+        if (!formSaveOnBar()) {
+            MetroButton("save", Modifier.padding(top = 8.dp), onClick = commitSplit)
         }
         if (row.parent) {
             MetroButton("one category", Modifier.padding(top = 8.dp)) { onUnsplit(row.id) }
@@ -403,7 +401,7 @@ fun TransferForm(
                 }
             }
         }
-        MetroButton("save", Modifier.padding(top = 8.dp)) {
+        val commitTransfer = {
             when (
                 val parsed =
                     RegisterEntry.transfer(
@@ -423,6 +421,10 @@ fun TransferForm(
                 }
                 is EntryResult.Rejected -> localError = parsed.reason
             }
+        }
+        RememberFormSave(commitTransfer)
+        if (!formSaveOnBar()) {
+            MetroButton("save", Modifier.padding(top = 8.dp), onClick = commitTransfer)
         }
     }
 }

@@ -39,7 +39,6 @@ fun MonthReviewSection(
     review: MonthReviewPage?,
     loading: Boolean,
     onListGesture: (Boolean) -> Unit,
-    onPreviousMonth: () -> Unit,
     onCategory: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -54,7 +53,6 @@ fun MonthReviewSection(
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         MetroText(monthLabel(review.month), Metro.typography.caption, color = Metro.colors.secondary)
         MetroText(ReviewCopy.SPENDING, Metro.typography.header)
-        MetroButton(ReviewCopy.PREVIOUS_MONTH, Modifier.padding(vertical = 8.dp), onClick = onPreviousMonth)
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             MetroText(ReviewCopy.INCOME, Metro.typography.subheader, Modifier.weight(1f))
             MetroText(

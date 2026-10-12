@@ -63,7 +63,10 @@ fun CategoryBudgetScreen(
         )
         MetroField(amount, { amount = it }, "budgeted", Modifier.testTag("category-budget-amount"))
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        MetroButton("save") { onSave(amount) }
+        RememberFormSave { onSave(amount) }
+        if (!formSaveOnBar()) {
+            MetroButton("save") { onSave(amount) }
+        }
         MetroButton(EnvelopeCopy.MOVE, onClick = onMove)
         MetroButton(
             if (category.carryover) "stop ${EnvelopeCopy.ROLLOVER}" else EnvelopeCopy.ROLLOVER,
@@ -108,7 +111,10 @@ fun MoveCategoryScreen(
                 )
             }
         }
-        MetroButton("move") { onSave(toId, amount) }
+        RememberFormSave { onSave(toId, amount) }
+        if (!formSaveOnBar()) {
+            MetroButton("move") { onSave(toId, amount) }
+        }
     }
 }
 
@@ -142,7 +148,10 @@ fun HoldMonthScreen(
         }
         MetroField(amount, { amount = it }, "amount for next month")
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        MetroButton(EnvelopeCopy.HOLD) { onSave(amount) }
+        RememberFormSave { onSave(amount) }
+        if (!formSaveOnBar()) {
+            MetroButton(EnvelopeCopy.HOLD) { onSave(amount) }
+        }
         if (shell.bufferedMinor != 0L) {
             MetroButton(EnvelopeCopy.RELEASE, onClick = onRelease)
         }

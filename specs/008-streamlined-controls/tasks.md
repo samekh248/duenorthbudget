@@ -18,8 +18,8 @@
 
 **Purpose**: Confirm the existing modules and ignore rules; no new Gradle module and no sqlite migration
 
-- [ ] T001 Verify `.gitignore` covers Android and Gradle outputs (`local.properties`, `.gradle/`, `**/build/`, `*.iml`, `.idea/`) and that `.specify/feature.json` stays ignored
-- [ ] T002 Confirm no new module is required in `settings.gradle.kts`; work stays in `:core:design` and `:app` per `plan.md`
+- [X] T001 Verify `.gitignore` covers Android and Gradle outputs (`local.properties`, `.gradle/`, `**/build/`, `*.iml`, `.idea/`) and that `.specify/feature.json` stays ignored
+- [X] T002 Confirm no new module is required in `settings.gradle.kts`; work stays in `:core:design` and `:app` per `plan.md`
 
 ---
 
@@ -29,9 +29,9 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Add `MonthWindow` in `core/design/src/main/kotlin/app/duenorth/budget/design/MonthWindow.kt` with `anchor: YearMonth`, `radius` 24, and `months` from `anchor.minusMonths(24)` through `anchor.plusMonths(24)` inclusive, oldest first
-- [ ] T004 [P] Expand `AppGlyph` and add `ScreenAction` (`id`, `glyph`, `label`, `primary`, `run`) in `core/design/src/main/kotlin/app/duenorth/budget/design/components/MetroComponents.kt`; remove `AppGlyph.More`; keep the ellipsis as chrome, not a `ScreenAction`
-- [ ] T005 [P] JVM tests for the ±24 window in `core/design/src/test/kotlin/app/duenorth/budget/design/MonthWindowTest.kt` (49 months; oldest and newest bounds)
+- [X] T003 Add `MonthWindow` in `core/design/src/main/kotlin/app/duenorth/budget/design/MonthWindow.kt` with `anchor: YearMonth`, `radius` 24, and `months` from `anchor.minusMonths(24)` through `anchor.plusMonths(24)` inclusive, oldest first
+- [X] T004 [P] Expand `AppGlyph` and add `ScreenAction` (`id`, `glyph`, `label`, `primary`, `run`) in `core/design/src/main/kotlin/app/duenorth/budget/design/components/MetroComponents.kt`; remove `AppGlyph.More`; keep the ellipsis as chrome, not a `ScreenAction`
+- [X] T005 [P] JVM tests for the ±24 window in `core/design/src/test/kotlin/app/duenorth/budget/design/MonthWindowTest.kt` (49 months; oldest and newest bounds)
 
 **Checkpoint**: Month window and action types exist without UI wiring.
 
@@ -45,16 +45,16 @@
 
 ### Tests for User Story 1
 
-- [ ] T006 [P] [US1] JVM tests for open-month selection in `app/src/test/kotlin/app/duenorth/budget/OpenMonthTest.kt` (cache hit swaps shell and review in one update; gesture sets `pendingMonth` and applies when the gesture ends; cache miss sets `displayedMonth` immediately; zero-amount month is not an error)
-- [ ] T007 [P] [US1] JVM tests for pinned editor months in `app/src/test/kotlin/app/duenorth/budget/OpenMonthTest.kt` (`GroupCategories`, `CategoryBudget`, `MoveCategory`, `HoldMonth` pin `openMonth` at push; later `openMonth` changes do not change `pinnedMonth`; writes use `pinnedMonth`)
+- [X] T006 [P] [US1] JVM tests for open-month selection in `app/src/test/kotlin/app/duenorth/budget/OpenMonthTest.kt` (cache hit swaps shell and review in one update; gesture sets `pendingMonth` and applies when the gesture ends; cache miss sets `displayedMonth` immediately; zero-amount month is not an error)
+- [X] T007 [P] [US1] JVM tests for pinned editor months in `app/src/test/kotlin/app/duenorth/budget/OpenMonthTest.kt` (`GroupCategories`, `CategoryBudget`, `MoveCategory`, `HoldMonth` pin `openMonth` at push; later `openMonth` changes do not change `pinnedMonth`; writes use `pinnedMonth`)
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] Replace `budgetMonth` and `reviewMonth` with `openMonth` (initial value current calendar month) and `pinnedMonth` in `app/src/main/kotlin/app/duenorth/budget/ShellViewModel.kt`; `load`/`apply`/`refreshBudgetShell` read shell and review for `openMonth`; switching budgets drops the month cache
-- [ ] T009 [US1] Add `MonthCache` and the painted-month transitions from `data-model.md` in `app/src/main/kotlin/app/duenorth/budget/ShellViewModel.kt` (warm the 49-month window on `Dispatchers.IO` when a budget opens; cache hit with no gesture applies in the same state update; gesture holds painted rows via the existing refresh gate; newer selection discards an older read)
-- [ ] T010 [US1] Add `MonthControl` (tags `month-label`, `month-previous`, `month-next`, `month-current`, `month-list`, `month-option-YYYY-MM`) in `app/src/main/kotlin/app/duenorth/budget/ShellScreens.kt` per `contracts/month-control.md`; previous hidden on oldest; next hidden on newest; current hidden when already on the calendar month
-- [ ] T011 [US1] Show `MonthControl` on Home and the four pinned editor routes, and remove previous/next word buttons from `BudgetSection` and the review previous-month button from `app/src/main/kotlin/app/duenorth/budget/ReviewScreens.kt` and `ShellScreens.kt`; show `budgetName` as one ellipsized line that does not overlap `month-label` or `to-budget`
-- [ ] T012 [US1] Wire selection and pin-on-push in `app/src/main/kotlin/app/duenorth/budget/DueNorthApp.kt` and `ShellViewModel.kt` so envelope editors use `pinnedMonth` and returning to Home shows the current `openMonth`
+- [X] T008 [US1] Replace `budgetMonth` and `reviewMonth` with `openMonth` (initial value current calendar month) and `pinnedMonth` in `app/src/main/kotlin/app/duenorth/budget/ShellViewModel.kt`; `load`/`apply`/`refreshBudgetShell` read shell and review for `openMonth`; switching budgets drops the month cache
+- [X] T009 [US1] Add `MonthCache` and the painted-month transitions from `data-model.md` in `app/src/main/kotlin/app/duenorth/budget/ShellViewModel.kt` (warm the 49-month window on `Dispatchers.IO` when a budget opens; cache hit with no gesture applies in the same state update; gesture holds painted rows via the existing refresh gate; newer selection discards an older read)
+- [X] T010 [US1] Add `MonthControl` (tags `month-label`, `month-previous`, `month-next`, `month-current`, `month-list`, `month-option-YYYY-MM`) in `app/src/main/kotlin/app/duenorth/budget/ShellScreens.kt` per `contracts/month-control.md`; previous hidden on oldest; next hidden on newest; current hidden when already on the calendar month
+- [X] T011 [US1] Show `MonthControl` on Home and the four pinned editor routes, and remove previous/next word buttons from `BudgetSection` and the review previous-month button from `app/src/main/kotlin/app/duenorth/budget/ReviewScreens.kt` and `ShellScreens.kt`; show `budgetName` as one ellipsized line that does not overlap `month-label` or `to-budget`
+- [X] T012 [US1] Wire selection and pin-on-push in `app/src/main/kotlin/app/duenorth/budget/DueNorthApp.kt` and `ShellViewModel.kt` so envelope editors use `pinnedMonth` and returning to Home shows the current `openMonth`
 
 **Checkpoint**: User Story 1 works offline with one month control and no list word buttons for month changes.
 
@@ -68,13 +68,13 @@
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Glyph ink tests in `core/design/src/test/kotlin/app/duenorth/budget/design/AppGlyphTest.kt` (every `AppGlyph` draws non-empty ink; no `More`)
-- [ ] T014 [P] [US2] Compose bar-tap tests in `app/src/test/kotlin/app/duenorth/budget/ScreenBarContentTest.kt` (collapsed `app-bar-{id}` runs once; expanded runs the same action; `app-bar-ellipsis` toggles and does not navigate; adjacent targets do not share a hit)
+- [X] T013 [P] [US2] Glyph ink tests in `core/design/src/test/kotlin/app/duenorth/budget/design/AppGlyphTest.kt` (every `AppGlyph` draws non-empty ink; no `More`)
+- [X] T014 [P] [US2] Compose bar-tap tests in `app/src/test/kotlin/app/duenorth/budget/ScreenBarContentTest.kt` (collapsed `app-bar-{id}` runs once; expanded runs the same action; `app-bar-ellipsis` toggles and does not navigate; adjacent targets do not share a hit)
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Draw stroked icons for hold, categories, add, settings, transfer, reconcile, import, save, cancel, budgets, appearance, sync, and payees in `core/design/src/main/kotlin/app/duenorth/budget/design/components/MetroComponents.kt`; circles stay 48 dp with at least 8 dp gaps
-- [ ] T016 [US2] Update `MetroAppBar` in `core/design/src/main/kotlin/app/duenorth/budget/design/components/MetroComponents.kt` so the clickable area is the circle, labels show only when expanded, secondary actions appear only as `app-bar-menu-{id}` while expanded, and the ellipsis is tagged `app-bar-ellipsis`
+- [X] T015 [US2] Draw stroked icons for hold, categories, add, settings, transfer, reconcile, import, save, cancel, budgets, appearance, sync, and payees in `core/design/src/main/kotlin/app/duenorth/budget/design/components/MetroComponents.kt`; circles stay 48 dp with at least 8 dp gaps
+- [X] T016 [US2] Update `MetroAppBar` in `core/design/src/main/kotlin/app/duenorth/budget/design/components/MetroComponents.kt` so the clickable area is the circle, labels show only when expanded, secondary actions appear only as `app-bar-menu-{id}` while expanded, and the ellipsis is tagged `app-bar-ellipsis`
 
 **Checkpoint**: Bar icons are drawn and respond with labels hidden.
 
@@ -88,13 +88,13 @@
 
 ### Tests for User Story 3
 
-- [ ] T017 [P] [US3] Route-action mapping tests in `app/src/test/kotlin/app/duenorth/budget/ScreenBarTest.kt` (Home envelope: `add`, `hold`, `categories`, `settings`; Home tracking: no hold; no budget: `settings` only; Register: `add`, `transfer`, `reconcile`, `import`; write forms: `save`, `cancel`; form bar has no panorama actions)
+- [X] T017 [P] [US3] Route-action mapping tests in `app/src/test/kotlin/app/duenorth/budget/ScreenBarTest.kt` (Home envelope: `add`, `hold`, `categories`, `settings`; Home tracking: no hold; no budget: `settings` only; Register: `add`, `transfer`, `reconcile`, `import`; write forms: `save`, `cancel`; form bar has no panorama actions)
 
 ### Implementation for User Story 3
 
-- [ ] T018 [US3] Implement `ScreenBar.forState` in `app/src/main/kotlin/app/duenorth/budget/ScreenBar.kt` per `contracts/screen-bar.md`, wiring each id to the existing `ShellViewModel` methods
-- [ ] T019 [US3] Add `ShellRoute.Settings` and a settings screen tagged `settings-screen` in `app/src/main/kotlin/app/duenorth/budget/ShellScreens.kt` and `ShellViewModel.kt` with rows for budgets, appearance, sync, and payees (no instance switching; that is spec 009)
-- [ ] T020 [US3] Drive `ShellChrome` from `ScreenBar.forState` in `app/src/main/kotlin/app/duenorth/budget/DueNorthApp.kt`; remove hold/manage word buttons from `BudgetSection` in `ShellScreens.kt`; remove add/transfer/reconcile/import word buttons from `RegisterScreens.kt`; remove in-body save/cancel duplicates on write forms listed in `contracts/screen-bar.md`
+- [X] T018 [US3] Implement `ScreenBar.forState` in `app/src/main/kotlin/app/duenorth/budget/ScreenBar.kt` per `contracts/screen-bar.md`, wiring each id to the existing `ShellViewModel` methods
+- [X] T019 [US3] Add `ShellRoute.Settings` and a settings screen tagged `settings-screen` in `app/src/main/kotlin/app/duenorth/budget/ShellScreens.kt` and `ShellViewModel.kt` with rows for budgets, appearance, sync, and payees (no instance switching; that is spec 009)
+- [X] T020 [US3] Drive `ShellChrome` from `ScreenBar.forState` in `app/src/main/kotlin/app/duenorth/budget/DueNorthApp.kt`; remove hold/manage word buttons from `BudgetSection` in `ShellScreens.kt`; remove add/transfer/reconcile/import word buttons from `RegisterScreens.kt`; remove in-body save/cancel duplicates on write forms listed in `contracts/screen-bar.md`
 
 **Checkpoint**: User Stories 1–3 work together; the bar matches the route.
 
@@ -108,12 +108,12 @@
 
 ### Tests for User Story 4
 
-- [ ] T021 [P] [US4] Replace the title-shift assertions in `core/design/src/test/kotlin/app/duenorth/budget/design/DesignRulesTest.kt` (adjacent pages differ by `stepPx`; motion off or one section yields 0; fractional pages lerp; absolute shift never exceeds `stepPx`)
+- [X] T021 [P] [US4] Replace the title-shift assertions in `core/design/src/test/kotlin/app/duenorth/budget/design/DesignRulesTest.kt` (adjacent pages differ by `stepPx`; motion off or one section yields 0; fractional pages lerp; absolute shift never exceeds `stepPx`)
 
 ### Implementation for User Story 4
 
-- [ ] T022 [US4] Rewrite `PanoramaMotion.titleShiftPx` in `core/design/src/main/kotlin/app/duenorth/budget/design/PanoramaMotion.kt` per `contracts/panorama-title.md` (even page rest 0, odd page rest `-stepPx`, lerp between; motion disabled → 0)
-- [ ] T023 [US4] Apply the new shift in `MetroPanorama` in `core/design/src/main/kotlin/app/duenorth/budget/design/components/MetroComponents.kt`: measure `stepPx` as the width of "due"; rest inset at least `stepPx`; scale the title block down from 118 sp only until inset plus block width fits; remove the gutter `coerceIn` clamp; keep clip off; one section disables sideways scroll; peek and snap stay
+- [X] T022 [US4] Rewrite `PanoramaMotion.titleShiftPx` in `core/design/src/main/kotlin/app/duenorth/budget/design/PanoramaMotion.kt` per `contracts/panorama-title.md` (even page rest 0, odd page rest `-stepPx`, lerp between; motion disabled → 0)
+- [X] T023 [US4] Apply the new shift in `MetroPanorama` in `core/design/src/main/kotlin/app/duenorth/budget/design/components/MetroComponents.kt`: measure `stepPx` as the width of "due"; rest inset at least `stepPx`; scale the title block down from 118 sp only until inset plus block width fits; remove the gutter `coerceIn` clamp; keep clip off; one section disables sideways scroll; peek and snap stay
 
 **Checkpoint**: Title lag is visible and letters stay on screen.
 
@@ -123,10 +123,10 @@
 
 **Purpose**: Screenshots, offline confirmation, and quickstart validation
 
-- [ ] T024 [P] Update Roborazzi light and dark captures for the month control and the new bar in `app/src/test/kotlin/app/duenorth/budget/ShellScreenshotTest.kt` and `RegisterScreenshotTest.kt`
-- [ ] T025 [P] Compose checks for month tags and collapsed bar actions in `app/src/test/kotlin/app/duenorth/budget/ShellContentTest.kt` (`month-label`, `month-previous`, `app-bar-add`, `app-bar-ellipsis`; no previous/next/hold/manage word buttons on the budget list)
-- [ ] T026 Run the validation commands in `specs/008-streamlined-controls/quickstart.md` (`:core:design:testDebugUnitTest`, `:app:testDebugUnitTest`, `:app:verifyRoborazziDebug`, and `:core:budget:test` when month snapshots use `readShell`)
-- [ ] T027 Confirm offline bar writes and month figures still come from the local file only (no new network calls) across `ShellViewModel.kt` and `ScreenBar.kt`
+- [X] T024 [P] Update Roborazzi light and dark captures for the month control and the new bar in `app/src/test/kotlin/app/duenorth/budget/ShellScreenshotTest.kt` and `RegisterScreenshotTest.kt`
+- [X] T025 [P] Compose checks for month tags and collapsed bar actions in `app/src/test/kotlin/app/duenorth/budget/ShellContentTest.kt` (`month-label`, `month-previous`, `app-bar-add`, `app-bar-ellipsis`; no previous/next/hold/manage word buttons on the budget list)
+- [X] T026 Run the validation commands in `specs/008-streamlined-controls/quickstart.md` (`:core:design:testDebugUnitTest`, `:app:testDebugUnitTest`, `:app:verifyRoborazziDebug`, and `:core:budget:test` when month snapshots use `readShell`)
+- [X] T027 Confirm offline bar writes and month figures still come from the local file only (no new network calls) across `ShellViewModel.kt` and `ScreenBar.kt`
 
 ---
 
