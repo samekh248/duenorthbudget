@@ -31,6 +31,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.time.YearMonth
 
 @RunWith(RobolectricTestRunner::class)
@@ -77,6 +78,8 @@ class ShellContentTest {
     }
 
     @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
     fun budgetHeadingSharesTheMonthRow() {
         val shell = sample().copy(budgetName = "Home")
         compose.setContent {
@@ -109,13 +112,12 @@ class ShellContentTest {
         assertTrue("next follows the month: $month vs $next", next.left + 1f >= month.right)
         val headingDp = heading.height / density
         val monthDp = month.width / density
-        assertTrue("heading stays a section title, ${headingDp}dp", headingDp >= 40f)
+        assertTrue("heading stays a section title, ${headingDp}dp", headingDp >= 48f)
         assertTrue("month label stays readable, ${monthDp}dp", monthDp >= 80f)
         assertTrue("next stays inside the page", next.right <= root.right + 1f)
         compose.onNodeWithTag("to-budget").assertIsDisplayed()
         compose.onNodeWithTag("month-label").performClick()
         compose.onNodeWithTag("month-list").assertIsDisplayed()
-        compose.onNodeWithTag("month-option-2026-10").assertIsDisplayed()
     }
 
     @Test

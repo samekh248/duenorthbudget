@@ -286,7 +286,8 @@ private fun HeadingMonthRow(
     val titleStyle = Metro.typography.sectionHeader
     val labelStyle = Metro.typography.subheader
     SubcomposeLayout(modifier.fillMaxWidth().heightIn(min = MetroDimens.TouchTarget)) { constraints ->
-        val loose = constraints.copy(minWidth = 0, minHeight = 0, maxWidth = Constraints.Infinity)
+        // Widths near Constraints.Infinity make this text measure about one pixel per character.
+        val loose = constraints.copy(minWidth = 0, minHeight = 0, maxWidth = 2_048)
         val buttonPx = MetroDimens.TouchTarget.roundToPx()
         val buttonsW = buttonPx * listOfNotNull(onPrevious, onCalendar, onNext).size
         val safety = 1.dp.roundToPx()
