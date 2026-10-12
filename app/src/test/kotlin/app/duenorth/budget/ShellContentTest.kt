@@ -175,10 +175,18 @@ class ShellContentTest {
         }
         compose.onNodeWithTag("group-g").assertIsDisplayed()
         compose.onNodeWithText("Everyday", substring = true).assertIsDisplayed()
+        compose.onNodeWithTag("held-amount").assertTextEquals("$250.00")
         val toBudget = compose.onNodeWithTag("to-budget").fetchSemanticsNode().boundsInRoot
         val held = compose.onNodeWithTag("held-amount").fetchSemanticsNode().boundsInRoot
+        val heldLabel = compose.onNodeWithText("held").fetchSemanticsNode().boundsInRoot
+        val toLabel = compose.onNodeWithText("to budget").fetchSemanticsNode().boundsInRoot
         assertTrue("held sits beside to-budget: $toBudget vs $held", held.left + 1f >= toBudget.right)
         assertTrue("held shares the to-budget row: $toBudget vs $held", held.top < toBudget.bottom && toBudget.top < held.bottom)
+        assertTrue(
+            "held label sits on the caption: $heldLabel vs $toLabel",
+            heldLabel.top < toLabel.bottom && toLabel.top < heldLabel.bottom,
+        )
+        assertTrue("held label sits above its amount: $heldLabel vs $held", heldLabel.bottom <= held.top + 1f)
         compose.onNodeWithTag("category-c-food").assertDoesNotExist()
         compose.onNodeWithText("Groceries").assertDoesNotExist()
     }

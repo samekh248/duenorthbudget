@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.testTag
@@ -375,20 +376,20 @@ fun BudgetSection(
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
-        MetroText(shell.headerLabel, Metro.typography.caption, color = Metro.colors.secondary)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            MetroText(
-                MoneyFormat.format(shell.headerMinor, shell.currency),
-                Metro.typography.subheader,
-                color = Metro.accent.text,
-                modifier = Modifier.alignByBaseline().testTag("to-budget"),
+        Row(verticalAlignment = Alignment.Top) {
+            BudgetTotal(
+                label = shell.headerLabel,
+                amount = MoneyFormat.format(shell.headerMinor, shell.currency),
+                amountColor = Metro.accent.text,
+                amountTag = "to-budget",
             )
             if (shell.bufferedMinor != 0L) {
-                MetroText(
-                    "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
-                    Metro.typography.caption,
-                    color = Metro.colors.secondary,
-                    modifier = Modifier.padding(start = MetroDimens.Gutter).alignByBaseline().testTag("held-amount"),
+                BudgetTotal(
+                    label = "held",
+                    amount = MoneyFormat.format(shell.bufferedMinor, shell.currency),
+                    amountColor = Metro.colors.secondary,
+                    amountTag = "held-amount",
+                    modifier = Modifier.padding(start = MetroDimens.Gutter),
                 )
             }
         }
@@ -406,6 +407,25 @@ fun BudgetSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BudgetTotal(
+    label: String,
+    amount: String,
+    amountColor: Color,
+    amountTag: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        MetroText(label, Metro.typography.caption, color = Metro.colors.secondary)
+        MetroText(
+            amount,
+            Metro.typography.subheader,
+            color = amountColor,
+            modifier = Modifier.testTag(amountTag),
+        )
     }
 }
 
