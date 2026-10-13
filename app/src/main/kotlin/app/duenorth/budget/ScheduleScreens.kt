@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CurrencySpec
+import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.UpcomingScheduleRow
@@ -37,6 +38,7 @@ fun DueSection(
     onPost: (String) -> Unit,
     onSkip: (String) -> Unit,
     modifier: Modifier = Modifier,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
     if (rows.isEmpty()) {
         MetroText(
@@ -52,7 +54,7 @@ fun DueSection(
     }
     LazyColumn(modifier.fillMaxSize(), state = list) {
         items(rows, key = { it.id }) { row ->
-            DueLine(row, currency, onPost, onSkip)
+            DueLine(row, currency, onPost, onSkip, formatOptions)
         }
     }
 }
@@ -63,6 +65,7 @@ private fun DueLine(
     currency: CurrencySpec,
     onPost: (String) -> Unit,
     onSkip: (String) -> Unit,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
     Column(
         Modifier
@@ -81,7 +84,7 @@ private fun DueLine(
                 )
             }
             MetroText(
-                MoneyFormat.format(row.amountMinor, currency),
+                MoneyFormat.format(row.amountMinor, currency, formatOptions),
                 Metro.typography.subheader,
                 Modifier.widthIn(max = 148.dp),
             )

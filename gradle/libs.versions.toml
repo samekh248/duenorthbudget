@@ -15,6 +15,7 @@ robolectric = "4.16"
 roborazzi = "1.50.0"
 ktlintPlugin = "13.1.0"
 securityCrypto = "1.0.0"
+browser = "1.8.0"
 
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
@@ -38,6 +39,7 @@ roborazzi = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = 
 roborazzi-compose = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
 roborazzi-junit-rule = { module = "io.github.takahirom.roborazzi:roborazzi-junit-rule", version.ref = "roborazzi" }
 security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
+browser = { module = "androidx.browser:browser", version.ref = "browser" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
