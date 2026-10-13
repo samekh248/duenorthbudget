@@ -225,7 +225,11 @@ object RegisterEntry {
         return "%04d-%02d-%02d".format(year, month, day)
     }
 
-    fun registerDateLabel(date: Int): String {
+    fun registerDateLabel(
+        date: Int,
+        dateFormat: String? = null,
+    ): String {
+        if (dateFormat != null) return DateFormats.format(date, dateFormat)
         val month = (date / 100) % 100
         val day = date % 100
         if (month !in 1..12) return date.toString()

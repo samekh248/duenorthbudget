@@ -1,7 +1,9 @@
 package app.duenorth.budget
 
 import android.app.Application
+import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.net.Uri
 import android.os.Bundle
 import android.os.StrictMode
 import android.provider.Settings
@@ -10,6 +12,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -19,12 +22,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -32,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.ThemeMode
@@ -76,6 +82,8 @@ class DueNorthApplication : Application() {
 }
 
 class MainActivity : ComponentActivity() {
+    private var shellModel: ShellViewModel? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val application = application as DueNorthApplication
@@ -89,8 +97,18 @@ class MainActivity : ComponentActivity() {
                             developerMode = application.developerMode,
                         ),
                 )
+            shellModel = model
+            LaunchedEffect(intent?.data) {
+                model.completeOpenId(intent?.dataString)
+            }
             DueNorthApp(model)
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        shellModel?.completeOpenId(intent.dataString)
     }
 }
 
@@ -109,6 +127,25 @@ fun DueNorthApp(model: ShellViewModel) {
             val name = uri.lastPathSegment?.substringAfterLast('/') ?: "import.qif"
             model.previewImportFile(accountId, bytes, name)
         }
+    LaunchedEffect(state.openIdRedirectUrl) {
+        val url = state.openIdRedirectUrl ?: return@LaunchedEffect
+        CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+        model.clearOpenIdRedirect()
+    }
+    LaunchedEffect(state.pendingExport) {
+        val export = state.pendingExport ?: return@LaunchedEffect
+        val file = File(context.cacheDir, export.fileName)
+        file.writeBytes(export.bytes)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        val share =
+            Intent(Intent.ACTION_SEND).apply {
+                type = "application/zip"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        context.startActivity(Intent.createChooser(share, export.fileName))
+        model.clearPendingExport()
+    }
     val systemDark = isSystemInDarkTheme()
     val dark =
         when (ThemeMode.fromStored(state.settings.themeMode)) {
@@ -133,12 +170,19 @@ fun DueNorthApp(model: ShellViewModel) {
     }
     val canBack =
         state.confirm != null ||
+            state.confirmAdvanced != null ||
             (
                 state.route != ShellRoute.Home &&
                     !(state.route == ShellRoute.Create && state.shell == null) &&
                     !(state.route == ShellRoute.BudgetPassword && state.locked)
             )
-    BackHandler(enabled = canBack) { model.back() }
+    BackHandler(enabled = canBack) {
+        if (state.confirmAdvanced != null) {
+            model.cancelAdvanced()
+        } else {
+            model.back()
+        }
+    }
     val formSaveHost = rememberFormSaveHost()
     MetroTheme(
         darkTheme = dark,
@@ -216,13 +260,60 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSelectMonth = model::selectOpenMonth,
                                 onBudgetGroup = if (state.shell == null) null else model::openGroupCategories,
                                 onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
+                                formatOptions =
+                                    FormatOptions(
+                                        hideFraction = state.formatPrefs.hideFraction,
+                                        numberFormat = state.formatPrefs.numberFormat,
+                                    ),
                             )
                         ShellRoute.Settings ->
                             SettingsScreen(
-                                onBudgets = model::showBudgets,
-                                onAppearance = model::showAppearance,
-                                onSync = model::showServer,
+                                instances = state.instances,
+                                activeInstance = state.activeInstance,
+                                instanceReachable = state.instanceReachable,
+                                signedIn = state.signedIn,
+                                serverError = state.serverError,
+                                budgets = state.budgets,
+                                openBudgetId = state.settings.openBudgetId,
+                                themeMode = state.settings.themeMode,
+                                accentId = state.settings.accent,
+                                formatPrefs = state.formatPrefs,
+                                cloudFileId = state.cloudFileId,
+                                createError = state.createError,
+                                encryptionError = state.encryptionError,
+                                openIdAvailable = state.openIdAvailable,
+                                onConnect = model::connectInstance,
+                                onBeginOpenId = model::beginOpenId,
+                                onMakeActive = model::requestInstanceSwitch,
+                                onRemoveInstance = model::removeInstance,
+                                onSignOut = model::signOutInstance,
+                                onOpenBudget = model::requestSwitch,
+                                onCreateBudget = model::createFromSettings,
+                                onTheme = model::setTheme,
+                                onAccent = model::setAccent,
                                 onPayees = model::showPayees,
+                                onDateFormat = model::setDateFormat,
+                                onNumberFormat = model::setNumberFormat,
+                                onFirstDay = model::setFirstDay,
+                                onHideFraction = model::setHideFraction,
+                                onExperimental = model::setExperimental,
+                                onExport = model::exportBudget,
+                                onSetEncryptionPassword = model::setEncryptionPassword,
+                                onChangeEncryptionPassword = model::changeEncryptionPassword,
+                                onRemoveEncryptionPassword = model::removeEncryptionPassword,
+                                onRequestAdvanced = model::requestAdvanced,
+                                modifier = fill,
+                            )
+                        ShellRoute.ConfirmInstanceSwitch ->
+                            ConfirmInstanceSwitchScreen(
+                                leaving =
+                                    state.activeInstance?.label
+                                        ?: state.activeInstance?.address.orEmpty(),
+                                opening =
+                                    state.switchInstanceTarget?.label
+                                        ?: state.switchInstanceTarget?.address.orEmpty(),
+                                onOpen = { model.confirmInstanceSwitch() },
+                                onStay = model::cancelInstanceSwitch,
                                 modifier = fill,
                             )
                         ShellRoute.Budgets ->
@@ -594,6 +685,21 @@ fun DueNorthApp(model: ShellViewModel) {
                         ScheduleDuplicateScreen(
                             onPostAnyway = model::confirmScheduleDuplicate,
                             onCancel = model::cancelScheduleDuplicate,
+                            modifier = fill,
+                        )
+                    }
+                    val advanced = state.confirmAdvanced
+                    if (advanced != null) {
+                        ConfirmAdvancedScreen(
+                            kind = advanced,
+                            onConfirm = {
+                                when (advanced) {
+                                    AdvancedConfirm.Rebuild -> model.confirmRebuild()
+                                    AdvancedConfirm.Repair -> model.confirmRepair()
+                                    AdvancedConfirm.ResetSync -> model.confirmResetSync()
+                                }
+                            },
+                            onCancel = model::cancelAdvanced,
                             modifier = fill,
                         )
                     }

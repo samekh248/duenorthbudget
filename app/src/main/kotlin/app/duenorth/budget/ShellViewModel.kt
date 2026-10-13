@@ -14,6 +14,7 @@ import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.EditResult
 import app.duenorth.budget.core.ForcedWrite
+import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
@@ -27,6 +28,7 @@ import app.duenorth.budget.core.OpenResult
 import app.duenorth.budget.core.ParsedImportRow
 import app.duenorth.budget.core.PayeeRow
 import app.duenorth.budget.core.PayeeWriteResult
+import app.duenorth.budget.core.PendingExport
 import app.duenorth.budget.core.PhoneSettings
 import app.duenorth.budget.core.PreviewRowStatus
 import app.duenorth.budget.core.ReconcileFinishResult
@@ -36,6 +38,7 @@ import app.duenorth.budget.core.RefreshGate
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RemoteFile
+import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.ScheduleWriteResult
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.SyncCoordinator
@@ -46,6 +49,7 @@ import app.duenorth.budget.core.UnlockResult
 import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.UploadResult
 import app.duenorth.budget.core.WriteResult
+import app.duenorth.budget.core.activeInstance
 import app.duenorth.budget.core.syncFraction
 import app.duenorth.budget.core.withBudgetedAssignment
 import app.duenorth.budget.core.withHold
@@ -69,6 +73,8 @@ sealed interface ShellRoute {
     data object Create : ShellRoute
 
     data object ConfirmSwitch : ShellRoute
+
+    data object ConfirmInstanceSwitch : ShellRoute
 
     data object Appearance : ShellRoute
 
@@ -193,6 +199,20 @@ data class ShellUiState(
     val importFetchPending: Boolean = false,
     val registerBankLinked: Boolean = false,
     val categoryManage: CategoryManagePage? = null,
+    val instances: List<SavedInstance> = emptyList(),
+    val activeInstance: SavedInstance? = null,
+    val instanceReachable: Boolean? = null,
+    val formatPrefs: FormatPrefs = FormatPrefs(),
+    val budgetMethod: String = "envelope",
+    val cloudFileId: String? = null,
+    val pendingExport: PendingExport? = null,
+    val confirmAdvanced: AdvancedConfirm? = null,
+    val openIdRedirectUrl: String? = null,
+    val openIdAvailable: Boolean = false,
+    val openIdPendingAddress: String? = null,
+    val switchInstanceTarget: SavedInstance? = null,
+    val encryptionError: String? = null,
+    val switchReturnRoute: ShellRoute = ShellRoute.Budgets,
 )
 
 class ShellViewModel(
@@ -435,7 +455,248 @@ class ShellViewModel(
 
     fun showSettings() {
         history.clear()
-        _state.update { it.copy(route = ShellRoute.Settings, confirm = null) }
+        _state.update { it.copy(route = ShellRoute.Settings, confirm = null, createError = null, encryptionError = null) }
+        refreshSettingsSections()
+    }
+
+    fun connectInstance(
+        address: String,
+        password: String,
+    ) {
+        viewModelScope.launch {
+            _state.update { it.copy(serverError = null, syncing = true, syncProgress = 0f) }
+            val result = withContext(Dispatchers.IO) { sync.connect(address, password) }
+            val settings = withContext(Dispatchers.IO) { library.settings() }
+            _state.update {
+                it.copy(
+                    syncing = false,
+                    syncProgress = null,
+                    serverError = result.error,
+                    remoteFiles = if (result.error == null) result.files else it.remoteFiles,
+                    settings = settings,
+                    instances = settings.instances,
+                    activeInstance = settings.activeInstance(),
+                    instanceReachable = if (result.error == null) true else it.instanceReachable,
+                    signedIn = sync.signedIn(),
+                    openIdAvailable = false,
+                )
+            }
+            if (result.error == null) {
+                probeOpenId(address.ifBlank { settings.activeInstance()?.address.orEmpty() })
+            }
+        }
+    }
+
+    fun beginOpenId(address: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(serverError = null) }
+            val redirect =
+                withContext(Dispatchers.IO) {
+                    sync.beginOpenId(address, OPEN_ID_RETURN)
+                }
+            if (redirect.isNullOrBlank()) {
+                _state.update { it.copy(serverError = SyncCopy.ADDRESS_FAILED, openIdRedirectUrl = null) }
+            } else {
+                _state.update {
+                    it.copy(
+                        openIdRedirectUrl = redirect,
+                        openIdPendingAddress = SyncCoordinator.normalizeAddress(address) ?: address.trim().trimEnd('/'),
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearOpenIdRedirect() {
+        _state.update { it.copy(openIdRedirectUrl = null) }
+    }
+
+    fun completeOpenId(callbackUrl: String?) {
+        if (callbackUrl.isNullOrBlank()) return
+        val token = extractOAuthToken(callbackUrl) ?: run {
+            _state.update { it.copy(serverError = SyncCopy.SIGN_IN_FAILED) }
+            return
+        }
+        val address = _state.value.openIdPendingAddress ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(syncing = true, syncProgress = 0f, serverError = null) }
+            val result = withContext(Dispatchers.IO) { sync.completeOpenId(address, token) }
+            val settings = withContext(Dispatchers.IO) { library.settings() }
+            _state.update {
+                it.copy(
+                    syncing = false,
+                    syncProgress = null,
+                    serverError = result.error,
+                    remoteFiles = if (result.error == null) result.files else it.remoteFiles,
+                    settings = settings,
+                    instances = settings.instances,
+                    activeInstance = settings.activeInstance(),
+                    instanceReachable = if (result.error == null) true else false,
+                    signedIn = sync.signedIn(),
+                    openIdPendingAddress = null,
+                    openIdRedirectUrl = null,
+                    route = ShellRoute.Settings,
+                )
+            }
+        }
+    }
+
+    fun requestInstanceSwitch(instanceId: String) {
+        val settings = _state.value.settings
+        val target = settings.instances.firstOrNull { it.id == instanceId } ?: return
+        val current = settings.activeInstance()
+        if (current == null || current.id == target.id) {
+            confirmInstanceSwitch(instanceId)
+            return
+        }
+        _state.update {
+            it.copy(
+                route = ShellRoute.ConfirmInstanceSwitch,
+                switchInstanceTarget = target,
+            )
+        }
+    }
+
+    fun confirmInstanceSwitch(instanceId: String? = null) {
+        val id = instanceId ?: _state.value.switchInstanceTarget?.id ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { sync.makeActive(id) }
+            val settings = withContext(Dispatchers.IO) { library.settings() }
+            _state.update {
+                it.copy(
+                    settings = settings,
+                    instances = settings.instances,
+                    activeInstance = settings.activeInstance(),
+                    instanceReachable = null,
+                    remoteFiles = emptyList(),
+                    switchInstanceTarget = null,
+                    route = ShellRoute.Settings,
+                    signedIn = sync.signedIn(),
+                )
+            }
+            probeReachability()
+        }
+    }
+
+    fun cancelInstanceSwitch() {
+        _state.update {
+            it.copy(route = ShellRoute.Settings, switchInstanceTarget = null)
+        }
+    }
+
+    fun removeInstance(instanceId: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { sync.removeInstance(instanceId) }
+            val settings = withContext(Dispatchers.IO) { library.settings() }
+            _state.update {
+                it.copy(
+                    settings = settings,
+                    instances = settings.instances,
+                    activeInstance = settings.activeInstance(),
+                    signedIn = sync.signedIn(),
+                    remoteFiles = if (settings.activeInstanceId == null) emptyList() else it.remoteFiles,
+                )
+            }
+        }
+    }
+
+    fun signOutInstance() {
+        signOut(preferSettings = true)
+    }
+
+    fun setDateFormat(value: String) = setOpenBudgetPreference("dateFormat", value)
+
+    fun setNumberFormat(value: String) = setOpenBudgetPreference("numberFormat", value)
+
+    fun setFirstDay(index: Int) = setOpenBudgetPreference("firstDayOfWeekIdx", index.coerceIn(0, 6).toString())
+
+    fun setHideFraction(hide: Boolean) = setOpenBudgetPreference("hideFraction", if (hide) "true" else "false")
+
+    fun setExperimental(enabled: Boolean) = setOpenBudgetPreference("flags.experimental", if (enabled) "true" else "false")
+
+    fun exportBudget() {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val name =
+            _state.value.budgets
+                .find { it.id == budgetId }
+                ?.name
+                .orEmpty()
+        viewModelScope.launch {
+            val bytes = withContext(Dispatchers.IO) { library.exportZip(budgetId) } ?: return@launch
+            val fileName = library.exportFileName(name)
+            _state.update { it.copy(pendingExport = PendingExport(fileName, bytes)) }
+        }
+    }
+
+    fun clearPendingExport() {
+        _state.update { it.copy(pendingExport = null) }
+    }
+
+    fun requestAdvanced(kind: AdvancedConfirm) {
+        _state.update { it.copy(confirmAdvanced = kind) }
+    }
+
+    fun cancelAdvanced() {
+        _state.update { it.copy(confirmAdvanced = null) }
+    }
+
+    fun confirmRebuild() = confirmAdvancedAction(AdvancedConfirm.Rebuild) { id -> library.rebuildTotals(id) }
+
+    fun confirmRepair() = confirmAdvancedAction(AdvancedConfirm.Repair) { id -> library.repairSplits(id) }
+
+    fun confirmResetSync() = confirmAdvancedAction(AdvancedConfirm.ResetSync) { id -> sync.resetSync(id) }
+
+    fun setEncryptionPassword(password: String) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            when (val result = withContext(Dispatchers.IO) { sync.setEncryptionPassword(budgetId, password) }) {
+                is UnlockResult.Failed -> _state.update { it.copy(encryptionError = result.reason) }
+                UnlockResult.Unlocked -> _state.update { it.copy(encryptionError = null) }
+            }
+        }
+    }
+
+    fun changeEncryptionPassword(
+        current: String,
+        next: String,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            when (
+                val result =
+                    withContext(Dispatchers.IO) {
+                        sync.changeEncryptionPassword(budgetId, current, next)
+                    }
+            ) {
+                is UnlockResult.Failed -> _state.update { it.copy(encryptionError = result.reason) }
+                UnlockResult.Unlocked -> _state.update { it.copy(encryptionError = null) }
+            }
+        }
+    }
+
+    fun removeEncryptionPassword(password: String) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            when (val result = withContext(Dispatchers.IO) { sync.removeEncryptionPassword(budgetId, password) }) {
+                is UnlockResult.Failed -> _state.update { it.copy(encryptionError = result.reason) }
+                UnlockResult.Unlocked -> _state.update { it.copy(encryptionError = null) }
+            }
+        }
+    }
+
+    fun createFromSettings(
+        name: String,
+        currency: String,
+    ) {
+        viewModelScope.launch {
+            when (val result = withContext(Dispatchers.IO) { library.create(name, currency) }) {
+                is CreateResult.Created -> {
+                    _state.update { it.copy(createError = null, route = ShellRoute.Home) }
+                    reload()
+                }
+                is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
+            }
+        }
     }
 
     fun monthWindow(): MonthWindow = months.window
@@ -1096,11 +1357,24 @@ class ShellViewModel(
             _state.update { it.copy(route = ShellRoute.Home) }
             return
         }
-        _state.update { it.copy(switchTarget = target, pendingFile = null, route = ShellRoute.ConfirmSwitch) }
+        _state.update {
+            it.copy(
+                switchTarget = target,
+                pendingFile = null,
+                route = ShellRoute.ConfirmSwitch,
+                switchReturnRoute = it.route,
+            )
+        }
     }
 
     fun cancelSwitch() {
-        _state.update { it.copy(route = ShellRoute.Budgets, switchTarget = null, pendingFile = null) }
+        _state.update {
+            it.copy(
+                route = it.switchReturnRoute,
+                switchTarget = null,
+                pendingFile = null,
+            )
+        }
     }
 
     fun confirmSwitch() {
@@ -1121,25 +1395,31 @@ class ShellViewModel(
         address: String,
         password: String,
     ) {
+        connectInstance(address, password)
+    }
+
+    fun signOut(preferSettings: Boolean = false) {
+        // Non-blocking: detach token on IO while UI stays responsive even if sync is running.
         viewModelScope.launch {
-            _state.update { it.copy(serverError = null, syncing = true, syncProgress = 0f) }
-            val result = withContext(Dispatchers.IO) { sync.connect(address, password) }
-            _state.update {
-                it.copy(
-                    syncing = false,
-                    syncProgress = null,
-                    serverError = result.error,
-                    remoteFiles = if (result.error == null) result.files else it.remoteFiles,
-                    settings = library.settings(),
-                    signedIn = sync.signedIn(),
+            withContext(Dispatchers.IO) { sync.signOut() }
+            val settings = withContext(Dispatchers.IO) { library.settings() }
+            _state.update { current ->
+                current.copy(
+                    remoteFiles = emptyList(),
+                    serverError = null,
+                    signedIn = false,
+                    settings = settings,
+                    instances = settings.instances,
+                    activeInstance = settings.activeInstance(),
+                    instanceReachable = null,
+                    route =
+                        when {
+                            preferSettings || current.route == ShellRoute.Settings -> ShellRoute.Settings
+                            else -> ShellRoute.Server
+                        },
                 )
             }
         }
-    }
-
-    fun signOut() {
-        sync.signOut()
-        _state.update { it.copy(remoteFiles = emptyList(), serverError = null, route = ShellRoute.Server, signedIn = false) }
     }
 
     fun requestRemote(file: RemoteFile) {
@@ -1517,6 +1797,20 @@ class ShellViewModel(
                     accountId != null &&
                     !locked &&
                     library.bankLinked(budgetId, accountId)
+            val formatPrefs =
+                if (budgetId == null || locked) {
+                    FormatPrefs()
+                } else {
+                    library.readFormatPrefs(budgetId)
+                }
+            val cloudFileId =
+                if (budgetId == null || locked) {
+                    null
+                } else {
+                    library.useDatabase(budgetId) { session ->
+                        app.duenorth.budget.core.SyncSchema.state(session, "cloudFileId")
+                    }?.takeIf { it.isNotBlank() }
+                }
             Loaded(
                 settings,
                 budgets,
@@ -1529,6 +1823,8 @@ class ShellViewModel(
                 status,
                 conflicts,
                 bankLinked,
+                formatPrefs,
+                cloudFileId,
             )
         }
 
@@ -1583,6 +1879,11 @@ class ShellViewModel(
                 remoteFiles = sync.remoteFiles,
                 signedIn = sync.signedIn(),
                 registerBankLinked = loaded.bankLinked,
+                instances = loaded.settings.instances,
+                activeInstance = loaded.settings.activeInstance(),
+                formatPrefs = loaded.formatPrefs,
+                budgetMethod = loaded.formatPrefs.budgetType,
+                cloudFileId = loaded.cloudFileId,
             )
         }
         if (!loaded.locked && loaded.shell != null) {
@@ -1676,6 +1977,125 @@ class ShellViewModel(
         }
     }
 
+    private fun refreshSettingsSections() {
+        viewModelScope.launch {
+            val settings = withContext(Dispatchers.IO) { library.settings() }
+            val budgetId = settings.openBudgetId
+            val prefs =
+                if (budgetId == null) {
+                    FormatPrefs()
+                } else {
+                    withContext(Dispatchers.IO) { library.readFormatPrefs(budgetId) }
+                }
+            val cloud =
+                if (budgetId == null) {
+                    null
+                } else {
+                    withContext(Dispatchers.IO) {
+                        library.useDatabase(budgetId) { session ->
+                            app.duenorth.budget.core.SyncSchema.state(session, "cloudFileId")
+                        }
+                    }
+                }
+            _state.update {
+                it.copy(
+                    settings = settings,
+                    instances = settings.instances,
+                    activeInstance = settings.activeInstance(),
+                    formatPrefs = prefs,
+                    budgetMethod = prefs.budgetType,
+                    cloudFileId = cloud?.takeIf { id -> id.isNotBlank() },
+                    signedIn = sync.signedIn(),
+                )
+            }
+            val address = settings.activeInstance()?.address
+            if (!address.isNullOrBlank()) {
+                probeOpenId(address)
+                probeReachability()
+            } else {
+                _state.update { it.copy(openIdAvailable = false, instanceReachable = null) }
+            }
+        }
+    }
+
+    private fun setOpenBudgetPreference(
+        id: String,
+        value: String,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        val optimistic =
+            when (id) {
+                "dateFormat" -> _state.value.formatPrefs.copy(dateFormat = value)
+                "numberFormat" -> _state.value.formatPrefs.copy(numberFormat = value)
+                "firstDayOfWeekIdx" ->
+                    _state.value.formatPrefs.copy(firstDayOfWeekIdx = value.toIntOrNull() ?: 0)
+                "hideFraction" -> _state.value.formatPrefs.copy(hideFraction = value == "true")
+                "flags.experimental" -> _state.value.formatPrefs.copy(experimental = value == "true")
+                else -> _state.value.formatPrefs
+            }
+        _state.update {
+            it.copy(
+                formatPrefs = optimistic,
+                budgetMethod = optimistic.budgetType,
+            )
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            library.setPreference(budgetId, id, value)
+        }
+    }
+
+    private fun confirmAdvancedAction(
+        kind: AdvancedConfirm,
+        block: (String) -> Boolean,
+    ) {
+        if (_state.value.confirmAdvanced != kind) return
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { block(budgetId) }
+            _state.update { it.copy(confirmAdvanced = null) }
+            reload()
+            refreshSettingsSections()
+        }
+    }
+
+    private fun probeOpenId(address: String) {
+        if (address.isBlank()) return
+        viewModelScope.launch {
+            val methods = withContext(Dispatchers.IO) { sync.loginMethods(address) }
+            _state.update { it.copy(openIdAvailable = methods.any { method -> method.equals("openid", ignoreCase = true) }) }
+        }
+    }
+
+    private fun probeReachability() {
+        val address = _state.value.activeInstance?.address ?: return
+        viewModelScope.launch {
+            val reachable =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        sync.loginMethods(address)
+                        true
+                    }.getOrElse { false }
+                }
+            _state.update { it.copy(instanceReachable = reachable) }
+        }
+    }
+
+    private fun extractOAuthToken(callbackUrl: String): String? {
+        val uri = android.net.Uri.parse(callbackUrl)
+        val fromQuery = uri.getQueryParameter("token") ?: uri.getQueryParameter("access_token")
+        if (!fromQuery.isNullOrBlank()) return fromQuery
+        val fragment = uri.fragment.orEmpty()
+        if (fragment.isBlank()) return null
+        return fragment
+            .split('&')
+            .mapNotNull { part ->
+                val idx = part.indexOf('=')
+                if (idx <= 0) null else part.substring(0, idx) to part.substring(idx + 1)
+            }.firstOrNull { (key, _) -> key == "token" || key == "access_token" }
+            ?.second
+            ?.takeIf { it.isNotBlank() }
+    }
+
     private data class Loaded(
         val settings: PhoneSettings,
         val budgets: List<BudgetSummary>,
@@ -1688,9 +2108,13 @@ class ShellViewModel(
         val status: String,
         val conflicts: List<BudgetConflict>,
         val bankLinked: Boolean = false,
+        val formatPrefs: FormatPrefs = FormatPrefs(),
+        val cloudFileId: String? = null,
     )
 
     companion object {
+        const val OPEN_ID_RETURN = "duenorth://oauth"
+
         fun factory(
             library: BudgetLibrary,
             sync: SyncCoordinator,

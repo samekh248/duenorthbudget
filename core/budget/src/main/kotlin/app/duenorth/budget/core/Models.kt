@@ -54,22 +54,89 @@ object Currencies {
     fun byCode(code: String): CurrencySpec? = all.firstOrNull { it.code == code }
 }
 
+data class FormatOptions(
+    val hideFraction: Boolean = false,
+    val numberFormat: String = NUMBER_COMMA_DOT,
+) {
+    companion object {
+        const val NUMBER_COMMA_DOT = "comma-dot"
+        const val NUMBER_DOT_COMMA = "dot-comma"
+        const val NUMBER_SPACE_DOT = "space-dot"
+        const val NUMBER_COMMA_DOT_NO_GROUP = "comma-dot-without-commas"
+    }
+}
+
+data class FormatPrefs(
+    val dateFormat: String = "MM/dd/yyyy",
+    val numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
+    val hideFraction: Boolean = false,
+    val firstDayOfWeekIdx: Int = 0,
+    val experimental: Boolean = false,
+    val budgetType: String = "envelope",
+)
+
+data class PendingExport(
+    val fileName: String,
+    val bytes: ByteArray,
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is PendingExport) return false
+        return fileName == other.fileName && bytes.contentEquals(other.bytes)
+    }
+
+    override fun hashCode(): Int = 31 * fileName.hashCode() + bytes.contentHashCode()
+}
+
+object DateFormats {
+    val choices =
+        listOf(
+            "MM/dd/yyyy",
+            "dd/MM/yyyy",
+            "yyyy-MM-dd",
+            "MM.dd.yyyy",
+            "dd.MM.yyyy",
+        )
+
+    fun format(
+        date: Int,
+        pattern: String,
+    ): String {
+        val year = date / 10000
+        val month = (date / 100) % 100
+        val day = date % 100
+        if (month !in 1..12 || day !in 1..31) return date.toString()
+        val mm = month.toString().padStart(2, '0')
+        val dd = day.toString().padStart(2, '0')
+        val yyyy = year.toString().padStart(4, '0')
+        return when (pattern) {
+            "dd/MM/yyyy" -> "$dd/$mm/$yyyy"
+            "yyyy-MM-dd" -> "$yyyy-$mm-$dd"
+            "MM.dd.yyyy" -> "$mm.$dd.$yyyy"
+            "dd.MM.yyyy" -> "$dd.$mm.$yyyy"
+            else -> "$mm/$dd/$yyyy"
+        }
+    }
+}
+
 object MoneyFormat {
     fun format(
         minor: Long,
         currency: CurrencySpec,
+        options: FormatOptions = FormatOptions(),
     ): String {
         val negative = minor < 0
         val absolute = if (minor == Long.MIN_VALUE) Long.MAX_VALUE else kotlin.math.abs(minor)
+        val (groupSep, decimalSep) = separators(options.numberFormat)
+        var scale = 1L
+        repeat(currency.decimals) { scale *= 10 }
+        val whole = if (currency.decimals == 0) absolute else absolute / scale
+        val fraction = if (currency.decimals == 0) 0L else absolute % scale
         val digits =
-            if (currency.decimals == 0) {
-                group(absolute)
+            if (options.hideFraction || currency.decimals == 0) {
+                group(whole, groupSep)
             } else {
-                var scale = 1L
-                repeat(currency.decimals) { scale *= 10 }
-                val whole = absolute / scale
-                val fraction = (absolute % scale).toString().padStart(currency.decimals, '0')
-                group(whole) + "." + fraction
+                group(whole, groupSep) + decimalSep + fraction.toString().padStart(currency.decimals, '0')
             }
         val body = currency.symbol + digits
         return if (negative) "-$body" else body
@@ -100,20 +167,43 @@ object MoneyFormat {
         return if (negative) -minor else minor
     }
 
-    private fun group(value: Long): String {
+    private fun separators(numberFormat: String): Pair<String, String> =
+        when (numberFormat) {
+            FormatOptions.NUMBER_DOT_COMMA -> "." to ","
+            FormatOptions.NUMBER_SPACE_DOT -> " " to "."
+            FormatOptions.NUMBER_COMMA_DOT_NO_GROUP -> "" to "."
+            else -> "," to "."
+        }
+
+    private fun group(
+        value: Long,
+        separator: String,
+    ): String {
         val raw = value.toString()
+        if (separator.isEmpty()) return raw
         val out = StringBuilder()
         raw.forEachIndexed { index, char ->
-            if (index > 0 && (raw.length - index) % 3 == 0) out.append(',')
+            if (index > 0 && (raw.length - index) % 3 == 0) out.append(separator)
             out.append(char)
         }
         return out.toString()
     }
 }
 
+fun PhoneSettings.activeInstance(): SavedInstance? = instances.firstOrNull { it.id == activeInstanceId }
+
+fun PhoneSettings.activeAddress(): String? = activeInstance()?.address
+
 fun YearMonth.toActualMonth(): Int = year * 100 + monthValue
 
 fun monthLabel(month: YearMonth): String = "${month.month.name.lowercase()} ${month.year}"
+
+@Serializable
+data class SavedInstance(
+    val id: String,
+    val address: String,
+    val label: String? = null,
+)
 
 @Serializable
 data class PhoneSettings(
@@ -122,6 +212,8 @@ data class PhoneSettings(
     val accent: String = "magenta",
     val netWorthIncludeOffBudget: Boolean = true,
     val serverAddress: String? = null,
+    val instances: List<SavedInstance> = emptyList(),
+    val activeInstanceId: String? = null,
     val syncNode: String? = null,
     val askEachTime: List<String> = emptyList(),
 )

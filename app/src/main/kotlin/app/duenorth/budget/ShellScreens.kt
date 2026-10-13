@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MockBudgetDataset
@@ -91,6 +92,7 @@ fun HomePanorama(
     onSelectMonth: (YearMonth) -> Unit = {},
     onBudgetGroup: ((String) -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
@@ -128,6 +130,7 @@ fun HomePanorama(
                             shell,
                             onListGesture = { listGesture = it },
                             onGroup = onBudgetGroup,
+                            formatOptions = formatOptions,
                         )
                     }
                 },
@@ -140,6 +143,7 @@ fun HomePanorama(
                             shell,
                             onListGesture = { listGesture = it },
                             onAccount = onAccount,
+                            formatOptions = formatOptions,
                         )
                     }
                 },
@@ -153,6 +157,7 @@ fun HomePanorama(
                             onListGesture = { listGesture = it },
                             onPost = onPostSchedule,
                             onSkip = onSkipSchedule,
+                            formatOptions = formatOptions,
                         )
                     }
                 },
@@ -180,6 +185,7 @@ fun HomePanorama(
                             onListGesture = { listGesture = it },
                             onInbox = onInbox,
                             onAdd = onAddTransaction,
+                            formatOptions = formatOptions,
                         )
                     }
                 },
@@ -369,6 +375,7 @@ fun BudgetSection(
     onListGesture: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onGroup: ((String) -> Unit)? = null,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
     val list = rememberLazyListState()
     val arrivals = remember { RowArrivals() }
@@ -384,14 +391,14 @@ fun BudgetSection(
         ) {
             BudgetTotal(
                 label = shell.headerLabel,
-                amount = MoneyFormat.format(shell.headerMinor, shell.currency),
+                amount = MoneyFormat.format(shell.headerMinor, shell.currency, formatOptions),
                 amountColor = Metro.accent.text,
                 amountTag = "to-budget",
             )
             if (shell.bufferedMinor != 0L) {
                 BudgetTotal(
                     label = "held",
-                    amount = MoneyFormat.format(shell.bufferedMinor, shell.currency),
+                    amount = MoneyFormat.format(shell.bufferedMinor, shell.currency, formatOptions),
                     amountColor = Metro.colors.secondary,
                     amountTag = "held-amount",
                     alignEnd = true,
@@ -408,6 +415,7 @@ fun BudgetSection(
                         shell,
                         arrivalModifier(group.id, arrivals),
                         onOpen = onGroup,
+                        formatOptions = formatOptions,
                     )
                 }
             }
@@ -442,6 +450,7 @@ private fun GroupLine(
     shell: MonthShell,
     modifier: Modifier = Modifier,
     onOpen: ((String) -> Unit)? = null,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
     Row(
         modifier
@@ -462,7 +471,7 @@ private fun GroupLine(
             maxLines = 3,
         )
         MetroText(
-            MoneyFormat.format(group.availableMinor, shell.currency),
+            MoneyFormat.format(group.availableMinor, shell.currency, formatOptions),
             Metro.typography.groupHeader,
             Modifier
                 .widthIn(max = 148.dp)
@@ -478,6 +487,7 @@ fun AccountsSection(
     onListGesture: (Boolean) -> Unit,
     onAccount: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
     if (accounts.isEmpty()) {
         MetroText(
@@ -498,11 +508,15 @@ fun AccountsSection(
     LazyColumn(modifier.fillMaxSize(), state = list) {
         if (onBudget.isNotEmpty()) {
             item { SectionLabel(ShellCopy.ON_BUDGET, first = true) }
-            items(onBudget, key = { it.id }) { AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals)) }
+            items(onBudget, key = { it.id }) {
+                AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals), formatOptions)
+            }
         }
         if (offBudget.isNotEmpty()) {
             item { SectionLabel(ShellCopy.OFF_BUDGET, first = onBudget.isEmpty()) }
-            items(offBudget, key = { it.id }) { AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals)) }
+            items(offBudget, key = { it.id }) {
+                AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals), formatOptions)
+            }
         }
     }
 }
@@ -513,6 +527,7 @@ private fun AccountLine(
     shell: MonthShell,
     onAccount: (String) -> Unit,
     modifier: Modifier = Modifier,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
     Row(
         modifier
@@ -530,7 +545,7 @@ private fun AccountLine(
             maxLines = 3,
         )
         MetroText(
-            MoneyFormat.format(account.balanceMinor, shell.currency),
+            MoneyFormat.format(account.balanceMinor, shell.currency, formatOptions),
             Metro.typography.subheader,
             Modifier.widthIn(max = 148.dp),
         )
@@ -544,6 +559,7 @@ fun InboxSection(
     onInbox: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onAdd: (() -> Unit)? = null,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
     if (shell.inbox.isEmpty()) {
         Column(modifier.padding(MetroDimens.Gutter), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -561,7 +577,7 @@ fun InboxSection(
     Column(modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f), state = list) {
             items(shell.inbox, key = { it.id }) { row ->
-                InboxLine(row, shell, onInbox, arrivalModifier(row.id, arrivals))
+                InboxLine(row, shell, onInbox, arrivalModifier(row.id, arrivals), formatOptions)
             }
         }
         if (onAdd != null) {
@@ -576,6 +592,7 @@ private fun InboxLine(
     shell: MonthShell,
     onInbox: (String) -> Unit,
     modifier: Modifier = Modifier,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
     Row(
         modifier
@@ -587,7 +604,7 @@ private fun InboxLine(
     ) {
         MetroText(row.payee, Metro.typography.subheader, Modifier.weight(1f).padding(end = 12.dp), maxLines = 3)
         MetroText(
-            MoneyFormat.format(row.amountMinor, shell.currency),
+            MoneyFormat.format(row.amountMinor, shell.currency, formatOptions),
             Metro.typography.subheader,
             Modifier.widthIn(max = 148.dp),
         )
@@ -865,48 +882,6 @@ fun ShellChrome(
         content(Modifier.weight(1f))
         MetroAppBar(actions, expanded, { expanded = it })
     }
-}
-
-@Composable
-fun SettingsScreen(
-    onBudgets: () -> Unit,
-    onAppearance: () -> Unit,
-    onSync: () -> Unit,
-    onPayees: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("settings-screen"),
-    ) {
-        MetroText("settings", Metro.typography.header)
-        Column(Modifier.padding(top = MetroDimens.Grid)) {
-            SettingsRow("budgets", onBudgets)
-            SettingsRow("appearance", onAppearance)
-            SettingsRow("sync", onSync)
-            SettingsRow("payees", onPayees)
-        }
-    }
-}
-
-@Composable
-private fun SettingsRow(
-    label: String,
-    onClick: () -> Unit,
-) {
-    MetroText(
-        label,
-        Metro.typography.subheader,
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress(onClick)
-            .padding(vertical = MetroDimens.Row)
-            .testTag("settings-$label"),
-    )
 }
 
 private class RowArrivals {

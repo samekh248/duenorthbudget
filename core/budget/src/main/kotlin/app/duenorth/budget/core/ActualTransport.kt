@@ -34,6 +34,13 @@ interface ActualTransport {
         password: String,
     ): String
 
+    fun loginMethods(address: String): List<String>
+
+    fun beginOpenId(
+        address: String,
+        returnUrl: String,
+    ): String
+
     fun listFiles(
         address: String,
         token: String,
@@ -103,6 +110,7 @@ object SyncCopy {
     const val ENTER_AMOUNT = "enter an amount"
     const val NO_SERVER_FILES = "no budgets on this server"
     const val SYNCING = "syncing"
+    const val NOT_REACHED = "server has not been reached"
 }
 
 /**
@@ -138,6 +146,51 @@ class HttpActualTransport : ActualTransport {
                 ?.contentOrNull
         if (response.code != 200 || token.isNullOrBlank()) throw SyncAuthException(SyncCopy.SIGN_IN_FAILED)
         return token
+    }
+
+    override fun loginMethods(address: String): List<String> {
+        return try {
+            val response = send("$address/account/login-methods", "GET", token = null, contentType = null, body = null)
+            if (response.code != 200) return listOf("password")
+            val root = jsonObject(response.bytes)
+            val data = root["data"]?.jsonObject ?: root
+            val methods = data["methods"] as? JsonArray
+            val listed =
+                methods
+                    ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                    ?.filter { it.isNotBlank() }
+                    .orEmpty()
+            if (listed.isEmpty()) listOf("password") else listed
+        } catch (_: Exception) {
+            listOf("password")
+        }
+    }
+
+    override fun beginOpenId(
+        address: String,
+        returnUrl: String,
+    ): String {
+        val body =
+            buildJsonObject {
+                put("loginMethod", "openid")
+                put("returnUrl", returnUrl)
+            }.toString()
+        val response =
+            send(
+                "$address/account/login",
+                "POST",
+                token = null,
+                contentType = "application/json",
+                body = body.toByteArray(Charsets.UTF_8),
+            )
+        if (response.code == 400 || response.code == 401) throw SyncAuthException(SyncCopy.SIGN_IN_FAILED)
+        if (response.code != 200) throw SyncNetworkException(IOException("openid ${response.code}"))
+        val data = jsonObject(response.bytes)["data"]?.jsonObject
+        val redirect =
+            data?.get("redirect_url")?.jsonPrimitive?.contentOrNull
+                ?: data?.get("returnUrl")?.jsonPrimitive?.contentOrNull
+        if (redirect.isNullOrBlank()) throw SyncAuthException(SyncCopy.SIGN_IN_FAILED)
+        return redirect
     }
 
     override fun listFiles(
