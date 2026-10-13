@@ -653,6 +653,24 @@ class BudgetLibrary(
         return steps
     }
 
+    /** Cash flow, net worth, and spending for [range] (spec 010 US4). */
+    fun readReports(
+        budgetId: String,
+        range: ReportRange,
+        includeOffBudget: Boolean,
+        groupBy: SpendingGroupBy,
+    ): ReportsPage? =
+        open(budgetId) { session ->
+            val code =
+                session
+                    .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
+                    .firstOrNull()
+                    ?.str("value")
+                    .orEmpty()
+            val currency = Currencies.byCode(code) ?: Currencies.byCode("USD")!!
+            ReportsReader(session, clock.today()).page(range, includeOffBudget, groupBy, currency)
+        }
+
     fun listRules(budgetId: String): List<RuleSummary> = open(budgetId) { RuleEditorBook(it, ids).list() } ?: emptyList()
 
     fun readRuleDraft(

@@ -156,14 +156,14 @@ flowchart LR
 
 ### Tests for User Story 4
 
-- [ ] T051 [P] [US4] Parity tests in `core-test/parity/ReportsParityTest.kt` against `parity/reports/`: cash flow excludes on-budget transfers; net worth per month end with off-budget on and off; spending by category, group, and payee, largest first; deleted transactions and split parents excluded; empty range is zeros
+- [x] T051 [P] [US4] Parity tests in `core-test/parity/ReportsParityTest.kt` against `parity/reports/`: cash flow excludes on-budget transfers; net worth per month end with off-budget on and off; spending by category, group, and payee, largest first; deleted transactions and split parents excluded; empty range is zeros
 
 ### Implementation for User Story 4
 
-- [ ] T052 [US4] Create `core/…/core/Reports.kt` (`ReportsReader`) per `contracts/reports.md`; entry points in `core/…/core/BudgetLibrary.kt`
-- [ ] T053 [US4] Create `app/…/ReportScreens.kt`: `reports` pivot with cash flow, net worth, spending; shared range picker; flat accent bars; content-shaped placeholders while loading
-- [ ] T054 [US4] Route handlers in new `app/…/ShellViewModel+Reports.kt`, computed on `Dispatchers.IO`; Home menu id `reports` in `app/…/ScreenBar.kt`
-- [ ] T055 [P] [US4] Compose tests in `app-test/ReportContentTest.kt` (empty range, group-by switch) and Roborazzi light and dark in `app-test/ReportScreenshotTest.kt`
+- [x] T052 [US4] Create `core/…/core/Reports.kt` (`ReportsReader`) per `contracts/reports.md`; entry points in `core/…/core/BudgetLibrary.kt`
+- [x] T053 [US4] Create `app/…/ReportScreens.kt`: `reports` pivot with cash flow, net worth, spending; shared range picker; flat accent bars; content-shaped placeholders while loading
+- [x] T054 [US4] Route handlers in new `app/…/ShellViewModel+Reports.kt`, computed on `Dispatchers.IO`; Home menu id `reports` in `app/…/ScreenBar.kt`
+- [x] T055 [P] [US4] Compose tests in `app-test/ReportContentTest.kt` (empty range, group-by switch) and Roborazzi light and dark in `app-test/ReportScreenshotTest.kt`
 
 **Checkpoint**: Reports match desktop for the fixture file.
 

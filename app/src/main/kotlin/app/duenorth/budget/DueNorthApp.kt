@@ -245,6 +245,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onAddRule = model::openNewRule,
                     onDeleteSchedule = model::deleteOpenSchedule,
                     onDeleteRule = model::deleteOpenRule,
+                    onReports = model::openReports,
                 )
             }
         val actions = ScreenBar.forState(state, handlers)
@@ -748,6 +749,19 @@ fun DueNorthApp(model: ShellViewModel) {
                             }
                         }
                         ShellRoute.Rules -> RulesScreen(state.rulesList, model::openRule, fill)
+                        ShellRoute.Reports ->
+                            ReportsScreen(
+                                page = state.reports,
+                                loading = state.reportsLoading,
+                                preset = state.reportPreset,
+                                groupBy = state.reportGroupBy,
+                                includeOffBudget = state.settings.netWorthIncludeOffBudget,
+                                onPreset = model::setReportPreset,
+                                onCustom = model::setReportRange,
+                                onGroupBy = model::setReportGroupBy,
+                                onIncludeOffBudget = model::setReportIncludeOffBudget,
+                                modifier = fill,
+                            )
                         is ShellRoute.RuleEditor -> {
                             val draft = state.ruleDraft
                             val shell = state.shell

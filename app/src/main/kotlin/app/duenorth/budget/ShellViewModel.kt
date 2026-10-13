@@ -40,11 +40,15 @@ import app.duenorth.budget.core.RefreshGate
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RemoteFile
+import app.duenorth.budget.core.ReportPreset
+import app.duenorth.budget.core.ReportRange
+import app.duenorth.budget.core.ReportsPage
 import app.duenorth.budget.core.RuleDraft
 import app.duenorth.budget.core.RuleSummary
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.ScheduleDraft
 import app.duenorth.budget.core.ScheduleWriteResult
+import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
@@ -184,6 +188,9 @@ sealed interface ShellRoute {
         val ruleId: String?,
     ) : ShellRoute,
         StackRoute
+
+    // Spec 010 US4.
+    data object Reports : ShellRoute, StackRoute
 }
 
 /** A spec 010 screen that goes back to the screen it was opened from. */
@@ -263,6 +270,11 @@ data class ShellUiState(
     val scheduleDraft: ScheduleDraft? = null,
     val rulesList: List<RuleSummary> = emptyList(),
     val ruleDraft: RuleDraft? = null,
+    val reports: ReportsPage? = null,
+    val reportsLoading: Boolean = false,
+    val reportPreset: ReportPreset = ReportPreset.LAST_6,
+    val reportCustom: ReportRange? = null,
+    val reportGroupBy: SpendingGroupBy = SpendingGroupBy.CATEGORY,
 )
 
 class ShellViewModel(

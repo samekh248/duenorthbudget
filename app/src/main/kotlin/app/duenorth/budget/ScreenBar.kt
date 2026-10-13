@@ -3,6 +3,7 @@ package app.duenorth.budget
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
+import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.ScreenAction
 
@@ -142,6 +143,7 @@ object ScreenBar {
         listOf(
             menu("add-schedule", AppGlyph.Add, ScheduleScreenCopy.ADD),
             menu("rules", AppGlyph.Categories, RuleScreenCopy.TITLE),
+            menu("reports", AppGlyph.Breakdown, ReportsCopy.TITLE),
         )
 
     /** Present only while there is a step to undo; the label names it. */
@@ -186,6 +188,7 @@ class ScreenBarHandlers(
     val onAddRule: () -> Unit = {},
     val onDeleteSchedule: () -> Unit = {},
     val onDeleteRule: () -> Unit = {},
+    val onReports: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -222,6 +225,7 @@ class ScreenBarHandlers(
             "add-rule" -> onAddRule
             "delete-schedule" -> onDeleteSchedule
             "delete-rule" -> onDeleteRule
+            "reports" -> onReports
             else -> ({})
         }
 }
