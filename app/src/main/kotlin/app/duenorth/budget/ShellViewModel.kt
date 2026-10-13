@@ -165,6 +165,7 @@ data class ShellUiState(
     val budgets: List<BudgetSummary> = emptyList(),
     val developerMode: Boolean = false,
     val sampleBudgets: List<MockBudgetDataset> = emptyList(),
+    val defaultBudgetName: String = "",
     val shell: MonthShell? = null,
     val register: RegisterPage? = null,
     val registerFilter: String = "",
@@ -241,6 +242,7 @@ class ShellViewModel(
             ShellUiState(
                 developerMode = developerMode,
                 sampleBudgets = if (developerMode) MockBudgets.all else emptyList(),
+                defaultBudgetName = if (developerMode) MockBudgets.WALKTHROUGH_NAME else "",
             ),
         )
     val state: StateFlow<ShellUiState> = _state.asStateFlow()
@@ -705,7 +707,7 @@ class ShellViewModel(
         currency: String,
     ) {
         viewModelScope.launch {
-            when (val result = withContext(Dispatchers.IO) { library.create(name, currency) }) {
+            when (val result = withContext(Dispatchers.IO) { createBudget(name, currency) }) {
                 is CreateResult.Created -> {
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
@@ -1343,7 +1345,7 @@ class ShellViewModel(
         currency: String,
     ) {
         viewModelScope.launch {
-            when (val result = withContext(Dispatchers.IO) { library.create(name, currency) }) {
+            when (val result = withContext(Dispatchers.IO) { createBudget(name, currency) }) {
                 is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
                 is CreateResult.Created -> {
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
@@ -1352,6 +1354,17 @@ class ShellViewModel(
             }
         }
     }
+
+    /** Debug builds seed every new budget with the full walkthrough data; release builds start empty. */
+    private fun createBudget(
+        name: String,
+        currency: String,
+    ): CreateResult =
+        if (developerMode) {
+            library.createFromMock(MockBudgets.WALKTHROUGH, name.ifBlank { MockBudgets.WALKTHROUGH_NAME })
+        } else {
+            library.create(name, currency)
+        }
 
     fun createSample(datasetId: String) {
         if (!developerMode) return

@@ -75,6 +75,23 @@ class MockBudgetsTest {
     }
 
     @Test
+    fun walkthroughTakesTheGivenName() {
+        val library = library(LocalDate.of(2026, 10, 7))
+        val created =
+            library.createFromMock(MockBudgets.WALKTHROUGH, "  ${MockBudgets.WALKTHROUGH_NAME} ") as CreateResult.Created
+        val shell = library.readShell(created.id)!!
+        assertEquals(MockBudgets.WALKTHROUGH_NAME, shell.budgetName)
+        assertTrue(library.bankLinked(created.id, "checking"))
+    }
+
+    @Test
+    fun blankNameFallsBackToTheDatasetTitle() {
+        val library = library(LocalDate.of(2026, 10, 7))
+        val created = library.createFromMock(MockBudgets.FULL_TOUR, " ") as CreateResult.Created
+        assertEquals("full tour", library.readShell(created.id)!!.budgetName)
+    }
+
+    @Test
     fun unknownDatasetIsRejected() {
         val result = library(LocalDate.of(2026, 10, 7)).createFromMock("nope")
         assertTrue(result is CreateResult.Rejected)

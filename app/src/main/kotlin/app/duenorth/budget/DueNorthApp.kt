@@ -312,6 +312,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onRemoveEncryptionPassword = model::removeEncryptionPassword,
                                 onRequestAdvanced = model::requestAdvanced,
                                 modifier = fill,
+                                defaultBudgetName = state.defaultBudgetName,
                             )
                         ShellRoute.ConfirmInstanceSwitch ->
                             ConfirmInstanceSwitchScreen(
@@ -346,6 +347,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 error = state.createError,
                                 onCreate = model::create,
                                 modifier = fill,
+                                defaultName = state.defaultBudgetName,
                             )
                         ShellRoute.ConfirmSwitch ->
                             ConfirmSwitchScreen(
