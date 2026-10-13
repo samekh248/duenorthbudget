@@ -10,13 +10,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -906,6 +909,7 @@ fun ShellChrome(
     actions: List<ScreenAction>,
     syncing: Boolean = false,
     progress: Float? = null,
+    statusBar: WindowInsets = WindowInsets.statusBars,
     content: @Composable (Modifier) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -914,7 +918,13 @@ fun ShellChrome(
     // Composed after the app's back handler, so back closes an open bar before it leaves the screen.
     BackHandler(enabled = expanded) { expanded = false }
     MetroAppBarHost(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().background(Metro.colors.background)) {
+        // The background runs up behind the status bar; titles start below it.
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(Metro.colors.background)
+                .windowInsetsPadding(statusBar),
+        ) {
             if (syncing) SyncProgressBar(progress)
             content(Modifier.weight(1f))
             MetroAppBar(actions, expanded, { expanded = it })

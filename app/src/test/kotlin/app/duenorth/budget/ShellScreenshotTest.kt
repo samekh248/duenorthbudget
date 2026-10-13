@@ -1,10 +1,15 @@
 package app.duenorth.budget
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetMode
@@ -58,6 +63,10 @@ class ShellScreenshotTest {
     @Test
     fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = 5)
 
+    // Edge to edge with a 32dp status bar (gray strip): the pivot title starts below it.
+    @Test
+    fun homeUnderStatusBarDark() = statusBarSnap("home_status_bar_dark", dark = true, inset = 32.dp)
+
     @Test
     fun serverLight() = serverSnap("server_light", dark = false)
 
@@ -95,6 +104,35 @@ class ShellScreenshotTest {
                         expanded = false,
                         onExpandedChange = {},
                     )
+                }
+            }
+        }
+    }
+
+    private fun statusBarSnap(
+        name: String,
+        dark: Boolean,
+        inset: Dp,
+    ) {
+        val shell = sample()
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Box(Modifier.width(390.dp).height(780.dp)) {
+                    ShellChrome(actions = emptyList(), statusBar = WindowInsets(top = inset)) { modifier ->
+                        HomePivot(
+                            shell = shell,
+                            review = null,
+                            netWorth = null,
+                            upcoming = emptyList(),
+                            loading = false,
+                            openMonth = shell.month,
+                            monthWindow = MonthWindow.around(shell.month),
+                            initialSection = 5,
+                            onGesture = {},
+                            modifier = modifier,
+                        )
+                    }
+                    Box(Modifier.fillMaxWidth().height(32.dp).background(Color(0x80808080)))
                 }
             }
         }
