@@ -1,8 +1,10 @@
 package app.duenorth.budget
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
@@ -31,16 +33,24 @@ class AppBarScreenshotTest {
     @Test
     fun registerBarExpandedDark() = snap("app_bar_register_expanded_dark", register, dark = true, expanded = true)
 
+    // A phone with three-button navigation drawn edge to edge: the bar pads above the buttons.
+    @Test
+    fun homeBarOverNavigationLight() = snap("app_bar_home_nav_light", home, dark = false, expanded = false, navigation = 48.dp)
+
+    @Test
+    fun registerBarOverNavigationDark() = snap("app_bar_register_nav_dark", register, dark = true, expanded = false, navigation = 48.dp)
+
     private fun snap(
         name: String,
         actions: List<ScreenAction>,
         dark: Boolean,
         expanded: Boolean,
+        navigation: Dp = 0.dp,
     ) {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
                 Column(Modifier.width(390.dp)) {
-                    MetroAppBar(actions, expanded, {})
+                    MetroAppBar(actions, expanded, {}, windowInsets = WindowInsets(bottom = navigation))
                 }
             }
         }
