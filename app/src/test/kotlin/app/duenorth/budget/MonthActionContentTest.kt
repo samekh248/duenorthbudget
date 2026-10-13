@@ -178,6 +178,12 @@ class MonthActionContentTest {
         )
         await { model.state.value.route == ShellRoute.CategoryBudget("c-food") }
         await { model.state.value.undoLabel == MonthFillCopy.TO_BUDGET }
+        // The repaint after sync settles the figures; an earlier month load may land in between.
+        await {
+            model.state.value.shell
+                ?.category("c-food")
+                ?.budgetedMinor == before.category("c-food")!!.budgetedMinor - 2_500
+        }
         assertEquals(
             before.category("c-food")!!.budgetedMinor - 2_500,
             model.state.value.shell!!

@@ -52,6 +52,7 @@ import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.core.UnlockResult
@@ -191,6 +192,9 @@ sealed interface ShellRoute {
 
     // Spec 010 US4.
     data object Reports : ShellRoute, StackRoute
+
+    // Spec 010 US5.
+    data object Templates : ShellRoute, StackRoute
 }
 
 /** A spec 010 screen that goes back to the screen it was opened from. */
@@ -275,6 +279,11 @@ data class ShellUiState(
     val reportPreset: ReportPreset = ReportPreset.LAST_6,
     val reportCustom: ReportRange? = null,
     val reportGroupBy: SpendingGroupBy = SpendingGroupBy.CATEGORY,
+    val templateResult: TemplateResult? = null,
+    val templateBusy: Boolean = false,
+    val templateConfirm: String? = null,
+    /** The open category's note while templates are on; null until read. */
+    val categoryNote: String? = null,
 )
 
 class ShellViewModel(
@@ -685,6 +694,8 @@ class ShellViewModel(
     /** Settings → learn categories (spec 010 US3). */
     fun setLearning(enabled: Boolean) = setOpenBudgetPreference("learn-categories", if (enabled) "true" else "false")
 
+    fun setGoalTemplates(enabled: Boolean) = setOpenBudgetPreference("flags.goalTemplatesEnabled", if (enabled) "true" else "false")
+
     fun exportBudget() {
         val budgetId = _state.value.settings.openBudgetId ?: return
         val name =
@@ -817,7 +828,8 @@ class ShellViewModel(
 
     fun openCategoryBudget(categoryId: String) {
         push(ShellRoute.CategoryBudget(categoryId))
-        _state.update { it.copy(editError = null) }
+        _state.update { it.copy(editError = null, categoryNote = null) }
+        loadCategoryNote(categoryId)
     }
 
     fun openMoveCategory() {
@@ -991,6 +1003,10 @@ class ShellViewModel(
         }
         if (current.fillConfirm != null) {
             _state.update { it.copy(fillConfirm = null) }
+            return true
+        }
+        if (current.templateConfirm != null) {
+            _state.update { it.copy(templateConfirm = null) }
             return true
         }
         if (current.accountForceConfirm != null) {
@@ -2121,6 +2137,7 @@ class ShellViewModel(
                 "hideFraction" -> _state.value.formatPrefs.copy(hideFraction = value == "true")
                 "flags.experimental" -> _state.value.formatPrefs.copy(experimental = value == "true")
                 "learn-categories" -> _state.value.formatPrefs.copy(learnCategories = value == "true")
+                "flags.goalTemplatesEnabled" -> _state.value.formatPrefs.copy(goalTemplates = value == "true")
                 else -> _state.value.formatPrefs
             }
         _state.update {

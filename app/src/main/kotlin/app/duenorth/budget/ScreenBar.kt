@@ -4,6 +4,7 @@ import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.ReportsCopy
+import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.ScreenAction
 
@@ -22,6 +23,7 @@ object ScreenBar {
         undoLabel: String? = null,
         incomeCategory: Boolean = false,
         showClosed: Boolean = false,
+        templates: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             ShellRoute.Home ->
@@ -32,7 +34,7 @@ object ScreenBar {
                             spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
-                        ) + fills() + accounts() + schedules() + undo(undoLabel)
+                        ) + fills() + accounts() + schedules() + templates(templates) + undo(undoLabel)
                     else ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
@@ -40,7 +42,7 @@ object ScreenBar {
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
                             menu("breakdown", AppGlyph.Breakdown, MonthFillCopy.BREAKDOWN),
-                        ) + fills() + accounts() + schedules() + undo(undoLabel)
+                        ) + fills() + accounts() + schedules() + templates(templates) + undo(undoLabel)
                 }
             is ShellRoute.Register ->
                 listOf(
@@ -110,7 +112,15 @@ object ScreenBar {
         val hasBudget = state.shell != null && !state.locked
         val income =
             (state.route as? ShellRoute.CategoryBudget)?.let { route -> state.shell?.incomeCategory(route.categoryId) != null } == true
-        return specsFor(state.route, hasBudget, mode, state.undoLabel, income, state.settings.showClosedAccounts).map { spec ->
+        return specsFor(
+            state.route,
+            hasBudget,
+            mode,
+            state.undoLabel,
+            income,
+            state.settings.showClosedAccounts,
+            state.formatPrefs.templatesOn,
+        ).map { spec ->
             ScreenAction(
                 id = spec.id,
                 glyph = spec.glyph,
@@ -145,6 +155,9 @@ object ScreenBar {
             menu("rules", AppGlyph.Categories, RuleScreenCopy.TITLE),
             menu("reports", AppGlyph.Breakdown, ReportsCopy.TITLE),
         )
+
+    /** Home `•••` → templates, only while experimental features and budget templates are both on (spec 010 US5). */
+    private fun templates(on: Boolean) = if (on) listOf(menu("templates", AppGlyph.Average, TemplateCopy.TITLE)) else emptyList()
 
     /** Present only while there is a step to undo; the label names it. */
     private fun undo(label: String?) =
@@ -189,6 +202,7 @@ class ScreenBarHandlers(
     val onDeleteSchedule: () -> Unit = {},
     val onDeleteRule: () -> Unit = {},
     val onReports: () -> Unit = {},
+    val onTemplates: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -226,6 +240,7 @@ class ScreenBarHandlers(
             "delete-schedule" -> onDeleteSchedule
             "delete-rule" -> onDeleteRule
             "reports" -> onReports
+            "templates" -> onTemplates
             else -> ({})
         }
 }

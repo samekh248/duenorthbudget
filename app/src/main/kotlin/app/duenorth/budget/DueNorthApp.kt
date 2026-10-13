@@ -246,6 +246,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onDeleteSchedule = model::deleteOpenSchedule,
                     onDeleteRule = model::deleteOpenRule,
                     onReports = model::openReports,
+                    onTemplates = model::openTemplates,
                 )
             }
         val actions = ScreenBar.forState(state, handlers)
@@ -319,6 +320,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onFirstDay = model::setFirstDay,
                                 onHideFraction = model::setHideFraction,
                                 onExperimental = model::setExperimental,
+                                onGoalTemplates = model::setGoalTemplates,
                                 onLearning = model::setLearning,
                                 onExport = model::exportBudget,
                                 onSetEncryptionPassword = model::setEncryptionPassword,
@@ -622,6 +624,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                         onMove = model::openMoveCategory,
                                         onToggleCarryover = model::toggleCategoryCarryover,
                                         modifier = inner,
+                                        note = state.categoryNote.takeIf { state.formatPrefs.templatesOn },
+                                        onSaveNote = model::saveCategoryNote,
                                     )
                                 }
                             }
@@ -760,6 +764,19 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onCustom = model::setReportRange,
                                 onGroupBy = model::setReportGroupBy,
                                 onIncludeOffBudget = model::setReportIncludeOffBudget,
+                                modifier = fill,
+                            )
+                        ShellRoute.Templates ->
+                            TemplatesScreen(
+                                month = state.pinnedMonth ?: state.openMonth,
+                                result = state.templateResult,
+                                busy = state.templateBusy,
+                                confirm = state.templateConfirm,
+                                onCheck = model::checkTemplates,
+                                onApply = { model.applyTemplates(overwrite = false) },
+                                onOverwrite = { model.applyTemplates(overwrite = true) },
+                                onConfirm = model::confirmTemplateOverwrite,
+                                onKeep = model::keepTemplates,
                                 modifier = fill,
                             )
                         is ShellRoute.RuleEditor -> {

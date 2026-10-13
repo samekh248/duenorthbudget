@@ -74,6 +74,7 @@ fun SettingsScreen(
     onFirstDay: (Int) -> Unit,
     onHideFraction: (Boolean) -> Unit,
     onExperimental: (Boolean) -> Unit,
+    onGoalTemplates: (Boolean) -> Unit = {},
     onLearning: (Boolean) -> Unit = {},
     onExport: () -> Unit,
     onSetEncryptionPassword: (String) -> Unit,
@@ -132,7 +133,7 @@ fun SettingsScreen(
             )
             MethodSection(formatPrefs.budgetType)
             LearningSection(formatPrefs.learnCategories, onLearning)
-            ExperimentalSection(formatPrefs.experimental, onExperimental)
+            ExperimentalSection(formatPrefs.experimental, onExperimental, formatPrefs.goalTemplates, onGoalTemplates)
             IdsSection(openBudgetId.orEmpty(), cloudFileId)
             SettingsActionRow("export", "settings-export", onExport)
             EncryptionSection(
@@ -420,6 +421,8 @@ private fun LearningSection(
 private fun ExperimentalSection(
     enabled: Boolean,
     onToggle: (Boolean) -> Unit,
+    templates: Boolean,
+    onTemplates: (Boolean) -> Unit,
 ) {
     SettingsHeading("experimental", tag = "settings-experimental")
     ChoiceRow(
@@ -427,6 +430,14 @@ private fun ExperimentalSection(
         enabled,
         "settings-experimental-toggle",
     ) { onToggle(!enabled) }
+    // Actual's goal templates feature flag; it only counts while experimental features are on.
+    if (enabled) {
+        ChoiceRow(
+            if (templates) "budget templates  on" else "budget templates",
+            templates,
+            "settings-templates",
+        ) { onTemplates(!templates) }
+    }
 }
 
 @Composable

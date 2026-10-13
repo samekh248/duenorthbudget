@@ -143,7 +143,7 @@ fun ShellViewModel.undo() {
  * Repaints the open month after a month action or undo, drops other cached months
  * (a fill or hold changes every later month), then syncs and repaints again.
  */
-private suspend fun ShellViewModel.afterMonthWrite(budgetId: String) {
+internal suspend fun ShellViewModel.afterMonthWrite(budgetId: String) {
     repaintMonth(budgetId)
     withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }
     repaintMonth(budgetId)

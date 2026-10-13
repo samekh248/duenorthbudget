@@ -177,17 +177,17 @@ flowchart LR
 
 ### Tests for User Story 5
 
-- [ ] T056 [P] [US5] Parser tests in `core-test/TemplateParserTest.kt`: every form in `contracts/templates.md`, priorities, and named errors for bad lines
-- [ ] T057 [P] [US5] Parity tests in `core-test/parity/TemplatesParityTest.kt` against `parity/templates/`: fixed, up to, by with repeat, schedule (with and without `full`), percentage (with `previous`), average, remainder with weights, goal, priority ordering limited by to-budget, hidden skipped, apply only touches zeros, overwrite, and `goal` / `long_goal` / `goal_def` rows
-- [ ] T058 [P] [US5] Gate tests in `core-test/TemplateGateTest.kt`: either flag off means no budgeted change from notes; check with an invalid line writes nothing
+- [x] T056 [P] [US5] Parser tests in `core-test/TemplateParserTest.kt`: every form in `contracts/templates.md`, priorities, and named errors for bad lines
+- [x] T057 [P] [US5] Parity tests in `core-test/parity/TemplatesParityTest.kt` against `parity/templates/`: fixed, up to, by with repeat, schedule (with and without `full`), percentage (with `previous`), average, remainder with weights, goal, priority ordering limited by to-budget, hidden skipped, apply only touches zeros, overwrite, and `goal` / `long_goal` / `goal_def` rows
+- [x] T058 [P] [US5] Gate tests in `core-test/TemplateGateTest.kt`: either flag off means no budgeted change from notes; check with an invalid line writes nothing
 
 ### Implementation for User Story 5
 
-- [ ] T059 [US5] Create `core/…/core/Templates.kt` (`TemplateParser`, `TemplateEngine`) porting the 26.8.1 engine per research R12; one journal step per run
-- [ ] T060 [US5] Category note read and write through the `notes` dataset in `core/…/core/EnvelopeMonth.kt`; read `flags.goalTemplatesEnabled` in `core/…/core/BudgetLibrary.kt`
-- [ ] T061 [US5] Create `app/…/TemplateScreens.kt` (check result list, apply, overwrite confirm) and a category note editor on the category budget screen in `app/…/EnvelopeScreens.kt`
-- [ ] T062 [US5] Add the "budget templates" switch under experimental in `app/…/SettingsScreens.kt`; Home menu id `templates` only when both flags are on in `app/…/ScreenBar.kt`; handlers in new `app/…/ShellViewModel+Templates.kt`
-- [ ] T063 [P] [US5] Compose tests in `app-test/TemplateContentTest.kt` and Roborazzi light and dark in `app-test/TemplateScreenshotTest.kt`
+- [x] T059 [US5] Create `core/…/core/Templates.kt` (`TemplateParser`, `TemplateEngine`) porting the 26.8.1 engine per research R12; one journal step per run
+- [x] T060 [US5] Category note read and write through the `notes` dataset in `core/…/core/EnvelopeMonth.kt`; read `flags.goalTemplatesEnabled` in `core/…/core/BudgetLibrary.kt`
+- [x] T061 [US5] Create `app/…/TemplateScreens.kt` (check result list, apply, overwrite confirm) and a category note editor on the category budget screen in `app/…/EnvelopeScreens.kt`
+- [x] T062 [US5] Add the "budget templates" switch under experimental in `app/…/SettingsScreens.kt`; Home menu id `templates` only when both flags are on in `app/…/ScreenBar.kt`; handlers in new `app/…/ShellViewModel+Templates.kt`
+- [x] T063 [P] [US5] Compose tests in `app-test/TemplateContentTest.kt` and Roborazzi light and dark in `app-test/TemplateScreenshotTest.kt`
 
 **Checkpoint**: Templates match desktop, and stay inert when the flags are off.
 
