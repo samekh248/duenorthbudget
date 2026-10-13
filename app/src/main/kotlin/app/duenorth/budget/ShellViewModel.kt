@@ -19,7 +19,6 @@ import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
-import app.duenorth.budget.core.IncomeHoldRow
 import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.MoneyFormat
@@ -150,8 +149,6 @@ sealed interface ShellRoute {
         val categoryId: String,
     ) : ShellRoute
 
-    data object AutoHold : ShellRoute
-
     data object ManageCategories : ShellRoute
 
     data object Payees : ShellRoute
@@ -226,7 +223,6 @@ data class ShellUiState(
     val breakdown: ActualMonthMath.MonthBreakdown? = null,
     val fillConfirm: FillConfirm? = null,
     val monthNotice: String? = null,
-    val incomeHolds: List<IncomeHoldRow> = emptyList(),
     val undoLabel: String? = null,
 )
 
@@ -1932,8 +1928,7 @@ class ShellViewModel(
             this is ShellRoute.MoveCategory ||
             this is ShellRoute.HoldMonth ||
             this is ShellRoute.Breakdown ||
-            this is ShellRoute.ToBudget ||
-            this is ShellRoute.AutoHold
+            this is ShellRoute.ToBudget
 
     private fun refreshBudgetShell() {
         val budgetId = _state.value.settings.openBudgetId ?: return

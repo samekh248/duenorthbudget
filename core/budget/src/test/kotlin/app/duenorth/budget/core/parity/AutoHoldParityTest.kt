@@ -1,7 +1,6 @@
 package app.duenorth.budget.core.parity
 
 import app.duenorth.budget.core.AutoHoldChoice
-import app.duenorth.budget.core.IncomeHoldRow
 import app.duenorth.budget.core.MonthFillBook
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillResult
@@ -39,23 +38,31 @@ class AutoHoldParityTest {
     }
 
     @Test
-    fun incomeHoldsReadsTheMonthFlag() {
+    fun theShellShowsIncomeGroupsWithTheMonthFlag() {
         val fixture = ParityFixture.load("month", "auto-hold-on")
         val salary = fixture.id("categories", "Salary")
         fixture.open().use { opened ->
-            val before = opened.library.readIncomeHolds(opened.budgetId, october)
-            assertEquals(listOf(false), before.filter { it.id == salary }.map { it.on })
+            fun salaryRow() =
+                opened.library
+                    .readShell(opened.budgetId, october)!!
+                    .incomeGroups
+                    .flatMap { it.categories }
+                    .single { it.id == salary }
+            assertEquals(false, salaryRow().autoHold)
             opened.db { session -> MonthFillBook(session, fixture.today).setAutoHold(october, salary, AutoHoldChoice.ON) }
-            val after = opened.library.readIncomeHolds(opened.budgetId, october)
-            assertEquals(listOf(IncomeHoldRow(salary, "Salary", true)), after.filter { it.id == salary })
+            assertEquals(true, salaryRow().autoHold)
+            val shell = opened.library.readShell(opened.budgetId, october)!!
             val income =
                 opened.db { session ->
                     session
-                        .query("SELECT id FROM categories WHERE is_income = 1 AND tombstone = 0")
+                        .query("SELECT id FROM categories WHERE is_income = 1 AND tombstone = 0 AND hidden = 0")
                         .map { it.str("id").orEmpty() }
                         .toSet()
                 }
-            assertEquals(income, after.map { it.id }.toSet())
+            val incomeShown = shell.incomeGroups.flatMap { it.categories }.map { it.id }
+            val expenseShown = shell.groups.flatMap { it.categories }.map { it.id }
+            assertEquals(income, incomeShown.toSet())
+            assertEquals(emptySet<String>(), expenseShown.toSet() intersect income)
         }
     }
 

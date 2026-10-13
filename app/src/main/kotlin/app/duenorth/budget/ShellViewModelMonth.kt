@@ -97,26 +97,15 @@ fun ShellViewModel.submitToBudget(amountText: String) {
     }
 }
 
-/** Income auto-hold for the open month. Envelope only. */
-fun ShellViewModel.openAutoHold() {
-    val shell = state.value.shell ?: return
-    if (shell.mode != BudgetMode.ENVELOPE) return
-    push(ShellRoute.AutoHold)
-    mutate { it.copy(editError = null, monthNotice = null) }
-    loadIncomeHolds(shell.budgetId)
-}
-
-fun ShellViewModel.chooseAutoHold(
-    categoryId: String,
-    choice: AutoHoldChoice,
-) {
+/** Income auto-hold for the open income category (envelope only). */
+fun ShellViewModel.chooseAutoHold(choice: AutoHoldChoice) {
     val budgetId = state.value.shell?.budgetId ?: return
+    val categoryId = (state.value.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
     val month = editorMonth()
     viewModelScope.launch {
         when (val result = withContext(Dispatchers.IO) { sync.setAutoHold(budgetId, categoryId, month, choice) }) {
             MonthFillResult.Filled -> {
                 mutate { it.copy(editError = null) }
-                loadIncomeHolds(budgetId)
                 afterMonthWrite(budgetId)
             }
             is MonthFillResult.Rejected -> mutate { it.copy(editError = result.reason) }
@@ -147,14 +136,6 @@ fun ShellViewModel.undo() {
         } else {
             mutate { it.copy(undoLabel = library.undoLabel(budgetId)) }
         }
-    }
-}
-
-private fun ShellViewModel.loadIncomeHolds(budgetId: String) {
-    val month = editorMonth()
-    viewModelScope.launch {
-        val rows = withContext(Dispatchers.IO) { library.readIncomeHolds(budgetId, month) }
-        mutate { it.copy(incomeHolds = rows) }
     }
 }
 

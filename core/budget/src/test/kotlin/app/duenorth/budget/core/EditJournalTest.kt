@@ -194,6 +194,17 @@ class EditJournalTest {
         }
     }
 
+    @Test
+    fun assignOnATrackingFileWritesTrackingBudgets() {
+        withFile { session, _ ->
+            session.exec("INSERT INTO preferences (id, value) VALUES ('budgetType', 'tracking')")
+            BudgetEdits.assign(session, clock(), 202610, "c-sal", 500_000)
+            val tracked = session.query("SELECT amount FROM reflect_budgets WHERE month = 202610 AND category = 'c-sal'")
+            assertEquals(listOf(500_000L), tracked.map { it.long("amount") })
+            assertTrue(session.query("SELECT id FROM zero_budgets WHERE category = 'c-sal'").isEmpty())
+        }
+    }
+
     private fun assign(
         session: SqlSession,
         amount: Long,

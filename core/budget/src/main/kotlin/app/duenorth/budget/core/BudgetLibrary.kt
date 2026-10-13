@@ -395,11 +395,6 @@ class BudgetLibrary(
         month: YearMonth,
     ): ActualMonthMath.MonthBreakdown? = open(budgetId) { ShellReader.loadDetailed(it, month).breakdown }
 
-    fun readIncomeHolds(
-        budgetId: String,
-        month: YearMonth,
-    ): List<IncomeHoldRow> = open(budgetId) { MonthFillBook(it, clock.today()).incomeHolds(month) }.orEmpty()
-
     fun readCategoryManage(budgetId: String): CategoryManagePage? =
         open(budgetId) { session ->
             ActualSchema.ensure(session)

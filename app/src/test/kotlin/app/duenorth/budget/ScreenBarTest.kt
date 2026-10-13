@@ -12,7 +12,7 @@ class ScreenBarTest {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
         assertEquals(listOf("add", "hold", "categories", "settings"), specs.filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("breakdown", "copy-last", "average", "zero", "auto-hold"),
+            listOf("breakdown", "copy-last", "average", "zero"),
             specs.filter { !it.primary }.map { it.id },
         )
     }
@@ -35,6 +35,14 @@ class ScreenBarTest {
     fun registerActions() {
         val ids = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
         assertEquals(listOf("add", "transfer", "reconcile", "import"), ids)
+    }
+
+    @Test
+    fun envelopeIncomeCategoryHasNoSave() {
+        val income = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, incomeCategory = true)
+        assertTrue(income.isEmpty())
+        val tracking = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.TRACKING, incomeCategory = true)
+        assertEquals(listOf("save", "cancel"), tracking.map { it.id })
     }
 
     @Test

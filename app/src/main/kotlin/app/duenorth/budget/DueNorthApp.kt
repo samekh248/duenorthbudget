@@ -232,7 +232,6 @@ fun DueNorthApp(model: ShellViewModel) {
                     },
                     onBreakdown = model::openBreakdown,
                     onFill = { kind -> model.fillMonth(kind) },
-                    onAutoHold = model::openAutoHold,
                     onToBudget = model::openToBudget,
                     onUndo = model::undo,
                 )
@@ -579,7 +578,22 @@ fun DueNorthApp(model: ShellViewModel) {
                         is ShellRoute.GroupCategories -> {
                             val shell = state.shell
                             val group = shell?.groups?.firstOrNull { it.id == route.groupId }
-                            if (shell == null || group == null) {
+                            val incomeGroup = shell?.incomeGroups?.firstOrNull { it.id == route.groupId }
+                            if (shell != null && incomeGroup != null) {
+                                EditorWithMonth(
+                                    openMonth = state.openMonth,
+                                    monthWindow = model.monthWindow(),
+                                    onSelectMonth = model::selectOpenMonth,
+                                    modifier = fill,
+                                ) { inner ->
+                                    IncomeGroupScreen(
+                                        shell = shell,
+                                        group = incomeGroup,
+                                        onCategory = model::openCategoryBudget,
+                                        modifier = inner,
+                                    )
+                                }
+                            } else if (shell == null || group == null) {
                                 Placeholder()
                             } else {
                                 EditorWithMonth(
@@ -608,6 +622,18 @@ fun DueNorthApp(model: ShellViewModel) {
                                     onSelectMonth = model::selectOpenMonth,
                                     modifier = fill,
                                 ) { inner ->
+                                    val income = shell.incomeCategory(route.categoryId)
+                                    if (income != null) {
+                                        IncomeCategoryScreen(
+                                            shell = shell,
+                                            category = income,
+                                            error = state.editError,
+                                            onSave = model::saveCategoryBudget,
+                                            onAutoHold = model::chooseAutoHold,
+                                            modifier = inner,
+                                        )
+                                        return@EditorWithMonth
+                                    }
                                     CategoryBudgetScreen(
                                         shell = shell,
                                         categoryId = route.categoryId,
@@ -690,14 +716,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                 )
                             }
                         }
-                        ShellRoute.AutoHold ->
-                            AutoHoldScreen(
-                                month = state.pinnedMonth ?: state.openMonth,
-                                rows = state.incomeHolds,
-                                error = state.editError,
-                                onChoose = model::chooseAutoHold,
-                                modifier = fill,
-                            )
                         ShellRoute.ManageCategories -> {
                             val manage = state.categoryManage
                             if (manage == null) {

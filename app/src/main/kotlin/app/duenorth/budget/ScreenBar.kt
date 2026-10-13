@@ -19,6 +19,7 @@ object ScreenBar {
         hasBudget: Boolean,
         mode: BudgetMode?,
         undoLabel: String? = null,
+        incomeCategory: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             ShellRoute.Home ->
@@ -37,7 +38,7 @@ object ScreenBar {
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
                             menu("breakdown", AppGlyph.Breakdown, MonthFillCopy.BREAKDOWN),
-                        ) + fills() + menu("auto-hold", AppGlyph.Hold, MonthFillCopy.AUTO_HOLD) + undo(undoLabel)
+                        ) + fills() + undo(undoLabel)
                 }
             is ShellRoute.Register ->
                 listOf(
@@ -49,6 +50,9 @@ object ScreenBar {
             is ShellRoute.CategoryBudget ->
                 if (mode == BudgetMode.TRACKING) {
                     saveCancel()
+                } else if (incomeCategory) {
+                    // Auto-hold choices apply at once; there is nothing to save.
+                    emptyList()
                 } else {
                     saveCancel() + menu("to-budget", AppGlyph.Transfer, MonthActionCopy.TRANSFER)
                 }
@@ -74,7 +78,9 @@ object ScreenBar {
     ): List<ScreenAction> {
         val mode = state.shell?.mode
         val hasBudget = state.shell != null && !state.locked
-        return specsFor(state.route, hasBudget, mode, state.undoLabel).map { spec ->
+        val income =
+            (state.route as? ShellRoute.CategoryBudget)?.let { route -> state.shell?.incomeCategory(route.categoryId) != null } == true
+        return specsFor(state.route, hasBudget, mode, state.undoLabel, income).map { spec ->
             ScreenAction(
                 id = spec.id,
                 glyph = spec.glyph,
@@ -128,7 +134,6 @@ class ScreenBarHandlers(
     val onCancel: () -> Unit,
     val onBreakdown: () -> Unit = {},
     val onFill: (MonthFillKind) -> Unit = {},
-    val onAutoHold: () -> Unit = {},
     val onToBudget: () -> Unit = {},
     val onUndo: () -> Unit = {},
 ) {
@@ -154,7 +159,6 @@ class ScreenBarHandlers(
             "copy-last" -> ({ onFill(MonthFillKind.COPY_LAST) })
             "average" -> ({ onFill(MonthFillKind.AVERAGE) })
             "zero" -> ({ onFill(MonthFillKind.ZERO) })
-            "auto-hold" -> onAutoHold
             "to-budget" -> onToBudget
             "undo" -> onUndo
             else -> ({})

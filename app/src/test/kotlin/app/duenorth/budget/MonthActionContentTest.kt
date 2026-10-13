@@ -4,6 +4,7 @@ import android.os.Looper
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
@@ -18,6 +19,8 @@ import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.HttpActualTransport
+import app.duenorth.budget.core.IncomeCategoryRow
+import app.duenorth.budget.core.IncomeGroupRow
 import app.duenorth.budget.core.MemorySecretStore
 import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.MoneyFormat
@@ -199,30 +202,87 @@ class MonthActionContentTest {
     }
 
     @Test
-    fun autoHoldListsIncomeAndTurnsOn() {
-        val (model, _) = household("auto-hold")
-        model.openAutoHold()
-        await {
-            model.state.value.incomeHolds
-                .isNotEmpty()
+    fun incomeGroupsShowOnHomeAndOpen() {
+        var opened: String? = null
+        val shell = sample(BudgetMode.ENVELOPE)
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    HomePanorama(
+                        shell = shell,
+                        review = null,
+                        netWorth = null,
+                        upcoming = emptyList(),
+                        loading = false,
+                        openMonth = shell.month,
+                        monthWindow = MonthWindow.around(shell.month),
+                        onGesture = {},
+                        onBudgetGroup = { opened = it },
+                    )
+                }
+            }
         }
-        assertEquals(
-            listOf("c-sal"),
-            model.state.value.incomeHolds
-                .map { it.id },
-        )
-        assertFalse(
-            model.state.value.incomeHolds
-                .single()
-                .on,
-        )
-        model.chooseAutoHold("c-sal", app.duenorth.budget.core.AutoHoldChoice.ON)
+        compose
+            .onNodeWithTag("income-group-received-g-inc", useUnmergedTree = true)
+            .assertTextEquals(MoneyFormat.format(420_000, USD))
+        compose.onNodeWithTag("income-group-g-inc").performClick()
+        assertEquals("g-inc", opened)
+    }
+
+    @Test
+    fun envelopeIncomeCategoryTurnsAutoHoldOn() {
+        val (model, _) = household("auto-hold")
+        val salary =
+            model.state.value.shell!!
+                .incomeCategory("c-sal")!!
+        assertFalse(salary.autoHold)
+        model.openGroupCategories("g-inc")
+        model.openCategoryBudget("c-sal")
+        compose.setContent {
+            MetroTheme {
+                val state = model.state.collectAsState().value
+                IncomeCategoryScreen(
+                    shell = state.shell!!,
+                    category = state.shell!!.incomeCategory("c-sal")!!,
+                    error = state.editError,
+                    onSave = model::saveCategoryBudget,
+                    onAutoHold = model::chooseAutoHold,
+                )
+            }
+        }
+        compose.onNodeWithTag("income-budget-amount").assertDoesNotExist()
+        compose.onNodeWithTag("auto-hold-on").performClick()
         await {
-            model.state.value.incomeHolds
-                .singleOrNull()
-                ?.on == true
+            model.state.value.shell
+                ?.incomeCategory("c-sal")
+                ?.autoHold == true
         }
         await { model.state.value.undoLabel == MonthFillCopy.AUTO_HOLD }
+    }
+
+    @Test
+    fun trackingBudgetsIncome() {
+        val (model, library) = household("tracking-income", tracking = true)
+        val budgetId =
+            model.state.value.shell!!
+                .budgetId
+        val month =
+            model.state.value.shell!!
+                .month
+        assertEquals(
+            BudgetMode.TRACKING,
+            model.state.value.shell!!
+                .mode,
+        )
+        model.openGroupCategories("g-inc")
+        model.openCategoryBudget("c-sal")
+        model.saveCategoryBudget("5000")
+        await {
+            model.state.value.shell
+                ?.incomeCategory("c-sal")
+                ?.budgetedMinor == 500_000L
+        }
+        assertEquals(500_000L, library.readShell(budgetId, month)!!.incomeCategory("c-sal")!!.budgetedMinor)
     }
 
     @Test
@@ -296,7 +356,10 @@ class MonthActionContentTest {
     private fun homeIds(model: ShellViewModel) =
         ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, model.state.value.undoLabel).map { it.id }
 
-    private fun household(name: String): Pair<ShellViewModel, BudgetLibrary> {
+    private fun household(
+        name: String,
+        tracking: Boolean = false,
+    ): Pair<ShellViewModel, BudgetLibrary> {
         val context = RuntimeEnvironment.getApplication()
         val root =
             File(context.filesDir, "month-actions-$name").apply {
@@ -304,7 +367,12 @@ class MonthActionContentTest {
                 mkdirs()
             }
         val library = BudgetLibrary(root, AndroidSessionOpener(), BudgetClock.System)
-        assertTrue(library.createFromMock(MockBudgets.HOUSEHOLD) is CreateResult.Created)
+        val created = library.createFromMock(MockBudgets.HOUSEHOLD) as CreateResult.Created
+        if (tracking) {
+            library.useDatabase(created.id) { session ->
+                session.exec("UPDATE preferences SET value = 'tracking' WHERE id = 'budgetType'")
+            }
+        }
         val sync = SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System)
         val model = ShellViewModel(library, sync)
         await { !model.state.value.loading && model.state.value.shell != null }
@@ -335,6 +403,10 @@ class MonthActionContentTest {
                 ),
             accounts = emptyList(),
             inbox = emptyList(),
+            incomeGroups =
+                listOf(
+                    IncomeGroupRow("g-inc", "Income", 0, 420_000, listOf(IncomeCategoryRow("c-sal", "Salary", 0, 420_000, false))),
+                ),
         )
 
     private fun drain() {

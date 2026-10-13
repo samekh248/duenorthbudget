@@ -85,7 +85,7 @@ flowchart LR
 - [X] T022 [US1] Add entry points in `core/…/core/BudgetLibrary.kt` and `SyncCoordinator.kt`
 - [X] T023 [US1] Create `app/…/MonthActionScreens.kt`: breakdown screen (`breakdown-*` tags), fill confirm, transfer-to-to-budget form, auto-hold three-way choice
 - [X] T024 [US1] Route handlers and optimistic `OpenMonthStore` updates in new `app/…/ShellViewModel+Month.kt`; roll back on `Rejected` *(file is `ShellViewModelMonth.kt` for ktlint)*
-- [X] T025 [US1] Add menu ids `breakdown`, `copy-last`, `average`, `zero`, `undo` on Home and `to-budget`, `auto-hold` on category budget in `app/…/ScreenBar.kt` *(`auto-hold` sits on the Home menu instead: income categories never reach category budget, because Home's list leaves out income groups)*; make the Home to-budget figure (`to-budget-figure`) open the breakdown in `app/…/EnvelopeScreens.kt`
+- [X] T025 [US1] Add menu ids `breakdown`, `copy-last`, `average`, `zero`, `undo` on Home and `to-budget`, `auto-hold` on category budget in `app/…/ScreenBar.kt` *(`auto-hold` is three buttons on the income category page rather than a menu id; Home now lists income groups so income categories can be opened)*; make the Home to-budget figure (`to-budget-figure`) open the breakdown in `app/…/EnvelopeScreens.kt`
 - [X] T026 [P] [US1] Compose tests in `app-test/MonthActionContentTest.kt`: breakdown rows, confirm gate writes nothing until confirm, tracking hides breakdown / to-budget / auto-hold, undo absent when empty and present after an assign
 - [X] T027 [P] [US1] Roborazzi light and dark in `app-test/MonthActionScreenshotTest.kt` for the breakdown and fill confirm
 

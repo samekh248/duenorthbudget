@@ -418,7 +418,7 @@ fun BudgetSection(
             }
         }
         if (notice != null) MonthNotice(notice, Modifier.padding(top = MetroDimens.Row))
-        if (shell.groups.isEmpty()) {
+        if (shell.groups.isEmpty() && shell.incomeGroups.isEmpty()) {
             MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.caption, Modifier.padding(top = MetroDimens.Grid).weight(1f))
         } else {
             LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid), state = list) {
@@ -427,6 +427,14 @@ fun BudgetSection(
                         group,
                         shell,
                         arrivalModifier(group.id, arrivals),
+                        onOpen = onGroup,
+                        formatOptions = formatOptions,
+                    )
+                }
+                items(shell.incomeGroups, key = { "income-${it.id}" }) { group ->
+                    IncomeGroupLine(
+                        group,
+                        shell,
                         onOpen = onGroup,
                         formatOptions = formatOptions,
                     )
