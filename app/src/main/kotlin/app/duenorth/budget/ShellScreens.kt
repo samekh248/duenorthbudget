@@ -670,8 +670,9 @@ fun CreateBudgetScreen(
     error: String?,
     onCreate: (String, String) -> Unit,
     modifier: Modifier = Modifier,
+    defaultName: String = "",
 ) {
-    var name by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(defaultName) }
     var currency by remember { mutableStateOf("USD") }
     Column(
         modifier
