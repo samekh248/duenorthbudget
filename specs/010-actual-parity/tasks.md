@@ -73,21 +73,21 @@ flowchart LR
 
 ### Tests for User Story 1
 
-- [ ] T016 [P] [US1] Breakdown tests in `core-test/ActualMonthMathTest.kt`: the five parts add up to the header for months with income, carryover, overspend, manual hold, and auto hold
-- [ ] T017 [P] [US1] Parity tests in `core-test/parity/MonthFillParityTest.kt`: copy (hidden category, hidden group, income skipped on envelope, included on tracking), average with 3 / 2 / 0 earlier months, zero, nothing-to-copy leaves this month alone, each against `parity/month/`
-- [ ] T018 [P] [US1] Parity tests in `core-test/parity/AutoHoldParityTest.kt`: on writes carryover for m…m+12, off this month only, off entirely, manual hold overrides auto
-- [ ] T019 [P] [US1] Transfer-to-to-budget tests in `core-test/MonthFillBookTest.kt`: lowers budgeted, raises to-budget, refuses more than available, absent on tracking
+- [X] T016 [P] [US1] Breakdown tests in `core-test/ActualMonthMathTest.kt`: the five parts add up to the header for months with income, carryover, overspend, manual hold, and auto hold
+- [X] T017 [P] [US1] Parity tests in `core-test/parity/MonthFillParityTest.kt`: copy (hidden category, hidden group, income skipped on envelope, included on tracking), average with 3 / 2 / 0 earlier months, zero, nothing-to-copy leaves this month alone, each against `parity/month/`
+- [X] T018 [P] [US1] Parity tests in `core-test/parity/AutoHoldParityTest.kt`: on writes carryover for m…m+12, off this month only, off entirely, manual hold overrides auto
+- [X] T019 [P] [US1] Transfer-to-to-budget tests in `core-test/MonthFillBookTest.kt`: lowers budgeted, raises to-budget, refuses more than available, absent on tracking
 
 ### Implementation for User Story 1
 
-- [ ] T020 [US1] Add `MonthBreakdown` to `DetailedFigures` from the existing envelope loop in `core/…/core/ActualMonthMath.kt`
-- [ ] T021 [US1] Create `core/…/core/MonthFill.kt` (`MonthFillBook`: `copyLast`, `average3`, `zero`, `transferToBudget`, `setAutoHold`) writing `zero_budgets` or `reflect_budgets` through the funnel, one journal step per action, with `needsConfirm` per `contracts/month-actions.md`
-- [ ] T022 [US1] Add entry points in `core/…/core/BudgetLibrary.kt` and `SyncCoordinator.kt`
-- [ ] T023 [US1] Create `app/…/MonthActionScreens.kt`: breakdown screen (`breakdown-*` tags), fill confirm, transfer-to-to-budget form, auto-hold three-way choice
-- [ ] T024 [US1] Route handlers and optimistic `OpenMonthStore` updates in new `app/…/ShellViewModel+Month.kt`; roll back on `Rejected`
-- [ ] T025 [US1] Add menu ids `breakdown`, `copy-last`, `average`, `zero`, `undo` on Home and `to-budget`, `auto-hold` on category budget in `app/…/ScreenBar.kt`; make the Home to-budget figure (`to-budget-figure`) open the breakdown in `app/…/EnvelopeScreens.kt`
-- [ ] T026 [P] [US1] Compose tests in `app-test/MonthActionContentTest.kt`: breakdown rows, confirm gate writes nothing until confirm, tracking hides breakdown / to-budget / auto-hold, undo absent when empty and present after an assign
-- [ ] T027 [P] [US1] Roborazzi light and dark in `app-test/MonthActionScreenshotTest.kt` for the breakdown and fill confirm
+- [X] T020 [US1] Add `MonthBreakdown` to `DetailedFigures` from the existing envelope loop in `core/…/core/ActualMonthMath.kt`
+- [X] T021 [US1] Create `core/…/core/MonthFill.kt` (`MonthFillBook`: `copyLast`, `average3`, `zero`, `transferToBudget`, `setAutoHold`) writing `zero_budgets` or `reflect_budgets` through the funnel, one journal step per action, with `needsConfirm` per `contracts/month-actions.md`
+- [X] T022 [US1] Add entry points in `core/…/core/BudgetLibrary.kt` and `SyncCoordinator.kt`
+- [ ] T023 *(Deferred: `:app` cannot build in the cloud session because dl.google.com is blocked. Core entry points are in place.)* [US1] Create `app/…/MonthActionScreens.kt`: breakdown screen (`breakdown-*` tags), fill confirm, transfer-to-to-budget form, auto-hold three-way choice
+- [ ] T024 *(Deferred: `:app` cannot build in the cloud session because dl.google.com is blocked. Core entry points are in place.)* [US1] Route handlers and optimistic `OpenMonthStore` updates in new `app/…/ShellViewModel+Month.kt`; roll back on `Rejected`
+- [ ] T025 *(Deferred: `:app` cannot build in the cloud session because dl.google.com is blocked. Core entry points are in place.)* [US1] Add menu ids `breakdown`, `copy-last`, `average`, `zero`, `undo` on Home and `to-budget`, `auto-hold` on category budget in `app/…/ScreenBar.kt`; make the Home to-budget figure (`to-budget-figure`) open the breakdown in `app/…/EnvelopeScreens.kt`
+- [ ] T026 *(Deferred: `:app` cannot build in the cloud session because dl.google.com is blocked. Core entry points are in place.)* [P] [US1] Compose tests in `app-test/MonthActionContentTest.kt`: breakdown rows, confirm gate writes nothing until confirm, tracking hides breakdown / to-budget / auto-hold, undo absent when empty and present after an assign
+- [ ] T027 *(Deferred: `:app` cannot build in the cloud session because dl.google.com is blocked. Core entry points are in place.)* [P] [US1] Roborazzi light and dark in `app-test/MonthActionScreenshotTest.kt` for the breakdown and fill confirm
 
 **Checkpoint**: The month is fully Actual. With Phase 2, this is the MVP, including undo of month actions.
 

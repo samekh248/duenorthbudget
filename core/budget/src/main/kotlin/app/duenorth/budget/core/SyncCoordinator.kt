@@ -497,6 +497,47 @@ class SyncCoordinator(
         } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
     }
 
+    /** Copy last month, three-month average or zero (spec 010 US1); one undo step. */
+    fun fillMonth(
+        budgetId: String,
+        month: YearMonth,
+        kind: MonthFillKind,
+        confirmed: Boolean,
+    ): MonthFillResult {
+        val label =
+            when (kind) {
+                MonthFillKind.COPY_LAST -> MonthFillCopy.COPY_LAST
+                MonthFillKind.AVERAGE -> MonthFillCopy.AVERAGE
+                MonthFillKind.ZERO -> MonthFillCopy.ZERO
+            }
+        return journaled(budgetId, label) { session ->
+            MonthFillBook(session, dates.today()).fill(kind, month, confirmed)
+        } ?: MonthFillResult.Rejected(SyncCopy.LAST_FAILED)
+    }
+
+    fun transferToBudget(
+        budgetId: String,
+        categoryId: String,
+        month: YearMonth,
+        amountText: String,
+    ): MonthFillResult {
+        val amount =
+            MoneyFormat.parse(amountText, decimals(budgetId)) ?: return MonthFillResult.Rejected(SyncCopy.ENTER_AMOUNT)
+        return journaled(budgetId, MonthFillCopy.TO_BUDGET) { session ->
+            MonthFillBook(session, dates.today()).transferToBudget(month, categoryId, amount)
+        } ?: MonthFillResult.Rejected(SyncCopy.LAST_FAILED)
+    }
+
+    fun setAutoHold(
+        budgetId: String,
+        categoryId: String,
+        month: YearMonth,
+        choice: AutoHoldChoice,
+    ): MonthFillResult =
+        journaled(budgetId, MonthFillCopy.AUTO_HOLD) { session ->
+            MonthFillBook(session, dates.today()).setAutoHold(month, categoryId, choice)
+        } ?: MonthFillResult.Rejected(SyncCopy.LAST_FAILED)
+
     fun addCategoryGroup(
         budgetId: String,
         name: String,

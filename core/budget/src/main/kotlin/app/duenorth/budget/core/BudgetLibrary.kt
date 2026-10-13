@@ -389,6 +389,12 @@ class BudgetLibrary(
         }
     }
 
+    /** Envelope to-budget breakdown for [month]; null on tracking budgets. */
+    fun readBreakdown(
+        budgetId: String,
+        month: YearMonth,
+    ): ActualMonthMath.MonthBreakdown? = open(budgetId) { ShellReader.loadDetailed(it, month).breakdown }
+
     fun readCategoryManage(budgetId: String): CategoryManagePage? =
         open(budgetId) { session ->
             ActualSchema.ensure(session)

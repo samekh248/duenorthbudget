@@ -148,6 +148,7 @@ object ShellReader {
         val bufferedMinor: Long,
         val groups: List<SqlRow>,
         val categoryRows: List<LoadedCategoryRow>,
+        val breakdown: ActualMonthMath.MonthBreakdown? = null,
     )
 
     fun loadDetailed(
@@ -275,6 +276,7 @@ object ShellReader {
             bufferedMinor = detailed.bufferedMinor,
             groups = groups,
             categoryRows = categoryRows,
+            breakdown = detailed.breakdown,
         )
     }
 

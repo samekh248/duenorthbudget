@@ -108,6 +108,74 @@ class ActualMonthMathTest {
         assertTrue("300 groups took ${elapsedMs}ms", elapsedMs < 100)
     }
 
+    @Test
+    fun breakdownPartsAddUpToTheHeader() {
+        val octoberIncome = (202610 to "c-sal") to 300_000L
+        val autoHold = ActualMonthMath.AssignmentFact(202610, "c-sal", 0L, true)
+        val carried = ActualMonthMath.AssignmentFact(202609, "c-rent", 100_000L, true)
+        val cases =
+            mapOf(
+                "income and overspend" to Triple(septemberAssignments(), emptyMap<Int, Long>(), false),
+                "carryover" to Triple(listOf(septemberAssignments()[0], carried), emptyMap(), false),
+                "manual hold" to Triple(septemberAssignments(), mapOf(202610 to 40_000L), true),
+                "auto hold" to Triple(septemberAssignments() + autoHold, emptyMap(), true),
+                "manual beats auto" to Triple(septemberAssignments() + autoHold, mapOf(202610 to 40_000L), true),
+            )
+        for ((name, case) in cases) {
+            val (assignments, buffers, held) = case
+            val detailed =
+                ActualMonthMath.projectDetailed(
+                    mode = BudgetMode.ENVELOPE,
+                    month = YearMonth.of(2026, 10),
+                    groups = listOf(incomeGroup, living),
+                    categories = listOf(salary, food, rent),
+                    spentByCategoryMonth = septemberSpent() + octoberIncome,
+                    assignments = assignments + ActualMonthMath.AssignmentFact(202610, "c-food", 25_000L, false),
+                    buffers = buffers,
+                )
+            val parts = detailed.breakdown!!
+            assertEquals(name, detailed.figures.headerMinor, parts.totalMinor)
+            assertEquals(
+                name,
+                parts.totalMinor,
+                parts.incomeMinor + parts.carriedMinor + parts.overspentMinor + parts.budgetedMinor + parts.heldMinor,
+            )
+            assertEquals(name, 300_000L, parts.incomeMinor)
+            assertEquals(name, -25_000L, parts.budgetedMinor)
+            assertEquals(name, held, parts.heldMinor != 0L)
+        }
+    }
+
+    @Test
+    fun manualHoldWinsOverAutoHoldInTheBreakdown() {
+        val detailed =
+            ActualMonthMath.projectDetailed(
+                mode = BudgetMode.ENVELOPE,
+                month = YearMonth.of(2026, 10),
+                groups = listOf(incomeGroup, living),
+                categories = listOf(salary, food, rent),
+                spentByCategoryMonth = mapOf((202610 to "c-sal") to 300_000L),
+                assignments = listOf(ActualMonthMath.AssignmentFact(202610, "c-sal", 0L, true)),
+                buffers = mapOf(202610 to 40_000L),
+            )
+        assertEquals(-40_000L, detailed.breakdown!!.heldMinor)
+    }
+
+    @Test
+    fun trackingHasNoBreakdown() {
+        val detailed =
+            ActualMonthMath.projectDetailed(
+                mode = BudgetMode.TRACKING,
+                month = YearMonth.of(2026, 10),
+                groups = listOf(incomeGroup, living),
+                categories = listOf(salary, food, rent),
+                spentByCategoryMonth = emptyMap(),
+                assignments = emptyList(),
+                buffers = emptyMap(),
+            )
+        assertEquals(null, detailed.breakdown)
+    }
+
     private fun october(
         assignments: List<ActualMonthMath.AssignmentFact> = septemberAssignments(),
         buffers: Map<Int, Long> = emptyMap(),
