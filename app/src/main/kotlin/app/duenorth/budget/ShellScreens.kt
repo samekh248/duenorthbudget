@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -427,39 +428,43 @@ fun BudgetSection(
                 if (shell.groups.any { it.categories.isNotEmpty() }) {
                     item(key = "ledger-headings") { LedgerHeadings() }
                 }
-                shell.groups.forEachIndexed { index, group ->
+                shell.groups.forEach { group ->
                     item(key = group.id) {
                         GroupLine(
                             group,
                             shell,
-                            arrivalModifier(group.id, arrivals).then(groupGap(index > 0)),
+                            arrivalModifier(group.id, arrivals),
                             formatOptions = formatOptions,
                         )
                     }
                     items(group.categories, key = { "category-${it.id}" }) { category ->
                         CategoryLine(category, shell, onCategory, formatOptions = formatOptions)
                     }
+                    item(key = "gap-${group.id}") { GroupGap() }
                 }
-                shell.incomeGroups.forEachIndexed { index, group ->
+                shell.incomeGroups.forEach { group ->
                     item(key = "income-${group.id}") {
                         IncomeGroupLine(
                             group,
                             shell,
-                            groupGap(index > 0 || shell.groups.isNotEmpty()),
                             formatOptions = formatOptions,
                         )
                     }
                     items(group.categories, key = { "income-category-${it.id}" }) { category ->
                         IncomeCategoryLine(category, shell, onCategory, formatOptions = formatOptions)
                     }
+                    item(key = "income-gap-${group.id}") { GroupGap() }
                 }
             }
         }
     }
 }
 
-/** Air above every group but the first, so each group reads as its own block. */
-private fun groupGap(apart: Boolean): Modifier = if (apart) Modifier.padding(top = MetroDimens.Grid) else Modifier
+/** Air after a group's last category, so each group reads as its own block. */
+@Composable
+private fun GroupGap() {
+    Spacer(Modifier.height(MetroDimens.Grid))
+}
 
 @Composable
 private fun BudgetTotal(
