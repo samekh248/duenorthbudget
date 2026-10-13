@@ -138,9 +138,12 @@ class SyncCoordinator(
         syncClock = SyncClock(node, now)
     }
 
-    fun signedIn(): Boolean = !secrets.get(TOKEN).isNullOrBlank()
+    fun signedIn(): Boolean = !syncToken().isNullOrBlank()
 
-    fun syncToken(): String? = secrets.get(TOKEN)
+    fun syncToken(): String? {
+        val activeId = library.settings().activeInstanceId ?: return migrateLegacyToken(null)
+        return tokenFor(activeId) ?: migrateLegacyToken(activeId)
+    }
 
     fun connect(
         address: String,
@@ -149,8 +152,54 @@ class SyncCoordinator(
         val normalized = normalizeAddress(address) ?: return ConnectResult(emptyList(), SyncCopy.ADDRESS_FAILED)
         return try {
             val token = transport.login(normalized, password)
-            secrets.put(TOKEN, token)
-            library.updateSettings { it.copy(serverAddress = normalized) }
+            val instance = upsertConnectedInstance(normalized)
+            secrets.put(tokenKey(instance.id), token)
+            secrets.remove(LEGACY_TOKEN)
+            library.setActiveInstanceId(instance.id)
+            val files = transport.listFiles(normalized, token)
+            remoteFiles = files
+            ConnectResult(files, null)
+        } catch (_: SyncAuthException) {
+            ConnectResult(remoteFiles, SyncCopy.SIGN_IN_FAILED)
+        } catch (_: Exception) {
+            ConnectResult(remoteFiles, SyncCopy.ADDRESS_FAILED)
+        }
+    }
+
+    fun loginMethods(address: String): List<String> {
+        val normalized = normalizeAddress(address) ?: return listOf("password")
+        return try {
+            transport.loginMethods(normalized)
+        } catch (_: Exception) {
+            listOf("password")
+        }
+    }
+
+    fun beginOpenId(
+        address: String,
+        returnUrl: String,
+    ): String? {
+        val normalized = normalizeAddress(address) ?: return null
+        return try {
+            transport.beginOpenId(normalized, returnUrl)
+        } catch (_: SyncAuthException) {
+            null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun completeOpenId(
+        address: String,
+        token: String,
+    ): ConnectResult {
+        val normalized = normalizeAddress(address) ?: return ConnectResult(emptyList(), SyncCopy.ADDRESS_FAILED)
+        if (token.isBlank()) return ConnectResult(remoteFiles, SyncCopy.SIGN_IN_FAILED)
+        return try {
+            val instance = upsertConnectedInstance(normalized)
+            secrets.put(tokenKey(instance.id), token)
+            secrets.remove(LEGACY_TOKEN)
+            library.setActiveInstanceId(instance.id)
             val files = transport.listFiles(normalized, token)
             remoteFiles = files
             ConnectResult(files, null)
@@ -162,14 +211,14 @@ class SyncCoordinator(
     }
 
     fun refreshRemote(): ConnectResult {
-        val token = secrets.get(TOKEN) ?: return ConnectResult(emptyList(), SyncCopy.SIGN_IN_AGAIN)
-        val address = library.settings().serverAddress ?: return ConnectResult(emptyList(), SyncCopy.ADDRESS_FAILED)
+        val token = syncToken() ?: return ConnectResult(emptyList(), SyncCopy.SIGN_IN_AGAIN)
+        val address = activeAddress() ?: return ConnectResult(emptyList(), SyncCopy.ADDRESS_FAILED)
         return try {
             val files = transport.listFiles(address, token)
             remoteFiles = files
             ConnectResult(files, null)
         } catch (_: SyncAuthException) {
-            secrets.remove(TOKEN)
+            clearActiveToken()
             remoteFiles = emptyList()
             ConnectResult(emptyList(), SyncCopy.SIGN_IN_AGAIN)
         } catch (_: Exception) {
@@ -177,8 +226,28 @@ class SyncCoordinator(
         }
     }
 
+    fun makeActive(instanceId: String): Boolean {
+        val settings = library.settings()
+        if (settings.instances.none { it.id == instanceId }) return false
+        library.setActiveInstanceId(instanceId)
+        remoteFiles = emptyList()
+        return true
+    }
+
+    fun activateOffline(instanceId: String): Boolean = makeActive(instanceId)
+
+    fun removeInstance(instanceId: String) {
+        secrets.remove(tokenKey(instanceId))
+        val wasActive = library.settings().activeInstanceId == instanceId
+        library.removeInstance(instanceId)
+        if (wasActive) {
+            secrets.remove(LEGACY_TOKEN)
+            remoteFiles = emptyList()
+        }
+    }
+
     fun signOut() {
-        secrets.remove(TOKEN)
+        clearActiveToken()
         remoteFiles = emptyList()
     }
 
@@ -241,8 +310,8 @@ class SyncCoordinator(
         file: RemoteFile,
         onProgress: (Long, Long) -> Unit = { _, _ -> },
     ): OpenResult {
-        val token = secrets.get(TOKEN) ?: return OpenResult.Failed(SyncCopy.SIGN_IN_AGAIN)
-        val address = library.settings().serverAddress ?: return OpenResult.Failed(SyncCopy.ADDRESS_FAILED)
+        val token = syncToken() ?: return OpenResult.Failed(SyncCopy.SIGN_IN_AGAIN)
+        val address = activeAddress() ?: return OpenResult.Failed(SyncCopy.ADDRESS_FAILED)
         if (file.encryptKeyId != null && !isUnlocked(file.fileId)) return OpenResult.NeedsPassword
         val tracker = DownloadTracker()
         val bytes =
@@ -292,8 +361,8 @@ class SyncCoordinator(
     }
 
     fun sync(budgetId: String): SyncResult {
-        val token = secrets.get(TOKEN) ?: return fail(budgetId, "auth")
-        val address = library.settings().serverAddress ?: return SyncResult("")
+        val token = syncToken() ?: return fail(budgetId, "auth")
+        val address = activeAddress() ?: return SyncResult("")
         val cloud = state(budgetId, "cloudFileId").orEmpty()
         val group = state(budgetId, "groupId").orEmpty()
         if (cloud.isBlank() || group.isBlank()) return SyncResult(status(budgetId))
@@ -610,14 +679,83 @@ class SyncCoordinator(
                 }
         } ?: emptyList()
 
+    fun setEncryptionPassword(
+        budgetId: String,
+        password: String,
+    ): UnlockResult {
+        if (password.isEmpty()) return UnlockResult.Failed(SyncCopy.PASSWORD_WRONG)
+        if (state(budgetId, "encrypted") == "1") return UnlockResult.Failed(SyncCopy.PASSWORD_WRONG)
+        val salt = BudgetCrypto.newSalt()
+        val key = BudgetCrypto.derive(password, salt)
+        val keyId = ids()
+        val test = BudgetCrypto.testBlob(password, salt)
+        memoryKeys[budgetId] = key
+        library.useDatabase(budgetId) { session ->
+            SyncSchema.putState(session, "keySalt", BudgetCrypto.saltText(salt))
+            SyncSchema.putState(session, "keyTest", test)
+            SyncSchema.putState(session, "keyId", keyId)
+            SyncSchema.putState(session, "encrypted", "1")
+        } ?: return UnlockResult.Failed(SyncCopy.LAST_FAILED)
+        if (!asksEachTime(budgetId)) {
+            secrets.put(keySecret(budgetId), BudgetCrypto.export(key))
+        }
+        return UnlockResult.Unlocked
+    }
+
+    fun changeEncryptionPassword(
+        budgetId: String,
+        currentPassword: String,
+        newPassword: String,
+    ): UnlockResult {
+        if (newPassword.isEmpty()) return UnlockResult.Failed(SyncCopy.PASSWORD_WRONG)
+        val material = localMaterial(budgetId) ?: return UnlockResult.Failed(SyncCopy.PASSWORD_WRONG)
+        BudgetCrypto.verify(currentPassword, material.salt, material.test)
+            ?: return UnlockResult.Failed(SyncCopy.PASSWORD_WRONG)
+        val salt = BudgetCrypto.newSalt()
+        val key = BudgetCrypto.derive(newPassword, salt)
+        val test = BudgetCrypto.testBlob(newPassword, salt)
+        memoryKeys[budgetId] = key
+        library.useDatabase(budgetId) { session ->
+            SyncSchema.putState(session, "keySalt", BudgetCrypto.saltText(salt))
+            SyncSchema.putState(session, "keyTest", test)
+            SyncSchema.putState(session, "encrypted", "1")
+        } ?: return UnlockResult.Failed(SyncCopy.LAST_FAILED)
+        if (!asksEachTime(budgetId)) {
+            secrets.put(keySecret(budgetId), BudgetCrypto.export(key))
+        } else {
+            secrets.remove(keySecret(budgetId))
+        }
+        return UnlockResult.Unlocked
+    }
+
+    fun removeEncryptionPassword(
+        budgetId: String,
+        password: String,
+    ): UnlockResult {
+        val material = localMaterial(budgetId) ?: return UnlockResult.Failed(SyncCopy.PASSWORD_WRONG)
+        BudgetCrypto.verify(password, material.salt, material.test)
+            ?: return UnlockResult.Failed(SyncCopy.PASSWORD_WRONG)
+        memoryKeys.remove(budgetId)
+        secrets.remove(keySecret(budgetId))
+        library.useDatabase(budgetId) { session ->
+            SyncSchema.putState(session, "encrypted", "0")
+            SyncSchema.putState(session, "keySalt", "")
+            SyncSchema.putState(session, "keyTest", "")
+            SyncSchema.putState(session, "keyId", "")
+        } ?: return UnlockResult.Failed(SyncCopy.LAST_FAILED)
+        return UnlockResult.Unlocked
+    }
+
+    fun resetSync(budgetId: String): Boolean = library.resetSync(budgetId)
+
     private fun upload(
         budgetId: String,
         fileId: String?,
         groupId: String?,
         name: String,
     ): UploadResult {
-        val token = secrets.get(TOKEN) ?: return UploadResult.Failed(SyncCopy.SIGN_IN_AGAIN)
-        val address = library.settings().serverAddress ?: return UploadResult.Failed(SyncCopy.ADDRESS_FAILED)
+        val token = syncToken() ?: return UploadResult.Failed(SyncCopy.SIGN_IN_AGAIN)
+        val address = activeAddress() ?: return UploadResult.Failed(SyncCopy.ADDRESS_FAILED)
         val database = java.io.File(java.io.File(library.root, budgetId), "db.sqlite")
         if (!database.isFile) return UploadResult.Failed(SyncCopy.LAST_FAILED)
         val chosen =
@@ -658,7 +796,7 @@ class SyncCoordinator(
         library.useDatabase(budgetId) { session ->
             SyncSchema.putState(session, "lastFailure", kind)
         }
-        if (kind == "auth") secrets.remove(TOKEN)
+        if (kind == "auth") clearActiveToken()
         return SyncResult(if (kind == "auth") SyncCopy.SIGN_IN_AGAIN else SyncCopy.LAST_FAILED)
     }
 
@@ -717,10 +855,45 @@ class SyncCoordinator(
     }
 
     private fun fetchMaterial(file: RemoteFile): KeyMaterial? {
-        val token = secrets.get(TOKEN) ?: throw SyncAuthException(SyncCopy.SIGN_IN_AGAIN)
-        val address = library.settings().serverAddress ?: return null
+        val token = syncToken() ?: throw SyncAuthException(SyncCopy.SIGN_IN_AGAIN)
+        val address = activeAddress() ?: return null
         return transport.encryptionKey(address, token, file.fileId)
     }
+
+    private fun activeAddress(): String? = library.settings().activeAddress()
+
+    private fun upsertConnectedInstance(address: String): SavedInstance {
+        val settings = library.settings()
+        val existing = settings.instances.firstOrNull { it.address == address }
+        val instance =
+            existing
+                ?: SavedInstance(
+                    id = ids(),
+                    address = address,
+                    label = runCatching { java.net.URL(address).host }.getOrNull()?.takeIf { it.isNotBlank() } ?: address,
+                )
+        library.upsertInstance(instance)
+        return instance
+    }
+
+    private fun tokenFor(instanceId: String): String? = secrets.get(tokenKey(instanceId))
+
+    private fun clearActiveToken() {
+        val activeId = library.settings().activeInstanceId
+        if (activeId != null) secrets.remove(tokenKey(activeId))
+        secrets.remove(LEGACY_TOKEN)
+    }
+
+    private fun migrateLegacyToken(activeId: String?): String? {
+        val legacy = secrets.get(LEGACY_TOKEN) ?: return null
+        if (activeId != null) {
+            secrets.put(tokenKey(activeId), legacy)
+            secrets.remove(LEGACY_TOKEN)
+        }
+        return legacy
+    }
+
+    private fun tokenKey(instanceId: String): String = "$TOKEN_PREFIX$instanceId"
 
     private fun localMaterial(fileId: String): KeyMaterial? {
         val salt = state(fileId, "keySalt") ?: return null
@@ -770,7 +943,8 @@ class SyncCoordinator(
     )
 
     companion object {
-        private const val TOKEN = "actual.token"
+        private const val LEGACY_TOKEN = "actual.token"
+        private const val TOKEN_PREFIX = "actual.token."
 
         fun normalizeAddress(raw: String): String? {
             val trimmed = raw.trim().trimEnd('/')

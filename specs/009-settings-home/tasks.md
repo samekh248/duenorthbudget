@@ -18,8 +18,8 @@
 
 **Purpose**: Confirm existing modules and ignore rules; no new Gradle module
 
-- [ ] T001 Verify `.gitignore` covers Android and Gradle outputs (`local.properties`, `.gradle/`, `**/build/`, `*.iml`, `.idea/`, secrets) and that `.specify/feature.json` stays ignored
-- [ ] T002 Confirm no new module is required in `settings.gradle.kts`; work stays in `:core:budget` and `:app` per `plan.md`
+- [X] T001 Verify `.gitignore` covers Android and Gradle outputs (`local.properties`, `.gradle/`, `**/build/`, `*.iml`, `.idea/`, secrets) and that `.specify/feature.json` stays ignored
+- [X] T002 Confirm no new module is required in `settings.gradle.kts`; work stays in `:core:budget` and `:app` per `plan.md`
 
 ---
 
@@ -29,9 +29,9 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T003 Add `SavedInstance` (`id`, `address`, optional `label`) and extend `PhoneSettings` with `instances: List<SavedInstance>` and `activeInstanceId: String?` in `core/budget/src/main/kotlin/app/duenorth/budget/core/Models.kt`; keep legacy `serverAddress` for migration only
-- [ ] T004 Implement read-time migration in `core/budget/src/main/kotlin/app/duenorth/budget/core/BudgetLibrary.kt`: when `serverAddress` is set and `instances` is empty, create one instance with that address, set `activeInstanceId`, and clear `serverAddress` on the next save
-- [ ] T005 [P] JVM tests for migration and active-id rules in `core/budget/src/test/kotlin/app/duenorth/budget/core/InstanceSettingsTest.kt` (legacy `serverAddress` → one instance; at most one active; remove non-active leaves active and local budgets)
+- [X] T003 Add `SavedInstance` (`id`, `address`, optional `label`) and extend `PhoneSettings` with `instances: List<SavedInstance>` and `activeInstanceId: String?` in `core/budget/src/main/kotlin/app/duenorth/budget/core/Models.kt`; keep legacy `serverAddress` for migration only
+- [X] T004 Implement read-time migration in `core/budget/src/main/kotlin/app/duenorth/budget/core/BudgetLibrary.kt`: when `serverAddress` is set and `instances` is empty, create one instance with that address, set `activeInstanceId`, and clear `serverAddress` on the next save
+- [X] T005 [P] JVM tests for migration and active-id rules in `core/budget/src/test/kotlin/app/duenorth/budget/core/InstanceSettingsTest.kt` (legacy `serverAddress` → one instance; at most one active; remove non-active leaves active and local budgets)
 - [ ] T006 Replace the stub settings door with a sectioned hub tagged `settings-screen` in `app/src/main/kotlin/app/duenorth/budget/SettingsScreens.kt` (new) and wire `ShellRoute.Settings` in `app/src/main/kotlin/app/duenorth/budget/DueNorthApp.kt` / `ShellScreens.kt` per `contracts/settings-screens.md` (instance, budgets, appearance, payees; open-budget sections stubbed until later stories)
 
 **Checkpoint**: `phone.json` can hold instances; settings hub opens from the bar.
@@ -46,13 +46,13 @@
 
 ### Tests for User Story 1
 
-- [ ] T007 [P] [US1] JVM tests for password connect against localhost in `core/budget/src/test/kotlin/app/duenorth/budget/core/InstanceConnectTest.kt` (success stores token under `actual.token.<instanceId>` and sets active; auth failure leaves no active instance; network failure shows address-failed copy)
-- [ ] T008 [P] [US1] JVM tests for OpenID handshake against localhost in `core/budget/src/test/kotlin/app/duenorth/budget/core/OpenIdLoginTest.kt` (`login-methods` advertises openid; login returns redirect; callback token activates instance; cancel leaves prior active unchanged)
+- [X] T007 [P] [US1] JVM tests for password connect against localhost in `core/budget/src/test/kotlin/app/duenorth/budget/core/InstanceConnectTest.kt` (success stores token under `actual.token.<instanceId>` and sets active; auth failure leaves no active instance; network failure shows address-failed copy)
+- [X] T008 [P] [US1] JVM tests for OpenID handshake against localhost in `core/budget/src/test/kotlin/app/duenorth/budget/core/OpenIdLoginTest.kt` (`login-methods` advertises openid; login returns redirect; callback token activates instance; cancel leaves prior active unchanged)
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Extend `ActualTransport` / `HttpActualTransport` in `core/budget/src/main/kotlin/app/duenorth/budget/core/ActualTransport.kt` with login-methods discovery and OpenID login (`loginMethod: "openid"` + return URL) per `contracts/instances.md`
-- [ ] T010 [US1] Point `SyncCoordinator.connect` / token storage at the active instance id (`actual.token.<instanceId>`, active address from `PhoneSettings`) in `core/budget/src/main/kotlin/app/duenorth/budget/core/SyncCoordinator.kt`; failed sign-in must not mark active
+- [X] T009 [US1] Extend `ActualTransport` / `HttpActualTransport` in `core/budget/src/main/kotlin/app/duenorth/budget/core/ActualTransport.kt` with login-methods discovery and OpenID login (`loginMethod: "openid"` + return URL) per `contracts/instances.md`
+- [X] T010 [US1] Point `SyncCoordinator.connect` / token storage at the active instance id (`actual.token.<instanceId>`, active address from `PhoneSettings`) in `core/budget/src/main/kotlin/app/duenorth/budget/core/SyncCoordinator.kt`; failed sign-in must not mark active
 - [ ] T011 [US1] Add instance section UI (not connected / active name / add / password sign-in / browser sign-in) in `app/src/main/kotlin/app/duenorth/budget/SettingsScreens.kt` and ViewModel methods in `app/src/main/kotlin/app/duenorth/budget/ShellViewModel.kt`
 - [ ] T012 [US1] Wire Custom Tab + `duenorth://oauth` return in `app/src/main/kotlin/app/duenorth/budget/DueNorthApp.kt` (and manifest if needed) so a successful browser sign-in returns to settings with that instance active
 - [ ] T013 [US1] Keep offline budget edits on the phone path after an instance is active (no wait on server) — verify assign/add still write sqlite before sync in existing `SyncCoordinator` call sites used from settings flows
@@ -69,11 +69,11 @@
 
 ### Tests for User Story 2
 
-- [ ] T014 [P] [US2] JVM tests for switch / remove / sign-out in `core/budget/src/test/kotlin/app/duenorth/budget/core/InstanceSwitchTest.kt` (exactly one active; switch does not merge directories; remove non-active keeps active; remove active clears session; sign-out clears token and keeps files; offline activation persists `activeInstanceId`)
+- [X] T014 [P] [US2] JVM tests for switch / remove / sign-out in `core/budget/src/test/kotlin/app/duenorth/budget/core/InstanceSwitchTest.kt` (exactly one active; switch does not merge directories; remove non-active keeps active; remove active clears session; sign-out clears token and keeps files; offline activation persists `activeInstanceId`)
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Implement make-active, remove, and sign-out on `SyncCoordinator` / `BudgetLibrary` in `core/budget/src/main/kotlin/app/duenorth/budget/core/SyncCoordinator.kt` and `BudgetLibrary.kt` per `contracts/instances.md` (clear remote list on switch/sign-out; never delete local budget directories)
+- [X] T015 [US2] Implement make-active, remove, and sign-out on `SyncCoordinator` / `BudgetLibrary` in `core/budget/src/main/kotlin/app/duenorth/budget/core/SyncCoordinator.kt` and `BudgetLibrary.kt` per `contracts/instances.md` (clear remote list on switch/sign-out; never delete local budget directories)
 - [ ] T016 [US2] Add instance list UI and switch confirmation that names the server left and the server opening in `app/src/main/kotlin/app/duenorth/budget/SettingsScreens.kt`; show "server has not been reached" when active but unreachable
 - [ ] T017 [US2] Ensure sign-out finishes while a sync job may still be running without freezing the UI in `app/src/main/kotlin/app/duenorth/budget/ShellViewModel.kt` (cancel or detach token use; local file remains)
 
@@ -108,12 +108,12 @@
 
 ### Tests for User Story 4
 
-- [ ] T021 [P] [US4] JVM tests for preference read/write in `core/budget/src/test/kotlin/app/duenorth/budget/core/BudgetPreferencesTest.kt` (`dateFormat`, `numberFormat`, `hideFraction`, `firstDayOfWeekIdx`, `flags.experimental` default off; pending sync message when `cloudFileId` set; `budgetType` not writable via settings API)
-- [ ] T022 [P] [US4] JVM tests that `MoneyFormat` / date helpers honor prefs in `core/budget/src/test/kotlin/app/duenorth/budget/core/MoneyFormatTest.kt` (or adjacent) so hide-fraction and number format change the next formatted amount
+- [X] T021 [P] [US4] JVM tests for preference read/write in `core/budget/src/test/kotlin/app/duenorth/budget/core/BudgetPreferencesTest.kt` (`dateFormat`, `numberFormat`, `hideFraction`, `firstDayOfWeekIdx`, `flags.experimental` default off; pending sync message when `cloudFileId` set; `budgetType` not writable via settings API)
+- [X] T022 [P] [US4] JVM tests that `MoneyFormat` / date helpers honor prefs in `core/budget/src/test/kotlin/app/duenorth/budget/core/MoneyFormatTest.kt` (or adjacent) so hide-fraction and number format change the next formatted amount
 
 ### Implementation for User Story 4
 
-- [ ] T023 [US4] Add preference get/set helpers on `BudgetLibrary` in `core/budget/src/main/kotlin/app/duenorth/budget/core/BudgetLibrary.kt` for the keys in `contracts/budget-preferences.md`, including pending `preferences` sync messages when synced
+- [X] T023 [US4] Add preference get/set helpers on `BudgetLibrary` in `core/budget/src/main/kotlin/app/duenorth/budget/core/BudgetLibrary.kt` for the keys in `contracts/budget-preferences.md`, including pending `preferences` sync messages when synced
 - [ ] T024 [US4] Update amount and date formatting paths (`MoneyFormat` in `Models.kt`, register/review date display) to read open-budget prefs so the next painted values update with the settings tap
 - [ ] T025 [US4] Add appearance, formatting, method (read-only), and experimental rows to `app/src/main/kotlin/app/duenorth/budget/SettingsScreens.kt` and wire theme/accent/format/experimental methods in `ShellViewModel.kt` (theme/accent stay in `phone.json` only)
 
@@ -129,14 +129,14 @@
 
 ### Tests for User Story 5
 
-- [ ] T026 [P] [US5] JVM tests for export zip in `core/budget/src/test/kotlin/app/duenorth/budget/core/BudgetExportTest.kt` (contains `metadata.json` + `db.sqlite`; known account/transaction present; file name has no password strings)
-- [ ] T027 [P] [US5] JVM tests for recovery confirmations in `core/budget/src/test/kotlin/app/duenorth/budget/core/BudgetRecoveryTest.kt` (no-op without confirm; rebuild refreshes figures from transactions; repair fixes orphan splits; reset sync clears messages / clock fields but keeps `cloudFileId` and local rows)
+- [X] T026 [P] [US5] JVM tests for export zip in `core/budget/src/test/kotlin/app/duenorth/budget/core/BudgetExportTest.kt` (contains `metadata.json` + `db.sqlite`; known account/transaction present; file name has no password strings)
+- [X] T027 [P] [US5] JVM tests for recovery confirmations in `core/budget/src/test/kotlin/app/duenorth/budget/core/BudgetRecoveryTest.kt` (no-op without confirm; rebuild refreshes figures from transactions; repair fixes orphan splits; reset sync clears messages / clock fields but keeps `cloudFileId` and local rows)
 
 ### Implementation for User Story 5
 
-- [ ] T028 [US5] Implement export zip builder in `core/budget/src/main/kotlin/app/duenorth/budget/core/BudgetLibrary.kt` per `contracts/budget-preferences.md` (offline; display-name-only file name)
-- [ ] T029 [US5] Implement rebuild totals, repair splits, and reset sync (confirmed) in `core/budget/src/main/kotlin/app/duenorth/budget/core/BudgetLibrary.kt` / `SyncCoordinator.kt`
-- [ ] T030 [US5] Add encryption set/change/remove using `BudgetCrypto` in `SyncCoordinator.kt` / settings UI; wrong password reveals no amount; never write password into name, notes, or categories
+- [X] T028 [US5] Implement export zip builder in `core/budget/src/main/kotlin/app/duenorth/budget/core/BudgetLibrary.kt` per `contracts/budget-preferences.md` (offline; display-name-only file name)
+- [X] T029 [US5] Implement rebuild totals, repair splits, and reset sync (confirmed) in `core/budget/src/main/kotlin/app/duenorth/budget/core/BudgetLibrary.kt` / `SyncCoordinator.kt`
+- [X] T030 [US5] Add encryption set/change/remove using `BudgetCrypto` in `SyncCoordinator.kt` / settings UI; wrong password reveals no amount; never write password into name, notes, or categories
 - [ ] T031 [US5] Add export, ids, encryption, and advanced confirmation UI in `app/src/main/kotlin/app/duenorth/budget/SettingsScreens.kt` and share/save wiring in `ShellViewModel.kt` / `DueNorthApp.kt`; hide these sections when no budget is open
 
 **Checkpoint**: Export and recovery match FR-011–FR-014; offline export/rebuild work.

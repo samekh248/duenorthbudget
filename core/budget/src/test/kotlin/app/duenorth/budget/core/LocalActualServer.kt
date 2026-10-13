@@ -18,10 +18,12 @@ import java.util.concurrent.Executors
  */
 class LocalActualServer(
     private val password: String = "server-secret",
+    private val methods: List<String> = listOf("password", "openid"),
 ) : Closeable {
     var beforeSync: () -> Unit = {}
     var rejectToken: Boolean = false
     var online: Boolean = true
+    var openIdCancelled: Boolean = false
 
     private val json = Json { ignoreUnknownKeys = true }
     private val clock = SyncClock("SERVER0000000001")
@@ -32,6 +34,7 @@ class LocalActualServer(
     private val lock = Any()
 
     val baseUrl: String
+    val openIdCallbackPath: String = "/openid/callback"
 
     init {
         http.executor = pool
@@ -124,7 +127,9 @@ class LocalActualServer(
         val path = exchange.requestURI.path
         val method = exchange.requestMethod
         when {
+            method == "GET" && path == "/account/login-methods" -> loginMethods(exchange)
             method == "POST" && path == "/account/login" -> login(exchange)
+            method == "GET" && path == openIdCallbackPath -> openIdCallback(exchange)
             method == "GET" && path == "/sync/list-user-files" -> list(exchange)
             method == "GET" && path == "/sync/download-user-file" -> download(exchange)
             method == "POST" && path == "/sync/upload-user-file" -> upload(exchange)
@@ -134,8 +139,29 @@ class LocalActualServer(
         }
     }
 
+    private fun loginMethods(exchange: HttpExchange) {
+        val listed = methods.joinToString(",") { "\"$it\"" }
+        exchange.respond(
+            200,
+            """{"status":"ok","data":{"methods":[$listed]}}""".toByteArray(),
+            "application/json",
+        )
+    }
+
     private fun login(exchange: HttpExchange) {
         val body = json.parseToJsonElement(exchange.requestBody.readBytes().toString(Charsets.UTF_8)).jsonObject
+        val method = body["loginMethod"]?.jsonPrimitive?.content ?: "password"
+        if (method == "openid") {
+            val returnUrl = body["returnUrl"]?.jsonPrimitive?.content.orEmpty()
+            val redirect = "$baseUrl$openIdCallbackPath?returnUrl=${URLDecoder.decode(returnUrl.ifEmpty { "duenorth://oauth" }, Charsets.UTF_8)}"
+            val text =
+                buildJsonObject {
+                    put("status", "ok")
+                    put("data", buildJsonObject { put("redirect_url", redirect) })
+                }.toString()
+            exchange.respond(200, text.toByteArray(), "application/json")
+            return
+        }
         val given = body["password"]?.jsonPrimitive?.content
         if (given != password) {
             exchange.respond(400, """{"status":"error","reason":"invalid-password"}""".toByteArray(), "application/json")
@@ -148,6 +174,22 @@ class LocalActualServer(
             }.toString()
         exchange.respond(200, text.toByteArray(), "application/json")
     }
+
+    private fun openIdCallback(exchange: HttpExchange) {
+        if (openIdCancelled) {
+            exchange.respond(400, """{"status":"error","reason":"cancelled"}""".toByteArray(), "application/json")
+            return
+        }
+        val text =
+            buildJsonObject {
+                put("status", "ok")
+                put("data", buildJsonObject { put("token", token) })
+            }.toString()
+        exchange.respond(200, text.toByteArray(), "application/json")
+    }
+
+    /** Token returned by password login and OpenID callback (for tests). */
+    fun sessionToken(): String = token
 
     private fun list(exchange: HttpExchange) {
         if (!authorized(exchange)) {

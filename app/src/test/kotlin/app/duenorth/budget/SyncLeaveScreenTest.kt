@@ -96,6 +96,13 @@ class SyncLeaveScreenTest {
             password: String,
         ): String = "token"
 
+        override fun loginMethods(address: String): List<String> = listOf("password")
+
+        override fun beginOpenId(
+            address: String,
+            returnUrl: String,
+        ): String = "$address/openid?returnUrl=$returnUrl"
+
         override fun listFiles(
             address: String,
             token: String,

@@ -17,6 +17,35 @@ class MoneyFormatTest {
     }
 
     @Test
+    fun hideFractionAndNumberFormatChangeNextPaintedAmount() {
+        val usd = Currencies.byCode("USD")!!
+        assertEquals(
+            "$1,800",
+            MoneyFormat.format(180_000, usd, FormatOptions(hideFraction = true)),
+        )
+        assertEquals(
+            "$1.800,00",
+            MoneyFormat.format(180_000, usd, FormatOptions(numberFormat = FormatOptions.NUMBER_DOT_COMMA)),
+        )
+        assertEquals(
+            "$1 800.00",
+            MoneyFormat.format(180_000, usd, FormatOptions(numberFormat = FormatOptions.NUMBER_SPACE_DOT)),
+        )
+        assertEquals(
+            "$1800.00",
+            MoneyFormat.format(180_000, usd, FormatOptions(numberFormat = FormatOptions.NUMBER_COMMA_DOT_NO_GROUP)),
+        )
+        assertEquals(
+            "$1.800",
+            MoneyFormat.format(
+                180_000,
+                usd,
+                FormatOptions(hideFraction = true, numberFormat = FormatOptions.NUMBER_DOT_COMMA),
+            ),
+        )
+    }
+
+    @Test
     fun parseScalesByCurrencyDecimals() {
         assertEquals(2_500L, MoneyFormat.parse("25", 2))
         assertEquals(2_500L, MoneyFormat.parse("25.00", 2))

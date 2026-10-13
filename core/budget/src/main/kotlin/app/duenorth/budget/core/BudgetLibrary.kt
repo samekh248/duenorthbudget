@@ -2,17 +2,21 @@ package app.duenorth.budget.core
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.time.YearMonth
 import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 class BudgetLibrary(
     val root: File,
     private val sessions: SessionOpener,
     private val clock: BudgetClock,
     private val ids: () -> String = { UUID.randomUUID().toString() },
+    private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     private val json =
         Json {
@@ -23,17 +27,215 @@ class BudgetLibrary(
     fun settings(): PhoneSettings {
         val file = phoneFile()
         if (!file.exists()) return PhoneSettings()
-        return json.decodeFromString(PhoneSettings.serializer(), file.readText())
+        var settings = json.decodeFromString(PhoneSettings.serializer(), file.readText())
+        val legacy = settings.serverAddress?.trim()?.trimEnd('/')
+        if (!legacy.isNullOrBlank() && settings.instances.isEmpty()) {
+            val id = ids()
+            val label = instanceHostLabel(legacy)
+            settings =
+                settings.copy(
+                    instances = listOf(SavedInstance(id = id, address = legacy, label = label)),
+                    activeInstanceId = id,
+                )
+            save(settings)
+            settings = settings.copy(serverAddress = null)
+        }
+        return settings
     }
 
     fun save(settings: PhoneSettings) {
         root.mkdirs()
-        writeAtomically(phoneFile(), json.encodeToString(settings))
+        val cleaned =
+            if (settings.instances.isNotEmpty()) {
+                settings.copy(serverAddress = null)
+            } else {
+                settings
+            }
+        writeAtomically(phoneFile(), json.encodeToString(cleaned))
     }
 
     fun updateSettings(block: (PhoneSettings) -> PhoneSettings) {
         save(block(settings()))
     }
+
+    fun upsertInstance(instance: SavedInstance) {
+        updateSettings { settings ->
+            val without = settings.instances.filterNot { it.id == instance.id }
+            settings.copy(instances = without + instance)
+        }
+    }
+
+    fun removeInstance(instanceId: String) {
+        updateSettings { settings ->
+            val remaining = settings.instances.filterNot { it.id == instanceId }
+            val active =
+                if (settings.activeInstanceId == instanceId) {
+                    null
+                } else {
+                    settings.activeInstanceId
+                }
+            settings.copy(instances = remaining, activeInstanceId = active)
+        }
+    }
+
+    fun setActiveInstanceId(instanceId: String?) {
+        updateSettings { settings ->
+            if (instanceId != null && settings.instances.none { it.id == instanceId }) settings
+            else settings.copy(activeInstanceId = instanceId)
+        }
+    }
+
+    fun preference(
+        budgetId: String,
+        id: String,
+    ): String? =
+        open(budgetId) { session ->
+            session.query("SELECT value FROM preferences WHERE id = ?", listOf(id)).firstOrNull()?.str("value")
+        }
+
+    fun setPreference(
+        budgetId: String,
+        id: String,
+        value: String,
+    ): Boolean {
+        if (id == "budgetType") return false
+        return open(budgetId) { session ->
+            SyncSchema.ensure(session)
+            session.exec("INSERT OR REPLACE INTO preferences (id, value) VALUES (?, ?)", listOf(id, value))
+            val cloud = SyncSchema.state(session, "cloudFileId")
+            if (!cloud.isNullOrBlank()) {
+                val syncClock = syncClockFor(session)
+                SyncSchema.recordLocal(session, syncClock, "preferences", id, "value", value)
+            }
+            true
+        } ?: false
+    }
+
+    fun readFormatPrefs(budgetId: String): FormatPrefs =
+        open(budgetId) { session ->
+            fun value(id: String): String? =
+                session.query("SELECT value FROM preferences WHERE id = ?", listOf(id)).firstOrNull()?.str("value")
+            FormatPrefs(
+                dateFormat = value("dateFormat") ?: "MM/dd/yyyy",
+                numberFormat = value("numberFormat") ?: FormatOptions.NUMBER_COMMA_DOT,
+                hideFraction = value("hideFraction") == "true",
+                firstDayOfWeekIdx = value("firstDayOfWeekIdx")?.toIntOrNull()?.coerceIn(0, 6) ?: 0,
+                experimental = value("flags.experimental") == "true",
+                budgetType = value("budgetType") ?: "envelope",
+            )
+        } ?: FormatPrefs()
+
+    fun exportZip(budgetId: String): ByteArray? {
+        val dir = File(root, budgetId)
+        val metadata = File(dir, "metadata.json")
+        val database = File(dir, "db.sqlite")
+        if (!metadata.isFile || !database.isFile) return null
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            zip.putNextEntry(ZipEntry("metadata.json"))
+            zip.write(metadata.readBytes())
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("db.sqlite"))
+            zip.write(database.readBytes())
+            zip.closeEntry()
+        }
+        return output.toByteArray()
+    }
+
+    fun exportFileName(budgetName: String): String {
+        val sanitized =
+            budgetName
+                .trim()
+                .lowercase()
+                .replace(Regex("[^a-z0-9]+"), "-")
+                .trim('-')
+                .ifEmpty { "budget" }
+        return "$sanitized.zip"
+    }
+
+    fun rebuildTotals(budgetId: String): Boolean =
+        open(budgetId) { session ->
+            session
+                .query(
+                    """
+                    SELECT name FROM sqlite_master
+                    WHERE type = 'table' AND (name LIKE '%kvcache%' OR name LIKE '%cache%')
+                    """.trimIndent(),
+                ).forEach { row ->
+                    val name = row.str("name").orEmpty()
+                    if (name.isNotBlank() && name.all { it.isLetterOrDigit() || it == '_' }) {
+                        session.exec("DROP TABLE IF EXISTS \"$name\"")
+                    }
+                }
+            true
+        } ?: false
+
+    fun repairSplits(budgetId: String): Boolean =
+        open(budgetId) { session ->
+            // Empty parents (marked parent, no live children): tombstone them.
+            session
+                .query(
+                    """
+                    SELECT p.id AS id FROM transactions p
+                    WHERE IFNULL(p.isParent, 0) = 1 AND IFNULL(p.tombstone, 0) = 0
+                      AND NOT EXISTS (
+                        SELECT 1 FROM transactions c
+                        WHERE c.parent_id = p.id AND IFNULL(c.tombstone, 0) = 0
+                      )
+                    """.trimIndent(),
+                ).forEach { row ->
+                    session.exec("UPDATE transactions SET tombstone = 1 WHERE id = ?", listOf(row.str("id")))
+                }
+            // Orphan children: parent missing or tombstoned → tombstone the child.
+            session
+                .query(
+                    """
+                    SELECT c.id AS id FROM transactions c
+                    WHERE IFNULL(c.isChild, 0) = 1 AND IFNULL(c.tombstone, 0) = 0
+                      AND (
+                        c.parent_id IS NULL OR c.parent_id = ''
+                        OR NOT EXISTS (
+                          SELECT 1 FROM transactions p
+                          WHERE p.id = c.parent_id AND IFNULL(p.tombstone, 0) = 0
+                        )
+                      )
+                    """.trimIndent(),
+                ).forEach { row ->
+                    session.exec("UPDATE transactions SET tombstone = 1 WHERE id = ?", listOf(row.str("id")))
+                }
+            // Children pointing at a live non-parent: re-link by marking parent.
+            session
+                .query(
+                    """
+                    SELECT DISTINCT c.parent_id AS parent_id FROM transactions c
+                    JOIN transactions p ON p.id = c.parent_id
+                    WHERE IFNULL(c.isChild, 0) = 1 AND IFNULL(c.tombstone, 0) = 0
+                      AND IFNULL(p.tombstone, 0) = 0 AND IFNULL(p.isParent, 0) = 0
+                    """.trimIndent(),
+                ).forEach { row ->
+                    val parentId = row.str("parent_id") ?: return@forEach
+                    session.exec(
+                        "UPDATE transactions SET isParent = 1, isChild = 0, category = NULL WHERE id = ?",
+                        listOf(parentId),
+                    )
+                }
+            true
+        } ?: false
+
+    fun resetSync(budgetId: String): Boolean =
+        open(budgetId) { session ->
+            SyncSchema.ensure(session)
+            val cloud = SyncSchema.state(session, "cloudFileId")
+            val group = SyncSchema.state(session, "groupId")
+            session.exec("DELETE FROM messages")
+            session.exec("DELETE FROM conflicts")
+            listOf("clock", "lastRemote", "lastSuccessEpoch", "lastFailure", "merkle").forEach { key ->
+                session.exec("DELETE FROM sync_state WHERE id = ?", listOf(key))
+            }
+            if (!cloud.isNullOrBlank()) SyncSchema.putState(session, "cloudFileId", cloud)
+            if (!group.isNullOrBlank()) SyncSchema.putState(session, "groupId", group)
+            true
+        } ?: false
 
     fun <T> useDatabase(
         id: String,
@@ -436,6 +638,17 @@ class BudgetLibrary(
     }
 
     private fun phoneFile(): File = File(root, "phone.json")
+
+    private fun instanceHostLabel(address: String): String =
+        runCatching { java.net.URL(address).host }.getOrNull()?.takeIf { it.isNotBlank() } ?: address
+
+    private fun syncClockFor(session: SqlSession): SyncClock {
+        val settings = settings()
+        val node = settings.syncNode?.takeIf { it.length == 16 } ?: "0000000000000000"
+        val clock = SyncClock(node, now)
+        clock.restoreIfBehind(SyncSchema.state(session, "clock"))
+        return clock
+    }
 
     private fun writeAtomically(
         file: File,
