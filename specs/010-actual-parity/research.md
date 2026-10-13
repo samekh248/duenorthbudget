@@ -114,3 +114,18 @@ Running each action through `@actual-app/core` 26.8.1 (and reading its source) c
 | 10 | Desktop's **Spending** report is a month-vs-month cumulative comparison, not spending by category. Spending by category / group / payee is the **custom report** query (`makeQuery`), with transfers and off-budget filtered after the query. Cash flow excludes **all** transfers (`payee.transfer_acct = null`) and stops at today. | `reports/range-2026-06-to-09` | R11, US4 |
 | 11 | Templates: notes are parsed into `categories.goal_def` plus `categories.template_settings = {"source":"notes"}` before every run. `repeat every year` is valid; `repeat every 1 year` is a template error. Check returns `templates-check-passed` or `template-errors` with one line per bad template. | `templates/*` | R12 |
 | 12 | Actual stores `zero_budget_months.id` as `YYYY-MM`. The phone wrote and read it as `YYYYMM`, so holds made on desktop were ignored on the phone. The phone also left hidden categories out of the month math, while Actual counts them. Both were fixed in phase 1 (`ShellReader`), and `ParityFixtureTest` now checks the phone's to-budget against desktop for three months. The phone still writes `YYYYMM`; desktop reads that form too, and phase 2 should switch writes to `YYYY-MM`. | `month/breakdown` | spec 002, Phase 2 |
+
+## R17. What phase 2 found in the phone's sync code
+
+Moving every write onto the funnel showed that the phone's sync was more broken than spec 004's tests could see, because those tests only ever sent phone messages back to the phone.
+
+| # | Finding | Fixed by | Test |
+|---|---|---|---|
+| 1 | **Messages went out without Actual's type prefix.** Actual encodes every value as `N:<number>`, `S:<text>` or `0:` (null), and its `deserializeValue` rejects anything else (read from source). The phone sent `2500` instead of `N:2500`. | `SyncValues`; `recordLocal` stores the wire form, `applyRemote` decodes it, and older pending messages get a prefix on the way out | `SyncDatasetsTest` |
+| 2 | Register, payee, reconcile, rule, schedule and split-repair writes used plain `INSERT`/`UPDATE`, so none of them ever reached the server. Only month and category edits synced. | Every one now calls `SyncSchema.write` / `writeRow` | `SyncDatasetsTest`, `EditJournalTest` |
+| 3 | Reordering categories wrote `sort_order = 0`: the funnel parsed `16384.0` with `toLongOrNull`. | Numeric cells keep fractions | `SyncDatasetsTest.reorderKeepsFractionalSortOrder` |
+| 4 | `JdbcSqlSession.transaction` committed when an inner transaction ended, so a book's outer transaction was not atomic. Android's nests correctly. | Inner calls join the outer transaction | whole suite |
+| 5 | The phone stored schedule next dates as ISO text; Actual stores an integer `20261013` and a millisecond timestamp. | Writes use Actual's form; reads accept both | `ParityBackfillTest` |
+| 6 | Holds now go out with Actual's `YYYY-MM` row id (R16 #12). Phone files whose `zero_budget_months.id` is an integer keep working; the funnel maps the id to the table's type. | `SyncSchema.rowKey` | `SyncDatasetsTest.holdSendsActualsMonthId`, `desktopFilesKeepTextMonthIds` |
+| 7 | The backfill covers rules, schedules and next dates, as the contract says. Register, payee and reconcile edits made on a synced file before this version stay on the phone; the backfill cannot tell them from rows that came from the server. Uploading the phone's copy over the server file (spec 004) is the way to publish them. | Documented | |
+

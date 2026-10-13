@@ -143,6 +143,7 @@ object ActualSchema {
                 "INSERT INTO preferences (id, value) VALUES (?, ?)",
                 listOf("dueNorthSchema", VERSION),
             )
+            ensure(session)
         }
     }
 
@@ -153,6 +154,9 @@ object ActualSchema {
         ensureTransactionScheduleColumn(session)
         ensureTransactionImportColumns(session)
         ensureAccountBankColumns(session)
+        ensureParityTables(session)
+        ensureParityColumns(session)
+        SyncSchema.forgetShapes(session)
     }
 
     private fun ensureAccountType(session: SqlSession) {
@@ -238,6 +242,48 @@ object ActualSchema {
         }
         if ("account_sync_source" !in names) {
             session.exec("ALTER TABLE accounts ADD COLUMN account_sync_source TEXT")
+        }
+    }
+
+    /** Spec 010: tables desktop files carry that phone files lacked. */
+    private fun ensureParityTables(session: SqlSession) {
+        val tables = session.query("SELECT name FROM sqlite_master WHERE type = 'table'").mapNotNull { it.str("name") }.toSet()
+        if ("preferences" !in tables) return
+        if ("notes" !in tables) {
+            session.exec("CREATE TABLE notes (id TEXT PRIMARY KEY, note TEXT)")
+        }
+        if ("banks" !in tables) {
+            session.exec(
+                "CREATE TABLE banks (id TEXT PRIMARY KEY, bank_id TEXT, name TEXT, tombstone INTEGER NOT NULL DEFAULT 0)",
+            )
+        }
+    }
+
+    /** Spec 010: columns the sync funnel writes, added where a phone file lacks them. */
+    private fun ensureParityColumns(session: SqlSession) {
+        val wanted =
+            mapOf(
+                "accounts" to
+                    listOf(
+                        "bank" to "TEXT",
+                        "balance_current" to "INTEGER",
+                        "balance_available" to "INTEGER",
+                        "balance_limit" to "INTEGER",
+                        "last_sync" to "TEXT",
+                    ),
+                "categories" to listOf("goal_def" to "TEXT", "template_settings" to "TEXT"),
+                "zero_budgets" to listOf("goal" to "INTEGER", "long_goal" to "INTEGER"),
+                "reflect_budgets" to listOf("goal" to "INTEGER", "long_goal" to "INTEGER"),
+                "schedules" to listOf("active" to "INTEGER NOT NULL DEFAULT 0"),
+                "schedules_next_date" to listOf("tombstone" to "INTEGER NOT NULL DEFAULT 0"),
+                "payees" to listOf("learn_categories" to "INTEGER NOT NULL DEFAULT 1"),
+            )
+        for ((table, additions) in wanted) {
+            val names = session.query("PRAGMA table_info($table)").mapNotNull { it.str("name") }.toSet()
+            if (names.isEmpty()) continue
+            for ((column, type) in additions) {
+                if (column !in names) session.exec("ALTER TABLE $table ADD COLUMN $column $type")
+            }
         }
     }
 }

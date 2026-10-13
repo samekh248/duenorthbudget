@@ -96,7 +96,9 @@ class EnvelopeBook(
     ): EnvelopeEditResult {
         if (amountMinor < 0L) return EnvelopeEditResult.Rejected(EnvelopeCopy.ENTER_AMOUNT)
         if (amountMinor > toBudgetMinor) return EnvelopeEditResult.Rejected(EnvelopeCopy.HOLD_TOO_MUCH)
-        SyncSchema.recordLocal(session, clock, "zero_budget_months", month.toString(), "buffered", amountMinor.toString())
+        // Actual's row id is the month as "2026-10"; SyncSchema maps it onto older phone files.
+        val row = "%04d-%02d".format(month / 100, month % 100)
+        SyncSchema.recordLocal(session, clock, "zero_budget_months", row, "buffered", amountMinor.toString())
         return EnvelopeEditResult.Saved
     }
 

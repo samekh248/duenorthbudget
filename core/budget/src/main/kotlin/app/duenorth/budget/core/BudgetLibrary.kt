@@ -18,6 +18,9 @@ class BudgetLibrary(
     private val ids: () -> String = { UUID.randomUUID().toString() },
     private val now: () -> Long = { System.currentTimeMillis() },
 ) {
+    /** Undo steps for the open budget (spec 010). */
+    val journal = EditJournal()
+
     private val json =
         Json {
             ignoreUnknownKeys = true
@@ -184,7 +187,7 @@ class BudgetLibrary(
                       )
                     """.trimIndent(),
                 ).forEach { row ->
-                    session.exec("UPDATE transactions SET tombstone = 1 WHERE id = ?", listOf(row.str("id")))
+                    SyncSchema.write(session, "transactions", row.str("id").orEmpty(), "tombstone", 1)
                 }
             // Orphan children: parent missing or tombstoned → tombstone the child.
             session
@@ -201,7 +204,7 @@ class BudgetLibrary(
                       )
                     """.trimIndent(),
                 ).forEach { row ->
-                    session.exec("UPDATE transactions SET tombstone = 1 WHERE id = ?", listOf(row.str("id")))
+                    SyncSchema.write(session, "transactions", row.str("id").orEmpty(), "tombstone", 1)
                 }
             // Children pointing at a live non-parent: re-link by marking parent.
             session
@@ -214,9 +217,13 @@ class BudgetLibrary(
                     """.trimIndent(),
                 ).forEach { row ->
                     val parentId = row.str("parent_id") ?: return@forEach
-                    session.exec(
-                        "UPDATE transactions SET isParent = 1, isChild = 0, category = NULL WHERE id = ?",
-                        listOf(parentId),
+                    SyncSchema.writeRow(
+                        session,
+                        "transactions",
+                        parentId,
+                        "isParent" to 1,
+                        "isChild" to 0,
+                        "category" to null,
                     )
                 }
             true
@@ -388,6 +395,14 @@ class BudgetLibrary(
             ShellReader.loadCategoryManage(session)
         }
 
+    /** Undoes the newest step on [budgetId]; see `contracts/undo.md`. */
+    fun undo(budgetId: String): UndoResult =
+        open(budgetId) { session -> journal.undo(session, budgetId, SyncSchema.clockFor(session)) } ?: UndoResult.Empty
+
+    fun canUndo(budgetId: String): Boolean = journal.canUndo(budgetId)
+
+    fun undoLabel(budgetId: String): String? = journal.newestLabel(budgetId)
+
     fun readRegister(
         budgetId: String,
         accountId: String,
@@ -401,7 +416,7 @@ class BudgetLibrary(
     fun saveTransaction(
         budgetId: String,
         draft: TransactionDraft,
-    ): WriteResult = open(budgetId) { RegisterBook(it).save(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    ): WriteResult = edit(budgetId, UndoCopy.SAVE_TRANSACTION) { RegisterBook(it).save(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun setTransactionCategory(
         budgetId: String,
@@ -409,7 +424,7 @@ class BudgetLibrary(
         categoryId: String?,
         force: Boolean,
     ): WriteResult =
-        open(budgetId) { RegisterBook(it).setCategory(transactionId, categoryId, force) }
+        edit(budgetId, UndoCopy.CATEGORIZE) { RegisterBook(it).setCategory(transactionId, categoryId, force) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun deleteTransaction(
@@ -417,7 +432,7 @@ class BudgetLibrary(
         transactionId: String,
         force: Boolean,
     ): WriteResult =
-        open(budgetId) { RegisterBook(it).delete(transactionId, force) }
+        edit(budgetId, UndoCopy.DELETE_TRANSACTION) { RegisterBook(it).delete(transactionId, force) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun splitTransaction(
@@ -426,7 +441,7 @@ class BudgetLibrary(
         parts: List<SplitPart>,
         force: Boolean,
     ): WriteResult =
-        open(budgetId) { RegisterBook(it).split(transactionId, parts, force) }
+        edit(budgetId, UndoCopy.SPLIT) { RegisterBook(it).split(transactionId, parts, force) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun unsplitTransaction(
@@ -434,13 +449,13 @@ class BudgetLibrary(
         transactionId: String,
         force: Boolean,
     ): WriteResult =
-        open(budgetId) { RegisterBook(it).unsplit(transactionId, force) }
+        edit(budgetId, UndoCopy.UNSPLIT) { RegisterBook(it).unsplit(transactionId, force) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun transfer(
         budgetId: String,
         draft: TransferDraft,
-    ): WriteResult = open(budgetId) { RegisterBook(it).transfer(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    ): WriteResult = edit(budgetId, UndoCopy.TRANSFER) { RegisterBook(it).transfer(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun readMonthReview(
         budgetId: String,
@@ -482,7 +497,7 @@ class BudgetLibrary(
         budgetId: String,
         accountId: String,
     ): ReconcileFinishResult =
-        open(budgetId) { ReconcileBook(it).finish(accountId) }
+        edit(budgetId, UndoCopy.RECONCILE) { ReconcileBook(it).finish(accountId) }
             ?: ReconcileFinishResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun cancelReconcile(
@@ -498,14 +513,14 @@ class BudgetLibrary(
         scheduleId: String,
         forceDuplicate: Boolean = false,
     ): ScheduleWriteResult =
-        open(budgetId) { SchedulesBook(it, clock).post(scheduleId, forceDuplicate) }
+        edit(budgetId, UndoCopy.POST_SCHEDULE) { SchedulesBook(it, clock).post(scheduleId, forceDuplicate) }
             ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun skipSchedule(
         budgetId: String,
         scheduleId: String,
     ): ScheduleWriteResult =
-        open(budgetId) { SchedulesBook(it, clock).skip(scheduleId) }
+        edit(budgetId, UndoCopy.SKIP_SCHEDULE) { SchedulesBook(it, clock).skip(scheduleId) }
             ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun createScheduleFromTransaction(
@@ -515,14 +530,16 @@ class BudgetLibrary(
         nextDateIso: String,
         occurrences: Int? = null,
     ): ScheduleWriteResult =
-        open(budgetId) { SchedulesBook(it, clock).createFromTransaction(transactionId, frequency, nextDateIso, occurrences) }
+        edit(budgetId, UndoCopy.SAVE_SCHEDULE) {
+            SchedulesBook(it, clock).createFromTransaction(transactionId, frequency, nextDateIso, occurrences)
+        }
             ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun deleteSchedule(
         budgetId: String,
         scheduleId: String,
     ): ScheduleWriteResult =
-        open(budgetId) { SchedulesBook(it, clock).delete(scheduleId) }
+        edit(budgetId, UndoCopy.DELETE_SCHEDULE) { SchedulesBook(it, clock).delete(scheduleId) }
             ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun listPayees(budgetId: String): List<PayeeRow> =
@@ -535,7 +552,7 @@ class BudgetLibrary(
         confirmMerge: Boolean = false,
         rememberRule: Boolean = false,
     ): PayeeWriteResult =
-        open(budgetId) { PayeeBook(it).rename(payeeId, newName, confirmMerge, rememberRule) }
+        edit(budgetId, UndoCopy.RENAME_PAYEE) { PayeeBook(it).rename(payeeId, newName, confirmMerge, rememberRule) }
             ?: PayeeWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun setRuleEnabled(
@@ -558,7 +575,7 @@ class BudgetLibrary(
         accountId: String,
         candidates: List<ParsedImportRow>,
     ): ImportConfirmResult? =
-        open(budgetId) { ImportBook(it, ids).confirm(accountId, candidates) }
+        edit(budgetId, UndoCopy.IMPORT) { ImportBook(it, ids).confirm(accountId, candidates) }
 
     fun readImportReview(budgetId: String): ImportReviewPage? =
         open(budgetId) { ImportBook(it, ids).readReview() }
@@ -572,7 +589,7 @@ class BudgetLibrary(
         transactionId: String,
         categoryId: String?,
     ): WriteResult =
-        open(budgetId) { ImportBook(it, ids).setReviewCategory(transactionId, categoryId) }
+        edit(budgetId, UndoCopy.CATEGORIZE) { ImportBook(it, ids).setReviewCategory(transactionId, categoryId) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun bankLinked(
@@ -594,6 +611,7 @@ class BudgetLibrary(
     fun switchTo(id: String): Boolean {
         val target = summary(File(root, id)) ?: return false
         val settings = settings()
+        journal.switchTo(target.id)
         if (settings.openBudgetId == target.id) return true
         save(settings.copy(openBudgetId = target.id))
         return true
@@ -607,9 +625,16 @@ class BudgetLibrary(
         if (!database.isFile) return null
         return sessions.use(database) { session ->
             ActualSchema.ensure(session)
-            block(session)
+            SyncSchema.withClock(session, syncClockFor(session)) { block(session) }
         }
     }
+
+    /** [open] as one undo step labelled [label]. */
+    private fun <T> edit(
+        id: String,
+        label: String,
+        block: (SqlSession) -> T,
+    ): T? = open(id) { session -> journal.step(session, id, label) { block(session) } }
 
     private fun summary(dir: File): BudgetSummary? {
         val metadata = readMetadata(dir) ?: return null
@@ -646,7 +671,7 @@ class BudgetLibrary(
         val settings = settings()
         val node = settings.syncNode?.takeIf { it.length == 16 } ?: "0000000000000000"
         val clock = SyncClock(node, now)
-        clock.restoreIfBehind(SyncSchema.state(session, "clock"))
+        SyncSchema.restore(session, clock)
         return clock
     }
 

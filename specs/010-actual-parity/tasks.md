@@ -46,20 +46,20 @@ flowchart LR
 
 ### Tests for the foundation
 
-- [ ] T005 [P] JVM sync tests in `core-test/SyncDatasetsTest.kt`: each new dataset and column (`rules`, `schedules`, `schedules_next_date`, `notes`, `banks`, bank columns on `accounts`, `categories.goal_def`, `goal` / `long_goal`) round-trips through `LocalActualServer` and applies remotely
-- [ ] T006 [P] JVM tests for the upgrade backfill in `core-test/ParityBackfillTest.kt`: rules and schedules written with plain SQL before upgrade get pending messages once; a second open emits nothing; files without sync state are untouched
-- [ ] T007 [P] JVM tests for the journal in `core-test/EditJournalTest.kt`: a step captures old and new values per cell, a new row records null old, undo writes old values as new pending messages, a remote change to a cell turns undo into a conflict with no write, the stack caps at 100 and clears on budget switch
+- [X] T005 [P] JVM sync tests in `core-test/SyncDatasetsTest.kt`: each new dataset and column (`rules`, `schedules`, `schedules_next_date`, `notes`, `banks`, bank columns on `accounts`, `categories.goal_def`, `goal` / `long_goal`) round-trips through `LocalActualServer` and applies remotely
+- [X] T006 [P] JVM tests for the upgrade backfill in `core-test/ParityBackfillTest.kt`: rules and schedules written with plain SQL before upgrade get pending messages once; a second open emits nothing; files without sync state are untouched
+- [X] T007 [P] JVM tests for the journal in `core-test/EditJournalTest.kt`: a step captures old and new values per cell, a new row records null old, undo writes old values as new pending messages, a remote change to a cell turns undo into a conflict with no write, the stack caps at 100 and clears on budget switch
 
 ### Implementation for the foundation
 
-- [ ] T008 Add `notes` and `banks` tables (`CREATE TABLE IF NOT EXISTS`) and guarded `ALTER TABLE` for `accounts` bank columns, `categories.goal_def`, and `goal` / `long_goal` on `zero_budgets` and `reflect_budgets` in `core/…/core/ActualSchema.kt`
-- [ ] T009 Widen the column map, numeric set, and `ensureRow` for the new datasets in `core/…/core/SyncSchema.kt` per `contracts/sync-datasets.md`
-- [ ] T010 Create `core/…/core/EditJournal.kt` (`step(label) { }`, cell capture, `undo()` with conflict check, 100-step cap) and hook capture into `SyncSchema.recordLocal` when a step is open
-- [ ] T011 Move `RulesBook.insertRule`, `insertPayeeCategoryRule`, `insertPayeeRenameRule` in `core/…/core/RuleEngine.kt` and every `schedules` / `schedules_next_date` write in `core/…/core/Schedules.kt` onto `recordLocal`
-- [ ] T012 Implement the once-per-budget backfill (guard `sync_state` id `parity-backfill`) in `core/…/core/SyncSchema.kt` and call it from `SyncCoordinator` on open in `core/…/core/SyncCoordinator.kt`
-- [ ] T013 Feed remote conflicts from undo into spec 004's conflict list in `core/…/core/SyncCoordinator.kt`
-- [ ] T014 Own the undo stack in `ShellViewModel` (new `app/…/ShellViewModel+Undo.kt`): clear on budget switch, expose `canUndo` and the newest step's label
-- [ ] T015 Wrap existing person-level writes (assign, move, hold, carryover, category manage, transaction save/edit/delete/split, schedule post/skip) in `EditJournal.step` in `core/…/core/EnvelopeMonth.kt`, `Register.kt`, `Schedules.kt`
+- [X] T008 Add `notes` and `banks` tables (`CREATE TABLE IF NOT EXISTS`) and guarded `ALTER TABLE` for `accounts` bank columns, `categories.goal_def`, and `goal` / `long_goal` on `zero_budgets` and `reflect_budgets` in `core/…/core/ActualSchema.kt`
+- [X] T009 Widen the column map, numeric set, and `ensureRow` for the new datasets in `core/…/core/SyncSchema.kt` per `contracts/sync-datasets.md`
+- [X] T010 Create `core/…/core/EditJournal.kt` (`step(label) { }`, cell capture, `undo()` with conflict check, 100-step cap) and hook capture into `SyncSchema.recordLocal` when a step is open
+- [X] T011 Move `RulesBook.insertRule`, `insertPayeeCategoryRule`, `insertPayeeRenameRule` in `core/…/core/RuleEngine.kt` and every `schedules` / `schedules_next_date` write in `core/…/core/Schedules.kt` onto `recordLocal`
+- [X] T012 Implement the once-per-budget backfill (guard `sync_state` id `parity-backfill`) in `core/…/core/SyncSchema.kt` and call it from `SyncCoordinator` on open in `core/…/core/SyncCoordinator.kt`
+- [X] T013 Feed remote conflicts from undo into spec 004's conflict list in `core/…/core/SyncCoordinator.kt`
+- [ ] T014 *(Deferred to T069: `:app` cannot build in the cloud session. Core already clears the stack on budget switch and exposes `BudgetLibrary.canUndo` / `undoLabel` / `undo`.)* Own the undo stack in `ShellViewModel` (new `app/…/ShellViewModel+Undo.kt`): clear on budget switch, expose `canUndo` and the newest step's label
+- [X] T015 Wrap existing person-level writes (assign, move, hold, carryover, category manage, transaction save/edit/delete/split, schedule post/skip) in `EditJournal.step` in `core/…/core/EnvelopeMonth.kt`, `Register.kt`, `Schedules.kt`
 
 **Checkpoint**: Rules and schedules made on the phone now sync, and every existing edit can be undone in core. Spec 004 sync tests still pass.
 

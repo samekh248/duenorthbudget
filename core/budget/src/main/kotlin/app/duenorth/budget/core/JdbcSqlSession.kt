@@ -44,6 +44,11 @@ class JdbcSqlSession(
     }
 
     override fun transaction(body: () -> Unit) {
+        // Nested calls join the outer transaction, as Android's SQLiteDatabase does.
+        if (!connection.autoCommit) {
+            body()
+            return
+        }
         val previous = connection.autoCommit
         connection.autoCommit = false
         try {

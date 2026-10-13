@@ -99,10 +99,7 @@ class PayeeBook(
             merge(payeeId, collision, rememberRule)
             return PayeeWriteResult.Saved
         }
-        session.exec(
-            "UPDATE payees SET name = ? WHERE id = ?",
-            listOf(trimmed, payeeId),
-        )
+        SyncSchema.write(session, "payees", payeeId, "name", trimmed)
         if (rememberRule) {
             rules.insertPayeeRenameRule(payeeId, payeeId)
         }
@@ -122,7 +119,7 @@ class PayeeBook(
                 ).first()
                 .long("n")
         if (count > 0) return PayeeWriteResult.Rejected(PayeeCopy.IN_USE)
-        session.exec("UPDATE payees SET tombstone = 1 WHERE id = ?", listOf(payeeId))
+        SyncSchema.write(session, "payees", payeeId, "tombstone", 1)
         return PayeeWriteResult.Saved
     }
 
@@ -131,11 +128,11 @@ class PayeeBook(
         toId: String,
         rememberRule: Boolean,
     ) {
-        session.exec(
-            "UPDATE transactions SET description = ? WHERE description = ?",
-            listOf(toId, fromId),
-        )
-        session.exec("UPDATE payees SET tombstone = 1 WHERE id = ?", listOf(fromId))
+        session
+            .query("SELECT id FROM transactions WHERE description = ?", listOf(fromId))
+            .mapNotNull { it.str("id") }
+            .forEach { id -> SyncSchema.write(session, "transactions", id, "description", toId) }
+        SyncSchema.write(session, "payees", fromId, "tombstone", 1)
         if (rememberRule) {
             rules.insertPayeeRenameRule(fromId, toId)
         }

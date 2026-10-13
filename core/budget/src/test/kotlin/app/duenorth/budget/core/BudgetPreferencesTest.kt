@@ -61,7 +61,7 @@ class BudgetPreferencesTest {
         assertEquals("preferences", pending.str("dataset"))
         assertEquals("hideFraction", pending.str("row"))
         assertEquals("value", pending.str("column"))
-        assertEquals("true", pending.str("value"))
+        assertEquals("S:true", pending.str("value"))
         assertEquals(1L, pending.long("pending"))
     }
 
