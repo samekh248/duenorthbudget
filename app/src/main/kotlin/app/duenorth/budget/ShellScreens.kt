@@ -427,12 +427,12 @@ fun BudgetSection(
                 if (shell.groups.any { it.categories.isNotEmpty() }) {
                     item(key = "ledger-headings") { LedgerHeadings() }
                 }
-                shell.groups.forEach { group ->
+                shell.groups.forEachIndexed { index, group ->
                     item(key = group.id) {
                         GroupLine(
                             group,
                             shell,
-                            arrivalModifier(group.id, arrivals),
+                            arrivalModifier(group.id, arrivals).then(groupGap(index > 0)),
                             formatOptions = formatOptions,
                         )
                     }
@@ -440,9 +440,14 @@ fun BudgetSection(
                         CategoryLine(category, shell, onCategory, formatOptions = formatOptions)
                     }
                 }
-                shell.incomeGroups.forEach { group ->
+                shell.incomeGroups.forEachIndexed { index, group ->
                     item(key = "income-${group.id}") {
-                        IncomeGroupLine(group, shell, formatOptions = formatOptions)
+                        IncomeGroupLine(
+                            group,
+                            shell,
+                            groupGap(index > 0 || shell.groups.isNotEmpty()),
+                            formatOptions = formatOptions,
+                        )
                     }
                     items(group.categories, key = { "income-category-${it.id}" }) { category ->
                         IncomeCategoryLine(category, shell, onCategory, formatOptions = formatOptions)
@@ -452,6 +457,9 @@ fun BudgetSection(
         }
     }
 }
+
+/** Air above every group but the first, so each group reads as its own block. */
+private fun groupGap(apart: Boolean): Modifier = if (apart) Modifier.padding(top = MetroDimens.Grid) else Modifier
 
 @Composable
 private fun BudgetTotal(
