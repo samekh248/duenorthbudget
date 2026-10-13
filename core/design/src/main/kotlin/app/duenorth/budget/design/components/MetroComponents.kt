@@ -1,5 +1,8 @@
 package app.duenorth.budget.design.components
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,15 +17,19 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +37,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -41,11 +49,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -55,11 +65,10 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.duenorth.budget.design.PanoramaMotion
+import app.duenorth.budget.design.metroTilt
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
-import app.duenorth.budget.design.theme.MetroFonts
 import app.duenorth.budget.design.theme.MetroWeights
 import kotlinx.coroutines.launch
 
@@ -222,6 +231,17 @@ data class AppBarButton(
     val id: String = label,
 )
 
+private const val EXPAND_MS = 200
+
+/** Metro's ease out, used for the bar opening and closing. */
+private val AppBarEasing = CubicBezierEasing(0.1f, 0.9f, 0.2f, 1f)
+
+/**
+ * The WP8.1 Application Bar, as in due north tasks: round outlined buttons centered along the
+ * bottom and an ellipsis near the top right that expands the bar to show their labels and the
+ * menu. Running any action closes an expanded bar, and inside a [MetroAppBarHost] so does
+ * touching anything outside it.
+ */
 @Composable
 fun MetroAppBar(
     actions: List<ScreenAction>,
@@ -232,27 +252,42 @@ fun MetroAppBar(
     val colors = Metro.colors
     val primary = actions.filter { it.primary }
     val secondary = actions.filter { !it.primary }
-    Column(modifier.fillMaxWidth().background(colors.chrome)) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = MetroDimens.AppBar),
-        ) {
+    val collapse by rememberUpdatedState { onExpandedChange(false) }
+    val host = LocalAppBarHost.current
+    val registration = remember { ExpandedAppBar(collapse = { collapse() }) }
+    if (host != null) {
+        DisposableEffect(host, expanded) {
+            if (expanded) host.expanded = registration
+            onDispose { if (host.expanded === registration) host.expanded = null }
+        }
+    }
+    Column(
+        modifier
+            .fillMaxWidth()
+            .then(
+                if (host != null) {
+                    Modifier.onGloballyPositioned { registration.boundsInWindow = it.boundsInWindow() }
+                } else {
+                    Modifier
+                },
+            ).background(colors.chrome)
+            .animateContentSize(tween(EXPAND_MS, easing = AppBarEasing)),
+    ) {
+        Box(Modifier.fillMaxWidth().heightIn(min = MetroDimens.AppBar)) {
             Row(
-                Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .padding(end = 56.dp),
-                horizontalArrangement = Arrangement.spacedBy(MetroDimens.ControlGap, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
+                Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(MetroDimens.AppBarGap),
             ) {
                 primary.forEach { action ->
-                    AppBarIcon(action, expanded)
+                    AppBarIcon(action, expanded) {
+                        onExpandedChange(false)
+                        action.run()
+                    }
                 }
             }
             Box(
                 Modifier
-                    .align(Alignment.CenterEnd)
+                    .align(Alignment.TopEnd)
                     .size(width = 56.dp, height = MetroDimens.TouchTarget)
                     .testTag("app-bar-ellipsis")
                     .clickable(
@@ -260,90 +295,86 @@ fun MetroAppBar(
                         indication = null,
                         role = Role.Button,
                         onClick = { onExpandedChange(!expanded) },
-                    ),
-                contentAlignment = Alignment.Center,
+                    ).semantics { contentDescription = if (expanded) "less" else "more" }
+                    // A full 48dp target, with the dots where WP8.1 draws them near the top edge.
+                    .padding(top = 6.dp),
+                contentAlignment = Alignment.TopCenter,
             ) {
-                MetroText("•••", EllipsisLabel, color = colors.foreground)
+                EllipsisDots(colors.foreground)
             }
         }
         if (expanded && secondary.isNotEmpty()) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Gutter),
-            ) {
+            Column(Modifier.padding(start = MetroDimens.Gutter * 2, bottom = MetroDimens.Gutter)) {
                 secondary.forEach { action ->
-                    Box(
+                    MetroText(
+                        action.label,
+                        Metro.typography.subheader,
                         Modifier
                             .fillMaxWidth()
-                            .heightIn(min = MetroDimens.TouchTarget)
-                            .metroPress(action.run)
+                            .metroTilt()
                             .testTag("app-bar-menu-${action.id}")
-                            .padding(horizontal = MetroDimens.Gutter),
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            AppGlyphIcon(action.glyph)
-                            MetroText(action.label, Metro.typography.body)
-                        }
-                    }
+                            .clickable(interactionSource = null, indication = null, role = Role.Button) {
+                                onExpandedChange(false)
+                                action.run()
+                            }.heightIn(min = MetroDimens.TouchTarget)
+                            .padding(vertical = 10.dp),
+                    )
                 }
             }
         }
     }
 }
 
-private val AppBarLabel =
-    TextStyle(
-        fontFamily = MetroFonts.family,
-        fontWeight = MetroWeights.Regular,
-        fontSize = 9.5.sp,
-    )
-
-private val EllipsisLabel =
-    TextStyle(
-        fontFamily = MetroFonts.family,
-        fontWeight = MetroWeights.Semilight,
-        fontSize = 20.sp,
-    )
+/** The three small dots of the WP8.1 ellipsis. */
+@Composable
+private fun EllipsisDots(color: Color) {
+    Canvas(Modifier.size(20.dp)) {
+        val u = size.minDimension / 24f
+        for (x in listOf(6f, 12f, 18f)) drawCircle(color, radius = 1.4f * u, center = Offset(x * u, 12f * u))
+    }
+}
 
 @Composable
 private fun AppBarIcon(
     action: ScreenAction,
-    expanded: Boolean,
+    showLabel: Boolean,
+    onClick: () -> Unit,
 ) {
     val colors = Metro.colors
-    val animations = Metro.animations
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        Modifier
+            .width(MetroDimens.AppBarSlot)
+            .metroTilt()
+            .testTag("app-bar-${action.id}")
+            .clickable(
+                interactionSource = null,
+                indication = null,
+                onClickLabel = action.label,
+                role = Role.Button,
+                onClick = onClick,
+            ).semantics { contentDescription = action.label },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Box(
             Modifier
-                .size(MetroDimens.TouchTarget)
-                .testTag("app-bar-${action.id}")
-                .clickable(
-                    interactionSource = interaction,
-                    indication = null,
-                    role = Role.Button,
-                    onClick = action.run,
-                ).graphicsLayer { rotationZ = if (pressed && animations) 2.5f else 0f },
+                .size(MetroDimens.AppBarIcon)
+                .border(MetroDimens.AppBarStroke, colors.foreground, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Box(
-                Modifier
-                    .size(MetroDimens.AppBarIcon)
-                    .border(MetroDimens.Stroke, colors.foreground, CircleShape)
-                    .background(if (pressed) colors.foreground else Color.Transparent, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                AppGlyphIcon(action.glyph, if (pressed) colors.background else colors.foreground)
-            }
+            AppGlyphIcon(action.glyph)
         }
-        if (expanded) {
-            MetroText(action.label, AppBarLabel, color = colors.foreground)
+        if (showLabel) {
+            MetroText(
+                action.label,
+                Metro.typography.caption,
+                // Longer labels ("categories") may run a little past the slot, never wrap.
+                Modifier.wrapContentWidth(unbounded = true).padding(top = 4.dp, bottom = 6.dp),
+                color = colors.foreground,
+                maxLines = 1,
+                softWrap = false,
+            )
+        } else {
+            Box(Modifier.height(4.dp))
         }
     }
 }

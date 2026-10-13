@@ -298,17 +298,23 @@ object MetroDimens {
      */
     val Row = 12.dp
 
-    /** Gap between icon buttons, clear of the ellipsis. */
-    val ControlGap = 16.dp
+    /** Gap between app-bar button slots, as in due north tasks. */
+    val AppBarGap = 20.dp
 
     val TouchTarget = 48.dp
     val Peek = 40.dp
 
-    /** CommandBar closed height. */
-    val AppBar = 57.5.dp
+    /** Application bar closed height, as in due north tasks. */
+    val AppBar = 72.dp
 
-    /** AppBarButton ellipse. */
-    val AppBarIcon = 38.5.dp
+    /** App-bar button circle: a full touch target. */
+    val AppBarIcon = 48.dp
+
+    /** App-bar button circle stroke. */
+    val AppBarStroke = 2.dp
+
+    /** Width of one app-bar button and its label. */
+    val AppBarSlot = 64.dp
 
     /** PhoneStrokeThickness and the app-bar circle stroke. */
     val Stroke = 2.5.dp
