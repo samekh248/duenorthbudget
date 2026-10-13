@@ -13,7 +13,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.FormatPrefs
@@ -83,9 +83,9 @@ class SettingsContentTest {
                 }
             }
         }
-        compose.onNodeWithTag("settings-budget-a").assertIsDisplayed()
-        compose.onNodeWithTag("settings-budget-b").assertTextEquals("Beta  open")
-        compose.onNodeWithTag("settings-formatting").assertIsDisplayed()
+        compose.onNodeWithTag("settings-budget-a").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("settings-budget-b").performScrollTo().assertTextEquals("Beta  open")
+        compose.onNodeWithTag("settings-formatting").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -133,8 +133,8 @@ class SettingsContentTest {
                 }
             }
         }
-        compose.onNodeWithTag("settings-create-error").assertTextEquals(ShellCopy.ENTER_NAME)
-        compose.onNodeWithTag("settings-create").performClick()
+        compose.onNodeWithTag("settings-create-error").performScrollTo().assertTextEquals(ShellCopy.ENTER_NAME)
+        compose.onNodeWithTag("settings-create").performScrollTo().performClick()
         assertEquals("", createdName)
         assertTrue(createdName!!.trim().isEmpty())
     }
@@ -189,8 +189,8 @@ class SettingsContentTest {
         compose.onNodeWithTag("settings-export").assertDoesNotExist()
         compose.onNodeWithTag("settings-encryption").assertDoesNotExist()
         compose.onNodeWithTag("settings-advanced").assertDoesNotExist()
-        compose.onNodeWithText("appearance").assertIsDisplayed()
         compose.onNodeWithTag("instance-status").assertIsDisplayed()
+        compose.onNodeWithText("appearance").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -242,7 +242,7 @@ class SettingsContentTest {
                 }
             }
         }
-        compose.onNodeWithTag("settings-theme-dark").performClick()
+        compose.onNodeWithTag("settings-theme-dark").performScrollTo().performClick()
         assertEquals(ThemeMode.DARK.stored(), theme)
         assertTrue(theme == "dark")
     }
