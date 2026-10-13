@@ -216,6 +216,8 @@ data class PhoneSettings(
     val activeInstanceId: String? = null,
     val syncNode: String? = null,
     val askEachTime: List<String> = emptyList(),
+    /** Accounts list shows closed accounts (spec 010 US2, menu `show-closed`). */
+    val showClosedAccounts: Boolean = false,
 )
 
 @Serializable

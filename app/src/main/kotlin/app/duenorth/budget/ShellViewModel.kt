@@ -3,6 +3,7 @@ package app.duenorth.budget
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import app.duenorth.budget.core.AccountDetail
 import app.duenorth.budget.core.ActualMonthMath
 import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetConflict
@@ -152,7 +153,25 @@ sealed interface ShellRoute {
     data object Settings : ShellRoute
 
     data object SampleBudgets : ShellRoute
+
+    // Spec 010 US2: account management.
+    data object Accounts : ShellRoute, StackRoute
+
+    data object AddAccount : ShellRoute, StackRoute
+
+    data class EditAccount(
+        val accountId: String,
+    ) : ShellRoute,
+        StackRoute
+
+    data class CloseAccount(
+        val accountId: String,
+    ) : ShellRoute,
+        StackRoute
 }
+
+/** A spec 010 screen that goes back to the screen it was opened from. */
+interface StackRoute
 
 data class ShellUiState(
     val loading: Boolean = true,
@@ -221,6 +240,10 @@ data class ShellUiState(
     val fillConfirm: FillConfirm? = null,
     val monthNotice: String? = null,
     val undoLabel: String? = null,
+    val accountsList: List<AccountDetail> = emptyList(),
+    val accountDetail: AccountDetail? = null,
+    val accountsReorder: Boolean = false,
+    val accountForceConfirm: String? = null,
 )
 
 class ShellViewModel(
@@ -934,6 +957,10 @@ class ShellViewModel(
         }
         if (current.fillConfirm != null) {
             _state.update { it.copy(fillConfirm = null) }
+            return true
+        }
+        if (current.accountForceConfirm != null) {
+            _state.update { it.copy(accountForceConfirm = null) }
             return true
         }
         if (current.route == ShellRoute.Home) return false
@@ -1921,7 +1948,8 @@ class ShellViewModel(
             this is ShellRoute.ImportReviewRoute
 
     private fun ShellRoute.isHomeFlow(): Boolean =
-        this is ShellRoute.ReviewCategory ||
+        this is StackRoute ||
+            this is ShellRoute.ReviewCategory ||
             pinsMonth() ||
             this is ShellRoute.ManageCategories
 

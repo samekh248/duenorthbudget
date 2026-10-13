@@ -83,8 +83,11 @@ class BudgetLibrary(
 
     fun setActiveInstanceId(instanceId: String?) {
         updateSettings { settings ->
-            if (instanceId != null && settings.instances.none { it.id == instanceId }) settings
-            else settings.copy(activeInstanceId = instanceId)
+            if (instanceId != null && settings.instances.none { it.id == instanceId }) {
+                settings
+            } else {
+                settings.copy(activeInstanceId = instanceId)
+            }
         }
     }
 
@@ -389,7 +392,7 @@ class BudgetLibrary(
         return sessions.use(database) { session ->
             ActualSchema.ensure(session)
             SyncSchema.ensure(session)
-            ShellReader.read(session, metadata, clock.today(), viewMonth)
+            ShellReader.read(session, metadata, clock.today(), viewMonth, settings().showClosedAccounts)
         }
     }
 
@@ -413,6 +416,70 @@ class BudgetLibrary(
 
     fun undoLabel(budgetId: String): String? = journal.newestLabel(budgetId)
 
+    /** Accounts for the account screens (spec 010 US2); closed ones only when [includeClosed]. */
+    fun readAccounts(
+        budgetId: String,
+        includeClosed: Boolean,
+    ): List<AccountDetail> = open(budgetId) { AccountsBook(it, clock.today(), ids).list(includeClosed) } ?: emptyList()
+
+    fun readAccount(
+        budgetId: String,
+        accountId: String,
+    ): AccountDetail? = open(budgetId) { AccountsBook(it, clock.today(), ids).detail(accountId) }
+
+    fun createAccount(
+        budgetId: String,
+        name: String,
+        offBudget: Boolean,
+        balanceMinor: Long,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.ADD) { AccountsBook(it, clock.today(), ids).create(name, offBudget, balanceMinor) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun renameAccount(
+        budgetId: String,
+        accountId: String,
+        name: String,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.EDIT) { AccountsBook(it, clock.today(), ids).rename(accountId, name) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun setAccountNote(
+        budgetId: String,
+        accountId: String,
+        note: String,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.NOTE) { AccountsBook(it, clock.today(), ids).setNote(accountId, note) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** Places [accountId] before [targetId], or last when null. */
+    fun moveAccount(
+        budgetId: String,
+        accountId: String,
+        targetId: String?,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.REORDER) { AccountsBook(it, clock.today(), ids).move(accountId, targetId) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun closeAccount(
+        budgetId: String,
+        accountId: String,
+        destinationId: String?,
+        categoryId: String?,
+        forced: Boolean = false,
+        confirmed: Boolean = false,
+    ): AccountWriteResult =
+        edit(budgetId, if (forced) AccountsCopy.FORCE_CLOSE else AccountsCopy.CLOSE) {
+            AccountsBook(it, clock.today(), ids).close(accountId, destinationId, categoryId, forced, confirmed)
+        } ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun reopenAccount(
+        budgetId: String,
+        accountId: String,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.REOPEN) { AccountsBook(it, clock.today(), ids).reopen(accountId) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     fun readRegister(
         budgetId: String,
         accountId: String,
@@ -426,7 +493,8 @@ class BudgetLibrary(
     fun saveTransaction(
         budgetId: String,
         draft: TransactionDraft,
-    ): WriteResult = edit(budgetId, UndoCopy.SAVE_TRANSACTION) { RegisterBook(it).save(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    ): WriteResult =
+        edit(budgetId, UndoCopy.SAVE_TRANSACTION) { RegisterBook(it).save(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun setTransactionCategory(
         budgetId: String,
@@ -552,8 +620,7 @@ class BudgetLibrary(
         edit(budgetId, UndoCopy.DELETE_SCHEDULE) { SchedulesBook(it, clock).delete(scheduleId) }
             ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
-    fun listPayees(budgetId: String): List<PayeeRow> =
-        open(budgetId) { PayeeBook(it).list() } ?: emptyList()
+    fun listPayees(budgetId: String): List<PayeeRow> = open(budgetId) { PayeeBook(it).list() } ?: emptyList()
 
     fun renamePayee(
         budgetId: String,
@@ -569,7 +636,11 @@ class BudgetLibrary(
         budgetId: String,
         ruleId: String,
         enabled: Boolean,
-    ): Boolean = open(budgetId) { RulesBook(it).setEnabled(ruleId, enabled); true } ?: false
+    ): Boolean =
+        open(budgetId) {
+            RulesBook(it).setEnabled(ruleId, enabled)
+            true
+        } ?: false
 
     fun previewImportFile(
         budgetId: String,
@@ -584,11 +655,9 @@ class BudgetLibrary(
         budgetId: String,
         accountId: String,
         candidates: List<ParsedImportRow>,
-    ): ImportConfirmResult? =
-        edit(budgetId, UndoCopy.IMPORT) { ImportBook(it, ids).confirm(accountId, candidates) }
+    ): ImportConfirmResult? = edit(budgetId, UndoCopy.IMPORT) { ImportBook(it, ids).confirm(accountId, candidates) }
 
-    fun readImportReview(budgetId: String): ImportReviewPage? =
-        open(budgetId) { ImportBook(it, ids).readReview() }
+    fun readImportReview(budgetId: String): ImportReviewPage? = open(budgetId) { ImportBook(it, ids).readReview() }
 
     fun finishImportReview(budgetId: String) {
         open(budgetId) { ImportBook(it, ids).finishReview() }

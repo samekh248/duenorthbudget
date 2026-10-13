@@ -234,6 +234,12 @@ fun DueNorthApp(model: ShellViewModel) {
                     onFill = { kind -> model.fillMonth(kind) },
                     onToBudget = model::openToBudget,
                     onUndo = model::undo,
+                    onAccounts = model::openAccounts,
+                    onAddAccount = model::openAddAccount,
+                    onShowClosed = model::toggleShowClosedAccounts,
+                    onReorder = model::toggleReorderAccounts,
+                    onEditAccount = model::openEditAccount,
+                    onCloseAccount = model::openCloseAccount,
                 )
             }
         val actions = ScreenBar.forState(state, handlers)
@@ -666,6 +672,55 @@ fun DueNorthApp(model: ShellViewModel) {
                                     currency = shell.currency,
                                     modifier = fill,
                                 )
+                            }
+                        }
+                        ShellRoute.Accounts -> {
+                            val shell = state.shell
+                            if (shell == null) {
+                                Placeholder()
+                            } else {
+                                AccountsScreen(
+                                    accounts = state.accountsList,
+                                    currency = shell.currency,
+                                    showClosed = state.settings.showClosedAccounts,
+                                    reorder = state.accountsReorder,
+                                    onAccount = model::openAccount,
+                                    onMoveUp = model::moveAccountUp,
+                                    onReopen = model::reopenAccount,
+                                    onDoneReorder = model::toggleReorderAccounts,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        ShellRoute.AddAccount ->
+                            AddAccountScreen(error = state.editError, onSave = model::submitAddAccount, modifier = fill)
+                        is ShellRoute.EditAccount -> {
+                            val detail = state.accountDetail
+                            if (detail == null || detail.id != route.accountId) {
+                                Placeholder()
+                            } else {
+                                EditAccountScreen(detail, state.editError, model::submitEditAccount, fill)
+                            }
+                        }
+                        is ShellRoute.CloseAccount -> {
+                            val detail = state.accountDetail
+                            val shell = state.shell
+                            val force = state.accountForceConfirm
+                            when {
+                                detail == null || shell == null || detail.id != route.accountId -> Placeholder()
+                                force != null ->
+                                    ForceCloseConfirmScreen(force, model::confirmForceClose, model::keepAccount, fill)
+                                else ->
+                                    CloseAccountScreen(
+                                        account = detail,
+                                        others = state.accountsList,
+                                        categories = state.categories,
+                                        currency = shell.currency,
+                                        error = state.editError,
+                                        onClose = { destination, category -> model.submitCloseAccount(destination, category) },
+                                        onForceClose = { model.submitCloseAccount(null, null, forced = true) },
+                                        modifier = fill,
+                                    )
                             }
                         }
                         is ShellRoute.ToBudget -> {

@@ -20,6 +20,7 @@ object ScreenBar {
         mode: BudgetMode?,
         undoLabel: String? = null,
         incomeCategory: Boolean = false,
+        showClosed: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             ShellRoute.Home ->
@@ -30,7 +31,7 @@ object ScreenBar {
                             spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
-                        ) + fills() + undo(undoLabel)
+                        ) + fills() + accounts() + undo(undoLabel)
                     else ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
@@ -38,7 +39,7 @@ object ScreenBar {
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
                             menu("breakdown", AppGlyph.Breakdown, MonthFillCopy.BREAKDOWN),
-                        ) + fills() + undo(undoLabel)
+                        ) + fills() + accounts() + undo(undoLabel)
                 }
             is ShellRoute.Register ->
                 listOf(
@@ -46,7 +47,22 @@ object ScreenBar {
                     spec("transfer", AppGlyph.Transfer, "transfer"),
                     spec("reconcile", AppGlyph.Reconcile, "reconcile"),
                     spec("import", AppGlyph.Import, "import"),
+                    menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT),
+                    menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE),
                 ) + undo(undoLabel)
+            ShellRoute.Accounts ->
+                listOf(
+                    spec("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
+                    menu(
+                        "show-closed",
+                        AppGlyph.Categories,
+                        if (showClosed) AccountScreenCopy.HIDE_CLOSED else AccountScreenCopy.SHOW_CLOSED,
+                    ),
+                    menu("reorder", AppGlyph.Categories, AccountScreenCopy.REORDER),
+                ) + undo(undoLabel)
+            ShellRoute.AddAccount,
+            is ShellRoute.EditAccount,
+            -> saveCancel()
             is ShellRoute.CategoryBudget ->
                 if (mode == BudgetMode.TRACKING) {
                     saveCancel()
@@ -80,7 +96,7 @@ object ScreenBar {
         val hasBudget = state.shell != null && !state.locked
         val income =
             (state.route as? ShellRoute.CategoryBudget)?.let { route -> state.shell?.incomeCategory(route.categoryId) != null } == true
-        return specsFor(state.route, hasBudget, mode, state.undoLabel, income).map { spec ->
+        return specsFor(state.route, hasBudget, mode, state.undoLabel, income, state.settings.showClosedAccounts).map { spec ->
             ScreenAction(
                 id = spec.id,
                 glyph = spec.glyph,
@@ -104,6 +120,9 @@ object ScreenBar {
             menu("average", AppGlyph.Average, MonthFillCopy.AVERAGE),
             menu("zero", AppGlyph.Zero, MonthFillCopy.ZERO),
         )
+
+    /** Home `•••` → the account list (spec 010 US2). */
+    private fun accounts() = listOf(menu("accounts", AppGlyph.Budgets, AccountScreenCopy.TITLE))
 
     /** Present only while there is a step to undo; the label names it. */
     private fun undo(label: String?) =
@@ -136,6 +155,12 @@ class ScreenBarHandlers(
     val onFill: (MonthFillKind) -> Unit = {},
     val onToBudget: () -> Unit = {},
     val onUndo: () -> Unit = {},
+    val onAccounts: () -> Unit = {},
+    val onAddAccount: () -> Unit = {},
+    val onShowClosed: () -> Unit = {},
+    val onReorder: () -> Unit = {},
+    val onEditAccount: () -> Unit = {},
+    val onCloseAccount: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -161,6 +186,12 @@ class ScreenBarHandlers(
             "zero" -> ({ onFill(MonthFillKind.ZERO) })
             "to-budget" -> onToBudget
             "undo" -> onUndo
+            "accounts" -> onAccounts
+            "add-account" -> onAddAccount
+            "show-closed" -> onShowClosed
+            "reorder" -> onReorder
+            "edit-account" -> onEditAccount
+            "close" -> onCloseAccount
             else -> ({})
         }
 }
