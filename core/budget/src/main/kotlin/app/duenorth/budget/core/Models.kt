@@ -239,6 +239,24 @@ data class CategoryRow(
     val carryover: Boolean,
 )
 
+/** An income category for the month: what came in, and in tracking files what was budgeted. */
+data class IncomeCategoryRow(
+    val id: String,
+    val name: String,
+    val budgetedMinor: Long,
+    val receivedMinor: Long,
+    /** Envelope auto-hold: this month's income is held for next month. */
+    val autoHold: Boolean,
+)
+
+data class IncomeGroupRow(
+    val id: String,
+    val name: String,
+    val budgetedMinor: Long,
+    val receivedMinor: Long,
+    val categories: List<IncomeCategoryRow> = emptyList(),
+)
+
 data class GroupRow(
     val id: String,
     val name: String,
@@ -272,6 +290,8 @@ data class MonthShell(
     val groups: List<GroupRow>,
     val accounts: List<AccountRow>,
     val inbox: List<InboxRow>,
+    /** Income groups, shown after the expense groups as desktop Actual does. */
+    val incomeGroups: List<IncomeGroupRow> = emptyList(),
 )
 
 object ShellCopy {

@@ -634,11 +634,28 @@ object BudgetEdits {
         categoryId: String,
         amount: Long,
     ) {
+        // Actual's `setBudget`: update the row already there for (month, category), else insert one.
+        // Tracking files keep budgets in reflect_budgets.
+        val tracking =
+            session
+                .query("SELECT value FROM preferences WHERE id = 'budgetType'")
+                .firstOrNull()
+                ?.str("value") == "tracking"
+        val table = if (tracking) "reflect_budgets" else "zero_budgets"
+        val existing =
+            session
+                .query("SELECT id FROM $table WHERE month = ? AND category = ?", listOf(month, categoryId))
+                .firstOrNull()
+                ?.str("id")
+        if (existing != null) {
+            SyncSchema.recordLocal(session, clock, table, existing, "amount", amount.toString())
+            return
+        }
         val id = assignmentId(month, categoryId)
-        SyncSchema.recordLocal(session, clock, "zero_budgets", id, "month", month.toString())
-        SyncSchema.recordLocal(session, clock, "zero_budgets", id, "category", categoryId)
-        SyncSchema.recordLocal(session, clock, "zero_budgets", id, "amount", amount.toString())
-        SyncSchema.recordLocal(session, clock, "zero_budgets", id, "carryover", "0")
+        SyncSchema.recordLocal(session, clock, table, id, "month", month.toString())
+        SyncSchema.recordLocal(session, clock, table, id, "category", categoryId)
+        SyncSchema.recordLocal(session, clock, table, id, "amount", amount.toString())
+        SyncSchema.recordLocal(session, clock, table, id, "carryover", "0")
     }
 
     fun addTransaction(

@@ -51,6 +51,11 @@ class OpenMonthStore(
         pendingMonth = null
     }
 
+    /** Forgets every cached month but keeps what is on screen; the next select reloads. */
+    fun invalidate() {
+        cache.clear()
+    }
+
     fun put(snapshot: MonthSnapshot) {
         cache[snapshot.month] = snapshot
     }

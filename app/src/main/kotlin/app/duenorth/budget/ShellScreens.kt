@@ -95,6 +95,8 @@ fun HomePanorama(
     onBudgetGroup: ((String) -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
     formatOptions: FormatOptions = FormatOptions(),
+    onToBudget: (() -> Unit)? = null,
+    notice: String? = null,
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
@@ -133,6 +135,8 @@ fun HomePanorama(
                             onListGesture = { listGesture = it },
                             onGroup = onBudgetGroup,
                             formatOptions = formatOptions,
+                            onToBudget = onToBudget,
+                            notice = notice,
                         )
                     }
                 },
@@ -378,6 +382,8 @@ fun BudgetSection(
     modifier: Modifier = Modifier,
     onGroup: ((String) -> Unit)? = null,
     formatOptions: FormatOptions = FormatOptions(),
+    onToBudget: (() -> Unit)? = null,
+    notice: String? = null,
 ) {
     val list = rememberLazyListState()
     val arrivals = remember { RowArrivals() }
@@ -396,6 +402,12 @@ fun BudgetSection(
                 amount = MoneyFormat.format(shell.headerMinor, shell.currency, formatOptions),
                 amountColor = Metro.accent.text,
                 amountTag = "to-budget",
+                modifier =
+                    if (onToBudget == null) {
+                        Modifier
+                    } else {
+                        Modifier.metroPress(onClick = onToBudget).testTag("to-budget-figure")
+                    },
             )
             if (shell.bufferedMinor != 0L) {
                 BudgetTotal(
@@ -407,7 +419,8 @@ fun BudgetSection(
                 )
             }
         }
-        if (shell.groups.isEmpty()) {
+        if (notice != null) MonthNotice(notice, Modifier.padding(top = MetroDimens.Row))
+        if (shell.groups.isEmpty() && shell.incomeGroups.isEmpty()) {
             MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.caption, Modifier.padding(top = MetroDimens.Grid).weight(1f))
         } else {
             LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid), state = list) {
@@ -416,6 +429,14 @@ fun BudgetSection(
                         group,
                         shell,
                         arrivalModifier(group.id, arrivals),
+                        onOpen = onGroup,
+                        formatOptions = formatOptions,
+                    )
+                }
+                items(shell.incomeGroups, key = { "income-${it.id}" }) { group ->
+                    IncomeGroupLine(
+                        group,
+                        shell,
                         onOpen = onGroup,
                         formatOptions = formatOptions,
                     )
