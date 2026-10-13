@@ -42,3 +42,22 @@ Parity tests only:
 - Sync tests show each new dataset round-tripping through the spec 004 harness, and the upgrade backfill emitting messages for pre-existing phone rules and schedules.
 - Light and dark screenshots exist for every new screen and confirm gate.
 - Spec 001 fluidity budgets still pass; new budgets cover the 100-rule save and undo.
+
+## Offline sweep (T072)
+
+Run on 2026-10-13 against branch `claude/project-thread-9z5oiv`, with every scenario that needs no bank and no server exercised by its automated test. These tests open the budget from local files only: nothing in them reaches a network, and the Robolectric tests run with no server signed in. Result of `./gradlew :core:budget:test :app:testDebugUnitTest :app:verifyRoborazziDebug`: core 212 tests, app 142 tests, 0 failures; screenshots verified.
+
+| # | Scenario | Offline? | Covered by | Result |
+|---|---|---|---|---|
+| 1 | Breakdown | yes | `MonthFillParityTest`, `MonthActionContentTest` | pass |
+| 2 | Fill the month | yes | `MonthFillParityTest`, `MonthFillBookTest`, `MonthActionContentTest` | pass |
+| 3 | To-budget and auto-hold | yes | `AutoHoldParityTest`, `MonthActionContentTest` | pass |
+| 4 | Accounts | yes, except the desktop sync step | `AccountsParityTest`, `AccountsBookTest`, `AccountContentTest` | pass |
+| 5 | Schedules | yes | `SchedulesRulesParityTest`, `ScheduleAutoPostTest` (late open posts within 1 s, again posts nothing) | pass |
+| 6 | Rules and learning | yes | `SchedulesRulesParityTest`, `RuleEditorTest` (100-rule save under 50 ms), `RuleContentTest` | pass |
+| 7 | Reports | yes | `ReportsParityTest`, `ReportContentTest` | pass |
+| 8 | Templates | yes | `TemplatesParityTest`, `TemplateGateTest`, `TemplateParserTest`, `TemplateContentTest` | pass |
+| 9 | Bank link | no (needs the server) | `BankLinkBookTest` against the localhost server, including the stopped-server case | pass (harness only) |
+| 10 | Undo | yes | `UndoFlowTest` (offline undo newest first, under 100 ms; conflict after a remote change), `UndoContentTest`, `BudgetLibraryTest` fluidity checks | pass |
+
+Not yet done: the same scenarios by hand on a phone in airplane mode, and the desktop side-by-side and real provider links in T073.

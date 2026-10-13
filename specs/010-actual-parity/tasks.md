@@ -218,11 +218,11 @@ flowchart LR
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T071 [P] Extend the spec 001 fluidity budgets with a 100-rule save and an undo on the panorama
-- [ ] T072 [P] Offline sweep: run every quickstart scenario that does not need a bank or server with the network off and record the results in `specs/010-actual-parity/quickstart.md`
+- [x] T071 [P] Extend the spec 001 fluidity budgets with a 100-rule save and an undo on the panorama
+- [x] T072 [P] Offline sweep: run every quickstart scenario that does not need a bank or server with the network off and record the results in `specs/010-actual-parity/quickstart.md`
 - [ ] T073 Manual side-by-side with desktop Actual 26.8.1 for each quickstart scenario; one real link per provider where accounts exist
-- [ ] T074 Propose the constitution amendment for Principle VI (daily-loop gate met; templates and fixed reports allowed) in `.specify/memory/constitution.md`, bumping the version per Governance
-- [ ] T075 Record before-and-after light and dark screenshots for every visual change with `./gradlew :app:recordRoborazziDebug`, then run `./gradlew :core:budget:test :app:testDebugUnitTest :app:verifyRoborazziDebug`
+- [x] T074 Propose the constitution amendment for Principle VI (daily-loop gate met; templates and fixed reports allowed) in `.specify/memory/constitution.md`, bumping the version per Governance
+- [x] T075 Record before-and-after light and dark screenshots for every visual change with `./gradlew :app:recordRoborazziDebug`, then run `./gradlew :core:budget:test :app:testDebugUnitTest :app:verifyRoborazziDebug`
 
 ---
 
