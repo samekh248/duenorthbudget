@@ -20,7 +20,7 @@ Envelope only. Opened from the to-budget figure on Home (tag `to-budget-figure`)
 | Menu id | Action | Confirm |
 |---|---|---|
 | `copy-last` | budgeted(m) = budgeted(m−1) for targets | when any target is non-zero in m |
-| `average` | budgeted(m) = round(mean of budgeted over existing months among m−1…m−3) | when any target is non-zero in m |
+| `average` | budgeted(m) = round(mean spending over m−1…m−3, stopping before the category's first activity month; sign flipped for expenses) | when any target is non-zero in m |
 | `zero` | budgeted(m) = 0 for every category | always |
 
 Targets: visible categories whose group is visible. Envelope copy and average skip income categories. Tracking files write `reflect_budgets` and include income categories.

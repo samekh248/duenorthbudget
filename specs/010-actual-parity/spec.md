@@ -38,7 +38,7 @@ an income category and confirm next month's to-budget rises by that income.
 1. **Given** a month has income, assignments, an uncovered overspend, and an amount held for later, **When** the person opens the to-budget breakdown, **Then** they see income from this month, amounts carried in, the total budgeted, the uncovered overspend, and the amount held, and those parts add up to the to-budget figure on the month.
 2. **Given** last month has budgeted amounts, **When** the person copies last month's budget and confirms, **Then** this month's budgeted amounts match last month for categories that are visible, and hidden categories and hidden groups are left unchanged.
 3. **Given** an envelope budget, **When** the person copies last month, **Then** income categories are not given a budgeted amount by that copy.
-4. **Given** the person chooses the three-month average and confirms, **When** it finishes, **Then** each visible category's budgeted amount is the average of its budgeted amounts over the previous three months that exist.
+4. **Given** the person chooses the three-month average and confirms, **When** it finishes, **Then** each visible category's budgeted amount is the average of its spending over the previous three months, counting only months since that category first had activity, as desktop Actual does.
 5. **Given** the person sets this month's budgeted amounts to zero and confirms, **When** it finishes, **Then** every budgeted amount for this month is zero and no category, transaction, or other month is deleted.
 6. **Given** a category has available money, **When** the person transfers some of it back to to-budget, **Then** the category's available amount falls and to-budget rises by that amount before the finger lifts.
 7. **Given** the person turns on automatic holding for an income category, **When** income is categorized there, **Then** that income is held for the next month for this month and the following 12 months.
@@ -182,8 +182,9 @@ returns to the earlier figure with the network off.
 - Copy or average when the previous months have no budgeted amounts. The
   action reports that there is nothing to copy and does not clear amounts
   the person already entered this month.
-- The three-month average uses only the months that exist when there are
-  fewer than three.
+- The three-month average uses only the months since the category first had
+  activity when there are fewer than three. A category with no activity is
+  set to zero.
 - Set-to-zero, overwrite templates, and force close always ask first. Until
   the person confirms, nothing changes.
 - A tracking budget follows Actual's tracking rules for these actions. The
@@ -210,8 +211,8 @@ returns to the earlier figure with the network off.
   in, the total budgeted, uncovered overspending, and the amount held. The
   parts MUST add up to the to-budget figure.
 - **FR-002**: The person MUST be able to copy the previous month's budgeted
-  amounts, set this month from the average of the previous three months
-  that exist, and set this month's budgeted amounts to zero. Each MUST ask
+  amounts, set this month from the average spending of the previous three
+  months, and set this month's budgeted amounts to zero. Each MUST ask
   before replacing amounts already entered. Hidden categories and hidden
   groups MUST be skipped. On an envelope budget, a copy MUST NOT assign a
   budgeted amount to an income category.
