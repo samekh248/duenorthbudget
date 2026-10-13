@@ -26,6 +26,13 @@ object MonthFillCopy {
     const val INCOME_ONLY = "only for income categories"
 }
 
+/** An income category and whether its income is held for next month in the open month. */
+data class IncomeHoldRow(
+    val id: String,
+    val name: String,
+    val on: Boolean,
+)
+
 sealed interface MonthFillResult {
     data object Filled : MonthFillResult
 
@@ -123,6 +130,22 @@ class MonthFillBook(
             }
         }
         return MonthFillResult.Filled
+    }
+
+    /** Envelope income categories with this month's `carryover` flag; empty on tracking files. */
+    fun incomeHolds(month: YearMonth): List<IncomeHoldRow> {
+        if (tracking) return emptyList()
+        return session
+            .query(
+                """
+                SELECT c.id AS id, c.name AS name, b.carryover AS carryover
+                FROM categories c
+                LEFT JOIN $table b ON b.category = c.id AND b.month = ?
+                WHERE IFNULL(c.is_income, 0) = 1 AND IFNULL(c.tombstone, 0) = 0
+                ORDER BY c.sort_order, c.id
+                """.trimIndent(),
+                listOf(month.toActualMonth()),
+            ).map { row -> IncomeHoldRow(row.str("id").orEmpty(), row.str("name").orEmpty(), row.bool("carryover")) }
     }
 
     /** `copyPreviousMonth`: last month's budget rows, minus hidden and (envelope) income. */

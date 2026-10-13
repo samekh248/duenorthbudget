@@ -634,6 +634,16 @@ object BudgetEdits {
         categoryId: String,
         amount: Long,
     ) {
+        // Actual's `setBudget`: update the row already there for (month, category), else insert one.
+        val existing =
+            session
+                .query("SELECT id FROM zero_budgets WHERE month = ? AND category = ?", listOf(month, categoryId))
+                .firstOrNull()
+                ?.str("id")
+        if (existing != null) {
+            SyncSchema.recordLocal(session, clock, "zero_budgets", existing, "amount", amount.toString())
+            return
+        }
         val id = assignmentId(month, categoryId)
         SyncSchema.recordLocal(session, clock, "zero_budgets", id, "month", month.toString())
         SyncSchema.recordLocal(session, clock, "zero_budgets", id, "category", categoryId)

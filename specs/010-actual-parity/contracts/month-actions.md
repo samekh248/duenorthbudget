@@ -33,7 +33,7 @@ Envelope only. From category budget `•••` → `to-budget`. Amount ≤ cate
 
 ## Auto-hold
 
-Envelope, income categories only. From category budget `•••` → `auto-hold`, three choices:
+Envelope, income categories only. From Home `•••` → `auto-hold` (screen tag `auto-hold-screen`), which lists every income category with three choices. Income categories never reach the category budget screen, because Home's budget list leaves out income groups:
 
 | Choice | Writes `carryover` on income category budget rows |
 |---|---|

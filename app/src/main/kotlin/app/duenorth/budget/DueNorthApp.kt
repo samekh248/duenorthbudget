@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.SyncCoordinator
@@ -170,6 +171,7 @@ fun DueNorthApp(model: ShellViewModel) {
     }
     val canBack =
         state.confirm != null ||
+            state.fillConfirm != null ||
             state.confirmAdvanced != null ||
             (
                 state.route != ShellRoute.Home &&
@@ -228,6 +230,11 @@ fun DueNorthApp(model: ShellViewModel) {
                             else -> model.back()
                         }
                     },
+                    onBreakdown = model::openBreakdown,
+                    onFill = { kind -> model.fillMonth(kind) },
+                    onAutoHold = model::openAutoHold,
+                    onToBudget = model::openToBudget,
+                    onUndo = model::undo,
                 )
             }
         val actions = ScreenBar.forState(state, handlers)
@@ -260,6 +267,9 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSelectMonth = model::selectOpenMonth,
                                 onBudgetGroup = if (state.shell == null) null else model::openGroupCategories,
                                 onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
+                                onToBudget =
+                                    if (state.shell?.mode == BudgetMode.ENVELOPE) model::openBreakdown else null,
+                                notice = state.monthNotice,
                                 formatOptions =
                                     FormatOptions(
                                         hideFraction = state.formatPrefs.hideFraction,
@@ -652,6 +662,42 @@ fun DueNorthApp(model: ShellViewModel) {
                                 }
                             }
                         }
+                        ShellRoute.Breakdown -> {
+                            val shell = state.shell
+                            val breakdown = state.breakdown
+                            if (shell == null || breakdown == null) {
+                                Placeholder()
+                            } else {
+                                BreakdownScreen(
+                                    month = state.pinnedMonth ?: state.openMonth,
+                                    breakdown = breakdown,
+                                    currency = shell.currency,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        is ShellRoute.ToBudget -> {
+                            val shell = state.shell
+                            if (shell == null) {
+                                Placeholder()
+                            } else {
+                                ToBudgetScreen(
+                                    shell = shell,
+                                    categoryId = route.categoryId,
+                                    error = state.editError,
+                                    onSave = model::submitToBudget,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        ShellRoute.AutoHold ->
+                            AutoHoldScreen(
+                                month = state.pinnedMonth ?: state.openMonth,
+                                rows = state.incomeHolds,
+                                error = state.editError,
+                                onChoose = model::chooseAutoHold,
+                                modifier = fill,
+                            )
                         ShellRoute.ManageCategories -> {
                             val manage = state.categoryManage
                             if (manage == null) {
@@ -678,6 +724,16 @@ fun DueNorthApp(model: ShellViewModel) {
                         ReconcileWarningScreen(
                             onChange = model::confirmWrite,
                             onKeep = model::dismissConfirm,
+                            modifier = fill,
+                        )
+                    }
+                    val fillConfirm = state.fillConfirm
+                    if (fillConfirm != null) {
+                        FillConfirmScreen(
+                            confirm = fillConfirm,
+                            month = state.pinnedMonth ?: state.openMonth,
+                            onConfirm = model::confirmFill,
+                            onKeep = model::keepFill,
                             modifier = fill,
                         )
                     }

@@ -174,6 +174,26 @@ class EditJournalTest {
         }
     }
 
+    @Test
+    fun assignUpdatesTheRowAlreadyThereAndKeepsItsRollover() {
+        withFile { session, _ ->
+            SyncSchema.writeRow(
+                session,
+                "zero_budgets",
+                "seeded",
+                "month" to 202610,
+                "category" to "c-food",
+                "amount" to 100,
+                "carryover" to 1,
+            )
+            BudgetEdits.assign(session, clock(), 202610, "c-food", 2_500)
+            val rows = session.query("SELECT id, amount, carryover FROM zero_budgets WHERE month = 202610 AND category = 'c-food'")
+            assertEquals(listOf("seeded"), rows.map { it.str("id") })
+            assertEquals(2_500L, rows.single().long("amount"))
+            assertTrue(rows.single().bool("carryover"))
+        }
+    }
+
     private fun assign(
         session: SqlSession,
         amount: Long,

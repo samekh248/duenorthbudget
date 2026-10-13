@@ -1,6 +1,7 @@
 package app.duenorth.budget.core.parity
 
 import app.duenorth.budget.core.AutoHoldChoice
+import app.duenorth.budget.core.IncomeHoldRow
 import app.duenorth.budget.core.MonthFillBook
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillResult
@@ -34,6 +35,27 @@ class AutoHoldParityTest {
                 assertEquals(MonthFillResult.Rejected(MonthFillCopy.INCOME_ONLY), result)
                 fixture.assertTable(session, "zero_budgets")
             }
+        }
+    }
+
+    @Test
+    fun incomeHoldsReadsTheMonthFlag() {
+        val fixture = ParityFixture.load("month", "auto-hold-on")
+        val salary = fixture.id("categories", "Salary")
+        fixture.open().use { opened ->
+            val before = opened.library.readIncomeHolds(opened.budgetId, october)
+            assertEquals(listOf(false), before.filter { it.id == salary }.map { it.on })
+            opened.db { session -> MonthFillBook(session, fixture.today).setAutoHold(october, salary, AutoHoldChoice.ON) }
+            val after = opened.library.readIncomeHolds(opened.budgetId, october)
+            assertEquals(listOf(IncomeHoldRow(salary, "Salary", true)), after.filter { it.id == salary })
+            val income =
+                opened.db { session ->
+                    session
+                        .query("SELECT id FROM categories WHERE is_income = 1 AND tombstone = 0")
+                        .map { it.str("id").orEmpty() }
+                        .toSet()
+                }
+            assertEquals(income, after.map { it.id }.toSet())
         }
     }
 

@@ -58,7 +58,7 @@ flowchart LR
 - [X] T011 Move `RulesBook.insertRule`, `insertPayeeCategoryRule`, `insertPayeeRenameRule` in `core/…/core/RuleEngine.kt` and every `schedules` / `schedules_next_date` write in `core/…/core/Schedules.kt` onto `recordLocal`
 - [X] T012 Implement the once-per-budget backfill (guard `sync_state` id `parity-backfill`) in `core/…/core/SyncSchema.kt` and call it from `SyncCoordinator` on open in `core/…/core/SyncCoordinator.kt`
 - [X] T013 Feed remote conflicts from undo into spec 004's conflict list in `core/…/core/SyncCoordinator.kt`
-- [ ] T014 *(Deferred to T069: `:app` cannot build in the cloud session. Core already clears the stack on budget switch and exposes `BudgetLibrary.canUndo` / `undoLabel` / `undo`.)* Own the undo stack in `ShellViewModel` (new `app/…/ShellViewModel+Undo.kt`): clear on budget switch, expose `canUndo` and the newest step's label
+- [X] T014 *(Done with phase 3: `ShellUiState.undoLabel` refreshes after every load and edit, and `undo()` lives in `app/…/ShellViewModelMonth.kt` beside the month actions; ktlint's filename rule forbids `+` in file names.)* Own the undo stack in `ShellViewModel` (new `app/…/ShellViewModel+Undo.kt`): clear on budget switch, expose `canUndo` and the newest step's label
 - [X] T015 Wrap existing person-level writes (assign, move, hold, carryover, category manage, transaction save/edit/delete/split, schedule post/skip) in `EditJournal.step` in `core/…/core/EnvelopeMonth.kt`, `Register.kt`, `Schedules.kt`
 
 **Checkpoint**: Rules and schedules made on the phone now sync, and every existing edit can be undone in core. Spec 004 sync tests still pass.
@@ -83,11 +83,11 @@ flowchart LR
 - [X] T020 [US1] Add `MonthBreakdown` to `DetailedFigures` from the existing envelope loop in `core/…/core/ActualMonthMath.kt`
 - [X] T021 [US1] Create `core/…/core/MonthFill.kt` (`MonthFillBook`: `copyLast`, `average3`, `zero`, `transferToBudget`, `setAutoHold`) writing `zero_budgets` or `reflect_budgets` through the funnel, one journal step per action, with `needsConfirm` per `contracts/month-actions.md`
 - [X] T022 [US1] Add entry points in `core/…/core/BudgetLibrary.kt` and `SyncCoordinator.kt`
-- [ ] T023 *(Deferred: `:app` cannot build in the cloud session because dl.google.com is blocked. Core entry points are in place.)* [US1] Create `app/…/MonthActionScreens.kt`: breakdown screen (`breakdown-*` tags), fill confirm, transfer-to-to-budget form, auto-hold three-way choice
-- [ ] T024 *(Deferred: `:app` cannot build in the cloud session because dl.google.com is blocked. Core entry points are in place.)* [US1] Route handlers and optimistic `OpenMonthStore` updates in new `app/…/ShellViewModel+Month.kt`; roll back on `Rejected`
-- [ ] T025 *(Deferred: `:app` cannot build in the cloud session because dl.google.com is blocked. Core entry points are in place.)* [US1] Add menu ids `breakdown`, `copy-last`, `average`, `zero`, `undo` on Home and `to-budget`, `auto-hold` on category budget in `app/…/ScreenBar.kt`; make the Home to-budget figure (`to-budget-figure`) open the breakdown in `app/…/EnvelopeScreens.kt`
-- [ ] T026 *(Deferred: `:app` cannot build in the cloud session because dl.google.com is blocked. Core entry points are in place.)* [P] [US1] Compose tests in `app-test/MonthActionContentTest.kt`: breakdown rows, confirm gate writes nothing until confirm, tracking hides breakdown / to-budget / auto-hold, undo absent when empty and present after an assign
-- [ ] T027 *(Deferred: `:app` cannot build in the cloud session because dl.google.com is blocked. Core entry points are in place.)* [P] [US1] Roborazzi light and dark in `app-test/MonthActionScreenshotTest.kt` for the breakdown and fill confirm
+- [X] T023 [US1] Create `app/…/MonthActionScreens.kt`: breakdown screen (`breakdown-*` tags), fill confirm, transfer-to-to-budget form, auto-hold three-way choice
+- [X] T024 [US1] Route handlers and optimistic `OpenMonthStore` updates in new `app/…/ShellViewModel+Month.kt`; roll back on `Rejected` *(file is `ShellViewModelMonth.kt` for ktlint)*
+- [X] T025 [US1] Add menu ids `breakdown`, `copy-last`, `average`, `zero`, `undo` on Home and `to-budget`, `auto-hold` on category budget in `app/…/ScreenBar.kt` *(`auto-hold` sits on the Home menu instead: income categories never reach category budget, because Home's list leaves out income groups)*; make the Home to-budget figure (`to-budget-figure`) open the breakdown in `app/…/EnvelopeScreens.kt`
+- [X] T026 [P] [US1] Compose tests in `app-test/MonthActionContentTest.kt`: breakdown rows, confirm gate writes nothing until confirm, tracking hides breakdown / to-budget / auto-hold, undo absent when empty and present after an assign
+- [X] T027 [P] [US1] Roborazzi light and dark in `app-test/MonthActionScreenshotTest.kt` for the breakdown and fill confirm
 
 **Checkpoint**: The month is fully Actual. With Phase 2, this is the MVP, including undo of month actions.
 
