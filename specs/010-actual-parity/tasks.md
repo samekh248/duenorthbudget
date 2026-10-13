@@ -31,10 +31,10 @@ flowchart LR
 
 **Purpose**: Confirm no new module, and land the desktop-Actual fixtures every parity test reads
 
-- [ ] T001 Confirm no new module is required in `settings.gradle.kts`; work stays in `:core:budget` and `:app` per `plan.md`
-- [ ] T002 Add fixture generator `tools/parity-fixtures/generate.mjs` (Node 20, `@actual-app/api` 26.8.1, pinned in `tools/parity-fixtures/package.json`) that builds each fixture budget, runs the scripted actions from research R1, and writes the budget zip plus expected rows as JSON. Document in `tools/parity-fixtures/README.md` that CI never runs it
-- [ ] T003 Generate and commit fixtures under `core/budget/src/test/resources/parity/` (`month/`, `accounts/`, `schedules-rules/`, `reports/`, `templates/`, `undo/`), one zip and one `expected.json` per scenario
-- [ ] T004 [P] Add `core-test/parity/ParityFixture.kt`: opens a fixture zip into a temp budget directory, runs a block, and diffs named tables against `expected.json` with readable row-level failures
+- [X] T001 Confirm no new module is required in `settings.gradle.kts`; work stays in `:core:budget` and `:app` per `plan.md`
+- [X] T002 Add fixture generator `tools/parity-fixtures/generate.mjs` (Node 20+, `@actual-app/api` 26.8.1, pinned in `tools/parity-fixtures/package.json`) that builds each fixture budget, runs the scripted actions from research R1, and writes the budget zip plus expected rows as JSON. Document in `tools/parity-fixtures/README.md` that CI never runs it
+- [X] T003 Generate and commit fixtures under `core/budget/src/test/resources/parity/` (`month/`, `accounts/`, `schedules-rules/`, `reports/`, `templates/`, `undo/`), one zip and one `expected.json` per scenario
+- [X] T004 [P] Add `core-test/parity/ParityFixture.kt`: opens a fixture zip into a temp budget directory, runs a block, and diffs named tables against `expected.json` with readable row-level failures
 
 ---
 

@@ -1,0 +1,615 @@
+{
+  "scenario": "overwrite",
+  "base": "base.zip",
+  "actualVersion": "26.8.1",
+  "today": "2026-10-07",
+  "action": {
+    "handler": "budget/overwrite-goal-template",
+    "args": {
+      "month": "2026-10"
+    }
+  },
+  "ids": {
+    "accounts": {
+      "Checking": "463aabea-b316-4bed-b428-e4dc648629b6"
+    },
+    "categories": {
+      "Food": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "General": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "Bills": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "Bills (Flexible)": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "Income": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "Starting Balances": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "Savings": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+      "Salary": "ecac4c8d-ac51-4728-ade8-4c357eee3256",
+      "Fixed": "faef00e4-1e8d-42ac-afe7-c809cb8df591",
+      "Up To": "91967b60-d067-46bb-8a4d-a4875241fa2c",
+      "By Date": "70270a7d-c6f7-402e-b23d-f0e3a27f92a0",
+      "Rent": "df6f8952-050e-494b-a5b6-19f7932a0bb5",
+      "Percent": "e3e5ef0d-2dac-484e-9ee5-0d961c78e117",
+      "Average": "17f1931b-a69f-401c-93a0-e848cda3c34d",
+      "Remainder A": "562b51cd-b881-46b8-b4d0-b6e3f6d872e3",
+      "Remainder B": "9b59b8b0-6faa-483f-8415-d56e8aea711f",
+      "Goal": "f378594a-31c5-40c3-853e-b6d2cd1e6247",
+      "Priority": "037fc9c6-83d2-4b18-b3ba-11231755a43b",
+      "Already Set": "2cf3412f-971c-4052-9124-1d718323ea3e",
+      "Hidden Tmpl": "ff05a2a6-0a77-448d-8dc7-dec7a687b812"
+    },
+    "groups": {
+      "Usual Expenses": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "Income": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "Investments and Savings": "a137772f-cf2f-4089-9432-822d2ddc1466"
+    },
+    "payees": {
+      "Employer": "7f8f140f-ecc1-4053-b854-528a65d9a58e",
+      "Store": "259ea2c6-342a-433a-917c-0cc6663299e1",
+      "Landlord": "e726615d-dd83-48da-b244-284831351671"
+    },
+    "schedules": {
+      "Rent": "94bb82a4-edcb-41d3-a15e-e86dcd26f73f"
+    }
+  },
+  "tables": {
+    "zero_budgets": [
+      {
+        "id": "202610-037fc9c6-83d2-4b18-b3ba-11231755a43b",
+        "month": 202610,
+        "category": "037fc9c6-83d2-4b18-b3ba-11231755a43b",
+        "amount": 7500,
+        "carryover": 0,
+        "goal": 7500,
+        "long_goal": null
+      },
+      {
+        "id": "202610-17f1931b-a69f-401c-93a0-e848cda3c34d",
+        "month": 202610,
+        "category": "17f1931b-a69f-401c-93a0-e848cda3c34d",
+        "amount": 12000,
+        "carryover": 0,
+        "goal": 12000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+        "month": 202610,
+        "category": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-2cf3412f-971c-4052-9124-1d718323ea3e",
+        "month": 202610,
+        "category": "2cf3412f-971c-4052-9124-1d718323ea3e",
+        "amount": 9900,
+        "carryover": 0,
+        "goal": 9900,
+        "long_goal": null
+      },
+      {
+        "id": "202610-541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "month": 202610,
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-562b51cd-b881-46b8-b4d0-b6e3f6d872e3",
+        "month": 202610,
+        "category": "562b51cd-b881-46b8-b4d0-b6e3f6d872e3",
+        "amount": 563200,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+        "month": 202610,
+        "category": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-70270a7d-c6f7-402e-b23d-f0e3a27f92a0",
+        "month": 202610,
+        "category": "70270a7d-c6f7-402e-b23d-f0e3a27f92a0",
+        "amount": 20000,
+        "carryover": 0,
+        "goal": 20000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-91967b60-d067-46bb-8a4d-a4875241fa2c",
+        "month": 202610,
+        "category": "91967b60-d067-46bb-8a4d-a4875241fa2c",
+        "amount": 20000,
+        "carryover": 0,
+        "goal": 20000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-9b59b8b0-6faa-483f-8415-d56e8aea711f",
+        "month": 202610,
+        "category": "9b59b8b0-6faa-483f-8415-d56e8aea711f",
+        "amount": 1126400,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-af375fd4-d759-46b3-bffe-74a856151d57",
+        "month": 202610,
+        "category": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "month": 202610,
+        "category": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-df6f8952-050e-494b-a5b6-19f7932a0bb5",
+        "month": 202610,
+        "category": "df6f8952-050e-494b-a5b6-19f7932a0bb5",
+        "amount": 150000,
+        "carryover": 0,
+        "goal": 150000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-e3e5ef0d-2dac-484e-9ee5-0d961c78e117",
+        "month": 202610,
+        "category": "e3e5ef0d-2dac-484e-9ee5-0d961c78e117",
+        "amount": 50000,
+        "carryover": 0,
+        "goal": 50000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-f378594a-31c5-40c3-853e-b6d2cd1e6247",
+        "month": 202610,
+        "category": "f378594a-31c5-40c3-853e-b6d2cd1e6247",
+        "amount": 0,
+        "carryover": 0,
+        "goal": 50000,
+        "long_goal": 1
+      },
+      {
+        "id": "202610-faef00e4-1e8d-42ac-afe7-c809cb8df591",
+        "month": 202610,
+        "category": "faef00e4-1e8d-42ac-afe7-c809cb8df591",
+        "amount": 5000,
+        "carryover": 0,
+        "goal": 5000,
+        "long_goal": null
+      }
+    ],
+    "categories": [
+      {
+        "id": "037fc9c6-83d2-4b18-b3ba-11231755a43b",
+        "name": "Priority",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 16,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"simple\",\"monthly\":75,\"limit\":null,\"priority\":2,\"directive\":\"template\"}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "17f1931b-a69f-401c-93a0-e848cda3c34d",
+        "name": "Average",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 256,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"average\",\"numMonths\":3,\"priority\":0,\"directive\":\"template\"}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+        "name": "Bills (Flexible)",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 65536,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "2cf3412f-971c-4052-9124-1d718323ea3e",
+        "name": "Already Set",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 8,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"simple\",\"monthly\":99,\"limit\":null,\"priority\":0,\"directive\":\"template\"}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+        "name": "Income",
+        "is_income": 1,
+        "cat_group": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+        "sort_order": 32768,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+        "name": "Starting Balances",
+        "is_income": 1,
+        "cat_group": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+        "sort_order": 32768,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "name": "Food",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 16384,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "562b51cd-b881-46b8-b4d0-b6e3f6d872e3",
+        "name": "Remainder A",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 128,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"remainder\",\"priority\":null,\"directive\":\"template\",\"weight\":1,\"limit\":null}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+        "name": "Savings",
+        "is_income": 0,
+        "cat_group": "a137772f-cf2f-4089-9432-822d2ddc1466",
+        "sort_order": 32768,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "70270a7d-c6f7-402e-b23d-f0e3a27f92a0",
+        "name": "By Date",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 2048,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"by\",\"amount\":600,\"month\":\"2026-12\",\"annual\":true,\"from\":null,\"priority\":0,\"directive\":\"template\"}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "91967b60-d067-46bb-8a4d-a4875241fa2c",
+        "name": "Up To",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 4096,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"simple\",\"monthly\":null,\"limit\":{\"amount\":200,\"hold\":null,\"period\":\"monthly\",\"start\":null},\"priority\":0,\"directive\":\"template\"}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "9b59b8b0-6faa-483f-8415-d56e8aea711f",
+        "name": "Remainder B",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 64,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"remainder\",\"priority\":null,\"directive\":\"template\",\"weight\":2,\"limit\":null}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "name": "General",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 32768,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "name": "Bills",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 49152,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "df6f8952-050e-494b-a5b6-19f7932a0bb5",
+        "name": "Rent",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 1024,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"schedule\",\"name\":\"Rent\",\"priority\":0,\"directive\":\"template\",\"full\":null}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "e3e5ef0d-2dac-484e-9ee5-0d961c78e117",
+        "name": "Percent",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 512,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"percentage\",\"percent\":10,\"previous\":false,\"category\":\"Salary\",\"priority\":0,\"directive\":\"template\"}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "ecac4c8d-ac51-4728-ade8-4c357eee3256",
+        "name": "Salary",
+        "is_income": 1,
+        "cat_group": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+        "sort_order": 16384,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "f378594a-31c5-40c3-853e-b6d2cd1e6247",
+        "name": "Goal",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 32,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"goal\",\"amount\":500,\"priority\":null,\"directive\":\"goal\"}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "faef00e4-1e8d-42ac-afe7-c809cb8df591",
+        "name": "Fixed",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 8192,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"simple\",\"monthly\":50,\"limit\":null,\"priority\":0,\"directive\":\"template\"}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "ff05a2a6-0a77-448d-8dc7-dec7a687b812",
+        "name": "Hidden Tmpl",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 4,
+        "tombstone": 0,
+        "hidden": 1,
+        "goal_def": "[{\"type\":\"simple\",\"monthly\":40,\"limit\":null,\"priority\":0,\"directive\":\"template\"}]",
+        "template_settings": "{\"source\":\"notes\"}",
+        "cleanup_def": null
+      }
+    ],
+    "notes": [
+      {
+        "id": "037fc9c6-83d2-4b18-b3ba-11231755a43b",
+        "note": "#template-2 75"
+      },
+      {
+        "id": "17f1931b-a69f-401c-93a0-e848cda3c34d",
+        "note": "#template average 3 months"
+      },
+      {
+        "id": "2cf3412f-971c-4052-9124-1d718323ea3e",
+        "note": "#template 99"
+      },
+      {
+        "id": "562b51cd-b881-46b8-b4d0-b6e3f6d872e3",
+        "note": "#template remainder"
+      },
+      {
+        "id": "70270a7d-c6f7-402e-b23d-f0e3a27f92a0",
+        "note": "#template 600 by 2026-12 repeat every year"
+      },
+      {
+        "id": "91967b60-d067-46bb-8a4d-a4875241fa2c",
+        "note": "#template up to 200"
+      },
+      {
+        "id": "9b59b8b0-6faa-483f-8415-d56e8aea711f",
+        "note": "#template remainder 2"
+      },
+      {
+        "id": "df6f8952-050e-494b-a5b6-19f7932a0bb5",
+        "note": "#template schedule Rent"
+      },
+      {
+        "id": "e3e5ef0d-2dac-484e-9ee5-0d961c78e117",
+        "note": "#template 10% of Salary"
+      },
+      {
+        "id": "f378594a-31c5-40c3-853e-b6d2cd1e6247",
+        "note": "#goal 500"
+      },
+      {
+        "id": "faef00e4-1e8d-42ac-afe7-c809cb8df591",
+        "note": "#template 50"
+      },
+      {
+        "id": "ff05a2a6-0a77-448d-8dc7-dec7a687b812",
+        "note": "#template 40"
+      }
+    ]
+  },
+  "values": {
+    "2026-10": {
+      "month": "2026-10",
+      "incomeAvailable": 1979000,
+      "lastMonthOverspent": -15000,
+      "forNextMonth": 0,
+      "totalBudgeted": -1964000,
+      "toBudget": 0,
+      "fromLastMonth": 1479000,
+      "totalIncome": 500000,
+      "totalSpent": 0,
+      "totalBalance": 1964000,
+      "bufferedAuto": 0,
+      "bufferedSelected": 0,
+      "categories": {
+        "Hidden Tmpl": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Already Set": {
+          "budgeted": 9900,
+          "spent": 0,
+          "balance": 9900,
+          "carryover": false
+        },
+        "Priority": {
+          "budgeted": 7500,
+          "spent": 0,
+          "balance": 7500,
+          "carryover": false
+        },
+        "Goal": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Remainder B": {
+          "budgeted": 1126400,
+          "spent": 0,
+          "balance": 1126400,
+          "carryover": false
+        },
+        "Remainder A": {
+          "budgeted": 563200,
+          "spent": 0,
+          "balance": 563200,
+          "carryover": false
+        },
+        "Average": {
+          "budgeted": 12000,
+          "spent": 0,
+          "balance": 12000,
+          "carryover": false
+        },
+        "Percent": {
+          "budgeted": 50000,
+          "spent": 0,
+          "balance": 50000,
+          "carryover": false
+        },
+        "Rent": {
+          "budgeted": 150000,
+          "spent": 0,
+          "balance": 150000,
+          "carryover": false
+        },
+        "By Date": {
+          "budgeted": 20000,
+          "spent": 0,
+          "balance": 20000,
+          "carryover": false
+        },
+        "Up To": {
+          "budgeted": 20000,
+          "spent": 0,
+          "balance": 20000,
+          "carryover": false
+        },
+        "Fixed": {
+          "budgeted": 5000,
+          "spent": 0,
+          "balance": 5000,
+          "carryover": false
+        },
+        "Food": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "General": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Bills": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Bills (Flexible)": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Savings": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Salary": {},
+        "Income": {},
+        "Starting Balances": {}
+      }
+    }
+  }
+}

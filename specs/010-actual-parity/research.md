@@ -95,3 +95,22 @@ Phase 0 output for [plan.md](plan.md). Each entry is Decision / Rationale / Alte
 - **Decision**: Month fills, templates, and undo write `reflect_budgets` on tracking files, following Actual's tracking rules (no to-budget, no hold, no transfer to to-budget, income categories budgeted). Breakdown, transfer to to-budget, and auto-hold are absent on tracking files. No action writes `budgetType`.
 - **Rationale**: FR-017, Principle III.
 - **Alternatives**: Hiding every month action on tracking files (they exist in Actual for tracking too).
+
+## R16. What the phase 1 fixtures showed
+
+Running each action through `@actual-app/core` 26.8.1 (and reading its source) corrected several assumptions above. Where an entry here and an earlier entry disagree, this one wins; each item names the fixture that shows it.
+
+| # | Finding | Fixture | Affects |
+|---|---|---|---|
+| 1 | **Three-month average uses spending, not budgeted amounts.** `set3MonthAvg` averages each category's `sum-amount` (activity, sign flipped for expenses) over up to 3 months ending last month, stopping at the category's first activity month, and rounds with `Math.round`. Spec US1 acceptance 4 says "budgeted amounts"; Actual does not. | `month/set-3month-avg` | R4, US1 |
+| 2 | Set to zero skips income categories on envelope files and does **not** skip hidden categories. Copy last month does skip hidden categories and hidden groups. | `month/set-zero`, `month/copy-previous-month` | R4 |
+| 3 | Transfer to to-budget also appends a line to the month's note (`notes` id `budget-YYYY-MM`): `- Reassigned 40.00 from Food → To Budget on October 07`. | `month/transfer-to-budget` | R5 |
+| 4 | Auto-hold writes `carryover` from the start month through the **last month the budget has created** (`getAllMonths`), which is 12 months past today in the fixture, not a fixed 12. "Off this month" is `budget/reset-income-carryover`, which clears every income category for that month. The held amount is the sheet's `buffered-auto`; `forNextMonth` reports only the manual hold. | `month/auto-hold-*` | R6 |
+| 5 | Closing an account with **no transactions** tombstones it instead of closing it. Closing also unlinks any bank link first. | `accounts/close-no-transactions` | R7, US6 |
+| 6 | `account-create` takes the balance as a decimal amount (`500` → `50000`). The Starting Balance transaction is dated today and cleared. | `accounts/create-*` | R7 |
+| 7 | Category learning needs at least 3 of the payee's latest 5 transactions (within 180 days back and forward) to share a category (`getProbableCategory`), and only counts payees whose `payees.learn_categories = 1`. That per-payee column is a second switch beside the `learn-categories` preference. | `schedules-rules/learning-on` | R10 |
+| 8 | A schedule created after its start date gets its next date in the future, so it does not post the past occurrence. Auto-post (`advanceSchedulesService`) posted exactly once across two runs. | `schedules-rules/schedule-monthly-autopost` | R8 |
+| 9 | Rules store payee as field `description` and account as `acct` in `conditions` / `actions`, whatever the editor calls them; `imported_payee` is stored as `imported_description`. | `schedules-rules/rule-kept-from-file` | R9 |
+| 10 | Desktop's **Spending** report is a month-vs-month cumulative comparison, not spending by category. Spending by category / group / payee is the **custom report** query (`makeQuery`), with transfers and off-budget filtered after the query. Cash flow excludes **all** transfers (`payee.transfer_acct = null`) and stops at today. | `reports/range-2026-06-to-09` | R11, US4 |
+| 11 | Templates: notes are parsed into `categories.goal_def` plus `categories.template_settings = {"source":"notes"}` before every run. `repeat every year` is valid; `repeat every 1 year` is a template error. Check returns `templates-check-passed` or `template-errors` with one line per bad template. | `templates/*` | R12 |
+| 12 | Actual stores `zero_budget_months.id` as `YYYY-MM`. The phone wrote and read it as `YYYYMM`, so holds made on desktop were ignored on the phone. The phone also left hidden categories out of the month math, while Actual counts them. Both were fixed in phase 1 (`ShellReader`), and `ParityFixtureTest` now checks the phone's to-budget against desktop for three months. The phone still writes `YYYYMM`; desktop reads that form too, and phase 2 should switch writes to `YYYY-MM`. | `month/breakdown` | spec 002, Phase 2 |

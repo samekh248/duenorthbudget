@@ -1,0 +1,430 @@
+{
+  "scenario": "transfer-to-budget",
+  "base": "envelope-base.zip",
+  "actualVersion": "26.8.1",
+  "today": "2026-10-07",
+  "action": {
+    "handler": "budget/transfer-category",
+    "args": {
+      "month": "2026-10",
+      "amount": 4000,
+      "from": "Food",
+      "to": "to-budget"
+    }
+  },
+  "ids": {
+    "accounts": {
+      "Checking": "0a4252ae-8410-4a7b-9c76-479ff98cc059"
+    },
+    "categories": {
+      "Food": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "General": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "Bills": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "Bills (Flexible)": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "Income": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "Starting Balances": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "Savings": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+      "Salary": "defc06a1-e652-4cbb-9757-6dddb588ac48",
+      "Pets": "5a3ea424-e9ec-4554-a537-3d261a0b4fc0",
+      "Old Gym": "e60678f5-6f1b-4b3b-9bd3-d10575ffbd10",
+      "Archived": "d0ec2552-e3d2-45c9-83ff-7410872da3dd"
+    },
+    "groups": {
+      "Usual Expenses": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "Income": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "Investments and Savings": "a137772f-cf2f-4089-9432-822d2ddc1466",
+      "Archive": "a64107d1-4f13-4eae-b36b-523f7cc13016"
+    },
+    "payees": {
+      "Employer": "b009ad59-ba2a-41de-8476-a82a760d3c8f",
+      "Landlord": "9179c529-0ef1-4457-b038-9afc41a29234",
+      "Grocer": "ec4464e6-9ffb-4f55-9f34-a5383141ce18",
+      "Shop": "4c09ef5a-983f-41a8-897c-4ca3806e0612",
+      "Vet": "ee0f5399-349d-4602-9ffb-0141b76050ab",
+      "Gym": "5ea765cb-e019-4d7d-b52d-0ad6cb18af0f"
+    },
+    "schedules": {}
+  },
+  "tables": {
+    "zero_budgets": [
+      {
+        "id": "202607-541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "month": 202607,
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "amount": 45000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202607-af375fd4-d759-46b3-bffe-74a856151d57",
+        "month": 202607,
+        "category": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "amount": 10000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202607-d0ec2552-e3d2-45c9-83ff-7410872da3dd",
+        "month": 202607,
+        "category": "d0ec2552-e3d2-45c9-83ff-7410872da3dd",
+        "amount": 2000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202607-d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "month": 202607,
+        "category": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "amount": 120000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202607-e60678f5-6f1b-4b3b-9bd3-d10575ffbd10",
+        "month": 202607,
+        "category": "e60678f5-6f1b-4b3b-9bd3-d10575ffbd10",
+        "amount": 3000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202608-541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "month": 202608,
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "amount": 40000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202608-5a3ea424-e9ec-4554-a537-3d261a0b4fc0",
+        "month": 202608,
+        "category": "5a3ea424-e9ec-4554-a537-3d261a0b4fc0",
+        "amount": 3000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202608-af375fd4-d759-46b3-bffe-74a856151d57",
+        "month": 202608,
+        "category": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "amount": 10000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202608-d0ec2552-e3d2-45c9-83ff-7410872da3dd",
+        "month": 202608,
+        "category": "d0ec2552-e3d2-45c9-83ff-7410872da3dd",
+        "amount": 2000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202608-d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "month": 202608,
+        "category": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "amount": 120000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202608-e60678f5-6f1b-4b3b-9bd3-d10575ffbd10",
+        "month": 202608,
+        "category": "e60678f5-6f1b-4b3b-9bd3-d10575ffbd10",
+        "amount": 3000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202609-541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "month": 202609,
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "amount": 50000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202609-5a3ea424-e9ec-4554-a537-3d261a0b4fc0",
+        "month": 202609,
+        "category": "5a3ea424-e9ec-4554-a537-3d261a0b4fc0",
+        "amount": 3000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202609-af375fd4-d759-46b3-bffe-74a856151d57",
+        "month": 202609,
+        "category": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "amount": 5000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202609-d0ec2552-e3d2-45c9-83ff-7410872da3dd",
+        "month": 202609,
+        "category": "d0ec2552-e3d2-45c9-83ff-7410872da3dd",
+        "amount": 2000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202609-d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "month": 202609,
+        "category": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "amount": 120000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202609-e60678f5-6f1b-4b3b-9bd3-d10575ffbd10",
+        "month": 202609,
+        "category": "e60678f5-6f1b-4b3b-9bd3-d10575ffbd10",
+        "amount": 3000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "month": 202610,
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "amount": 46000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      }
+    ],
+    "reflect_budgets": [],
+    "zero_budget_months": [
+      {
+        "id": "2026-09",
+        "buffered": 20000
+      }
+    ],
+    "notes": [
+      {
+        "id": "budget-2026-10",
+        "note": "- Reassigned 40.00 from Food → To Budget on October 07"
+      }
+    ]
+  },
+  "values": {
+    "2026-09": {
+      "month": "2026-09",
+      "incomeAvailable": 542000,
+      "lastMonthOverspent": 0,
+      "forNextMonth": 20000,
+      "totalBudgeted": -183000,
+      "toBudget": 339000,
+      "fromLastMonth": 242000,
+      "totalIncome": 300000,
+      "totalSpent": -185000,
+      "totalBalance": 16000,
+      "bufferedAuto": 0,
+      "bufferedSelected": 20000,
+      "categories": {
+        "Old Gym": {
+          "budgeted": 3000,
+          "spent": 0,
+          "balance": 7000,
+          "carryover": false
+        },
+        "Pets": {
+          "budgeted": 3000,
+          "spent": -3000,
+          "balance": 500,
+          "carryover": false
+        },
+        "Food": {
+          "budgeted": 50000,
+          "spent": -50000,
+          "balance": 10000,
+          "carryover": false
+        },
+        "General": {
+          "budgeted": 5000,
+          "spent": -12000,
+          "balance": -6000,
+          "carryover": false
+        },
+        "Bills": {
+          "budgeted": 120000,
+          "spent": -120000,
+          "balance": 0,
+          "carryover": false
+        },
+        "Bills (Flexible)": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Savings": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Archived": {
+          "budgeted": 2000,
+          "spent": 0,
+          "balance": 4500,
+          "carryover": false
+        },
+        "Salary": {},
+        "Income": {},
+        "Starting Balances": {}
+      }
+    },
+    "2026-10": {
+      "month": "2026-10",
+      "incomeAvailable": 659000,
+      "lastMonthOverspent": -6000,
+      "forNextMonth": 0,
+      "totalBudgeted": -46000,
+      "toBudget": 607000,
+      "fromLastMonth": 359000,
+      "totalIncome": 300000,
+      "totalSpent": -130000,
+      "totalBalance": -62000,
+      "bufferedAuto": 0,
+      "bufferedSelected": 0,
+      "categories": {
+        "Old Gym": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 7000,
+          "carryover": false
+        },
+        "Pets": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 500,
+          "carryover": false
+        },
+        "Food": {
+          "budgeted": 46000,
+          "spent": -10000,
+          "balance": 46000,
+          "carryover": false
+        },
+        "General": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Bills": {
+          "budgeted": 0,
+          "spent": -120000,
+          "balance": -120000,
+          "carryover": false
+        },
+        "Bills (Flexible)": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Savings": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Archived": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 4500,
+          "carryover": false
+        },
+        "Salary": {},
+        "Income": {},
+        "Starting Balances": {}
+      }
+    },
+    "2026-11": {
+      "month": "2026-11",
+      "incomeAvailable": 607000,
+      "lastMonthOverspent": -120000,
+      "forNextMonth": 0,
+      "totalBudgeted": 0,
+      "toBudget": 487000,
+      "fromLastMonth": 607000,
+      "totalIncome": 0,
+      "totalSpent": 0,
+      "totalBalance": 58000,
+      "bufferedAuto": 0,
+      "bufferedSelected": 0,
+      "categories": {
+        "Old Gym": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 7000,
+          "carryover": false
+        },
+        "Pets": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 500,
+          "carryover": false
+        },
+        "Food": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 46000,
+          "carryover": false
+        },
+        "General": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Bills": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Bills (Flexible)": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Savings": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Archived": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 4500,
+          "carryover": false
+        },
+        "Salary": {},
+        "Income": {},
+        "Starting Balances": {}
+      }
+    }
+  }
+}

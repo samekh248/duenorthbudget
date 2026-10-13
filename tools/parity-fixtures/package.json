@@ -1,0 +1,12 @@
+{
+  "name": "duenorth-parity-fixtures",
+  "private": true,
+  "type": "module",
+  "description": "Generates desktop-Actual golden fixtures for spec 010 parity tests. Run by hand, never in CI.",
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {
+    "@actual-app/api": "26.8.1"
+  }
+}
