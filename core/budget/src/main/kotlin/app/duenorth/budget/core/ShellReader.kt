@@ -109,6 +109,23 @@ object ShellReader {
                             categories = cats,
                         )
                     },
+            incomeGroups =
+                groups
+                    .filter { it.bool("is_income") }
+                    .map { row ->
+                        val id = row.str("id").orEmpty()
+                        val cats =
+                            detailed.incomeRows
+                                .filter { it.groupId == id }
+                                .map { IncomeCategoryRow(it.id, it.name, it.budgetedMinor, it.receivedMinor, it.carryover) }
+                        IncomeGroupRow(
+                            id = id,
+                            name = row.str("name").orEmpty(),
+                            budgetedMinor = cats.sumOf { it.budgetedMinor },
+                            receivedMinor = cats.sumOf { it.receivedMinor },
+                            categories = cats,
+                        )
+                    },
             accounts =
                 accounts.map { row ->
                     val id = row.str("id").orEmpty()
@@ -142,6 +159,15 @@ object ShellReader {
         val carryover: Boolean,
     )
 
+    data class LoadedIncomeRow(
+        val id: String,
+        val name: String,
+        val groupId: String,
+        val budgetedMinor: Long,
+        val receivedMinor: Long,
+        val carryover: Boolean,
+    )
+
     data class LoadedDetailed(
         val figures: ActualMonthMath.Figures,
         val categories: Map<String, ActualMonthMath.CategoryMonthStat>,
@@ -149,6 +175,7 @@ object ShellReader {
         val groups: List<SqlRow>,
         val categoryRows: List<LoadedCategoryRow>,
         val breakdown: ActualMonthMath.MonthBreakdown? = null,
+        val incomeRows: List<LoadedIncomeRow> = emptyList(),
     )
 
     fun loadDetailed(
@@ -270,7 +297,26 @@ object ShellReader {
                     carryover = stat.carryover,
                 )
             }
+        val target = viewMonth.toActualMonth()
+        val targetAssignments =
+            assignments
+                .filter { it.long("month").toInt() == target }
+                .associateBy { it.str("category").orEmpty() }
+        val incomeRows =
+            categories.filter { it.bool("is_income") }.map { row ->
+                val id = row.str("id").orEmpty()
+                val assignment = targetAssignments[id]
+                LoadedIncomeRow(
+                    id = id,
+                    name = row.str("name").orEmpty(),
+                    groupId = row.str("cat_group").orEmpty(),
+                    budgetedMinor = assignment?.long("amount") ?: 0L,
+                    receivedMinor = spent[target to id] ?: 0L,
+                    carryover = assignment?.bool("carryover") == true,
+                )
+            }
         return LoadedDetailed(
+            incomeRows = incomeRows,
             figures = detailed.figures,
             categories = detailed.categories,
             bufferedMinor = detailed.bufferedMinor,

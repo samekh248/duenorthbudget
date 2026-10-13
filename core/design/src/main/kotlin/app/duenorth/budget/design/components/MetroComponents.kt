@@ -212,6 +212,11 @@ enum class AppGlyph {
     ChevronRight,
     ChevronDown,
     Calendar,
+    Breakdown,
+    Copy,
+    Average,
+    Zero,
+    Undo,
 }
 
 @Immutable
@@ -402,6 +407,11 @@ object AppGlyphInk {
             AppGlyph.ChevronRight -> 2
             AppGlyph.ChevronDown -> 2
             AppGlyph.Calendar -> 3
+            AppGlyph.Breakdown -> 4
+            AppGlyph.Copy -> 2
+            AppGlyph.Average -> 3
+            AppGlyph.Zero -> 1
+            AppGlyph.Undo -> 3
         }
 
     fun DrawScope.draw(
@@ -511,6 +521,60 @@ object AppGlyphInk {
                 )
                 drawLine(color, Offset(4.dp.toPx(), 10.dp.toPx()), Offset(18.dp.toPx(), 10.dp.toPx()), strokeWidth = 1.6.dp.toPx())
                 drawLine(color, Offset(8.dp.toPx(), 4.dp.toPx()), Offset(8.dp.toPx(), 8.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+            }
+            AppGlyph.Breakdown -> {
+                drawLine(color, Offset(4.dp.toPx(), 5.dp.toPx()), Offset(18.dp.toPx(), 5.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(4.dp.toPx(), 9.dp.toPx()), Offset(14.dp.toPx(), 9.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(4.dp.toPx(), 13.dp.toPx()), Offset(16.dp.toPx(), 13.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(4.dp.toPx(), 18.dp.toPx()), Offset(18.dp.toPx(), 18.dp.toPx()), strokeWidth = 2.2.dp.toPx())
+            }
+            AppGlyph.Copy -> {
+                drawRect(
+                    color,
+                    topLeft = Offset(4.dp.toPx(), 7.dp.toPx()),
+                    size =
+                        androidx.compose.ui.geometry
+                            .Size(11.dp.toPx(), 11.dp.toPx()),
+                    style = stroke,
+                )
+                drawRect(
+                    color,
+                    topLeft = Offset(8.dp.toPx(), 3.dp.toPx()),
+                    size =
+                        androidx.compose.ui.geometry
+                            .Size(11.dp.toPx(), 11.dp.toPx()),
+                    style = stroke,
+                )
+            }
+            AppGlyph.Average -> {
+                drawLine(color, Offset(4.dp.toPx(), 15.dp.toPx()), Offset(4.dp.toPx(), 18.dp.toPx()), strokeWidth = 2.2.dp.toPx())
+                drawLine(color, Offset(11.dp.toPx(), 9.dp.toPx()), Offset(11.dp.toPx(), 18.dp.toPx()), strokeWidth = 2.2.dp.toPx())
+                drawLine(color, Offset(3.dp.toPx(), 12.dp.toPx()), Offset(19.dp.toPx(), 12.dp.toPx()), strokeWidth = 1.2.dp.toPx())
+            }
+            AppGlyph.Zero -> {
+                drawOval(
+                    color,
+                    topLeft = Offset(6.dp.toPx(), 4.dp.toPx()),
+                    size =
+                        androidx.compose.ui.geometry
+                            .Size(10.dp.toPx(), 14.dp.toPx()),
+                    style = stroke,
+                )
+            }
+            AppGlyph.Undo -> {
+                drawLine(color, Offset(5.dp.toPx(), 9.dp.toPx()), Offset(15.dp.toPx(), 9.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(5.dp.toPx(), 9.dp.toPx()), Offset(9.dp.toPx(), 5.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawArc(
+                    color,
+                    startAngle = -90f,
+                    sweepAngle = 180f,
+                    useCenter = false,
+                    topLeft = Offset(11.dp.toPx(), 9.dp.toPx()),
+                    size =
+                        androidx.compose.ui.geometry
+                            .Size(8.dp.toPx(), 8.dp.toPx()),
+                    style = stroke,
+                )
             }
         }
     }

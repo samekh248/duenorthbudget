@@ -33,7 +33,7 @@ Envelope only. From category budget `•••` → `to-budget`. Amount ≤ cate
 
 ## Auto-hold
 
-Envelope, income categories only. From category budget `•••` → `auto-hold`, three choices:
+Envelope, income categories only. Home lists income groups after the expense groups (tags `income-group-<id>`); opening an income category shows what it received and three choices (`auto-hold-on`, `auto-hold-off-month`, `auto-hold-off`). On tracking files the same page budgets income instead:
 
 | Choice | Writes `carryover` on income category budget rows |
 |---|---|
