@@ -1,0 +1,39 @@
+name: Build APKs and screenshots
+
+on:
+  push:
+    branches: [claude/project-thread-1rtdcx]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build debug and release APKs
+        run: ./gradlew --no-daemon :app:assembleDebug :app:assembleRelease
+      - name: Record screenshots
+        run: ./gradlew --no-daemon :app:recordRoborazziDebug
+      - name: Sign release APK with a debug key
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          mkdir -p out/screenshots
+          "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk out/aligned.apk
+          "$BT/apksigner" sign --ks "$HOME/.android/debug.keystore" --ks-pass pass:android \
+            --ks-key-alias androiddebugkey --key-pass pass:android \
+            --out out/due-north-budget-release.apk out/aligned.apk
+          "$BT/apksigner" verify out/due-north-budget-release.apk
+          rm out/aligned.apk
+          cp app/build/outputs/apk/debug/app-debug.apk out/due-north-budget-debug.apk
+          cp app/src/test/snapshots/*.png out/screenshots/
+          ls -lR out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: due-north-build
+          path: out/
