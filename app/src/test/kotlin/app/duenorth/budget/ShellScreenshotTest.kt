@@ -119,9 +119,9 @@ class ShellScreenshotTest {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    GroupCategoriesScreen(
+                    BudgetSection(
                         shell = sample().copy(groups = listOf(group)),
-                        group = group,
+                        onListGesture = {},
                         onCategory = {},
                     )
                 }
@@ -166,10 +166,34 @@ class ShellScreenshotTest {
             bufferedMinor = 25_000,
             groups =
                 listOf(
-                    GroupRow("g-bills", "Bills", 124_000),
-                    GroupRow("g-every", "Everyday", 18_640),
-                    GroupRow("g-food", "Food", -3_200),
-                    GroupRow("g-save", "Savings", 80_000),
+                    GroupRow(
+                        "g-bills",
+                        "Bills",
+                        124_000,
+                        listOf(
+                            CategoryRow("c-rent", "Rent", 110_000, 0, 110_000, false),
+                            CategoryRow("c-power", "Power", 14_000, 0, 14_000, false),
+                        ),
+                    ),
+                    GroupRow(
+                        "g-every",
+                        "Everyday",
+                        18_640,
+                        listOf(
+                            CategoryRow("c-gas", "Gas", 12_000, 4_360, 7_640, false),
+                            CategoryRow("c-phone", "Phone", 11_000, 0, 11_000, false),
+                        ),
+                    ),
+                    GroupRow(
+                        "g-food",
+                        "Food",
+                        -3_200,
+                        listOf(
+                            CategoryRow("c-groceries", "Groceries", 20_000, 28_000, -8_000, false),
+                            CategoryRow("c-dining", "Dining", 8_000, 3_200, 4_800, false),
+                        ),
+                    ),
+                    GroupRow("g-save", "Savings", 80_000, listOf(CategoryRow("c-rainy", "Rainy day", 80_000, 0, 80_000, false))),
                 ),
             accounts =
                 listOf(

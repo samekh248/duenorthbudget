@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.ActualMonthMath
 import app.duenorth.budget.core.BudgetClock
@@ -202,7 +204,7 @@ class MonthActionContentTest {
     }
 
     @Test
-    fun incomeGroupsShowOnHomeAndOpen() {
+    fun incomeCategoriesShowUnderTheirGroupOnHome() {
         var opened: String? = null
         val shell = sample(BudgetMode.ENVELOPE)
         compose.setContent {
@@ -217,7 +219,7 @@ class MonthActionContentTest {
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),
                         onGesture = {},
-                        onBudgetGroup = { opened = it },
+                        onBudgetCategory = { opened = it },
                     )
                 }
             }
@@ -225,8 +227,9 @@ class MonthActionContentTest {
         compose
             .onNodeWithTag("income-group-received-g-inc", useUnmergedTree = true)
             .assertTextEquals(MoneyFormat.format(420_000, USD))
-        compose.onNodeWithTag("income-group-g-inc").performClick()
-        assertEquals("g-inc", opened)
+        compose.onNodeWithTag("income-group-g-inc").assertIsDisplayed()
+        compose.onNodeWithTag("income-category-c-sal").performScrollTo().performClick()
+        assertEquals("c-sal", opened)
     }
 
     @Test
@@ -236,7 +239,6 @@ class MonthActionContentTest {
             model.state.value.shell!!
                 .incomeCategory("c-sal")!!
         assertFalse(salary.autoHold)
-        model.openGroupCategories("g-inc")
         model.openCategoryBudget("c-sal")
         compose.setContent {
             MetroTheme {
@@ -274,7 +276,6 @@ class MonthActionContentTest {
             model.state.value.shell!!
                 .mode,
         )
-        model.openGroupCategories("g-inc")
         model.openCategoryBudget("c-sal")
         model.saveCategoryBudget("5000")
         await {

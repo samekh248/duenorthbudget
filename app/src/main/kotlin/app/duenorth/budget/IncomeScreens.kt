@@ -4,12 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,15 +57,13 @@ fun IncomeGroupLine(
     group: IncomeGroupRow,
     shell: MonthShell,
     modifier: Modifier = Modifier,
-    onOpen: ((String) -> Unit)? = null,
     formatOptions: FormatOptions = FormatOptions(),
 ) {
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .then(if (onOpen != null) Modifier.metroPress { onOpen(group.id) } else Modifier)
-            .padding(vertical = MetroDimens.Row)
+            .padding(top = MetroDimens.Row)
             .testTag("income-group-${group.id}"),
         verticalAlignment = Alignment.Top,
     ) {
@@ -92,76 +89,50 @@ fun IncomeGroupLine(
     }
 }
 
-/** An income group's categories: received, and budgeted on tracking files. */
+/**
+ * One income category under its group on Home, on the same columns as the ledger:
+ * budgeted on tracking files, and received under available.
+ */
 @Composable
-fun IncomeGroupScreen(
+fun IncomeCategoryLine(
+    category: IncomeCategoryRow,
     shell: MonthShell,
-    group: IncomeGroupRow,
-    onCategory: (String) -> Unit,
+    onOpen: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
-    val tracking = shell.mode == BudgetMode.TRACKING
-    Column(
+    val money = shell.currency
+    Row(
         modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(horizontal = MetroDimens.Gutter),
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .then(if (onOpen != null) Modifier.metroPress { onOpen(category.id) } else Modifier)
+            .testTag("income-category-${category.id}"),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        MetroText(group.name, Metro.typography.header)
         MetroText(
-            "${IncomeCopy.RECEIVED} ${MoneyFormat.format(group.receivedMinor, shell.currency)}",
-            Metro.typography.subheader,
-            Modifier.padding(top = MetroDimens.Gutter),
-            color = Metro.accent.text,
+            category.name,
+            Metro.typography.body,
+            Modifier.weight(LEDGER_NAME).padding(end = MetroDimens.Gutter),
+            maxLines = 2,
         )
-        Row(Modifier.fillMaxWidth().padding(top = MetroDimens.Grid)) {
-            MetroText("", Metro.typography.caption, Modifier.weight(1.4f))
-            if (tracking) {
-                MetroText(
-                    IncomeCopy.BUDGETED,
-                    Metro.typography.caption.copy(textAlign = TextAlign.End),
-                    Modifier.weight(1f),
-                    color = Metro.colors.secondary,
-                )
-            }
-            MetroText(
-                IncomeCopy.RECEIVED,
-                Metro.typography.caption.copy(textAlign = TextAlign.End),
-                Modifier.weight(1f),
-                color = Metro.colors.secondary,
+        if (shell.mode == BudgetMode.TRACKING) {
+            LedgerCell(
+                MoneyFormat.format(category.budgetedMinor, money, formatOptions),
+                Metro.typography.body,
+                Metro.colors.foreground,
+                "income-budgeted-${category.id}",
             )
+        } else {
+            Spacer(Modifier.weight(LEDGER_FIGURE))
         }
-        LazyColumn(Modifier.weight(1f)) {
-            items(group.categories, key = { it.id }) { category ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = MetroDimens.TouchTarget)
-                        .metroPress { onCategory(category.id) }
-                        .testTag("income-category-${category.id}"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    MetroText(category.name, Metro.typography.body, Modifier.weight(1.4f).padding(end = MetroDimens.Gutter), maxLines = 2)
-                    if (tracking) {
-                        MetroText(
-                            MoneyFormat.format(category.budgetedMinor, shell.currency),
-                            Metro.typography.body.copy(textAlign = TextAlign.End),
-                            Modifier.weight(1f).testTag("income-budgeted-${category.id}"),
-                            maxLines = 1,
-                            softWrap = false,
-                        )
-                    }
-                    MetroText(
-                        MoneyFormat.format(category.receivedMinor, shell.currency),
-                        Metro.typography.body.copy(textAlign = TextAlign.End),
-                        Modifier.weight(1f).testTag("income-received-${category.id}"),
-                        color = Metro.accent.text,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                }
-            }
-        }
+        Spacer(Modifier.weight(LEDGER_FIGURE))
+        LedgerCell(
+            MoneyFormat.format(category.receivedMinor, money, formatOptions),
+            Metro.typography.body,
+            Metro.accent.text,
+            "income-received-${category.id}",
+        )
     }
 }
 
