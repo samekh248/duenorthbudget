@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryManagePage
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.EnvelopeCopy
-import app.duenorth.budget.core.GroupRow
+import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.ManageCategoryRow
 import app.duenorth.budget.core.ManageGroupRow
 import app.duenorth.budget.core.MoneyFormat
@@ -327,49 +327,19 @@ private fun ManageCategoryLine(
 }
 
 @Composable
-fun GroupCategoriesScreen(
-    shell: MonthShell,
-    group: GroupRow,
-    onCategory: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(horizontal = MetroDimens.Gutter),
-    ) {
-        MetroText(group.name, Metro.typography.header)
-        MetroText(
-            MoneyFormat.format(group.availableMinor, shell.currency),
-            Metro.typography.subheader,
-            Modifier.padding(top = MetroDimens.Gutter),
-            color = Metro.accent.text,
-        )
-        if (group.categories.isNotEmpty()) {
-            LedgerHeadings(Modifier.padding(top = MetroDimens.Grid))
-        }
-        LazyColumn(Modifier.weight(1f)) {
-            items(group.categories, key = { it.id }) { category ->
-                CategoryLine(category, shell, onCategory)
-            }
-        }
-    }
-}
-
-@Composable
 fun CategoryLine(
     category: CategoryRow,
     shell: MonthShell,
-    onOpen: (String) -> Unit,
+    onOpen: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
+    formatOptions: FormatOptions = FormatOptions(),
 ) {
     val money = shell.currency
     Box(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress { onOpen(category.id) }
+            .then(if (onOpen != null) Modifier.metroPress { onOpen(category.id) } else Modifier)
             .testTag("category-${category.id}"),
     ) {
         Row(
@@ -383,19 +353,19 @@ fun CategoryLine(
                 maxLines = 2,
             )
             LedgerCell(
-                MoneyFormat.format(category.budgetedMinor, money),
+                MoneyFormat.format(category.budgetedMinor, money, formatOptions),
                 Metro.typography.body,
                 Metro.colors.foreground,
                 "category-budgeted-${category.id}",
             )
             LedgerCell(
-                MoneyFormat.format(category.spentMinor, money),
+                MoneyFormat.format(category.spentMinor, money, formatOptions),
                 Metro.typography.body,
                 Metro.colors.foreground,
                 "category-spent-${category.id}",
             )
             LedgerCell(
-                MoneyFormat.format(category.availableMinor, money),
+                MoneyFormat.format(category.availableMinor, money, formatOptions),
                 Metro.typography.body,
                 Metro.accent.text,
                 "category-available-${category.id}",
@@ -415,7 +385,7 @@ fun CategoryLine(
 }
 
 @Composable
-private fun LedgerHeadings(modifier: Modifier = Modifier) {
+internal fun LedgerHeadings(modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         Spacer(Modifier.weight(LEDGER_NAME))
         LedgerCell("budgeted", Metro.typography.caption, Metro.colors.secondary, "ledger-budgeted")
@@ -425,7 +395,7 @@ private fun LedgerHeadings(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun RowScope.LedgerCell(
+internal fun RowScope.LedgerCell(
     text: String,
     style: TextStyle,
     color: Color,
@@ -441,5 +411,5 @@ private fun RowScope.LedgerCell(
     )
 }
 
-private const val LEDGER_NAME = 1.4f
-private const val LEDGER_FIGURE = 1f
+internal const val LEDGER_NAME = 1.4f
+internal const val LEDGER_FIGURE = 1f

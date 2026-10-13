@@ -92,7 +92,7 @@ fun HomePanorama(
     onSkipSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onSelectMonth: (YearMonth) -> Unit = {},
-    onBudgetGroup: ((String) -> Unit)? = null,
+    onBudgetCategory: ((String) -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
     formatOptions: FormatOptions = FormatOptions(),
     onToBudget: (() -> Unit)? = null,
@@ -133,7 +133,7 @@ fun HomePanorama(
                         BudgetSection(
                             shell,
                             onListGesture = { listGesture = it },
-                            onGroup = onBudgetGroup,
+                            onCategory = onBudgetCategory,
                             formatOptions = formatOptions,
                             onToBudget = onToBudget,
                             notice = notice,
@@ -380,7 +380,7 @@ fun BudgetSection(
     shell: MonthShell,
     onListGesture: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    onGroup: ((String) -> Unit)? = null,
+    onCategory: ((String) -> Unit)? = null,
     formatOptions: FormatOptions = FormatOptions(),
     onToBudget: (() -> Unit)? = null,
     notice: String? = null,
@@ -424,22 +424,29 @@ fun BudgetSection(
             MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.caption, Modifier.padding(top = MetroDimens.Grid).weight(1f))
         } else {
             LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid), state = list) {
-                items(shell.groups, key = { it.id }) { group ->
-                    GroupLine(
-                        group,
-                        shell,
-                        arrivalModifier(group.id, arrivals),
-                        onOpen = onGroup,
-                        formatOptions = formatOptions,
-                    )
+                if (shell.groups.any { it.categories.isNotEmpty() }) {
+                    item(key = "ledger-headings") { LedgerHeadings() }
                 }
-                items(shell.incomeGroups, key = { "income-${it.id}" }) { group ->
-                    IncomeGroupLine(
-                        group,
-                        shell,
-                        onOpen = onGroup,
-                        formatOptions = formatOptions,
-                    )
+                shell.groups.forEach { group ->
+                    item(key = group.id) {
+                        GroupLine(
+                            group,
+                            shell,
+                            arrivalModifier(group.id, arrivals),
+                            formatOptions = formatOptions,
+                        )
+                    }
+                    items(group.categories, key = { "category-${it.id}" }) { category ->
+                        CategoryLine(category, shell, onCategory, formatOptions = formatOptions)
+                    }
+                }
+                shell.incomeGroups.forEach { group ->
+                    item(key = "income-${group.id}") {
+                        IncomeGroupLine(group, shell, formatOptions = formatOptions)
+                    }
+                    items(group.categories, key = { "income-category-${it.id}" }) { category ->
+                        IncomeCategoryLine(category, shell, onCategory, formatOptions = formatOptions)
+                    }
                 }
             }
         }
@@ -472,15 +479,13 @@ private fun GroupLine(
     group: GroupRow,
     shell: MonthShell,
     modifier: Modifier = Modifier,
-    onOpen: ((String) -> Unit)? = null,
     formatOptions: FormatOptions = FormatOptions(),
 ) {
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .then(if (onOpen != null) Modifier.metroPress { onOpen(group.id) } else Modifier)
-            .padding(vertical = MetroDimens.Row)
+            .padding(top = MetroDimens.Row)
             .testTag("group-${group.id}"),
         verticalAlignment = Alignment.Top,
     ) {

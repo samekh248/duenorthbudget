@@ -25,6 +25,7 @@ import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.theme.MetroTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -190,7 +191,8 @@ class ShellContentTest {
     }
 
     @Test
-    fun budgetSectionShowsGroupsNotCategories() {
+    fun budgetSectionNestsCategoriesUnderTheirGroup() {
+        var opened: String? = null
         val categories = listOf(CategoryRow("c-food", "Groceries", 0L, 0L, 12_000L, false))
         val shell =
             sample().copy(
@@ -203,7 +205,7 @@ class ShellContentTest {
                     BudgetSection(
                         shell,
                         onListGesture = {},
-                        onGroup = {},
+                        onCategory = { opened = it },
                     )
                 }
             }
@@ -226,8 +228,12 @@ class ShellContentTest {
         )
         assertTrue("held label sits above its amount: $heldLabel vs $held", heldLabel.bottom <= held.top + 1f)
         assertTrue("to-budget stays on the left: $toBudget vs $row", toBudget.left <= row.left + 1f)
-        compose.onNodeWithTag("category-c-food").assertDoesNotExist()
-        compose.onNodeWithText("Groceries").assertDoesNotExist()
+        val group = compose.onNodeWithTag("group-g").fetchSemanticsNode().boundsInRoot
+        val category = compose.onNodeWithTag("category-c-food").fetchSemanticsNode().boundsInRoot
+        assertTrue("category sits under its group: $group vs $category", category.top >= group.bottom - 1f)
+        compose.onNodeWithText("Groceries", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("category-c-food").performClick()
+        assertEquals("c-food", opened)
     }
 
     @Test
@@ -238,11 +244,7 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(320.dp)) {
-                    GroupCategoriesScreen(
-                        shell = shell,
-                        group = group,
-                        onCategory = {},
-                    )
+                    BudgetSection(shell, onListGesture = {}, onCategory = {})
                 }
             }
         }
@@ -257,7 +259,7 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    GroupCategoriesScreen(sample().copy(groups = listOf(group)), group, onCategory = {})
+                    BudgetSection(sample().copy(groups = listOf(group)), onListGesture = {}, onCategory = {})
                 }
             }
         }

@@ -129,10 +129,6 @@ sealed interface ShellRoute {
         val categoryId: String,
     ) : ShellRoute
 
-    data class GroupCategories(
-        val groupId: String,
-    ) : ShellRoute
-
     data class CategoryBudget(
         val categoryId: String,
     ) : ShellRoute
@@ -760,11 +756,6 @@ class ShellViewModel(
                 months.put(MonthSnapshot(month, shell, review))
             }
         }
-    }
-
-    fun openGroupCategories(groupId: String) {
-        push(ShellRoute.GroupCategories(groupId))
-        _state.update { it.copy(editError = null) }
     }
 
     fun openCategoryBudget(categoryId: String) {
@@ -1936,8 +1927,7 @@ class ShellViewModel(
 
     /** Editors of one month keep that month while the person swipes elsewhere. */
     private fun ShellRoute.pinsMonth(): Boolean =
-        this is ShellRoute.GroupCategories ||
-            this is ShellRoute.CategoryBudget ||
+        this is ShellRoute.CategoryBudget ||
             this is ShellRoute.MoveCategory ||
             this is ShellRoute.HoldMonth ||
             this is ShellRoute.Breakdown ||

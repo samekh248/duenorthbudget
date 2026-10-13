@@ -264,7 +264,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSkipSchedule = model::skipSchedule,
                                 modifier = fill,
                                 onSelectMonth = model::selectOpenMonth,
-                                onBudgetGroup = if (state.shell == null) null else model::openGroupCategories,
+                                onBudgetCategory = if (state.shell == null) null else model::openCategoryBudget,
                                 onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
                                 onToBudget =
                                     if (state.shell?.mode == BudgetMode.ENVELOPE) model::openBreakdown else null,
@@ -575,42 +575,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                     onGesture = model::setGesture,
                                     modifier = fill,
                                 )
-                            }
-                        }
-                        is ShellRoute.GroupCategories -> {
-                            val shell = state.shell
-                            val group = shell?.groups?.firstOrNull { it.id == route.groupId }
-                            val incomeGroup = shell?.incomeGroups?.firstOrNull { it.id == route.groupId }
-                            if (shell != null && incomeGroup != null) {
-                                EditorWithMonth(
-                                    openMonth = state.openMonth,
-                                    monthWindow = model.monthWindow(),
-                                    onSelectMonth = model::selectOpenMonth,
-                                    modifier = fill,
-                                ) { inner ->
-                                    IncomeGroupScreen(
-                                        shell = shell,
-                                        group = incomeGroup,
-                                        onCategory = model::openCategoryBudget,
-                                        modifier = inner,
-                                    )
-                                }
-                            } else if (shell == null || group == null) {
-                                Placeholder()
-                            } else {
-                                EditorWithMonth(
-                                    openMonth = state.openMonth,
-                                    monthWindow = model.monthWindow(),
-                                    onSelectMonth = model::selectOpenMonth,
-                                    modifier = fill,
-                                ) { inner ->
-                                    GroupCategoriesScreen(
-                                        shell = shell,
-                                        group = group,
-                                        onCategory = model::openCategoryBudget,
-                                        modifier = inner,
-                                    )
-                                }
                             }
                         }
                         is ShellRoute.CategoryBudget -> {
