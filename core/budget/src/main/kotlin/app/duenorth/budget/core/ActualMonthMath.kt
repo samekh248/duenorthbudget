@@ -41,10 +41,24 @@ object ActualMonthMath {
         val carryover: Boolean,
     )
 
+    /**
+     * How Actual's envelope sheet reaches to-budget: income + carried + overspent
+     * + budgeted + held, where budgeted and held are already negative. Spec 010.
+     */
+    data class MonthBreakdown(
+        val incomeMinor: Long,
+        val carriedMinor: Long,
+        val overspentMinor: Long,
+        val budgetedMinor: Long,
+        val heldMinor: Long,
+        val totalMinor: Long,
+    )
+
     data class DetailedFigures(
         val figures: Figures,
         val categories: Map<String, CategoryMonthStat>,
         val bufferedMinor: Long,
+        val breakdown: MonthBreakdown? = null,
     )
 
     fun projectDetailed(
@@ -158,6 +172,7 @@ object ActualMonthMath {
         var currentLeft = HashMap<String, Long>()
         var currentCarry = HashMap<String, Boolean>()
         var bufferedForTarget = 0L
+        var breakdown: MonthBreakdown? = null
 
         for (month in months) {
             val incomeSum = income.sumOf { spent[month to it.id] ?: 0L }
@@ -183,6 +198,9 @@ object ActualMonthMath {
             val buffered = if (manual != 0L) manual else auto
             if (month == target) bufferedForTarget = buffered
             toBudget = incomeSum + fromLast + lastOver + (-budgetedSum) - buffered
+            if (month == target) {
+                breakdown = MonthBreakdown(incomeSum, fromLast, lastOver, -budgetedSum, -buffered, toBudget)
+            }
 
             val left = HashMap<String, Long>()
             val carry = HashMap<String, Boolean>()
@@ -223,6 +241,7 @@ object ActualMonthMath {
             figures = Figures(ShellCopy.TO_BUDGET, toBudget, available.filterKeys { it in shown }),
             categories = stats,
             bufferedMinor = bufferedForTarget,
+            breakdown = breakdown,
         )
     }
 

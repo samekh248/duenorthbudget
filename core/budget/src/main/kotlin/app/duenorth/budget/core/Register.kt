@@ -633,10 +633,7 @@ class RegisterBook(
             val kids = children(txn.id)
             guard(listOf(txn) + kids, force, ForcedWrite.Split(transactionId, parts))?.let { return@write it }
             kids.forEach { tombstone(it.id) }
-            session.exec(
-                "UPDATE transactions SET isParent = 1, isChild = 0, category = NULL WHERE id = ?",
-                listOf(txn.id),
-            )
+            setColumns(txn.id, "isParent" to 1, "isChild" to 0, "category" to null)
             parts.forEachIndexed { index, part ->
                 insert(
                     id = ids(),
@@ -666,10 +663,7 @@ class RegisterBook(
             guard(listOf(txn) + kids, force, ForcedWrite.Unsplit(transactionId))?.let { return@write it }
             val category = kids.firstOrNull()?.categoryId
             kids.forEach { tombstone(it.id) }
-            session.exec(
-                "UPDATE transactions SET isParent = 0, category = ? WHERE id = ?",
-                listOf(category, txn.id),
-            )
+            setColumns(txn.id, "isParent" to 0, "category" to category)
             WriteResult.Saved
         }
 
@@ -740,14 +734,8 @@ class RegisterBook(
                 } else {
                     updateFields(toId, to.id, placed.second, draft.amountMinor, toPayee, note, draft.date)
                 }
-                session.exec(
-                    "UPDATE transactions SET transferred_id = ? WHERE id = ?",
-                    listOf(toId, draft.id),
-                )
-                session.exec(
-                    "UPDATE transactions SET transferred_id = ? WHERE id = ?",
-                    listOf(draft.id, toId),
-                )
+                setColumns(draft.id, "transferred_id" to toId)
+                setColumns(toId, "transferred_id" to draft.id)
             }
             WriteResult.Saved
         }
@@ -898,10 +886,7 @@ class RegisterBook(
                 ?.str("id")
         if (existing != null) return existing
         val id = ids()
-        session.exec(
-            "INSERT INTO payees (id, name, tombstone) VALUES (?, ?, 0)",
-            listOf(id, trimmed),
-        )
+        SyncSchema.writeRow(session, "payees", id, "name" to trimmed, "tombstone" to 0)
         return id
     }
 
@@ -920,10 +905,7 @@ class RegisterBook(
         if (existing != null) return existing
         val named = account(accountId)?.name ?: accountId
         val id = ids()
-        session.exec(
-            "INSERT INTO payees (id, name, transfer_acct, tombstone) VALUES (?, ?, ?, 0)",
-            listOf(id, named, accountId),
-        )
+        SyncSchema.writeRow(session, "payees", id, "name" to named, "transfer_acct" to accountId, "tombstone" to 0)
         return id
     }
 
@@ -941,30 +923,38 @@ class RegisterBook(
         transferId: String? = null,
         sort: Double,
         scheduleId: String? = null,
+        financialId: String? = null,
+        importedPayee: String? = null,
     ) {
-        session.exec(
-            """
-            INSERT INTO transactions (
-                id, isParent, isChild, parent_id, acct, category, amount, description, notes, date,
-                starting_balance_flag, transferred_id, sort_order, cleared, reconciled, tombstone, schedule
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 1, 0, 0, ?)
-            """.trimIndent(),
-            listOf(
-                id,
-                if (parent) 1 else 0,
-                if (child) 1 else 0,
-                parentId,
-                accountId,
-                categoryId,
-                amount,
-                payeeId,
-                note,
-                date,
-                transferId,
-                sort,
-                scheduleId,
-            ),
+        setColumns(
+            id,
+            "acct" to accountId,
+            "amount" to amount,
+            "description" to payeeId,
+            "notes" to note,
+            "date" to date,
+            "category" to categoryId,
+            "isParent" to parent,
+            "isChild" to child,
+            "parent_id" to parentId,
+            "starting_balance_flag" to 0,
+            "transferred_id" to transferId,
+            "sort_order" to sort,
+            "cleared" to 1,
+            "reconciled" to 0,
+            "tombstone" to 0,
+            "schedule" to scheduleId,
+            "financial_id" to financialId,
+            "imported_description" to importedPayee,
         )
+    }
+
+    /** Every transaction write goes through the sync funnel (spec 010). */
+    private fun setColumns(
+        id: String,
+        vararg values: Pair<String, Any?>,
+    ) {
+        SyncSchema.writeRow(session, "transactions", id, *values)
     }
 
     private fun updateFields(
@@ -976,13 +966,14 @@ class RegisterBook(
         note: String?,
         date: Int,
     ) {
-        session.exec(
-            """
-            UPDATE transactions
-            SET acct = ?, category = ?, amount = ?, description = ?, notes = ?, date = ?
-            WHERE id = ?
-            """.trimIndent(),
-            listOf(accountId, categoryId, amount, payeeId, note, date, id),
+        setColumns(
+            id,
+            "acct" to accountId,
+            "category" to categoryId,
+            "amount" to amount,
+            "description" to payeeId,
+            "notes" to note,
+            "date" to date,
         )
     }
 
@@ -992,18 +983,13 @@ class RegisterBook(
         payeeId: String,
         date: Int,
     ) {
-        session.exec(
-            """
-            UPDATE transactions
-            SET acct = ?, description = ?, date = ?
-            WHERE parent_id = ? AND IFNULL(tombstone, 0) = 0
-            """.trimIndent(),
-            listOf(accountId, payeeId, date, parentId),
-        )
+        children(parentId).forEach { child ->
+            setColumns(child.id, "acct" to accountId, "description" to payeeId, "date" to date)
+        }
     }
 
     private fun tombstone(id: String) {
-        session.exec("UPDATE transactions SET tombstone = 1 WHERE id = ?", listOf(id))
+        setColumns(id, "tombstone" to 1)
     }
 
     private fun nextSort(): Double =
@@ -1027,45 +1013,19 @@ class RegisterBook(
         financialId: String?,
         importedPayee: String?,
     ) {
-        val hasFinancial = transactionColumns().contains("financial_id")
-        if (!hasFinancial) {
-            insert(
-                id = id,
-                accountId = accountId,
-                categoryId = categoryId,
-                amount = amount,
-                payeeId = payeeId,
-                note = note,
-                date = date,
-                sort = nextSort(),
-            )
-            return
-        }
-        session.exec(
-            """
-            INSERT INTO transactions (
-                id, isParent, isChild, parent_id, acct, category, amount, description, notes, date,
-                starting_balance_flag, transferred_id, sort_order, cleared, reconciled, tombstone, schedule,
-                financial_id, imported_description
-            ) VALUES (?, 0, 0, NULL, ?, ?, ?, ?, ?, ?, 0, NULL, ?, 1, 0, 0, NULL, ?, ?)
-            """.trimIndent(),
-            listOf(
-                id,
-                accountId,
-                categoryId,
-                amount,
-                payeeId,
-                note,
-                date,
-                nextSort(),
-                financialId,
-                importedPayee,
-            ),
+        insert(
+            id = id,
+            accountId = accountId,
+            categoryId = categoryId,
+            amount = amount,
+            payeeId = payeeId,
+            note = note,
+            date = date,
+            sort = nextSort(),
+            financialId = financialId,
+            importedPayee = importedPayee,
         )
     }
-
-    private fun transactionColumns(): Set<String> =
-        session.query("PRAGMA table_info(transactions)").mapNotNull { it.str("name") }.toSet()
 
     private fun categoryAlive(id: String): Boolean =
         session

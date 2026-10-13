@@ -347,6 +347,7 @@ class SyncCoordinator(
                 SyncSchema.putState(session, "groupId", file.groupId)
                 SyncSchema.putState(session, "keyId", file.encryptKeyId.orEmpty())
                 SyncSchema.putState(session, "encrypted", if (file.encryptKeyId != null) "1" else "0")
+                SyncSchema.markBackfilled(session)
                 pendingMaterial.remove(file.fileId)?.let { material ->
                     SyncSchema.putState(session, "keySalt", material.salt)
                     SyncSchema.putState(session, "keyTest", material.test)
@@ -405,6 +406,7 @@ class SyncCoordinator(
                 SyncSchema.applyRemote(session, timestamp, cell)
             }
             SyncSchema.acceptPending(session, pending.map { it.timestamp })
+            SyncSchema.backfill(session, syncClock)
             val newest = response.messages.maxOfOrNull { it.timestamp }
             if (newest != null && newest > since) SyncSchema.putState(session, "lastRemote", newest)
             SyncSchema.putState(session, "lastSuccessEpoch", now().toString())
@@ -421,8 +423,7 @@ class SyncCoordinator(
         amountText: String,
     ): EditResult {
         val amount = MoneyFormat.parse(amountText, decimals(budgetId)) ?: return EditResult.Rejected(SyncCopy.ENTER_AMOUNT)
-        restoreClock(budgetId)
-        library.useDatabase(budgetId) { session ->
+        journaled(budgetId, UndoCopy.ASSIGN) { session ->
             BudgetEdits.assign(session, syncClock, month.toActualMonth(), categoryId, amount)
         } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
         return EditResult.Saved
@@ -436,8 +437,7 @@ class SyncCoordinator(
         amountText: String,
     ): EditResult {
         val amount = MoneyFormat.parse(amountText, decimals(budgetId)) ?: return EditResult.Rejected(SyncCopy.ENTER_AMOUNT)
-        restoreClock(budgetId)
-        return library.useDatabase(budgetId) { session ->
+        return journaled(budgetId, UndoCopy.MOVE) { session ->
             when (
                 val outcome =
                     EnvelopeBook(session, syncClock).moveAvailable(
@@ -459,8 +459,7 @@ class SyncCoordinator(
         month: YearMonth,
         enabled: Boolean,
     ): EditResult {
-        restoreClock(budgetId)
-        library.useDatabase(budgetId) { session ->
+        journaled(budgetId, UndoCopy.CARRYOVER) { session ->
             EnvelopeBook(session, syncClock).setCarryover(month.toActualMonth(), categoryId, enabled)
         } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
         return EditResult.Saved
@@ -470,8 +469,7 @@ class SyncCoordinator(
         budgetId: String,
         month: YearMonth,
     ): EditResult {
-        restoreClock(budgetId)
-        return library.useDatabase(budgetId) { session ->
+        return journaled(budgetId, UndoCopy.HOLD) { session ->
             when (
                 val outcome =
                     EnvelopeBook(session, syncClock).setHold(month.toActualMonth(), 0L, Long.MAX_VALUE)
@@ -488,8 +486,7 @@ class SyncCoordinator(
         amountText: String,
     ): EditResult {
         val amount = MoneyFormat.parse(amountText, decimals(budgetId)) ?: return EditResult.Rejected(SyncCopy.ENTER_AMOUNT)
-        restoreClock(budgetId)
-        return library.useDatabase(budgetId) { session ->
+        return journaled(budgetId, UndoCopy.HOLD) { session ->
             val header = ShellReader.loadDetailed(session, month).figures.headerMinor
             when (
                 val outcome = EnvelopeBook(session, syncClock).setHold(month.toActualMonth(), amount, header)
@@ -500,12 +497,52 @@ class SyncCoordinator(
         } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
     }
 
+    /** Copy last month, three-month average or zero (spec 010 US1); one undo step. */
+    fun fillMonth(
+        budgetId: String,
+        month: YearMonth,
+        kind: MonthFillKind,
+        confirmed: Boolean,
+    ): MonthFillResult {
+        val label =
+            when (kind) {
+                MonthFillKind.COPY_LAST -> MonthFillCopy.COPY_LAST
+                MonthFillKind.AVERAGE -> MonthFillCopy.AVERAGE
+                MonthFillKind.ZERO -> MonthFillCopy.ZERO
+            }
+        return journaled(budgetId, label) { session ->
+            MonthFillBook(session, dates.today()).fill(kind, month, confirmed)
+        } ?: MonthFillResult.Rejected(SyncCopy.LAST_FAILED)
+    }
+
+    fun transferToBudget(
+        budgetId: String,
+        categoryId: String,
+        month: YearMonth,
+        amountText: String,
+    ): MonthFillResult {
+        val amount =
+            MoneyFormat.parse(amountText, decimals(budgetId)) ?: return MonthFillResult.Rejected(SyncCopy.ENTER_AMOUNT)
+        return journaled(budgetId, MonthFillCopy.TO_BUDGET) { session ->
+            MonthFillBook(session, dates.today()).transferToBudget(month, categoryId, amount)
+        } ?: MonthFillResult.Rejected(SyncCopy.LAST_FAILED)
+    }
+
+    fun setAutoHold(
+        budgetId: String,
+        categoryId: String,
+        month: YearMonth,
+        choice: AutoHoldChoice,
+    ): MonthFillResult =
+        journaled(budgetId, MonthFillCopy.AUTO_HOLD) { session ->
+            MonthFillBook(session, dates.today()).setAutoHold(month, categoryId, choice)
+        } ?: MonthFillResult.Rejected(SyncCopy.LAST_FAILED)
+
     fun addCategoryGroup(
         budgetId: String,
         name: String,
     ): EditResult {
-        restoreClock(budgetId)
-        library.useDatabase(budgetId) { session ->
+        journaled(budgetId, UndoCopy.CATEGORY) { session ->
             EnvelopeBook(session, syncClock).addGroup(name)
         } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
         return EditResult.Saved
@@ -516,8 +553,7 @@ class SyncCoordinator(
         groupId: String,
         name: String,
     ): EditResult {
-        restoreClock(budgetId)
-        library.useDatabase(budgetId) { session ->
+        journaled(budgetId, UndoCopy.CATEGORY) { session ->
             EnvelopeBook(session, syncClock).addCategory(groupId, name)
         } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
         return EditResult.Saved
@@ -528,8 +564,7 @@ class SyncCoordinator(
         categoryId: String,
         hidden: Boolean,
     ): EditResult {
-        restoreClock(budgetId)
-        library.useDatabase(budgetId) { session ->
+        journaled(budgetId, UndoCopy.CATEGORY) { session ->
             EnvelopeBook(session, syncClock).hideCategory(categoryId, hidden)
         } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
         return EditResult.Saved
@@ -541,8 +576,7 @@ class SyncCoordinator(
         name: String,
     ): EditResult {
         if (name.trim().isEmpty()) return EditResult.Rejected(EnvelopeCopy.ENTER_NAME)
-        restoreClock(budgetId)
-        library.useDatabase(budgetId) { session ->
+        journaled(budgetId, UndoCopy.CATEGORY) { session ->
             EnvelopeBook(session, syncClock).renameGroup(groupId, name)
         } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
         return EditResult.Saved
@@ -554,8 +588,7 @@ class SyncCoordinator(
         name: String,
     ): EditResult {
         if (name.trim().isEmpty()) return EditResult.Rejected(EnvelopeCopy.ENTER_NAME)
-        restoreClock(budgetId)
-        library.useDatabase(budgetId) { session ->
+        journaled(budgetId, UndoCopy.CATEGORY) { session ->
             EnvelopeBook(session, syncClock).renameCategory(categoryId, name)
         } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
         return EditResult.Saved
@@ -591,12 +624,32 @@ class SyncCoordinator(
 
     fun readCategoryManage(budgetId: String): CategoryManagePage? = library.readCategoryManage(budgetId)
 
+    /** Runs an edit as one undo step, with this coordinator's clock for every write in it. */
+    private fun <T> journaled(
+        budgetId: String,
+        label: String,
+        block: (SqlSession) -> T,
+    ): T? {
+        restoreClock(budgetId)
+        return library.useDatabase(budgetId) { session ->
+            SyncSchema.withClock(session, syncClock) {
+                library.journal.step(session, budgetId, label) { block(session) }
+            }
+        }
+    }
+
+    /** Undoes the newest step; a cell changed since lands in [conflicts]. */
+    fun undo(budgetId: String): UndoResult {
+        restoreClock(budgetId)
+        return library.useDatabase(budgetId) { session -> library.journal.undo(session, budgetId, syncClock) }
+            ?: UndoResult.Empty
+    }
+
     private fun envelopeEdit(
         budgetId: String,
         block: EnvelopeBook.() -> EnvelopeEditResult,
     ): EditResult {
-        restoreClock(budgetId)
-        return library.useDatabase(budgetId) { session ->
+        return journaled(budgetId, UndoCopy.CATEGORY) { session ->
             when (val outcome = EnvelopeBook(session, syncClock).block()) {
                 EnvelopeEditResult.Saved -> EditResult.Saved
                 is EnvelopeEditResult.Rejected -> EditResult.Rejected(outcome.reason)
@@ -611,8 +664,7 @@ class SyncCoordinator(
     ): EditResult {
         val amount = MoneyFormat.parse(amountText, decimals(budgetId)) ?: return EditResult.Rejected(SyncCopy.ENTER_AMOUNT)
         val name = payee.trim().ifEmpty { ShellCopy.NO_PAYEE }
-        restoreClock(budgetId)
-        library.useDatabase(budgetId) { session ->
+        journaled(budgetId, UndoCopy.ADD_TRANSACTION) { session ->
             BudgetEdits.addTransaction(session, syncClock, dates.today(), name, amount, ids)
         } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
         return EditResult.Saved
@@ -778,6 +830,7 @@ class SyncCoordinator(
             library.useDatabase(budgetId) { session ->
                 SyncSchema.putState(session, "cloudFileId", chosen)
                 if (group.isNotBlank()) SyncSchema.putState(session, "groupId", group)
+                SyncSchema.markBackfilled(session)
             }
             remoteFiles = transport.listFiles(address, token)
             UploadResult.Uploaded(chosen)
@@ -817,7 +870,7 @@ class SyncCoordinator(
                                 dataset = row.str("dataset").orEmpty(),
                                 row = row.str("row").orEmpty(),
                                 column = row.str("column").orEmpty(),
-                                value = row.str("value").orEmpty(),
+                                value = SyncValues.wire(row.str("column").orEmpty(), row.str("value")),
                             ),
                     )
                 }
@@ -905,6 +958,7 @@ class SyncCoordinator(
 
     private fun restoreClock(budgetId: String) {
         syncClock.restoreIfBehind(state(budgetId, "clock"))
+        syncClock.restoreIfBehind(state(budgetId, "lastRemote"))
     }
 
     private fun state(

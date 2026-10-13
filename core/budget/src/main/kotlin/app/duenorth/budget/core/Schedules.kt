@@ -176,22 +176,28 @@ class SchedulesBook(
         val conditions = buildScheduleConditions(accountId, payeeId, amount, dateCond)
         val scheduleId = ids()
         val ruleId = rules.insertRule(null, conditions, linkScheduleActions(scheduleId))
-        session.exec(
-            """
-            INSERT INTO schedules (id, name, rule, completed, posts_transaction, tombstone)
-            VALUES (?, ?, ?, 0, 0, 0)
-            """.trimIndent(),
-            listOf(scheduleId, payeeName.ifBlank { "schedule" }, ruleId),
+        SyncSchema.writeRow(
+            session,
+            "schedules",
+            scheduleId,
+            "name" to payeeName.ifBlank { "schedule" },
+            "rule" to ruleId,
+            "completed" to 0,
+            "posts_transaction" to 0,
+            "tombstone" to 0,
         )
-        val ndId = ids()
-        val now = System.currentTimeMillis().toDouble()
-        session.exec(
-            """
-            INSERT INTO schedules_next_date (
-                id, schedule_id, local_next_date, local_next_date_ts, base_next_date, base_next_date_ts
-            ) VALUES (?, ?, ?, ?, ?, ?)
-            """.trimIndent(),
-            listOf(ndId, scheduleId, nextDateIso, now, nextDateIso, now),
+        val now = System.currentTimeMillis()
+        val stored = ScheduleDates.toStored(nextDateIso)
+        SyncSchema.writeRow(
+            session,
+            "schedules_next_date",
+            ids(),
+            "schedule_id" to scheduleId,
+            "local_next_date" to stored,
+            "local_next_date_ts" to now,
+            "base_next_date" to stored,
+            "base_next_date_ts" to now,
+            "tombstone" to 0,
         )
         return ScheduleWriteResult.Posted
     }
@@ -203,18 +209,15 @@ class SchedulesBook(
         val schedule = loadSchedules().firstOrNull { it.id == scheduleId }
             ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
         val updated = replaceAmountCondition(schedule.conditionsJson, amountMinor)
-        session.exec(
-            "UPDATE rules SET conditions = ? WHERE id = ?",
-            listOf(updated.toString(), schedule.ruleId),
-        )
+        rules.updateConditions(schedule.ruleId, updated)
         return ScheduleWriteResult.Posted
     }
 
     fun delete(scheduleId: String): ScheduleWriteResult {
         val schedule = loadSchedules().firstOrNull { it.id == scheduleId }
             ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
-        session.exec("UPDATE schedules SET tombstone = 1 WHERE id = ?", listOf(scheduleId))
-        session.exec("UPDATE rules SET tombstone = 1 WHERE id = ?", listOf(schedule.ruleId))
+        SyncSchema.write(session, "schedules", scheduleId, "tombstone", 1)
+        rules.delete(schedule.ruleId)
         return ScheduleWriteResult.Posted
     }
 
@@ -247,7 +250,7 @@ class SchedulesBook(
                     nd.local_next_date AS next_date
                 FROM schedules s
                 JOIN rules r ON r.id = s.rule
-                LEFT JOIN schedules_next_date nd ON nd.schedule_id = s.id
+                LEFT JOIN schedules_next_date nd ON nd.schedule_id = s.id AND IFNULL(nd.tombstone, 0) = 0
                 WHERE IFNULL(s.tombstone, 0) = 0
                   AND IFNULL(r.tombstone, 0) = 0
                 """.trimIndent(),
@@ -263,7 +266,10 @@ class SchedulesBook(
                     val obj = it.jsonObject
                     obj["field"]?.jsonPrimitive?.contentOrNull == "date"
                 }?.jsonObject ?: return@mapNotNull null
-            val nextIso = row.str("next_date") ?: ScheduleRecurrence.firstDate(dateCond) ?: return@mapNotNull null
+            val nextIso =
+                ScheduleDates.storedToIso(row.str("next_date"))
+                    ?: ScheduleRecurrence.firstDate(dateCond)
+                    ?: return@mapNotNull null
             val payeeName =
                 payeeId?.let { id ->
                     session
@@ -355,40 +361,43 @@ class SchedulesBook(
     }
 
     private fun markCompleted(scheduleId: String) {
-        session.exec("UPDATE schedules SET completed = 1 WHERE id = ?", listOf(scheduleId))
+        SyncSchema.write(session, "schedules", scheduleId, "completed", 1)
     }
 
     private fun updateNextDate(
         scheduleId: String,
         iso: String,
     ) {
-        val now = System.currentTimeMillis().toDouble()
+        val now = System.currentTimeMillis()
+        val stored = ScheduleDates.toStored(iso)
         val existing =
             session
                 .query(
-                    "SELECT id FROM schedules_next_date WHERE schedule_id = ?",
+                    "SELECT id FROM schedules_next_date WHERE schedule_id = ? AND IFNULL(tombstone, 0) = 0",
                     listOf(scheduleId),
                 ).firstOrNull()
                 ?.str("id")
         if (existing == null) {
-            session.exec(
-                """
-                INSERT INTO schedules_next_date (
-                    id, schedule_id, local_next_date, local_next_date_ts, base_next_date, base_next_date_ts
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                """.trimIndent(),
-                listOf(ids(), scheduleId, iso, now, iso, now),
+            SyncSchema.writeRow(
+                session,
+                "schedules_next_date",
+                ids(),
+                "schedule_id" to scheduleId,
+                "local_next_date" to stored,
+                "local_next_date_ts" to now,
+                "base_next_date" to stored,
+                "base_next_date_ts" to now,
+                "tombstone" to 0,
             )
-        } else {
-            session.exec(
-                """
-                UPDATE schedules_next_date
-                SET local_next_date = ?, local_next_date_ts = ?
-                WHERE schedule_id = ?
-                """.trimIndent(),
-                listOf(iso, now, scheduleId),
-            )
+            return
         }
+        SyncSchema.writeRow(
+            session,
+            "schedules_next_date",
+            existing,
+            "local_next_date" to stored,
+            "local_next_date_ts" to now,
+        )
     }
 
     private fun account(id: String): RegisterAccount? {

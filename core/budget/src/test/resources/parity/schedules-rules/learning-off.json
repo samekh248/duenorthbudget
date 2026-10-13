@@ -1,0 +1,220 @@
+{
+  "scenario": "learning-off",
+  "base": "base.zip",
+  "actualVersion": "26.8.1",
+  "today": "2026-10-07",
+  "action": {
+    "handler": "transactions-batch-update",
+    "args": {
+      "updated": [
+        {
+          "payee": "Cafe",
+          "category": "Food"
+        }
+      ],
+      "learnCategories": false
+    },
+    "pref": {
+      "learn-categories": "false"
+    }
+  },
+  "ids": {
+    "accounts": {
+      "Checking": "ec0a559d-d7f7-45f8-ae69-b73b41319e9c"
+    },
+    "categories": {
+      "Food": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "General": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "Bills": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "Bills (Flexible)": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "Income": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "Starting Balances": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "Savings": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61"
+    },
+    "groups": {
+      "Usual Expenses": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "Income": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "Investments and Savings": "a137772f-cf2f-4089-9432-822d2ddc1466"
+    },
+    "payees": {
+      "Starting Balance": "64a1bf16-61be-4b02-bc30-2e32c7e0ced4",
+      "Cafe": "48e1a56f-2b1c-4599-b132-c6c41c846c21",
+      "Corner Shop": "f11a5f7e-37b3-4f84-8d26-332d20c64598"
+    },
+    "schedules": {}
+  },
+  "tables": {
+    "rules": [],
+    "transactions": [
+      {
+        "id": "2ec087af-7bd4-4de6-81c6-7f2edfee3428",
+        "isParent": 0,
+        "isChild": 0,
+        "acct": "ec0a559d-d7f7-45f8-ae69-b73b41319e9c",
+        "category": null,
+        "amount": -1200,
+        "description": "f11a5f7e-37b3-4f84-8d26-332d20c64598",
+        "notes": null,
+        "date": 20260902,
+        "financial_id": null,
+        "type": null,
+        "location": null,
+        "error": null,
+        "imported_description": "Corner Shop",
+        "starting_balance_flag": 0,
+        "transferred_id": null,
+        "sort_order": 1791374399198,
+        "tombstone": 0,
+        "cleared": 1,
+        "pending": 0,
+        "parent_id": null,
+        "schedule": null,
+        "reconciled": 0,
+        "raw_synced_data": null
+      },
+      {
+        "id": "8dca53c9-5feb-4bf7-96a3-3b443bedf976",
+        "isParent": 0,
+        "isChild": 0,
+        "acct": "ec0a559d-d7f7-45f8-ae69-b73b41319e9c",
+        "category": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+        "amount": 100000,
+        "description": "64a1bf16-61be-4b02-bc30-2e32c7e0ced4",
+        "notes": null,
+        "date": 20261007,
+        "financial_id": null,
+        "type": null,
+        "location": null,
+        "error": null,
+        "imported_description": null,
+        "starting_balance_flag": 1,
+        "transferred_id": null,
+        "sort_order": 1791374401232,
+        "tombstone": 0,
+        "cleared": 1,
+        "pending": 0,
+        "parent_id": null,
+        "schedule": null,
+        "reconciled": 0,
+        "raw_synced_data": null
+      },
+      {
+        "id": "cdbe716d-0b36-4bd5-9af9-5d3ca34746e6",
+        "isParent": 0,
+        "isChild": 0,
+        "acct": "ec0a559d-d7f7-45f8-ae69-b73b41319e9c",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "amount": -3000,
+        "description": "48e1a56f-2b1c-4599-b132-c6c41c846c21",
+        "notes": null,
+        "date": 20260905,
+        "financial_id": null,
+        "type": null,
+        "location": null,
+        "error": null,
+        "imported_description": "Cafe",
+        "starting_balance_flag": 0,
+        "transferred_id": null,
+        "sort_order": 1791374398174,
+        "tombstone": 0,
+        "cleared": 1,
+        "pending": 0,
+        "parent_id": null,
+        "schedule": null,
+        "reconciled": 0,
+        "raw_synced_data": null
+      },
+      {
+        "id": "e4d04739-33e3-4b50-a127-0f93cd15e7b3",
+        "isParent": 0,
+        "isChild": 0,
+        "acct": "ec0a559d-d7f7-45f8-ae69-b73b41319e9c",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "amount": -2800,
+        "description": "48e1a56f-2b1c-4599-b132-c6c41c846c21",
+        "notes": null,
+        "date": 20260805,
+        "financial_id": null,
+        "type": null,
+        "location": null,
+        "error": null,
+        "imported_description": "Cafe",
+        "starting_balance_flag": 0,
+        "transferred_id": null,
+        "sort_order": 1791374401246,
+        "tombstone": 0,
+        "cleared": 1,
+        "pending": 0,
+        "parent_id": null,
+        "schedule": null,
+        "reconciled": 0,
+        "raw_synced_data": null
+      },
+      {
+        "id": "fa20620c-7206-4f92-92cb-7a352f2c3c65",
+        "isParent": 0,
+        "isChild": 0,
+        "acct": "ec0a559d-d7f7-45f8-ae69-b73b41319e9c",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "amount": -3100,
+        "description": "48e1a56f-2b1c-4599-b132-c6c41c846c21",
+        "notes": null,
+        "date": 20260820,
+        "financial_id": null,
+        "type": null,
+        "location": null,
+        "error": null,
+        "imported_description": "Cafe",
+        "starting_balance_flag": 0,
+        "transferred_id": null,
+        "sort_order": 1791374400222,
+        "tombstone": 0,
+        "cleared": 1,
+        "pending": 0,
+        "parent_id": null,
+        "schedule": null,
+        "reconciled": 0,
+        "raw_synced_data": null
+      }
+    ],
+    "payees": [
+      {
+        "id": "48e1a56f-2b1c-4599-b132-c6c41c846c21",
+        "name": "Cafe",
+        "category": null,
+        "tombstone": 0,
+        "transfer_acct": null,
+        "favorite": 0,
+        "learn_categories": 1
+      },
+      {
+        "id": "5bd727f5-ceec-4fb3-9b1e-0425c739491a",
+        "name": "",
+        "category": null,
+        "tombstone": 0,
+        "transfer_acct": "ec0a559d-d7f7-45f8-ae69-b73b41319e9c",
+        "favorite": 0,
+        "learn_categories": 1
+      },
+      {
+        "id": "64a1bf16-61be-4b02-bc30-2e32c7e0ced4",
+        "name": "Starting Balance",
+        "category": null,
+        "tombstone": 0,
+        "transfer_acct": null,
+        "favorite": 0,
+        "learn_categories": 1
+      },
+      {
+        "id": "f11a5f7e-37b3-4f84-8d26-332d20c64598",
+        "name": "Corner Shop",
+        "category": null,
+        "tombstone": 0,
+        "transfer_acct": null,
+        "favorite": 0,
+        "learn_categories": 1
+      }
+    ]
+  },
+  "values": {}
+}

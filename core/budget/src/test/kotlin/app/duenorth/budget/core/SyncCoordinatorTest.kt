@@ -79,7 +79,7 @@ class SyncCoordinatorTest {
             server.online = true
             assertEquals("synced 3:04 pm", restarted.sync(remote.fileId).status)
             val messages = server.plainMessages(remote.fileId)
-            assertTrue(messages.any { it.row == "202610-c-food" && it.column == "amount" && it.value == "2500" })
+            assertTrue(messages.any { it.row == "202610-c-food" && it.column == "amount" && it.value == "N:2500" })
             val other = freshPhone()
             assertNull(other.sync.connect(server.baseUrl, "server-secret").error)
             assertEquals(OpenResult.Opened, other.sync.open(remote))
@@ -95,7 +95,7 @@ class SyncCoordinatorTest {
             assertEquals(OpenResult.Opened, openSignedIn(remote))
             server.online = false
             assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
-            server.appendChange(remote.fileId, "zero_budgets", "202610-c-food", "amount", "4000")
+            server.appendChange(remote.fileId, "zero_budgets", "202610-c-food", "amount", "N:4000")
             server.online = true
             sync.sync(remote.fileId)
             val conflicts = sync.conflicts(remote.fileId)
@@ -105,8 +105,8 @@ class SyncCoordinatorTest {
             assertEquals("$40.00", conflicts.single().remoteText)
             assertEquals(2_500L, assigned(remote.fileId))
             val values = cellValues(remote.fileId, "202610-c-food", "amount")
-            assertTrue(values.contains("2500"))
-            assertTrue(values.contains("4000"))
+            assertTrue(values.contains("N:2500"))
+            assertTrue(values.contains("N:4000"))
             sync.markConflictsSeen(remote.fileId)
             assertEquals("$25.00", sync.conflicts(remote.fileId).single().localText)
         }
@@ -154,7 +154,7 @@ class SyncCoordinatorTest {
             assertFalse(worker.isAlive)
             sync.sync(remote.fileId)
             assertTrue(
-                server.plainMessages(remote.fileId).any { it.column == "amount" && it.value == "2500" },
+                server.plainMessages(remote.fileId).any { it.column == "amount" && it.value == "N:2500" },
             )
         }
     }

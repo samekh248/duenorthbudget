@@ -107,10 +107,7 @@ class ReconcileBook(
         session.transaction {
             for ((id, entry) in baseline) {
                 if (!entry.reconciled) {
-                    session.exec(
-                        "UPDATE transactions SET cleared = 0 WHERE id = ?",
-                        listOf(id),
-                    )
+                    SyncSchema.write(session, "transactions", id, "cleared", 0)
                 }
             }
             saveSession(
@@ -136,10 +133,7 @@ class ReconcileBook(
         val sessionData = loadSession(accountId) ?: return null
         val row = find(accountId, transactionId) ?: return page(account, sessionData)
         if (row.reconciled) return page(account, sessionData)
-        session.exec(
-            "UPDATE transactions SET cleared = ? WHERE id = ?",
-            listOf(if (row.cleared) 0 else 1, transactionId),
-        )
+        SyncSchema.write(session, "transactions", transactionId, "cleared", !row.cleared)
         return page(account, sessionData)
     }
 
@@ -151,18 +145,19 @@ class ReconcileBook(
             return ReconcileFinishResult.Rejected(ReconcileCopy.NOT_BALANCED)
         }
         session.transaction {
-            session.exec(
-                """
-                UPDATE transactions
-                SET reconciled = 1
-                WHERE acct = ?
-                    AND IFNULL(tombstone, 0) = 0
-                    AND IFNULL(isChild, 0) = 0
-                    AND IFNULL(reconciled, 0) = 0
-                    AND IFNULL(cleared, 0) = 1
-                """.trimIndent(),
-                listOf(accountId),
-            )
+            session
+                .query(
+                    """
+                    SELECT id FROM transactions
+                    WHERE acct = ?
+                        AND IFNULL(tombstone, 0) = 0
+                        AND IFNULL(isChild, 0) = 0
+                        AND IFNULL(reconciled, 0) = 0
+                        AND IFNULL(cleared, 0) = 1
+                    """.trimIndent(),
+                    listOf(accountId),
+                ).mapNotNull { it.str("id") }
+                .forEach { id -> SyncSchema.write(session, "transactions", id, "reconciled", 1) }
             session.exec(
                 "INSERT OR REPLACE INTO preferences (id, value) VALUES (?, ?)",
                 listOf(statementBalanceKey(accountId), sessionData.statementMinor.toString()),
@@ -171,10 +166,7 @@ class ReconcileBook(
                 "INSERT OR REPLACE INTO preferences (id, value) VALUES (?, ?)",
                 listOf(statementDateKey(accountId), sessionData.statementDate.toString()),
             )
-            session.exec(
-                "UPDATE accounts SET last_reconciled = ? WHERE id = ?",
-                listOf(System.currentTimeMillis().toString(), accountId),
-            )
+            SyncSchema.write(session, "accounts", accountId, "last_reconciled", System.currentTimeMillis().toString())
             clearSession(accountId)
         }
         return ReconcileFinishResult.Finished
@@ -184,10 +176,8 @@ class ReconcileBook(
         val sessionData = loadSession(accountId) ?: return false
         session.transaction {
             for ((id, entry) in sessionData.baseline) {
-                session.exec(
-                    "UPDATE transactions SET cleared = ?, reconciled = ? WHERE id = ?",
-                    listOf(if (entry.cleared) 1 else 0, if (entry.reconciled) 1 else 0, id),
-                )
+                SyncSchema.write(session, "transactions", id, "cleared", entry.cleared)
+                SyncSchema.write(session, "transactions", id, "reconciled", entry.reconciled)
             }
             clearSession(accountId)
         }

@@ -1,0 +1,426 @@
+{
+  "scenario": "range-2026-06-to-09",
+  "base": "base.zip",
+  "actualVersion": "26.8.1",
+  "today": "2026-10-07",
+  "action": {
+    "kind": "read",
+    "range": {
+      "start": "2026-06",
+      "end": "2026-09"
+    }
+  },
+  "ids": {
+    "accounts": {
+      "Checking": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+      "Savings": "53d8b5b7-a5ca-4494-a797-b049bd1606dc",
+      "Brokerage": "ab541077-dc4f-4d91-8ea1-30d938252a34"
+    },
+    "categories": {
+      "Food": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "General": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "Bills": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "Bills (Flexible)": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "Income": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "Starting Balances": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "Savings": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+      "Salary": "d70ba948-634e-4485-9572-c68b33f1a49a"
+    },
+    "groups": {
+      "Usual Expenses": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "Income": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "Investments and Savings": "a137772f-cf2f-4089-9432-822d2ddc1466"
+    },
+    "payees": {
+      "Employer": "b7274e63-bcab-4068-8aad-e418a8db1dfe",
+      "Landlord": "f91e7838-df6a-4dbf-b05d-418c3e0b8931",
+      "Grocer": "ff3a364b-73a0-4174-b934-b623b5ee8a29",
+      "Cafe": "865bd1df-174e-4b0d-9911-e1f8857ffeff",
+      "Shop": "43b7849c-fd87-4222-aaba-d0ec8f91d4cb",
+      "Market": "e26f843b-5cbd-4a3c-92ee-8fc01d848bbc",
+      "Mistake": "fc74ff2e-b7a6-41f8-a268-efb829c8034e",
+      "Dividend": "5ae14940-2976-43ae-96ae-805c3cb21f12"
+    },
+    "schedules": {}
+  },
+  "tables": {},
+  "values": {
+    "range": {
+      "start": "2026-06",
+      "end": "2026-09"
+    },
+    "cashFlow": {
+      "income": 1600000,
+      "expense": -830000,
+      "monthlyIncome": [
+        {
+          "date": "2026-09",
+          "isTransfer": null,
+          "amount": 400000
+        },
+        {
+          "date": "2026-08",
+          "isTransfer": null,
+          "amount": 400000
+        },
+        {
+          "date": "2026-07",
+          "isTransfer": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+          "amount": 50000
+        },
+        {
+          "date": "2026-07",
+          "isTransfer": null,
+          "amount": 400000
+        },
+        {
+          "date": "2026-06",
+          "isTransfer": null,
+          "amount": 400000
+        }
+      ],
+      "monthlyExpense": [
+        {
+          "date": "2026-09",
+          "isTransfer": null,
+          "amount": -205000
+        },
+        {
+          "date": "2026-08",
+          "isTransfer": "ab541077-dc4f-4d91-8ea1-30d938252a34",
+          "amount": -70000
+        },
+        {
+          "date": "2026-08",
+          "isTransfer": null,
+          "amount": -215000
+        },
+        {
+          "date": "2026-07",
+          "isTransfer": "53d8b5b7-a5ca-4494-a797-b049bd1606dc",
+          "amount": -50000
+        },
+        {
+          "date": "2026-07",
+          "isTransfer": null,
+          "amount": -205000
+        },
+        {
+          "date": "2026-06",
+          "isTransfer": null,
+          "amount": -205000
+        }
+      ]
+    },
+    "netWorth": {
+      "Brokerage": {
+        "offbudget": true,
+        "starting": 0,
+        "monthly": [
+          {
+            "date": "2026-09",
+            "amount": 12500
+          },
+          {
+            "date": "2026-08",
+            "amount": 70000
+          }
+        ]
+      },
+      "Checking": {
+        "offbudget": false,
+        "starting": 0,
+        "monthly": [
+          {
+            "date": "2026-09",
+            "amount": 195000
+          },
+          {
+            "date": "2026-08",
+            "amount": 115000
+          },
+          {
+            "date": "2026-07",
+            "amount": 145000
+          },
+          {
+            "date": "2026-06",
+            "amount": 195000
+          }
+        ]
+      },
+      "Savings": {
+        "offbudget": false,
+        "starting": 0,
+        "monthly": [
+          {
+            "date": "2026-07",
+            "amount": 50000
+          }
+        ]
+      }
+    },
+    "spendingRows": [
+      {
+        "date": "2026-09",
+        "category": null,
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": null,
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "43b7849c-fd87-4222-aaba-d0ec8f91d4cb",
+        "transferAccount": null,
+        "amount": -5000
+      },
+      {
+        "date": "2026-09",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "865bd1df-174e-4b0d-9911-e1f8857ffeff",
+        "transferAccount": null,
+        "amount": -8000
+      },
+      {
+        "date": "2026-09",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "ff3a364b-73a0-4174-b934-b623b5ee8a29",
+        "transferAccount": null,
+        "amount": -42000
+      },
+      {
+        "date": "2026-09",
+        "category": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "f91e7838-df6a-4dbf-b05d-418c3e0b8931",
+        "transferAccount": null,
+        "amount": -150000
+      },
+      {
+        "date": "2026-08",
+        "category": null,
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": null,
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "89c662bd-b10f-4402-a592-87646d1aaf1b",
+        "transferAccount": "ab541077-dc4f-4d91-8ea1-30d938252a34",
+        "amount": -70000
+      },
+      {
+        "date": "2026-08",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "e26f843b-5cbd-4a3c-92ee-8fc01d848bbc",
+        "transferAccount": null,
+        "amount": -6000
+      },
+      {
+        "date": "2026-08",
+        "category": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "e26f843b-5cbd-4a3c-92ee-8fc01d848bbc",
+        "transferAccount": null,
+        "amount": -4000
+      },
+      {
+        "date": "2026-08",
+        "category": null,
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": null,
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "43b7849c-fd87-4222-aaba-d0ec8f91d4cb",
+        "transferAccount": null,
+        "amount": -5000
+      },
+      {
+        "date": "2026-08",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "865bd1df-174e-4b0d-9911-e1f8857ffeff",
+        "transferAccount": null,
+        "amount": -8000
+      },
+      {
+        "date": "2026-08",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "ff3a364b-73a0-4174-b934-b623b5ee8a29",
+        "transferAccount": null,
+        "amount": -42000
+      },
+      {
+        "date": "2026-08",
+        "category": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "f91e7838-df6a-4dbf-b05d-418c3e0b8931",
+        "transferAccount": null,
+        "amount": -150000
+      },
+      {
+        "date": "2026-07",
+        "category": null,
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": null,
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "82b6c7ec-a8b9-4e4d-9ff7-bb9391b94f68",
+        "transferAccount": "53d8b5b7-a5ca-4494-a797-b049bd1606dc",
+        "amount": -50000
+      },
+      {
+        "date": "2026-07",
+        "category": null,
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": null,
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "43b7849c-fd87-4222-aaba-d0ec8f91d4cb",
+        "transferAccount": null,
+        "amount": -5000
+      },
+      {
+        "date": "2026-07",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "865bd1df-174e-4b0d-9911-e1f8857ffeff",
+        "transferAccount": null,
+        "amount": -8000
+      },
+      {
+        "date": "2026-07",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "ff3a364b-73a0-4174-b934-b623b5ee8a29",
+        "transferAccount": null,
+        "amount": -42000
+      },
+      {
+        "date": "2026-07",
+        "category": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "f91e7838-df6a-4dbf-b05d-418c3e0b8931",
+        "transferAccount": null,
+        "amount": -150000
+      },
+      {
+        "date": "2026-06",
+        "category": null,
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": null,
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "43b7849c-fd87-4222-aaba-d0ec8f91d4cb",
+        "transferAccount": null,
+        "amount": -5000
+      },
+      {
+        "date": "2026-06",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "865bd1df-174e-4b0d-9911-e1f8857ffeff",
+        "transferAccount": null,
+        "amount": -8000
+      },
+      {
+        "date": "2026-06",
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "ff3a364b-73a0-4174-b934-b623b5ee8a29",
+        "transferAccount": null,
+        "amount": -42000
+      },
+      {
+        "date": "2026-06",
+        "category": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "categoryHidden": false,
+        "categoryIncome": false,
+        "categoryGroup": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "categoryGroupHidden": false,
+        "account": "8e362592-786e-404c-b8c4-e766e7b8a5f2",
+        "accountOffBudget": false,
+        "payee": "f91e7838-df6a-4dbf-b05d-418c3e0b8931",
+        "transferAccount": null,
+        "amount": -150000
+      }
+    ]
+  }
+}

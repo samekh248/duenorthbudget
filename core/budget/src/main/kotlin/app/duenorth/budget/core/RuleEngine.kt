@@ -135,14 +135,28 @@ class RulesBook(
         actions: JsonArray,
         id: String = ids(),
     ): String {
-        session.exec(
-            """
-            INSERT INTO rules (id, stage, conditions_op, conditions, actions, tombstone)
-            VALUES (?, ?, 'and', ?, ?, 0)
-            """.trimIndent(),
-            listOf(id, stage, conditions.toString(), actions.toString()),
+        SyncSchema.writeRow(
+            session,
+            "rules",
+            id,
+            "stage" to stage,
+            "conditions_op" to "and",
+            "conditions" to conditions.toString(),
+            "actions" to actions.toString(),
+            "tombstone" to 0,
         )
         return id
+    }
+
+    fun updateConditions(
+        ruleId: String,
+        conditions: JsonArray,
+    ) {
+        SyncSchema.write(session, "rules", ruleId, "conditions", conditions.toString())
+    }
+
+    fun delete(ruleId: String) {
+        SyncSchema.write(session, "rules", ruleId, "tombstone", 1)
     }
 
     fun insertPayeeCategoryRule(
@@ -453,4 +467,18 @@ object ScheduleDates {
         iso: String,
         days: Long,
     ): String = parseIso(iso)?.plusDays(days)?.toString() ?: iso
+
+    /** `schedules_next_date` dates as Actual stores them: an integer `20261013`. */
+    fun toStored(value: String?): String? {
+        val text = value?.trim() ?: return null
+        val compact = text.replace("-", "")
+        return if (compact.length == 8 && compact.all { it.isDigit() }) compact else text
+    }
+
+    /** A stored next date, integer or the ISO text phone files used before spec 010. */
+    fun storedToIso(value: String?): String? {
+        val compact = toStored(value) ?: return null
+        val number = compact.toIntOrNull() ?: return null
+        return toIso(number)
+    }
 }
