@@ -8,9 +8,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.ActualMonthMath
 import app.duenorth.budget.core.BudgetClock
@@ -210,7 +214,7 @@ class MonthActionContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    HomePanorama(
+                    HomePivot(
                         shell = shell,
                         review = null,
                         netWorth = null,
@@ -228,7 +232,12 @@ class MonthActionContentTest {
             .onNodeWithTag("income-group-received-g-inc", useUnmergedTree = true)
             .assertTextEquals(MoneyFormat.format(420_000, USD))
         compose.onNodeWithTag("income-group-g-inc").assertIsDisplayed()
-        compose.onNodeWithTag("income-category-c-sal").performScrollTo().performClick()
+        // The full-width pivot item lays out more rows, so scroll the list to the category first.
+        compose
+            .onAllNodes(hasScrollToNodeAction() and hasAnyDescendant(hasTestTag("income-group-g-inc")))
+            .onLast()
+            .performScrollToNode(hasTestTag("income-category-c-sal"))
+        compose.onNodeWithTag("income-category-c-sal").performClick()
         assertEquals("c-sal", opened)
     }
 
@@ -301,7 +310,7 @@ class MonthActionContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    HomePanorama(
+                    HomePivot(
                         shell = shell.copy(mode = mode.value),
                         review = null,
                         netWorth = null,

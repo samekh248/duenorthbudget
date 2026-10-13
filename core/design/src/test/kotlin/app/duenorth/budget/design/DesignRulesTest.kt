@@ -12,7 +12,6 @@ import app.duenorth.budget.design.theme.MetroWeights
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.abs
 
 class DesignRulesTest {
     @Test
@@ -28,9 +27,6 @@ class DesignRulesTest {
         assertEquals(Color(0xFFAA00FF), Accent.Violet.fill(false))
         assertEquals(Color(0xFFE51400), Accent.Red.fill(true))
         val type = MetroTypography.Default
-        assertEquals(118.sp, type.panoramaTitle.fontSize)
-        assertEquals(MetroWeights.Light, type.panoramaTitle.fontWeight)
-        assertEquals(20.sp, type.logoSubtitle.fontSize)
         assertEquals(42.667.sp, type.sectionHeader.fontSize)
         assertEquals(MetroWeights.Semilight, type.sectionHeader.fontWeight)
         assertEquals(16.sp, type.pageTitle.fontSize)
@@ -60,17 +56,18 @@ class DesignRulesTest {
     }
 
     @Test
-    fun titleMovesByStepBetweenAdjacentPages() {
-        val step = 40f
-        val even = PanoramaMotion.titleShiftPx(0f, 6, step, motionEnabled = true)
-        val odd = PanoramaMotion.titleShiftPx(1f, 6, step, motionEnabled = true)
-        val mid = PanoramaMotion.titleShiftPx(0.5f, 6, step, motionEnabled = true)
-        assertEquals(0f, even)
-        assertEquals(-step, odd)
-        assertEquals(-step / 2f, mid)
-        assertTrue(abs(odd - even) <= step + 0.01f)
-        assertEquals(0f, PanoramaMotion.titleShiftPx(1f, 6, step, motionEnabled = false))
-        assertEquals(0f, PanoramaMotion.titleShiftPx(1f, 1, step, motionEnabled = true))
+    fun pivotHeadersLeadWithTheSelectedItemAndWrap() {
+        assertEquals(listOf(0, 1, 2, 3, 4, 5), PivotMotion.order(0, 6))
+        assertEquals(listOf(4, 5, 0, 1, 2, 3), PivotMotion.order(4, 6))
+        assertEquals(listOf(0), PivotMotion.order(0, 1))
+    }
+
+    @Test
+    fun pivotTakesTheShortWayAroundTheLoop() {
+        assertEquals(1, PivotMotion.delta(0, 1, 6))
+        assertEquals(-1, PivotMotion.delta(0, 5, 6))
+        assertEquals(2, PivotMotion.delta(5, 1, 6))
+        assertEquals(0, PivotMotion.delta(3, 3, 6))
     }
 
     @Test

@@ -64,9 +64,9 @@ import app.duenorth.budget.design.components.MetroAppBarHost
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroOutlineButton
-import app.duenorth.budget.design.components.MetroPanorama
+import app.duenorth.budget.design.components.MetroPivot
 import app.duenorth.budget.design.components.MetroText
-import app.duenorth.budget.design.components.PanoramaSection
+import app.duenorth.budget.design.components.PivotItem
 import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Accent
@@ -75,7 +75,7 @@ import app.duenorth.budget.design.theme.MetroDimens
 import java.time.YearMonth
 
 @Composable
-fun HomePanorama(
+fun HomePivot(
     shell: MonthShell?,
     review: MonthReviewPage?,
     netWorth: NetWorthPage?,
@@ -102,46 +102,39 @@ fun HomePanorama(
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
     LaunchedEffect(pagerGesture, listGesture) { onGesture(pagerGesture || listGesture) }
-    MetroPanorama(
-        title = "budget",
-        subtitle = "due north",
-        sections =
+    MetroPivot(
+        title = "DUE NORTH BUDGET",
+        items =
             listOf(
-                PanoramaSection(
-                    "budget",
-                    headerBlock =
-                        if (shell == null) {
-                            null
-                        } else {
-                            { onActivate ->
-                                BudgetMonthTitle(
-                                    month = openMonth,
-                                    window = monthWindow,
-                                    onSelect = onSelectMonth,
-                                    onActivate = onActivate,
-                                    modifier =
-                                        Modifier.padding(
-                                            start = MetroDimens.Gutter,
-                                            bottom = MetroDimens.Grid,
-                                        ),
-                                )
-                            }
-                        },
-                ) {
+                PivotItem("budget") {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
-                        BudgetSection(
-                            shell,
-                            onListGesture = { listGesture = it },
-                            onCategory = onBudgetCategory,
-                            formatOptions = formatOptions,
-                            onToBudget = onToBudget,
-                            notice = notice,
-                        )
+                        Column(Modifier.fillMaxSize()) {
+                            BudgetMonthTitle(
+                                month = openMonth,
+                                window = monthWindow,
+                                onSelect = onSelectMonth,
+                                modifier =
+                                    Modifier.padding(
+                                        start = MetroDimens.Gutter,
+                                        end = MetroDimens.Gutter,
+                                        bottom = MetroDimens.Row,
+                                    ),
+                            )
+                            BudgetSection(
+                                shell,
+                                onListGesture = { listGesture = it },
+                                modifier = Modifier.weight(1f),
+                                onCategory = onBudgetCategory,
+                                formatOptions = formatOptions,
+                                onToBudget = onToBudget,
+                                notice = notice,
+                            )
+                        }
                     }
                 },
-                PanoramaSection("accounts") {
+                PivotItem("accounts") {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
@@ -154,7 +147,7 @@ fun HomePanorama(
                         )
                     }
                 },
-                PanoramaSection("due") {
+                PivotItem("due") {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
@@ -168,7 +161,7 @@ fun HomePanorama(
                         )
                     }
                 },
-                PanoramaSection("review") {
+                PivotItem("review") {
                     MonthReviewSection(
                         review = review,
                         loading = loading,
@@ -176,14 +169,14 @@ fun HomePanorama(
                         onCategory = onReviewCategory,
                     )
                 },
-                PanoramaSection("net worth") {
+                PivotItem("net worth") {
                     NetWorthSection(
                         page = netWorth,
                         loading = loading,
                         onIncludeOffBudget = onNetWorthIncludeOffBudget,
                     )
                 },
-                PanoramaSection("inbox") {
+                PivotItem("inbox") {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
@@ -198,7 +191,7 @@ fun HomePanorama(
                 },
             ),
         modifier = modifier,
-        initialSection = initialSection,
+        initialItem = initialSection,
         onGesture = { pagerGesture = it },
     )
 }
@@ -253,22 +246,19 @@ private fun BudgetMonthTitle(
     month: YearMonth,
     window: MonthWindow,
     onSelect: (YearMonth) -> Unit,
-    onActivate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val phrase = "${monthLabel(month)} budget"
-    val style = Metro.typography.sectionHeader
+    val phrase = monthLabel(month)
+    val style = Metro.typography.subheader
     Column(modifier.fillMaxWidth()) {
         SubcomposeLayout(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = MetroDimens.TouchTarget)
                 .semantics { heading() }
-                .metroPress {
-                    onActivate()
-                    expanded = !expanded
-                }.testTag("month-label"),
+                .metroPress { expanded = !expanded }
+                .testTag("month-label"),
         ) { constraints ->
             // Widths near Constraints.Infinity make this text measure about one pixel per character.
             val loose = constraints.copy(minWidth = 0, minHeight = 0, maxWidth = 2_048)

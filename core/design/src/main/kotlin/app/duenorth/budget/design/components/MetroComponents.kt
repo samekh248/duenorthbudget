@@ -11,9 +11,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,16 +33,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -52,28 +49,30 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import app.duenorth.budget.design.PanoramaMotion
+import app.duenorth.budget.design.PivotMotion
 import app.duenorth.budget.design.metroTilt
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroWeights
 import kotlinx.coroutines.launch
+import kotlin.math.floor
+import kotlin.math.roundToInt
 
 @Composable
 fun MetroText(
@@ -596,66 +595,43 @@ fun AppGlyphIcon(
     }
 }
 
-/** Draws this child higher by [distance] and gives that space back to the parent. */
-private fun Modifier.pullUp(distance: Dp): Modifier =
-    layout { measurable, constraints ->
-        val placeable = measurable.measure(constraints)
-        val dy = distance.roundToPx()
-        val height = (placeable.height - dy).coerceAtLeast(0)
-        layout(placeable.width, height) {
-            placeable.placeRelative(0, -dy)
-        }
-    }
-
 @Immutable
-class PanoramaSection(
+class PivotItem(
     val header: String,
-    val headerBlock: (@Composable (onActivate: () -> Unit) -> Unit)? = null,
     val content: @Composable () -> Unit,
 )
 
+/**
+ * Metro pivot: a small title, a row of headers, and one item at a time across the full width.
+ * The selected header leads the row; the rest follow in loop order, dimmed, and slide in as
+ * the person swipes. Tapping a header opens that item.
+ */
 @Composable
-fun MetroPanorama(
+fun MetroPivot(
     title: String,
-    sections: List<PanoramaSection>,
+    items: List<PivotItem>,
     modifier: Modifier = Modifier,
-    subtitle: String = "",
-    initialSection: Int = 0,
+    initialItem: Int = 0,
     onGesture: (Boolean) -> Unit = {},
 ) {
-    val count = sections.size
-    val loops = 200
+    val count = items.size
+    val loops = if (count > 1) 200 else 1
     val origin = remember(count) { (loops / 2) * count }
-    val pager = rememberPagerState(initialPage = origin + initialSection) { loops * count }
+    val pager = rememberPagerState(initialPage = origin + initialItem) { loops * count }
     val scope = rememberCoroutineScope()
     val type = Metro.typography
     val colors = Metro.colors
     val animations = Metro.animations
-    val measurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-    val stepPx =
-        remember(type.logoSubtitle, density) {
-            measurer
-                .measure(text = "due", style = type.logoSubtitle)
-                .size.width
-                .toFloat()
-        }
-    var titleBlockWidth by remember { mutableIntStateOf(0) }
-    var titleScale by remember { mutableFloatStateOf(1f) }
 
     LaunchedEffect(pager) {
         snapshotFlow { pager.isScrollInProgress }.collect { onGesture(it) }
     }
 
-    fun sectionOf(page: Int): Int = Math.floorMod(page - origin, count)
+    fun itemOf(page: Int): Int = Math.floorMod(page - origin, count)
 
     fun goTo(index: Int) {
         scope.launch {
-            val current = sectionOf(pager.currentPage)
-            var delta = index - current
-            if (delta > count / 2) delta -= count
-            if (delta < -count / 2) delta += count
-            val target = pager.currentPage + delta
+            val target = pager.currentPage + PivotMotion.delta(itemOf(pager.currentPage), index, count)
             if (animations) {
                 pager.animateScrollToPage(target)
             } else {
@@ -664,100 +640,78 @@ fun MetroPanorama(
         }
     }
 
+    val base by remember {
+        derivedStateOf { floor(pager.currentPage + pager.currentPageOffsetFraction).toInt() }
+    }
+    val selected by remember { derivedStateOf { itemOf(pager.currentPage) } }
+
     Column(
         modifier
             .fillMaxSize()
             .background(colors.background)
-            .testTag("panorama"),
+            .testTag("pivot"),
     ) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val viewport = constraints.maxWidth.toFloat()
-            val inset = stepPx.coerceAtLeast(0f)
-            val available = (viewport - inset).coerceAtLeast(1f)
-            val measured = titleBlockWidth.toFloat()
-            titleScale =
-                if (measured > available && measured > 0f) {
-                    (available / measured).coerceIn(0.35f, 1f)
-                } else {
-                    1f
-                }
-            val pagePosition = (pager.currentPage - origin) + pager.currentPageOffsetFraction
-            val shift =
-                PanoramaMotion.titleShiftPx(
-                    pagePosition = pagePosition,
-                    sectionCount = count,
-                    stepPx = stepPx,
-                    motionEnabled = animations,
-                )
-            // One logo: the title and "due north" stay locked and shift together.
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = with(density) { inset.toDp() }.coerceAtLeast(MetroDimens.Gutter),
-                        top = 8.dp,
-                        end = MetroDimens.Gutter,
-                    ).onGloballyPositioned { titleBlockWidth = it.size.width }
-                    .graphicsLayer {
-                        translationX = shift
-                        scaleX = titleScale
-                        scaleY = titleScale
-                        transformOrigin =
-                            androidx.compose.ui.graphics
-                                .TransformOrigin(0f, 0f)
-                    },
-            ) {
-                MetroText(
-                    title,
-                    type.panoramaTitle,
-                    Modifier.testTag("panorama-title"),
-                    maxLines = 1,
-                    softWrap = false,
-                )
-                if (subtitle.isNotEmpty()) {
+        MetroText(
+            title,
+            type.pageTitle,
+            Modifier
+                .padding(start = MetroDimens.Gutter, top = MetroDimens.Row, end = MetroDimens.Gutter)
+                .testTag("pivot-title"),
+            maxLines = 1,
+            softWrap = false,
+        )
+        val gapPx = with(LocalDensity.current) { MetroDimens.Grid.roundToPx() }
+        val gutterPx = with(LocalDensity.current) { MetroDimens.Gutter.roundToPx() }
+        Layout(
+            content = {
+                PivotMotion.order(itemOf(base), count).forEach { index ->
+                    val isSelected = index == selected
                     MetroText(
-                        subtitle,
-                        type.logoSubtitle,
+                        items[index].header,
+                        type.sectionHeader,
                         Modifier
-                            .pullUp(40.dp)
-                            .padding(start = 16.dp)
-                            .testTag("panorama-subtitle"),
-                        color = colors.secondary,
+                            .heightIn(min = MetroDimens.TouchTarget)
+                            .semantics {
+                                role = Role.Tab
+                                this.selected = isSelected
+                            }.metroPress { goTo(index) }
+                            .testTag("pivot-header-$index"),
+                        color = if (isSelected) colors.foreground else colors.secondary,
                         maxLines = 1,
                         softWrap = false,
                     )
+                }
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clipToBounds()
+                    .padding(bottom = MetroDimens.Row)
+                    .testTag("pivot-headers"),
+        ) { measurables, constraints ->
+            val loose = constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity, minHeight = 0)
+            val placeables = measurables.map { it.measure(loose) }
+            val height = placeables.maxOfOrNull { it.height } ?: 0
+            layout(constraints.maxWidth, height) {
+                // Read in layout so a swipe only moves the row; it never recomposes it.
+                val position = pager.currentPage + pager.currentPageOffsetFraction
+                val fraction = position - floor(position)
+                val lead = placeables.firstOrNull()?.width ?: 0
+                var x = gutterPx - (fraction * (lead + gapPx)).roundToInt()
+                placeables.forEach {
+                    it.placeRelative(x, 0)
+                    x += it.width + gapPx
                 }
             }
         }
         HorizontalPager(
             state = pager,
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(end = if (count > 1) MetroDimens.Peek else 0.dp),
             beyondViewportPageCount = 1,
             userScrollEnabled = count > 1,
         ) { page ->
-            val index = sectionOf(page)
-            val section = sections[index]
-            Column(Modifier.fillMaxSize()) {
-                val block = section.headerBlock
-                if (block != null) {
-                    block { goTo(index) }
-                } else {
-                    MetroText(
-                        section.header,
-                        type.sectionHeader,
-                        Modifier
-                            .padding(start = MetroDimens.Gutter, bottom = MetroDimens.Grid)
-                            .semantics { heading() }
-                            .metroPress { goTo(index) }
-                            .heightIn(min = MetroDimens.TouchTarget),
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                }
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    section.content()
-                }
+            Box(Modifier.fillMaxSize()) {
+                items[itemOf(page)].content()
             }
         }
     }

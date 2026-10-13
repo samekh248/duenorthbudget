@@ -56,7 +56,7 @@ class ShellScreenshotTest {
     fun accountsLight() = snap("accounts_light", dark = false, shell = sample(), section = 1)
 
     @Test
-    fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = 2)
+    fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = 5)
 
     @Test
     fun serverLight() = serverSnap("server_light", dark = false)
@@ -73,7 +73,7 @@ class ShellScreenshotTest {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
                 Column(Modifier.width(390.dp).height(780.dp)) {
-                    HomePanorama(
+                    HomePivot(
                         shell = shell,
                         review = null,
                         netWorth = null,

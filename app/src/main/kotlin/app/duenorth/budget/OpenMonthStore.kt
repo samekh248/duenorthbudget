@@ -12,7 +12,7 @@ data class MonthSnapshot(
 )
 
 /**
- * One open month for the panorama. Cache hits apply shell and review in the same call.
+ * One open month for the home pivot. Cache hits apply shell and review in the same call.
  * Gestures hold row updates until [flushPending].
  */
 class OpenMonthStore(

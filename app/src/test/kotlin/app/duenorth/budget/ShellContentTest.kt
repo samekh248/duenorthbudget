@@ -8,6 +8,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -34,6 +37,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.time.YearMonth
+import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
@@ -47,7 +51,7 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    HomePanorama(
+                    HomePivot(
                         shell = shell,
                         review = null,
                         netWorth = null,
@@ -63,19 +67,46 @@ class ShellContentTest {
         }
         compose.onNodeWithText("$0.00").assertIsDisplayed()
         compose.onNodeWithText(ShellCopy.NOTHING_TO_BUDGET).assertIsDisplayed()
-        val root = compose.onNodeWithTag("panorama").fetchSemanticsNode().boundsInRoot
-        val title = compose.onNodeWithTag("panorama-title").fetchSemanticsNode().boundsInRoot
-        val subtitle = compose.onNodeWithTag("panorama-subtitle").fetchSemanticsNode().boundsInRoot
-        compose.onNodeWithTag("panorama-title").assertTextEquals("budget")
-        compose.onNodeWithTag("panorama-subtitle").assertTextEquals("due north")
-        assertTrue("title left ${title.left}", title.left >= root.left - 1f)
-        assertTrue("title right ${title.right} > ${root.right}", title.right <= root.right + 1f)
-        assertTrue("title top ${title.top} root ${root.top}", title.top >= root.top - 1f)
-        assertTrue("title bottom ${title.bottom}", title.bottom <= root.bottom + 1f)
-        val tuckDp = (title.bottom - subtitle.top) / compose.density.density
-        assertTrue("due north should tuck under the title, ${tuckDp}dp", tuckDp in 34f..46f)
-        val indentDp = (subtitle.left - title.left) / compose.density.density
-        assertTrue("due north should indent from the title, ${indentDp}dp", indentDp in 12f..20f)
+        compose.onNodeWithTag("pivot-title").assertTextEquals("DUE NORTH BUDGET")
+        compose.onNodeWithTag("pivot-header-0").assertTextEquals("budget").assertIsSelected()
+        compose.onNodeWithTag("pivot-header-1").assertTextEquals("accounts").assertIsNotSelected()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun eachPivotItemFillsTheWidthAndAHeaderOpensIt() {
+        val shell = sample()
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    HomePivot(
+                        shell = shell,
+                        review = null,
+                        netWorth = null,
+                        upcoming = emptyList(),
+                        loading = false,
+                        openMonth = shell.month,
+                        monthWindow = MonthWindow.around(shell.month),
+                        onGesture = {},
+                    )
+                }
+            }
+        }
+        val root = compose.onNodeWithTag("pivot").fetchSemanticsNode().boundsInRoot
+        val headers = compose.onNodeWithTag("pivot-headers").fetchSemanticsNode().boundsInRoot
+        val accounts = compose.onNodeWithTag("pivot-header-1").fetchSemanticsNode().boundsInRoot
+        assertTrue("the next header waits in the header row", accounts.left < root.right && accounts.top < headers.bottom)
+        compose.onNodeWithTag("to-budget").assertIsDisplayed()
+        compose.onNodeWithTag("pivot-header-1").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("pivot-header-1").assertIsSelected()
+        compose.onNodeWithTag("pivot-header-0").assertIsNotSelected()
+        val lead = compose.onNodeWithTag("pivot-header-1").fetchSemanticsNode().boundsInRoot
+        val gutter = 12f * compose.density.density
+        assertTrue("the chosen header leads the row, $lead", abs(lead.left - (root.left + gutter)) <= 1f)
+        // No peek: the budget item leaves the screen entirely.
+        compose.onNodeWithTag("to-budget").assertIsNotDisplayed()
     }
 
     @Test
@@ -87,7 +118,7 @@ class ShellContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    HomePanorama(
+                    HomePivot(
                         shell = shell,
                         review = null,
                         netWorth = null,
@@ -105,24 +136,26 @@ class ShellContentTest {
         compose.onNodeWithText("Home").assertDoesNotExist()
         compose.onNodeWithTag("month-previous").assertDoesNotExist()
         compose.onNodeWithTag("month-next").assertDoesNotExist()
-        compose.onNodeWithText("october 2026 budget").assertIsDisplayed()
+        compose.onNodeWithText("october 2026").assertIsDisplayed()
         val density = compose.density.density
-        val title = compose.onNodeWithText("october 2026 budget", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val title = compose.onNodeWithText("october 2026", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val dropdown = compose.onNodeWithTag("month-dropdown", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val root = compose.onNodeWithTag("panorama").fetchSemanticsNode().boundsInRoot
+        val root = compose.onNodeWithTag("pivot").fetchSemanticsNode().boundsInRoot
+        val header = compose.onNodeWithTag("pivot-header-0").fetchSemanticsNode().boundsInRoot
         val titleDp = title.height / density
-        assertTrue("title stays a section heading, ${titleDp}dp", titleDp >= 36f)
+        assertTrue("month reads as a subheader under the pivot header, ${titleDp}dp", titleDp >= 24f)
+        assertTrue("month sits under the header row", title.top >= header.bottom)
         assertTrue("dropdown follows the title: $title vs $dropdown", dropdown.left + 1f >= title.right)
         assertTrue(
             "dropdown shares the title row: $title vs $dropdown",
             dropdown.top < title.bottom && title.top < dropdown.bottom,
         )
-        assertTrue("dropdown stays inside the page", dropdown.right <= root.right - 40f * density + 1f)
+        assertTrue("dropdown stays inside the page", dropdown.right <= root.right - 12f * density + 1f)
         compose.onNodeWithTag("to-budget").assertIsDisplayed()
         compose.onNodeWithTag("month-label").performClick()
         compose.onNodeWithTag("month-list").assertIsDisplayed()
         compose.onNodeWithTag("month-option-2024-10").performClick()
-        compose.onNodeWithText("october 2024 budget").assertIsDisplayed()
+        compose.onNodeWithText("october 2024").assertIsDisplayed()
         compose.onNodeWithTag("month-list").assertDoesNotExist()
     }
 

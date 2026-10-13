@@ -247,7 +247,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     val fill = Modifier.fillMaxSize()
                     when (val route = state.route) {
                         ShellRoute.Home ->
-                            HomePanorama(
+                            HomePivot(
                                 shell = state.shell,
                                 review = state.monthReview,
                                 netWorth = state.netWorth,

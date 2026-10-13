@@ -4,7 +4,12 @@ This app uses **Metro 2**, the Due North Light Panorama language.
 
 It is the second Metro design for Due North. The first mockups were a dark
 pivot with no panorama. On 2026-10-04 the chosen look became design C,
-Light Panorama, and that is Metro 2 here.
+Light Panorama, and that is Metro 2 here. On 2026-10-13 the home screen
+moved from that panorama to a pivot: a small "DUE NORTH BUDGET" title, a
+header row (budget, accounts, due, review, net worth, inbox) with the
+selected header in the foreground and the rest dimmed, and each item at
+full width with no peek. The open month is a dropdown at the top of the
+budget item. The colors, type, app bar, and motion are unchanged.
 
 Budget screens are drawn in [metro-mockups.svg](metro-mockups.svg): the
 month panorama, accounts, the budgets list, and switching files, in light
