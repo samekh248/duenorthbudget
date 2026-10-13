@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -58,6 +59,7 @@ import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroAppBar
+import app.duenorth.budget.design.components.MetroAppBarHost
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroOutlineButton
@@ -877,10 +879,16 @@ fun ShellChrome(
     content: @Composable (Modifier) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().background(Metro.colors.background)) {
-        if (syncing) SyncProgressBar(progress)
-        content(Modifier.weight(1f))
-        MetroAppBar(actions, expanded, { expanded = it })
+    // A new screen starts with its bar closed, as each screen in due north tasks has its own bar.
+    LaunchedEffect(actions.map { it.id }) { expanded = false }
+    // Composed after the app's back handler, so back closes an open bar before it leaves the screen.
+    BackHandler(enabled = expanded) { expanded = false }
+    MetroAppBarHost(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().background(Metro.colors.background)) {
+            if (syncing) SyncProgressBar(progress)
+            content(Modifier.weight(1f))
+            MetroAppBar(actions, expanded, { expanded = it })
+        }
     }
 }
 
