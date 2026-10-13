@@ -201,16 +201,16 @@ flowchart LR
 
 ### Tests for User Story 6
 
-- [ ] T064 [P] [US6] Bank link tests in `core-test/BankLinkBookTest.kt` with a fake provider on `LocalActualServer`: status, SimpleFIN secret posted to `/secret` and absent from `db.sqlite` and `phone.json`, link writes `banks` and account columns, replace, remove clears them, unreachable server writes nothing
-- [ ] T065 [P] [US6] Undo end-to-end tests in `core-test/UndoFlowTest.kt`: assign, account edit, and transaction edit undone newest first offline; undo after a conflicting remote change shows a conflict; SC-007 under 100 ms
+- [x] T064 [P] [US6] Bank link tests in `core-test/BankLinkBookTest.kt` with a fake provider on `LocalActualServer`: status, SimpleFIN secret posted to `/secret` and absent from `db.sqlite` and `phone.json`, link writes `banks` and account columns, replace, remove clears them, unreachable server writes nothing
+- [x] T065 [P] [US6] Undo end-to-end tests in `core-test/UndoFlowTest.kt`: assign, account edit, and transaction edit undone newest first offline; undo after a conflicting remote change shows a conflict; SC-007 under 100 ms
 
 ### Implementation for User Story 6
 
-- [ ] T066 [US6] Add provider calls (`gocardless/*`, `simplefin/*`, `pluggyai/*`, `secret`) to `core/…/core/ActualTransport.kt`
-- [ ] T067 [US6] Add `BankLinkBook` (link, replace, remove) to `core/…/core/BankSync.kt` per `contracts/bank-link.md`, one journal step per change
-- [ ] T068 [US6] Create `app/…/BankLinkScreens.kt` (provider pick, GoCardless Custom Tab, SimpleFIN token field cleared after send, account match, remove) and handlers in new `app/…/ShellViewModel+BankLink.kt`; register menu id `bank-link`
-- [ ] T069 [US6] Undo control: menu id `undo` on Home and Register labelled with the newest step, absent when the stack is empty, conflict routed to the conflicts screen, in `app/…/ScreenBar.kt` and `app/…/ShellViewModel+Undo.kt`
-- [ ] T070 [P] [US6] Compose tests in `app-test/BankLinkContentTest.kt` and `app-test/UndoContentTest.kt`; Roborazzi light and dark in `app-test/BankLinkScreenshotTest.kt`
+- [x] T066 [US6] Add provider calls (`gocardless/*`, `simplefin/*`, `pluggyai/*`, `secret`) to `core/…/core/ActualTransport.kt`
+- [x] T067 [US6] Add `BankLinkBook` (link, replace, remove) to `core/…/core/BankSync.kt` per `contracts/bank-link.md`, one journal step per change
+- [x] T068 [US6] Create `app/…/BankLinkScreens.kt` (provider pick, GoCardless Custom Tab, SimpleFIN token field cleared after send, account match, remove) and handlers in new `app/…/ShellViewModel+BankLink.kt`; register menu id `bank-link`
+- [x] T069 [US6] Undo control: menu id `undo` on Home and Register labelled with the newest step, absent when the stack is empty, conflict routed to the conflicts screen, in `app/…/ScreenBar.kt` and `app/…/ShellViewModel+Undo.kt`
+- [x] T070 [P] [US6] Compose tests in `app-test/BankLinkContentTest.kt` and `app-test/UndoContentTest.kt`; Roborazzi light and dark in `app-test/BankLinkScreenshotTest.kt`
 
 **Checkpoint**: All six stories work on their own.
 

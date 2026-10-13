@@ -127,6 +127,12 @@ fun ShellViewModel.undo() {
                 UndoResult.Empty -> null
             }
         mutate { it.copy(monthNotice = notice) }
+        if (result is UndoResult.Conflict) {
+            // The changed cell is listed with the server's value (contracts/undo.md).
+            val conflicts = withContext(Dispatchers.IO) { sync.conflicts(budgetId) }
+            push(ShellRoute.Conflicts)
+            mutate { it.copy(conflicts = conflicts) }
+        }
         if (result is UndoResult.Undone) {
             if (accountId != null) {
                 val register = withContext(Dispatchers.IO) { library.readRegister(budgetId, accountId) }

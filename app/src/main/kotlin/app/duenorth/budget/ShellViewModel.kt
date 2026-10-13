@@ -195,6 +195,12 @@ sealed interface ShellRoute {
 
     // Spec 010 US5.
     data object Templates : ShellRoute, StackRoute
+
+    // Spec 010 US6.
+    data class BankLink(
+        val accountId: String,
+    ) : ShellRoute,
+        StackRoute
 }
 
 /** A spec 010 screen that goes back to the screen it was opened from. */
@@ -284,6 +290,7 @@ data class ShellUiState(
     val templateConfirm: String? = null,
     /** The open category's note while templates are on; null until read. */
     val categoryNote: String? = null,
+    val bankLink: BankLinkUi? = null,
 )
 
 class ShellViewModel(
@@ -819,9 +826,13 @@ class ShellViewModel(
             for (month in windowMonths) {
                 if (_state.value.settings.openBudgetId != budgetId) return@launch
                 if (months.cached(month) != null) continue
-                val shell = library.readShell(budgetId, month) ?: continue
-                val review = library.readMonthReview(budgetId, month)
-                months.put(MonthSnapshot(month, shell, review))
+                // Warming is best effort: a month that fails here loads when it is opened.
+                val snapshot =
+                    runCatching {
+                        val shell = library.readShell(budgetId, month) ?: return@runCatching null
+                        MonthSnapshot(month, shell, library.readMonthReview(budgetId, month))
+                    }.getOrElse { return@launch } ?: continue
+                months.put(snapshot)
             }
         }
     }

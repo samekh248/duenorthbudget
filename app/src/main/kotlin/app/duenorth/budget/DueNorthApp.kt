@@ -247,6 +247,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onDeleteRule = model::deleteOpenRule,
                     onReports = model::openReports,
                     onTemplates = model::openTemplates,
+                    onBankLink = model::openBankLink,
                 )
             }
         val actions = ScreenBar.forState(state, handlers)
@@ -766,6 +767,27 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onIncludeOffBudget = model::setReportIncludeOffBudget,
                                 modifier = fill,
                             )
+                        is ShellRoute.BankLink -> {
+                            val ui = state.bankLink
+                            val shell = state.shell
+                            if (ui == null || shell == null || ui.accountId != route.accountId) {
+                                Placeholder()
+                            } else {
+                                BankLinkScreen(
+                                    ui = ui,
+                                    currency = shell.currency,
+                                    onProvider = model::pickBankProvider,
+                                    onToken = model::sendSimpleFinToken,
+                                    onCountry = model::findGoCardlessBanks,
+                                    onInstitution = model::startGoCardless,
+                                    onOpenBank = { url -> CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url)) },
+                                    onSignedIn = model::checkGoCardless,
+                                    onLink = model::linkBank,
+                                    onRemove = model::removeBankLink,
+                                    modifier = fill,
+                                )
+                            }
+                        }
                         ShellRoute.Templates ->
                             TemplatesScreen(
                                 month = state.pinnedMonth ?: state.openMonth,

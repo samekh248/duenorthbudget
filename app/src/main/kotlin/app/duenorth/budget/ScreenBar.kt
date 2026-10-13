@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
@@ -51,6 +52,7 @@ object ScreenBar {
                     spec("reconcile", AppGlyph.Reconcile, "reconcile"),
                     spec("import", AppGlyph.Import, "import"),
                     menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT),
+                    menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE),
                     menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE),
                 ) + undo(undoLabel)
             ShellRoute.Accounts ->
@@ -203,6 +205,7 @@ class ScreenBarHandlers(
     val onDeleteRule: () -> Unit = {},
     val onReports: () -> Unit = {},
     val onTemplates: () -> Unit = {},
+    val onBankLink: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -241,6 +244,7 @@ class ScreenBarHandlers(
             "delete-rule" -> onDeleteRule
             "reports" -> onReports
             "templates" -> onTemplates
+            "bank-link" -> onBankLink
             else -> ({})
         }
 }

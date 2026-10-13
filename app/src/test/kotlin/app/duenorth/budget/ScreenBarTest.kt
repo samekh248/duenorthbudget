@@ -34,7 +34,7 @@ class ScreenBarTest {
     @Test
     fun registerActions() {
         val ids = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
-        assertEquals(listOf("add", "transfer", "reconcile", "import", "edit-account", "close"), ids)
+        assertEquals(listOf("add", "transfer", "reconcile", "import", "edit-account", "bank-link", "close"), ids)
     }
 
     @Test

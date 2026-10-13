@@ -34,6 +34,7 @@ import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.SyncCoordinator
+import app.duenorth.budget.core.UndoCopy
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
@@ -361,14 +362,15 @@ class MonthActionContentTest {
         assertEquals(25_000L, budgeted(library, budgetId, month, "c-food"))
 
         model.undo()
+        // The label clears when the step is popped; the notice follows the write.
+        await { model.state.value.monthNotice == "${MonthActionCopy.UNDONE} ${UndoCopy.ASSIGN}" }
         await { model.state.value.undoLabel == null }
         assertEquals(220_000L, budgeted(library, budgetId, month, "c-food"))
-        assertEquals(
-            220_000L,
-            model.state.value.shell!!
-                .category("c-food")!!
-                .budgetedMinor,
-        )
+        await {
+            model.state.value.shell
+                ?.category("c-food")
+                ?.budgetedMinor == 220_000L
+        }
         assertFalse(homeIds(model).contains("undo"))
     }
 
