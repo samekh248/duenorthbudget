@@ -83,8 +83,11 @@ class BudgetLibrary(
 
     fun setActiveInstanceId(instanceId: String?) {
         updateSettings { settings ->
-            if (instanceId != null && settings.instances.none { it.id == instanceId }) settings
-            else settings.copy(activeInstanceId = instanceId)
+            if (instanceId != null && settings.instances.none { it.id == instanceId }) {
+                settings
+            } else {
+                settings.copy(activeInstanceId = instanceId)
+            }
         }
     }
 
@@ -125,6 +128,8 @@ class BudgetLibrary(
                 firstDayOfWeekIdx = value("firstDayOfWeekIdx")?.toIntOrNull()?.coerceIn(0, 6) ?: 0,
                 experimental = value("flags.experimental") == "true",
                 budgetType = value("budgetType") ?: "envelope",
+                learnCategories = value("learn-categories") != "false",
+                goalTemplates = value("flags.goalTemplatesEnabled") == "true",
             )
         } ?: FormatPrefs()
 
@@ -389,7 +394,7 @@ class BudgetLibrary(
         return sessions.use(database) { session ->
             ActualSchema.ensure(session)
             SyncSchema.ensure(session)
-            ShellReader.read(session, metadata, clock.today(), viewMonth)
+            ShellReader.read(session, metadata, clock.today(), viewMonth, settings().showClosedAccounts)
         }
     }
 
@@ -407,11 +412,75 @@ class BudgetLibrary(
 
     /** Undoes the newest step on [budgetId]; see `contracts/undo.md`. */
     fun undo(budgetId: String): UndoResult =
-        open(budgetId) { session -> journal.undo(session, budgetId, SyncSchema.clockFor(session)) } ?: UndoResult.Empty
+        serial { open(budgetId) { session -> journal.undo(session, budgetId, SyncSchema.clockFor(session)) } } ?: UndoResult.Empty
 
     fun canUndo(budgetId: String): Boolean = journal.canUndo(budgetId)
 
     fun undoLabel(budgetId: String): String? = journal.newestLabel(budgetId)
+
+    /** Accounts for the account screens (spec 010 US2); closed ones only when [includeClosed]. */
+    fun readAccounts(
+        budgetId: String,
+        includeClosed: Boolean,
+    ): List<AccountDetail> = open(budgetId) { AccountsBook(it, clock.today(), ids).list(includeClosed) } ?: emptyList()
+
+    fun readAccount(
+        budgetId: String,
+        accountId: String,
+    ): AccountDetail? = open(budgetId) { AccountsBook(it, clock.today(), ids).detail(accountId) }
+
+    fun createAccount(
+        budgetId: String,
+        name: String,
+        offBudget: Boolean,
+        balanceMinor: Long,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.ADD) { AccountsBook(it, clock.today(), ids).create(name, offBudget, balanceMinor) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun renameAccount(
+        budgetId: String,
+        accountId: String,
+        name: String,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.EDIT) { AccountsBook(it, clock.today(), ids).rename(accountId, name) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun setAccountNote(
+        budgetId: String,
+        accountId: String,
+        note: String,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.NOTE) { AccountsBook(it, clock.today(), ids).setNote(accountId, note) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** Places [accountId] before [targetId], or last when null. */
+    fun moveAccount(
+        budgetId: String,
+        accountId: String,
+        targetId: String?,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.REORDER) { AccountsBook(it, clock.today(), ids).move(accountId, targetId) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun closeAccount(
+        budgetId: String,
+        accountId: String,
+        destinationId: String?,
+        categoryId: String?,
+        forced: Boolean = false,
+        confirmed: Boolean = false,
+    ): AccountWriteResult =
+        edit(budgetId, if (forced) AccountsCopy.FORCE_CLOSE else AccountsCopy.CLOSE) {
+            AccountsBook(it, clock.today(), ids).close(accountId, destinationId, categoryId, forced, confirmed)
+        } ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun reopenAccount(
+        budgetId: String,
+        accountId: String,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.REOPEN) { AccountsBook(it, clock.today(), ids).reopen(accountId) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun readRegister(
         budgetId: String,
@@ -426,7 +495,12 @@ class BudgetLibrary(
     fun saveTransaction(
         budgetId: String,
         draft: TransactionDraft,
-    ): WriteResult = edit(budgetId, UndoCopy.SAVE_TRANSACTION) { RegisterBook(it).save(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    ): WriteResult =
+        edit(budgetId, UndoCopy.SAVE_TRANSACTION) { session ->
+            RegisterBook(session).save(draft).also {
+                if (it is WriteResult.Saved && draft.categoryId != null) CategoryLearning(session, ids).learnFrom(draft.id)
+            }
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun setTransactionCategory(
         budgetId: String,
@@ -434,8 +508,11 @@ class BudgetLibrary(
         categoryId: String?,
         force: Boolean,
     ): WriteResult =
-        edit(budgetId, UndoCopy.CATEGORIZE) { RegisterBook(it).setCategory(transactionId, categoryId, force) }
-            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+        edit(budgetId, UndoCopy.CATEGORIZE) { session ->
+            RegisterBook(session).setCategory(transactionId, categoryId, force).also {
+                if (it is WriteResult.Saved) CategoryLearning(session, ids).learnFrom(transactionId)
+            }
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun deleteTransaction(
         budgetId: String,
@@ -552,8 +629,109 @@ class BudgetLibrary(
         edit(budgetId, UndoCopy.DELETE_SCHEDULE) { SchedulesBook(it, clock).delete(scheduleId) }
             ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
-    fun listPayees(budgetId: String): List<PayeeRow> =
-        open(budgetId) { PayeeBook(it).list() } ?: emptyList()
+    /** Schedule editor (spec 010 US3). */
+    fun readScheduleDraft(
+        budgetId: String,
+        scheduleId: String,
+    ): ScheduleDraft? = open(budgetId) { SchedulesBook(it, clock, ids).draft(scheduleId) }
+
+    fun saveSchedule(
+        budgetId: String,
+        draft: ScheduleDraft,
+    ): ScheduleWriteResult =
+        edit(budgetId, UndoCopy.SAVE_SCHEDULE) { SchedulesBook(it, clock, ids).save(draft) }
+            ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** Posts every due auto-post occurrence, one undo step each; returns how many steps ran. */
+    fun autoPostSchedules(budgetId: String): Int {
+        if (open(budgetId) { SchedulesBook(it, clock, ids).hasAutoPostDue() } != true) return 0
+        var steps = 0
+        while (steps < MAX_AUTO_POST) {
+            val ran = edit(budgetId, UndoCopy.AUTO_POST) { SchedulesBook(it, clock, ids).autoPostOne() } ?: false
+            if (!ran) break
+            steps++
+        }
+        return steps
+    }
+
+    /** Cash flow, net worth, and spending for [range] (spec 010 US4). */
+    fun readReports(
+        budgetId: String,
+        range: ReportRange,
+        includeOffBudget: Boolean,
+        groupBy: SpendingGroupBy,
+    ): ReportsPage? =
+        open(budgetId) { session ->
+            val code =
+                session
+                    .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
+                    .firstOrNull()
+                    ?.str("value")
+                    .orEmpty()
+            val currency = Currencies.byCode(code) ?: Currencies.byCode("USD")!!
+            ReportsReader(session, clock.today()).page(range, includeOffBudget, groupBy, currency)
+        }
+
+    /** Lists bad template lines across category notes; writes nothing (spec 010 US5). */
+    fun checkTemplates(budgetId: String): TemplateResult =
+        when {
+            !readFormatPrefs(budgetId).templatesOn -> TemplateResult.Rejected(TemplateCopy.OFF)
+            else -> open(budgetId) { TemplateEngine(it, clock.today()).check() } ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
+        }
+
+    /** Apply or overwrite [month]'s budgets from templates as one undo step; both flags must be on. */
+    fun applyTemplates(
+        budgetId: String,
+        month: YearMonth,
+        overwrite: Boolean,
+        confirmed: Boolean = false,
+    ): TemplateResult {
+        if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF)
+        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).run(month, overwrite, confirmed) }
+            ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    }
+
+    fun readCategoryNote(
+        budgetId: String,
+        categoryId: String,
+    ): String = open(budgetId) { CategoryNotes.read(it, categoryId) }.orEmpty()
+
+    fun saveCategoryNote(
+        budgetId: String,
+        categoryId: String,
+        note: String,
+    ): Boolean = edit(budgetId, UndoCopy.CATEGORY_NOTE) { CategoryNotes.write(it, categoryId, note) } != null
+
+    fun listRules(budgetId: String): List<RuleSummary> = open(budgetId) { RuleEditorBook(it, ids).list() } ?: emptyList()
+
+    fun readRuleDraft(
+        budgetId: String,
+        ruleId: String,
+    ): RuleDraft? = open(budgetId) { RuleEditorBook(it, ids).draft(ruleId) }
+
+    fun saveRule(
+        budgetId: String,
+        draft: RuleDraft,
+    ): RuleSaveResult =
+        edit(budgetId, RuleEditorCopy.SAVE_RULE) { RuleEditorBook(it, ids).save(draft) }
+            ?: RuleSaveResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun deleteRule(
+        budgetId: String,
+        ruleId: String,
+    ): RuleSaveResult =
+        edit(budgetId, RuleEditorCopy.DELETE_RULE) { RuleEditorBook(it, ids).delete(ruleId) }
+            ?: RuleSaveResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** Actual's `learn-categories` preference; absent means on. */
+    fun learningEnabled(budgetId: String): Boolean = preference(budgetId, "learn-categories") != "false"
+
+    fun setLearning(
+        budgetId: String,
+        enabled: Boolean,
+    ): Boolean = setPreference(budgetId, "learn-categories", enabled.toString())
+
+    fun listPayees(budgetId: String): List<PayeeRow> = open(budgetId) { PayeeBook(it).list() } ?: emptyList()
 
     fun renamePayee(
         budgetId: String,
@@ -569,7 +747,11 @@ class BudgetLibrary(
         budgetId: String,
         ruleId: String,
         enabled: Boolean,
-    ): Boolean = open(budgetId) { RulesBook(it).setEnabled(ruleId, enabled); true } ?: false
+    ): Boolean =
+        open(budgetId) {
+            RulesBook(it).setEnabled(ruleId, enabled)
+            true
+        } ?: false
 
     fun previewImportFile(
         budgetId: String,
@@ -584,11 +766,9 @@ class BudgetLibrary(
         budgetId: String,
         accountId: String,
         candidates: List<ParsedImportRow>,
-    ): ImportConfirmResult? =
-        edit(budgetId, UndoCopy.IMPORT) { ImportBook(it, ids).confirm(accountId, candidates) }
+    ): ImportConfirmResult? = edit(budgetId, UndoCopy.IMPORT) { ImportBook(it, ids).confirm(accountId, candidates) }
 
-    fun readImportReview(budgetId: String): ImportReviewPage? =
-        open(budgetId) { ImportBook(it, ids).readReview() }
+    fun readImportReview(budgetId: String): ImportReviewPage? = open(budgetId) { ImportBook(it, ids).readReview() }
 
     fun finishImportReview(budgetId: String) {
         open(budgetId) { ImportBook(it, ids).finishReview() }
@@ -627,6 +807,12 @@ class BudgetLibrary(
         return true
     }
 
+    private val editLock = Any()
+
+    private companion object {
+        const val MAX_AUTO_POST = 500
+    }
+
     private fun <T> open(
         id: String,
         block: (SqlSession) -> T,
@@ -644,7 +830,13 @@ class BudgetLibrary(
         id: String,
         label: String,
         block: (SqlSession) -> T,
-    ): T? = open(id) { session -> journal.step(session, id, label) { block(session) } }
+    ): T? =
+        // One step at a time: a capture belongs to the session, and auto-post runs from sync on
+        // another thread while the person edits.
+        serial { open(id) { session -> journal.step(session, id, label) { block(session) } } }
+
+    /** Journaled writes and undo run one at a time. */
+    internal fun <T> serial(block: () -> T): T = synchronized(editLock) { block() }
 
     private fun summary(dir: File): BudgetSummary? {
         val metadata = readMetadata(dir) ?: return null

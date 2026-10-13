@@ -47,11 +47,16 @@ data class RuleTransactionView(
     var notes: String?,
     var dateIso: String,
     var schedule: String? = null,
+    var cleared: Boolean? = null,
 )
 
 class RulesBook(
     private val session: SqlSession,
-    private val ids: () -> String = { java.util.UUID.randomUUID().toString() },
+    private val ids: () -> String = {
+        java.util.UUID
+            .randomUUID()
+            .toString()
+    },
 ) {
     fun isEnabled(ruleId: String): Boolean = !disabledIds().contains(ruleId)
 
@@ -105,7 +110,7 @@ class RulesBook(
                 ).mapNotNull { it.str("rule") }
                 .toSet()
         val rules =
-            rankRules(loadRules().filter { it.id !in disabled && !isScheduleOnlyRule(it) })
+            RuleCache.ranked(session) { rankRules(loadRules().filter { !isScheduleOnlyRule(it) }) }.filter { it.id !in disabled }
         var current = view
         for (rule in rules) {
             if (scheduleRuleId != null) {
@@ -165,13 +170,15 @@ class RulesBook(
         stage: String? = null,
     ): String {
         val conditions =
-            ruleJson.parseToJsonElement(
-                """[{"op":"is","field":"payee","value":"$payeeId","type":"id"}]""",
-            ).jsonArray
+            ruleJson
+                .parseToJsonElement(
+                    """[{"op":"is","field":"description","value":"$payeeId","type":"id"}]""",
+                ).jsonArray
         val actions =
-            ruleJson.parseToJsonElement(
-                """[{"op":"set","field":"category","value":"$categoryId","type":"id"}]""",
-            ).jsonArray
+            ruleJson
+                .parseToJsonElement(
+                    """[{"op":"set","field":"category","value":"$categoryId","type":"id"}]""",
+                ).jsonArray
         return insertRule(stage, conditions, actions)
     }
 
@@ -180,13 +187,15 @@ class RulesBook(
         toPayeeId: String,
     ): String {
         val conditions =
-            ruleJson.parseToJsonElement(
-                """[{"op":"is","field":"payee","value":"$fromPayeeId","type":"id"}]""",
-            ).jsonArray
+            ruleJson
+                .parseToJsonElement(
+                    """[{"op":"is","field":"description","value":"$fromPayeeId","type":"id"}]""",
+                ).jsonArray
         val actions =
-            ruleJson.parseToJsonElement(
-                """[{"op":"set","field":"payee","value":"$toPayeeId","type":"id"}]""",
-            ).jsonArray
+            ruleJson
+                .parseToJsonElement(
+                    """[{"op":"set","field":"description","value":"$toPayeeId","type":"id"}]""",
+                ).jsonArray
         return insertRule("pre", conditions, actions)
     }
 
@@ -205,7 +214,11 @@ class RulesBook(
                 ?.str("value")
                 .orEmpty()
         if (raw.isBlank()) return emptySet()
-        return ruleJson.parseToJsonElement(raw).jsonArray.mapNotNull { it.jsonPrimitive.contentOrNull }.toSet()
+        return ruleJson
+            .parseToJsonElement(raw)
+            .jsonArray
+            .mapNotNull { it.jsonPrimitive.contentOrNull }
+            .toSet()
     }
 
     private fun persistDisabled(ids: Set<String>) {
@@ -274,6 +287,11 @@ class RulesBook(
                 val amount = jsonNumber(value) ?: return view
                 view.copy(amount = amount)
             }
+            "date" -> {
+                val iso = (value as? JsonPrimitive)?.contentOrNull?.let { ScheduleDates.parseIso(it) } ?: return view
+                view.copy(dateIso = iso.toString())
+            }
+            "cleared" -> view.copy(cleared = (value as? JsonPrimitive)?.let { it.booleanOrNull ?: (it.contentOrNull == "1") })
             else -> view
         }
     }
@@ -301,16 +319,26 @@ class RulesBook(
         val field = cond["field"]?.jsonPrimitive?.contentOrNull ?: return false
         val op = cond["op"]?.jsonPrimitive?.contentOrNull ?: return false
         val value = cond["value"]
-        return when (field) {
+        return runCatching { evalField(field, op, value, cond, view) }.getOrDefault(false)
+    }
+
+    /** An op the engine cannot evaluate is false; it never throws (`contracts/schedules-rules.md`). */
+    private fun evalField(
+        field: String,
+        op: String,
+        value: JsonElement?,
+        cond: JsonObject,
+        view: RuleTransactionView,
+    ): Boolean =
+        when (field) {
             "payee", "description" -> evalId(view.payee, op, value)
             "category" -> evalId(view.category, op, value)
             "account", "acct" -> evalId(view.account, op, value)
-            "amount" -> evalAmount(view.amount, op, value)
+            "amount" -> evalAmount(view.amount, op, value, cond["options"] as? JsonObject)
             "notes" -> evalString(view.notes.orEmpty(), op, value)
             "date" -> evalDate(view.dateIso, op, value)
             else -> false
         }
-    }
 
     private fun evalId(
         fieldValue: String?,
@@ -318,7 +346,7 @@ class RulesBook(
         expected: JsonElement?,
     ): Boolean {
         val left = fieldValue
-        val right = expected?.jsonPrimitive?.contentOrNull
+        val right = (expected as? JsonPrimitive)?.contentOrNull
         return when (op) {
             "is" -> left == right
             "isNot" -> left != right
@@ -333,22 +361,44 @@ class RulesBook(
         op: String,
         expected: JsonElement?,
     ): Boolean {
-        val needle = expected?.jsonPrimitive?.contentOrNull?.lowercase().orEmpty()
         val hay = fieldValue.lowercase()
+        if (op == "oneOf" || op == "notOneOf") {
+            val options = (expected as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.lowercase() } ?: return false
+            return if (op == "oneOf") hay in options else hay !in options
+        }
+        val needle = (expected as? JsonPrimitive)?.contentOrNull?.lowercase().orEmpty()
         return when (op) {
             "is" -> hay == needle
+            "isNot" -> hay != needle
             "contains" -> needle.isNotEmpty() && hay.contains(needle)
             "doesNotContain" -> needle.isEmpty() || !hay.contains(needle)
+            "matches" ->
+                runCatching {
+                    Regex(
+                        (expected as? JsonPrimitive)?.contentOrNull.orEmpty(),
+                    ).containsMatchIn(fieldValue)
+                }.getOrDefault(false)
             else -> false
         }
     }
 
     private fun evalAmount(
-        fieldValue: Long,
+        rawValue: Long,
         op: String,
         expected: JsonElement?,
+        options: JsonObject? = null,
     ): Boolean {
+        val inflow = options?.get("inflow")?.jsonPrimitive?.booleanOrNull == true
+        val outflow = options?.get("outflow")?.jsonPrimitive?.booleanOrNull == true
+        if (inflow && rawValue <= 0) return false
+        if (outflow && rawValue >= 0) return false
+        val fieldValue = if (inflow || outflow) abs(rawValue) else rawValue
+        val target = jsonNumber(expected)
         return when (op) {
+            "gt" -> target != null && fieldValue > target
+            "gte" -> target != null && fieldValue >= target
+            "lt" -> target != null && fieldValue < target
+            "lte" -> target != null && fieldValue <= target
             "is" -> fieldValue == jsonNumber(expected)
             "isapprox" -> {
                 val target = jsonNumber(expected) ?: return false
@@ -356,7 +406,7 @@ class RulesBook(
                 abs(fieldValue - target) <= threshold
             }
             "isbetween" -> {
-                val obj = expected?.jsonObject ?: return false
+                val obj = expected as? JsonObject ?: return false
                 val low = obj["num1"]?.jsonPrimitive?.longOrNull ?: return false
                 val high = obj["num2"]?.jsonPrimitive?.longOrNull ?: return false
                 val min = minOf(low, high)
@@ -378,8 +428,18 @@ class RulesBook(
             return when (op) {
                 "is" -> field == target
                 "isapprox" -> abs(ChronoUnit.DAYS.between(target, field)) <= 2
+                "gt" -> field > target
+                "gte" -> field >= target
+                "lt" -> field < target
+                "lte" -> field <= target
                 else -> false
             }
+        }
+        if (expected is JsonObject && (op == "is" || op == "isapprox")) {
+            val window = if (op == "isapprox") 2L else 0L
+            return ScheduleRecurrence
+                .occurrences(expected, field.minusDays(window), limit = 1)
+                .any { abs(ChronoUnit.DAYS.between(it, field)) <= window }
         }
         return false
     }
@@ -400,6 +460,46 @@ class RulesBook(
             is JsonPrimitive -> value.longOrNull ?: value.doubleOrNull?.roundToLong()
             else -> null
         }
+}
+
+/**
+ * Parsed and ranked rules per open file, so 100 rules do not slow a save (SC-004). Any local or
+ * remote `rules` write bumps [generation]; the rule count guards rows written outside the funnel.
+ */
+object RuleCache {
+    @Volatile
+    var generation = 0L
+        private set
+
+    private data class Entry(
+        val generation: Long,
+        val count: Long,
+        val rules: List<RuleRecord>,
+    )
+
+    private val entries = java.util.concurrent.ConcurrentHashMap<String, Entry>()
+
+    fun invalidate() {
+        synchronized(this) { generation++ }
+    }
+
+    fun ranked(
+        session: SqlSession,
+        load: () -> List<RuleRecord>,
+    ): List<RuleRecord> {
+        val key =
+            runCatching { session.query("PRAGMA database_list").firstOrNull { it.str("name") == "main" }?.str("file") }
+                .getOrNull()
+                .orEmpty()
+        val count = session.query("SELECT COUNT(*) AS n FROM rules").first().long("n")
+        if (key.isEmpty()) return load()
+        val gen = generation
+        val hit = entries[key]
+        if (hit != null && hit.generation == gen && hit.count == count) return hit.rules
+        val rules = load()
+        entries[key] = Entry(gen, count, rules)
+        return rules
+    }
 }
 
 fun rankRules(rules: List<RuleRecord>): List<RuleRecord> {

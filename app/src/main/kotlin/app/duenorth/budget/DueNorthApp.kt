@@ -234,6 +234,20 @@ fun DueNorthApp(model: ShellViewModel) {
                     onFill = { kind -> model.fillMonth(kind) },
                     onToBudget = model::openToBudget,
                     onUndo = model::undo,
+                    onAccounts = model::openAccounts,
+                    onAddAccount = model::openAddAccount,
+                    onShowClosed = model::toggleShowClosedAccounts,
+                    onReorder = model::toggleReorderAccounts,
+                    onEditAccount = model::openEditAccount,
+                    onCloseAccount = model::openCloseAccount,
+                    onAddSchedule = model::openNewSchedule,
+                    onRules = model::openRules,
+                    onAddRule = model::openNewRule,
+                    onDeleteSchedule = model::deleteOpenSchedule,
+                    onDeleteRule = model::deleteOpenRule,
+                    onReports = model::openReports,
+                    onTemplates = model::openTemplates,
+                    onBankLink = model::openBankLink,
                 )
             }
         val actions = ScreenBar.forState(state, handlers)
@@ -263,6 +277,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onPostSchedule = model::postSchedule,
                                 onSkipSchedule = model::skipSchedule,
                                 modifier = fill,
+                                onOpenSchedule = model::openSchedule,
                                 onSelectMonth = model::selectOpenMonth,
                                 onBudgetCategory = if (state.shell == null) null else model::openCategoryBudget,
                                 onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
@@ -306,6 +321,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onFirstDay = model::setFirstDay,
                                 onHideFraction = model::setHideFraction,
                                 onExperimental = model::setExperimental,
+                                onGoalTemplates = model::setGoalTemplates,
+                                onLearning = model::setLearning,
                                 onExport = model::exportBudget,
                                 onSetEncryptionPassword = model::setEncryptionPassword,
                                 onChangeEncryptionPassword = model::changeEncryptionPassword,
@@ -608,6 +625,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                         onMove = model::openMoveCategory,
                                         onToggleCarryover = model::toggleCategoryCarryover,
                                         modifier = inner,
+                                        note = state.categoryNote.takeIf { state.formatPrefs.templatesOn },
+                                        onSaveNote = model::saveCategoryNote,
                                     )
                                 }
                             }
@@ -664,6 +683,136 @@ fun DueNorthApp(model: ShellViewModel) {
                                     month = state.pinnedMonth ?: state.openMonth,
                                     breakdown = breakdown,
                                     currency = shell.currency,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        ShellRoute.Accounts -> {
+                            val shell = state.shell
+                            if (shell == null) {
+                                Placeholder()
+                            } else {
+                                AccountsScreen(
+                                    accounts = state.accountsList,
+                                    currency = shell.currency,
+                                    showClosed = state.settings.showClosedAccounts,
+                                    reorder = state.accountsReorder,
+                                    onAccount = model::openAccount,
+                                    onMoveUp = model::moveAccountUp,
+                                    onReopen = model::reopenAccount,
+                                    onDoneReorder = model::toggleReorderAccounts,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        ShellRoute.AddAccount ->
+                            AddAccountScreen(error = state.editError, onSave = model::submitAddAccount, modifier = fill)
+                        is ShellRoute.EditAccount -> {
+                            val detail = state.accountDetail
+                            if (detail == null || detail.id != route.accountId) {
+                                Placeholder()
+                            } else {
+                                EditAccountScreen(detail, state.editError, model::submitEditAccount, fill)
+                            }
+                        }
+                        is ShellRoute.CloseAccount -> {
+                            val detail = state.accountDetail
+                            val shell = state.shell
+                            val force = state.accountForceConfirm
+                            when {
+                                detail == null || shell == null || detail.id != route.accountId -> Placeholder()
+                                force != null ->
+                                    ForceCloseConfirmScreen(force, model::confirmForceClose, model::keepAccount, fill)
+                                else ->
+                                    CloseAccountScreen(
+                                        account = detail,
+                                        others = state.accountsList,
+                                        categories = state.categories,
+                                        currency = shell.currency,
+                                        error = state.editError,
+                                        onClose = { destination, category -> model.submitCloseAccount(destination, category) },
+                                        onForceClose = { model.submitCloseAccount(null, null, forced = true) },
+                                        modifier = fill,
+                                    )
+                            }
+                        }
+                        is ShellRoute.ScheduleEditor -> {
+                            val draft = state.scheduleDraft
+                            val shell = state.shell
+                            if (draft == null || shell == null || draft.id != route.scheduleId) {
+                                Placeholder()
+                            } else {
+                                ScheduleEditorScreen(
+                                    draft = draft,
+                                    accounts = shell.accounts,
+                                    categories = state.categories.filter { !it.income || draft.amountMinor > 0 },
+                                    decimals = shell.currency.decimals,
+                                    error = state.editError,
+                                    onSave = model::submitSchedule,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        ShellRoute.Rules -> RulesScreen(state.rulesList, model::openRule, fill)
+                        ShellRoute.Reports ->
+                            ReportsScreen(
+                                page = state.reports,
+                                loading = state.reportsLoading,
+                                preset = state.reportPreset,
+                                groupBy = state.reportGroupBy,
+                                includeOffBudget = state.settings.netWorthIncludeOffBudget,
+                                onPreset = model::setReportPreset,
+                                onCustom = model::setReportRange,
+                                onGroupBy = model::setReportGroupBy,
+                                onIncludeOffBudget = model::setReportIncludeOffBudget,
+                                modifier = fill,
+                            )
+                        is ShellRoute.BankLink -> {
+                            val ui = state.bankLink
+                            val shell = state.shell
+                            if (ui == null || shell == null || ui.accountId != route.accountId) {
+                                Placeholder()
+                            } else {
+                                BankLinkScreen(
+                                    ui = ui,
+                                    currency = shell.currency,
+                                    onProvider = model::pickBankProvider,
+                                    onToken = model::sendSimpleFinToken,
+                                    onCountry = model::findGoCardlessBanks,
+                                    onInstitution = model::startGoCardless,
+                                    onOpenBank = { url -> CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url)) },
+                                    onSignedIn = model::checkGoCardless,
+                                    onLink = model::linkBank,
+                                    onRemove = model::removeBankLink,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        ShellRoute.Templates ->
+                            TemplatesScreen(
+                                month = state.pinnedMonth ?: state.openMonth,
+                                result = state.templateResult,
+                                busy = state.templateBusy,
+                                confirm = state.templateConfirm,
+                                onCheck = model::checkTemplates,
+                                onApply = { model.applyTemplates(overwrite = false) },
+                                onOverwrite = { model.applyTemplates(overwrite = true) },
+                                onConfirm = model::confirmTemplateOverwrite,
+                                onKeep = model::keepTemplates,
+                                modifier = fill,
+                            )
+                        is ShellRoute.RuleEditor -> {
+                            val draft = state.ruleDraft
+                            val shell = state.shell
+                            if (draft == null || shell == null || draft.id != route.ruleId) {
+                                Placeholder()
+                            } else {
+                                RuleEditorScreen(
+                                    draft = draft,
+                                    names = model.ruleNames(),
+                                    decimals = shell.currency.decimals,
+                                    error = state.editError,
+                                    onSave = model::submitRule,
                                     modifier = fill,
                                 )
                             }

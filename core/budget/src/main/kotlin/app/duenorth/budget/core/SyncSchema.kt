@@ -298,6 +298,7 @@ object SyncSchema {
         value: String?,
     ) {
         ensure(session)
+        if (dataset == "rules") RuleCache.invalidate()
         val stamp = clock.send()
         session.transaction {
             captures[session]?.takeIf { column in columns[dataset].orEmpty() }?.let { cells ->
@@ -362,6 +363,7 @@ object SyncSchema {
         message: CellMessage,
     ): ApplyOutcome {
         ensure(session)
+        if (message.dataset == "rules") RuleCache.invalidate()
         if (session.query("SELECT timestamp FROM messages WHERE timestamp = ?", listOf(timestamp)).isNotEmpty()) {
             return ApplyOutcome.Duplicate
         }

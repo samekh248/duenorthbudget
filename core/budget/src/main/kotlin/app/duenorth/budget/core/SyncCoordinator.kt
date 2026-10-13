@@ -361,7 +361,14 @@ class SyncCoordinator(
         }
     }
 
+    /** Syncs, then posts any due auto-post schedules (spec 010 US3); posting needs no server. */
     fun sync(budgetId: String): SyncResult {
+        val result = syncNetwork(budgetId)
+        runCatching { library.autoPostSchedules(budgetId) }
+        return result
+    }
+
+    private fun syncNetwork(budgetId: String): SyncResult {
         val token = syncToken() ?: return fail(budgetId, "auth")
         val address = activeAddress() ?: return SyncResult("")
         val cloud = state(budgetId, "cloudFileId").orEmpty()
@@ -468,8 +475,8 @@ class SyncCoordinator(
     fun releaseMonthHold(
         budgetId: String,
         month: YearMonth,
-    ): EditResult {
-        return journaled(budgetId, UndoCopy.HOLD) { session ->
+    ): EditResult =
+        journaled(budgetId, UndoCopy.HOLD) { session ->
             when (
                 val outcome =
                     EnvelopeBook(session, syncClock).setHold(month.toActualMonth(), 0L, Long.MAX_VALUE)
@@ -478,7 +485,6 @@ class SyncCoordinator(
                 is EnvelopeEditResult.Rejected -> EditResult.Rejected(outcome.reason)
             }
         } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
-    }
 
     fun holdForNextMonth(
         budgetId: String,
@@ -631,31 +637,74 @@ class SyncCoordinator(
         block: (SqlSession) -> T,
     ): T? {
         restoreClock(budgetId)
-        return library.useDatabase(budgetId) { session ->
-            SyncSchema.withClock(session, syncClock) {
-                library.journal.step(session, budgetId, label) { block(session) }
+        return library.serial {
+            library.useDatabase(budgetId) { session ->
+                SyncSchema.withClock(session, syncClock) {
+                    library.journal.step(session, budgetId, label) { block(session) }
+                }
             }
         }
     }
 
+    /** Provider calls on the active server (spec 010 US6); null when signed out. */
+    fun bankClient(): BankLinkClient? {
+        val token = syncToken() ?: return null
+        val address = activeAddress() ?: return null
+        return BankLinkClient(transport, address, token)
+    }
+
+    /** Runs a provider call, turning network and auth failures into a reason to show. */
+    fun <T> bankCall(block: (BankLinkClient) -> T): Result<T> {
+        val client = bankClient() ?: return Result.failure(BankLinkException(BankLinkCopy.SIGN_IN_FIRST))
+        return try {
+            Result.success(block(client))
+        } catch (error: BankLinkException) {
+            Result.failure(error)
+        } catch (error: SyncAuthException) {
+            Result.failure(BankLinkException(SyncCopy.SIGN_IN_AGAIN))
+        } catch (error: SyncNetworkException) {
+            Result.failure(BankLinkException(BankLinkCopy.UNREACHABLE))
+        }
+    }
+
+    fun linkBankAccount(
+        budgetId: String,
+        accountId: String,
+        provider: BankProvider,
+        external: ExternalAccount,
+    ): BankLinkResult =
+        journaled(budgetId, UndoCopy.BANK_LINK) { BankLinkBook(it, ids).link(accountId, provider, external) }
+            ?: BankLinkResult.Rejected(SyncCopy.LAST_FAILED)
+
+    fun unlinkBankAccount(
+        budgetId: String,
+        accountId: String,
+    ): BankLinkResult =
+        journaled(budgetId, UndoCopy.BANK_LINK) { BankLinkBook(it, ids).remove(accountId) }
+            ?: BankLinkResult.Rejected(SyncCopy.LAST_FAILED)
+
+    fun bankLinkOf(
+        budgetId: String,
+        accountId: String,
+    ): Pair<BankProvider, String>? = library.useDatabase(budgetId) { BankLinkBook(it, ids).linked(accountId) }
+
     /** Undoes the newest step; a cell changed since lands in [conflicts]. */
     fun undo(budgetId: String): UndoResult {
         restoreClock(budgetId)
-        return library.useDatabase(budgetId) { session -> library.journal.undo(session, budgetId, syncClock) }
+        return library.serial { library.useDatabase(budgetId) { session -> library.journal.undo(session, budgetId, syncClock) } }
             ?: UndoResult.Empty
     }
 
     private fun envelopeEdit(
         budgetId: String,
         block: EnvelopeBook.() -> EnvelopeEditResult,
-    ): EditResult {
-        return journaled(budgetId, UndoCopy.CATEGORY) { session ->
+    ): EditResult =
+        journaled(budgetId, UndoCopy.CATEGORY) { session ->
             when (val outcome = EnvelopeBook(session, syncClock).block()) {
                 EnvelopeEditResult.Saved -> EditResult.Saved
                 is EnvelopeEditResult.Rejected -> EditResult.Rejected(outcome.reason)
             }
         } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
-    }
 
     fun addTransaction(
         budgetId: String,

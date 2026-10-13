@@ -127,6 +127,12 @@ fun ShellViewModel.undo() {
                 UndoResult.Empty -> null
             }
         mutate { it.copy(monthNotice = notice) }
+        if (result is UndoResult.Conflict) {
+            // The changed cell is listed with the server's value (contracts/undo.md).
+            val conflicts = withContext(Dispatchers.IO) { sync.conflicts(budgetId) }
+            push(ShellRoute.Conflicts)
+            mutate { it.copy(conflicts = conflicts) }
+        }
         if (result is UndoResult.Undone) {
             if (accountId != null) {
                 val register = withContext(Dispatchers.IO) { library.readRegister(budgetId, accountId) }
@@ -143,7 +149,7 @@ fun ShellViewModel.undo() {
  * Repaints the open month after a month action or undo, drops other cached months
  * (a fill or hold changes every later month), then syncs and repaints again.
  */
-private suspend fun ShellViewModel.afterMonthWrite(budgetId: String) {
+internal suspend fun ShellViewModel.afterMonthWrite(budgetId: String) {
     repaintMonth(budgetId)
     withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }
     repaintMonth(budgetId)

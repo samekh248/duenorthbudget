@@ -113,8 +113,7 @@ class HttpBankSyncTransport : BankSyncTransport {
         )
     }
 
-    private fun JsonObject.string(name: String): String? =
-        this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+    private fun JsonObject.string(name: String): String? = this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
 
     private fun JsonObject.longAmount(name: String): Long? {
         val primitive = this[name]?.jsonPrimitive ?: return null
@@ -184,7 +183,12 @@ class BankSyncBook(
             } catch (error: BankSyncException) {
                 return null to error.message
             }
-        val import = ImportBook(session) { java.util.UUID.randomUUID().toString() }
+        val import =
+            ImportBook(session) {
+                java.util.UUID
+                    .randomUUID()
+                    .toString()
+            }
         val currency =
             session
                 .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
@@ -205,4 +209,241 @@ class FakeBankSyncTransport(
         bankAccountId: String,
         startDateIso: String,
     ): List<ParsedImportRow> = rows
+}
+
+/** Words for spec 010's bank link (`contracts/bank-link.md`). */
+object BankLinkCopy {
+    const val TITLE = "bank link"
+    const val PROVIDERS = "providers"
+    const val NONE = "no bank providers are set up on this server"
+    const val TOKEN = "SimpleFIN setup token"
+    const val SEND_TOKEN = "save token"
+    const val COUNTRY = "country code, like GB"
+    const val FIND_BANKS = "find banks"
+    const val SIGN_IN = "sign in at your bank"
+    const val SIGNED_IN = "I've signed in"
+    const val PICK_ACCOUNT = "pick the bank account"
+    const val NO_ACCOUNTS = "no accounts yet"
+    const val LINKED = "linked to"
+    const val REMOVE = "remove link"
+    const val LINK = "link bank account"
+    const val UNREACHABLE = "couldn't reach the bank provider"
+    const val SIGN_IN_FIRST = "sign in to a server first"
+    const val WAITING = "finish signing in at your bank first"
+}
+
+class BankLinkException(
+    message: String,
+) : Exception(message)
+
+/** The providers Actual 26.8.1's server can link through, with the `account_sync_source` each writes. */
+enum class BankProvider(
+    val label: String,
+    val syncSource: String,
+    val path: String,
+) {
+    GOCARDLESS("GoCardless", "goCardless", "gocardless"),
+    SIMPLEFIN("SimpleFIN", "simpleFin", "simplefin"),
+    PLUGGY("Pluggy.ai", "pluggyai", "pluggyai"),
+    ;
+
+    companion object {
+        fun bySource(source: String?): BankProvider? = entries.firstOrNull { it.syncSource == source }
+    }
+}
+
+/** An account at the bank, as the provider lists it. */
+data class ExternalAccount(
+    val accountId: String,
+    val name: String,
+    val institution: String,
+    /** `banks.bank_id`: the requisition for GoCardless, the org domain or id otherwise. */
+    val bankKey: String,
+    val balanceMinor: Long?,
+)
+
+data class GoCardlessBank(
+    val id: String,
+    val name: String,
+)
+
+data class GoCardlessLink(
+    val link: String,
+    val requisitionId: String,
+)
+
+/** Provider calls through the active server. Secrets go only to `POST /secret`. */
+class BankLinkClient(
+    private val transport: ActualTransport,
+    private val address: String,
+    private val token: String,
+) {
+    /** The providers the server reports as configured. */
+    fun configured(): List<BankProvider> =
+        BankProvider.entries.filter { provider ->
+            val data = call("${provider.path}/status", JsonObject(emptyMap()))
+            (data as? JsonObject)?.get("configured")?.jsonPrimitive?.contentOrNull == "true"
+        }
+
+    /** Sends the SimpleFIN setup token to the server and keeps no copy. */
+    fun saveSimpleFinToken(value: String) {
+        call("secret", JsonObject(mapOf("name" to JsonPrimitive("simplefin_token"), "value" to JsonPrimitive(value.trim()))))
+    }
+
+    fun accounts(provider: BankProvider): List<ExternalAccount> {
+        require(provider != BankProvider.GOCARDLESS) { "GoCardless accounts come from a requisition" }
+        val data = call("${provider.path}/accounts", JsonObject(emptyMap()))
+        return list(data, "accounts").mapNotNull { account ->
+            val org = account["org"] as? JsonObject
+            val id = account.text("id") ?: account.text("account_id") ?: return@mapNotNull null
+            val institution = org?.text("name") ?: account.text("institution") ?: provider.label
+            ExternalAccount(
+                accountId = id,
+                name = account.text("name") ?: id,
+                institution = institution,
+                bankKey = org?.text("domain") ?: org?.text("id") ?: institution,
+                balanceMinor = minor(account["balance"]),
+            )
+        }
+    }
+
+    fun goCardlessBanks(country: String): List<GoCardlessBank> {
+        val data = call("gocardless/get-banks", JsonObject(mapOf("country" to JsonPrimitive(country.trim().uppercase()))))
+        return (data as? JsonArray)
+            .orEmpty()
+            .mapNotNull { it as? JsonObject }
+            .mapNotNull { bank -> GoCardlessBank(bank.text("id") ?: return@mapNotNull null, bank.text("name").orEmpty()) }
+    }
+
+    fun goCardlessStart(institutionId: String): GoCardlessLink {
+        val data =
+            call(
+                "gocardless/create-web-token",
+                JsonObject(mapOf("institutionId" to JsonPrimitive(institutionId), "accessValidForDays" to JsonPrimitive(90))),
+            ) as? JsonObject ?: throw BankLinkException(BankLinkCopy.UNREACHABLE)
+        return GoCardlessLink(
+            link = data.text("link") ?: throw BankLinkException(BankLinkCopy.UNREACHABLE),
+            requisitionId = data.text("requisitionId") ?: throw BankLinkException(BankLinkCopy.UNREACHABLE),
+        )
+    }
+
+    /** The requisition's accounts; empty until the person finishes at the bank. */
+    fun goCardlessAccounts(requisitionId: String): List<ExternalAccount> {
+        val data = call("gocardless/get-accounts", JsonObject(mapOf("requisitionId" to JsonPrimitive(requisitionId))))
+        return list(data, "accounts").mapNotNull { account ->
+            val id = account.text("account_id") ?: return@mapNotNull null
+            ExternalAccount(
+                accountId = id,
+                name = account.text("name") ?: account.text("official_name") ?: id,
+                institution = (account["institution"] as? JsonObject)?.text("name") ?: BankProvider.GOCARDLESS.label,
+                bankKey = requisitionId,
+                balanceMinor = minor(account["balance"]),
+            )
+        }
+    }
+
+    private fun call(
+        path: String,
+        body: JsonObject,
+    ): JsonElement =
+        try {
+            transport.provider(address, token, path, body)
+        } catch (error: SyncNetworkException) {
+            throw BankLinkException(BankLinkCopy.UNREACHABLE)
+        }
+
+    private fun list(
+        data: JsonElement,
+        key: String,
+    ): List<JsonObject> =
+        ((data as? JsonObject)?.get(key) as? JsonArray)
+            .orEmpty()
+            .mapNotNull { it as? JsonObject }
+
+    private fun JsonObject.text(name: String): String? = (this[name] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+
+    private fun minor(value: JsonElement?): Long? =
+        (value as? JsonPrimitive)
+            ?.contentOrNull
+            ?.toBigDecimalOrNull()
+            ?.movePointRight(2)
+            ?.setScale(0, java.math.RoundingMode.HALF_UP)
+            ?.toLong()
+}
+
+sealed interface BankLinkResult {
+    data object Saved : BankLinkResult
+
+    data class Rejected(
+        val reason: String,
+    ) : BankLinkResult
+}
+
+/**
+ * Links a phone account to a bank account as Actual's `linkSimpleFinAccount` and friends do
+ * (`contracts/bank-link.md`): a `banks` row found or made by its `bank_id`, then the account's
+ * link columns. Remove clears them as `unlinkAccount` does.
+ */
+class BankLinkBook(
+    private val session: SqlSession,
+    private val ids: () -> String,
+) {
+    fun link(
+        accountId: String,
+        provider: BankProvider,
+        external: ExternalAccount,
+    ): BankLinkResult {
+        if (!accountAlive(accountId)) return BankLinkResult.Rejected(AccountsCopy.NOT_FOUND)
+        val bank =
+            session
+                .query("SELECT id FROM banks WHERE bank_id = ? AND IFNULL(tombstone, 0) = 0", listOf(external.bankKey))
+                .firstOrNull()
+                ?.str("id")
+                ?: ids().also { id ->
+                    SyncSchema.writeRow(
+                        session,
+                        "banks",
+                        id,
+                        "bank_id" to external.bankKey,
+                        "name" to external.institution,
+                        "tombstone" to 0,
+                    )
+                }
+        SyncSchema.write(session, "accounts", accountId, "account_id", external.accountId)
+        SyncSchema.write(session, "accounts", accountId, "bank", bank)
+        SyncSchema.write(session, "accounts", accountId, "account_sync_source", provider.syncSource)
+        SyncSchema.write(session, "accounts", accountId, "balance_current", external.balanceMinor)
+        SyncSchema.write(session, "accounts", accountId, "balance_available", null)
+        SyncSchema.write(session, "accounts", accountId, "balance_limit", null)
+        SyncSchema.write(session, "accounts", accountId, "last_sync", null)
+        return BankLinkResult.Saved
+    }
+
+    fun remove(accountId: String): BankLinkResult {
+        if (!accountAlive(accountId)) return BankLinkResult.Rejected(AccountsCopy.NOT_FOUND)
+        for (column in listOf("account_id", "bank", "account_sync_source", "balance_current", "balance_available", "balance_limit")) {
+            SyncSchema.write(session, "accounts", accountId, column, null)
+        }
+        return BankLinkResult.Saved
+    }
+
+    /** Provider and bank name for a linked account, else null. */
+    fun linked(accountId: String): Pair<BankProvider, String>? {
+        val row =
+            session
+                .query(
+                    """
+                    SELECT a.account_sync_source, a.account_id, b.name AS bank_name
+                    FROM accounts a LEFT JOIN banks b ON b.id = a.bank
+                    WHERE a.id = ?
+                    """.trimIndent(),
+                    listOf(accountId),
+                ).firstOrNull() ?: return null
+        if (row.str("account_id").isNullOrBlank()) return null
+        val provider = BankProvider.bySource(row.str("account_sync_source")) ?: return null
+        return provider to (row.str("bank_name") ?: provider.label)
+    }
+
+    private fun accountAlive(accountId: String): Boolean =
+        session.query("SELECT 1 FROM accounts WHERE id = ? AND IFNULL(tombstone, 0) = 0", listOf(accountId)).isNotEmpty()
 }

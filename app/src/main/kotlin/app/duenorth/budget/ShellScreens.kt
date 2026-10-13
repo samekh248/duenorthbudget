@@ -95,6 +95,7 @@ fun HomePivot(
     onPostSchedule: (String) -> Unit = {},
     onSkipSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    onOpenSchedule: (String) -> Unit = {},
     onSelectMonth: (YearMonth) -> Unit = {},
     onBudgetCategory: ((String) -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
@@ -161,6 +162,7 @@ fun HomePivot(
                             onPost = onPostSchedule,
                             onSkip = onSkipSchedule,
                             formatOptions = formatOptions,
+                            onOpen = onOpenSchedule,
                         )
                     }
                 },

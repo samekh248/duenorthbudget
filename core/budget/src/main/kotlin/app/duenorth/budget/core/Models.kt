@@ -73,7 +73,13 @@ data class FormatPrefs(
     val firstDayOfWeekIdx: Int = 0,
     val experimental: Boolean = false,
     val budgetType: String = "envelope",
-)
+    /** Actual's `learn-categories`; absent means on (spec 010 US3). */
+    val learnCategories: Boolean = true,
+    /** Actual's `flags.goalTemplatesEnabled`; templates also need [experimental] (spec 010 US5). */
+    val goalTemplates: Boolean = false,
+) {
+    val templatesOn: Boolean get() = experimental && goalTemplates
+}
 
 data class PendingExport(
     val fileName: String,
@@ -216,6 +222,8 @@ data class PhoneSettings(
     val activeInstanceId: String? = null,
     val syncNode: String? = null,
     val askEachTime: List<String> = emptyList(),
+    /** Accounts list shows closed accounts (spec 010 US2, menu `show-closed`). */
+    val showClosedAccounts: Boolean = false,
 )
 
 @Serializable

@@ -74,6 +74,8 @@ fun SettingsScreen(
     onFirstDay: (Int) -> Unit,
     onHideFraction: (Boolean) -> Unit,
     onExperimental: (Boolean) -> Unit,
+    onGoalTemplates: (Boolean) -> Unit = {},
+    onLearning: (Boolean) -> Unit = {},
     onExport: () -> Unit,
     onSetEncryptionPassword: (String) -> Unit,
     onChangeEncryptionPassword: (String, String) -> Unit,
@@ -130,7 +132,8 @@ fun SettingsScreen(
                 onHideFraction = onHideFraction,
             )
             MethodSection(formatPrefs.budgetType)
-            ExperimentalSection(formatPrefs.experimental, onExperimental)
+            LearningSection(formatPrefs.learnCategories, onLearning)
+            ExperimentalSection(formatPrefs.experimental, onExperimental, formatPrefs.goalTemplates, onGoalTemplates)
             IdsSection(openBudgetId.orEmpty(), cloudFileId)
             SettingsActionRow("export", "settings-export", onExport)
             EncryptionSection(
@@ -400,10 +403,26 @@ private fun MethodSection(budgetType: String) {
     MetroText(label, Metro.typography.subheader, Modifier.testTag("settings-method-value"))
 }
 
+/** Actual's "learn categories": a payee's usual category becomes a rule. */
+@Composable
+private fun LearningSection(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    SettingsHeading("rules", tag = "settings-rules")
+    ChoiceRow(
+        if (enabled) "learn categories  on" else "learn categories",
+        enabled,
+        "settings-learning",
+    ) { onToggle(!enabled) }
+}
+
 @Composable
 private fun ExperimentalSection(
     enabled: Boolean,
     onToggle: (Boolean) -> Unit,
+    templates: Boolean,
+    onTemplates: (Boolean) -> Unit,
 ) {
     SettingsHeading("experimental", tag = "settings-experimental")
     ChoiceRow(
@@ -411,6 +430,14 @@ private fun ExperimentalSection(
         enabled,
         "settings-experimental-toggle",
     ) { onToggle(!enabled) }
+    // Actual's goal templates feature flag; it only counts while experimental features are on.
+    if (enabled) {
+        ChoiceRow(
+            if (templates) "budget templates  on" else "budget templates",
+            templates,
+            "settings-templates",
+        ) { onTemplates(!templates) }
+    }
 }
 
 @Composable

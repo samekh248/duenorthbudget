@@ -100,6 +100,58 @@ class BudgetLibraryTest {
         assertEquals(501, gate.visible!!.size)
     }
 
+    /** Spec 010 T071: a transaction save with 100 rules stays inside the spec 001 budget and its repaint waits for the gesture. */
+    @Test
+    fun aHundredRuleSaveIsQuickAndHeldDuringAGesture() {
+        val library = library(tempRoot())
+        val id = (library.createFromMock(MockBudgets.HOUSEHOLD) as CreateResult.Created).id
+        val account = library.readShell(id)!!.accounts.first().id
+        repeat(100) {
+            val condition = RulePart.condition("notes", "contains", kotlinx.serialization.json.JsonPrimitive("tag-$it"))
+            val action = RulePart.action("category", "set", kotlinx.serialization.json.JsonPrimitive("c-food"))
+            assertTrue(library.saveRule(id, RuleDraft(null, null, "and", listOf(condition), listOf(action))) is RuleSaveResult.Saved)
+        }
+        val gate = RefreshGate<MonthShell>()
+        gate.offer(library.readShell(id)!!)
+        val before = gate.visible
+        library.saveTransaction(id, TransactionDraft("warm", account, 20261007, "Cafe", -100L, null, "tag-1"))
+        gate.beginGesture()
+        val runs = 10
+        val started = System.nanoTime()
+        repeat(runs) { library.saveTransaction(id, TransactionDraft("t$it", account, 20261007, "Cafe", -100L, null, "tag-99")) }
+        val perSave = (System.nanoTime() - started) / runs / 1_000_000.0
+        assertTrue("save with 100 rules took $perSave ms", perSave < 50.0)
+        assertFalse(gate.offer(library.readShell(id)!!))
+        assertEquals(before, gate.visible)
+        gate.endGesture()
+        assertTrue(gate.visible != before)
+    }
+
+    /** Spec 010 T071: undo on the panorama is under 100 ms and does not move rows under the finger. */
+    @Test
+    fun undoOnThePanoramaIsQuickAndHeldDuringAGesture() {
+        val library = library(tempRoot())
+        val id = (library.createFromMock(MockBudgets.HOUSEHOLD) as CreateResult.Created).id
+        val account = library.readShell(id)!!.accounts.first().id
+        repeat(11) { library.saveTransaction(id, TransactionDraft("u$it", account, 20261007, "Cafe", -1_000L * (it + 1), "c-food", null)) }
+        library.undo(id)
+        val gate = RefreshGate<MonthShell>()
+        gate.offer(library.readShell(id)!!)
+        val before = gate.visible
+        gate.beginGesture()
+        val worst =
+            (0 until 10).maxOf {
+                val started = System.nanoTime()
+                assertTrue(library.undo(id) is UndoResult.Undone)
+                (System.nanoTime() - started) / 1_000_000
+            }
+        assertTrue("slowest undo took $worst ms", worst < 100)
+        assertFalse(gate.offer(library.readShell(id)!!))
+        assertEquals(before, gate.visible)
+        gate.endGesture()
+        assertTrue(gate.visible != before)
+    }
+
     private fun library(
         root: File,
         today: LocalDate = LocalDate.of(2026, 10, 7),

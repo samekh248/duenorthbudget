@@ -1,8 +1,11 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
+import app.duenorth.budget.core.ReportsCopy
+import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.ScreenAction
 
@@ -20,6 +23,8 @@ object ScreenBar {
         mode: BudgetMode?,
         undoLabel: String? = null,
         incomeCategory: Boolean = false,
+        showClosed: Boolean = false,
+        templates: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             ShellRoute.Home ->
@@ -30,7 +35,7 @@ object ScreenBar {
                             spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
-                        ) + fills() + undo(undoLabel)
+                        ) + fills() + accounts() + schedules() + templates(templates) + undo(undoLabel)
                     else ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
@@ -38,7 +43,7 @@ object ScreenBar {
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
                             menu("breakdown", AppGlyph.Breakdown, MonthFillCopy.BREAKDOWN),
-                        ) + fills() + undo(undoLabel)
+                        ) + fills() + accounts() + schedules() + templates(templates) + undo(undoLabel)
                 }
             is ShellRoute.Register ->
                 listOf(
@@ -46,7 +51,36 @@ object ScreenBar {
                     spec("transfer", AppGlyph.Transfer, "transfer"),
                     spec("reconcile", AppGlyph.Reconcile, "reconcile"),
                     spec("import", AppGlyph.Import, "import"),
+                    menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT),
+                    menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE),
+                    menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE),
                 ) + undo(undoLabel)
+            ShellRoute.Accounts ->
+                listOf(
+                    spec("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
+                    menu(
+                        "show-closed",
+                        AppGlyph.Categories,
+                        if (showClosed) AccountScreenCopy.HIDE_CLOSED else AccountScreenCopy.SHOW_CLOSED,
+                    ),
+                    menu("reorder", AppGlyph.Categories, AccountScreenCopy.REORDER),
+                ) + undo(undoLabel)
+            ShellRoute.AddAccount,
+            is ShellRoute.EditAccount,
+            -> saveCancel()
+            ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, RuleScreenCopy.ADD)) + undo(undoLabel)
+            is ShellRoute.ScheduleEditor ->
+                saveCancel() +
+                    if (route.scheduleId ==
+                        null
+                    ) {
+                        emptyList()
+                    } else {
+                        listOf(menu("delete-schedule", AppGlyph.Cancel, ScheduleScreenCopy.DELETE))
+                    }
+            is ShellRoute.RuleEditor ->
+                saveCancel() +
+                    if (route.ruleId == null) emptyList() else listOf(menu("delete-rule", AppGlyph.Cancel, RuleScreenCopy.DELETE))
             is ShellRoute.CategoryBudget ->
                 if (mode == BudgetMode.TRACKING) {
                     saveCancel()
@@ -80,7 +114,15 @@ object ScreenBar {
         val hasBudget = state.shell != null && !state.locked
         val income =
             (state.route as? ShellRoute.CategoryBudget)?.let { route -> state.shell?.incomeCategory(route.categoryId) != null } == true
-        return specsFor(state.route, hasBudget, mode, state.undoLabel, income).map { spec ->
+        return specsFor(
+            state.route,
+            hasBudget,
+            mode,
+            state.undoLabel,
+            income,
+            state.settings.showClosedAccounts,
+            state.formatPrefs.templatesOn,
+        ).map { spec ->
             ScreenAction(
                 id = spec.id,
                 glyph = spec.glyph,
@@ -104,6 +146,20 @@ object ScreenBar {
             menu("average", AppGlyph.Average, MonthFillCopy.AVERAGE),
             menu("zero", AppGlyph.Zero, MonthFillCopy.ZERO),
         )
+
+    /** Home `•••` → the account list (spec 010 US2). */
+    private fun accounts() = listOf(menu("accounts", AppGlyph.Budgets, AccountScreenCopy.TITLE))
+
+    /** Home `•••` → new schedule and rules (spec 010 US3). */
+    private fun schedules() =
+        listOf(
+            menu("add-schedule", AppGlyph.Add, ScheduleScreenCopy.ADD),
+            menu("rules", AppGlyph.Categories, RuleScreenCopy.TITLE),
+            menu("reports", AppGlyph.Breakdown, ReportsCopy.TITLE),
+        )
+
+    /** Home `•••` → templates, only while experimental features and budget templates are both on (spec 010 US5). */
+    private fun templates(on: Boolean) = if (on) listOf(menu("templates", AppGlyph.Average, TemplateCopy.TITLE)) else emptyList()
 
     /** Present only while there is a step to undo; the label names it. */
     private fun undo(label: String?) =
@@ -136,6 +192,20 @@ class ScreenBarHandlers(
     val onFill: (MonthFillKind) -> Unit = {},
     val onToBudget: () -> Unit = {},
     val onUndo: () -> Unit = {},
+    val onAccounts: () -> Unit = {},
+    val onAddAccount: () -> Unit = {},
+    val onShowClosed: () -> Unit = {},
+    val onReorder: () -> Unit = {},
+    val onEditAccount: () -> Unit = {},
+    val onCloseAccount: () -> Unit = {},
+    val onAddSchedule: () -> Unit = {},
+    val onRules: () -> Unit = {},
+    val onAddRule: () -> Unit = {},
+    val onDeleteSchedule: () -> Unit = {},
+    val onDeleteRule: () -> Unit = {},
+    val onReports: () -> Unit = {},
+    val onTemplates: () -> Unit = {},
+    val onBankLink: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -161,6 +231,20 @@ class ScreenBarHandlers(
             "zero" -> ({ onFill(MonthFillKind.ZERO) })
             "to-budget" -> onToBudget
             "undo" -> onUndo
+            "accounts" -> onAccounts
+            "add-account" -> onAddAccount
+            "show-closed" -> onShowClosed
+            "reorder" -> onReorder
+            "edit-account" -> onEditAccount
+            "close" -> onCloseAccount
+            "add-schedule" -> onAddSchedule
+            "rules" -> onRules
+            "add-rule" -> onAddRule
+            "delete-schedule" -> onDeleteSchedule
+            "delete-rule" -> onDeleteRule
+            "reports" -> onReports
+            "templates" -> onTemplates
+            "bank-link" -> onBankLink
             else -> ({})
         }
 }

@@ -3,6 +3,7 @@ package app.duenorth.budget
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import app.duenorth.budget.core.AccountDetail
 import app.duenorth.budget.core.ActualMonthMath
 import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetConflict
@@ -39,11 +40,19 @@ import app.duenorth.budget.core.RefreshGate
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RemoteFile
+import app.duenorth.budget.core.ReportPreset
+import app.duenorth.budget.core.ReportRange
+import app.duenorth.budget.core.ReportsPage
+import app.duenorth.budget.core.RuleDraft
+import app.duenorth.budget.core.RuleSummary
 import app.duenorth.budget.core.SavedInstance
+import app.duenorth.budget.core.ScheduleDraft
 import app.duenorth.budget.core.ScheduleWriteResult
+import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.core.UnlockResult
@@ -152,7 +161,50 @@ sealed interface ShellRoute {
     data object Settings : ShellRoute
 
     data object SampleBudgets : ShellRoute
+
+    // Spec 010 US2: account management.
+    data object Accounts : ShellRoute, StackRoute
+
+    data object AddAccount : ShellRoute, StackRoute
+
+    data class EditAccount(
+        val accountId: String,
+    ) : ShellRoute,
+        StackRoute
+
+    data class CloseAccount(
+        val accountId: String,
+    ) : ShellRoute,
+        StackRoute
+
+    // Spec 010 US3: schedules and rules.
+    data class ScheduleEditor(
+        val scheduleId: String?,
+    ) : ShellRoute,
+        StackRoute
+
+    data object Rules : ShellRoute, StackRoute
+
+    data class RuleEditor(
+        val ruleId: String?,
+    ) : ShellRoute,
+        StackRoute
+
+    // Spec 010 US4.
+    data object Reports : ShellRoute, StackRoute
+
+    // Spec 010 US5.
+    data object Templates : ShellRoute, StackRoute
+
+    // Spec 010 US6.
+    data class BankLink(
+        val accountId: String,
+    ) : ShellRoute,
+        StackRoute
 }
+
+/** A spec 010 screen that goes back to the screen it was opened from. */
+interface StackRoute
 
 data class ShellUiState(
     val loading: Boolean = true,
@@ -221,6 +273,24 @@ data class ShellUiState(
     val fillConfirm: FillConfirm? = null,
     val monthNotice: String? = null,
     val undoLabel: String? = null,
+    val accountsList: List<AccountDetail> = emptyList(),
+    val accountDetail: AccountDetail? = null,
+    val accountsReorder: Boolean = false,
+    val accountForceConfirm: String? = null,
+    val scheduleDraft: ScheduleDraft? = null,
+    val rulesList: List<RuleSummary> = emptyList(),
+    val ruleDraft: RuleDraft? = null,
+    val reports: ReportsPage? = null,
+    val reportsLoading: Boolean = false,
+    val reportPreset: ReportPreset = ReportPreset.LAST_6,
+    val reportCustom: ReportRange? = null,
+    val reportGroupBy: SpendingGroupBy = SpendingGroupBy.CATEGORY,
+    val templateResult: TemplateResult? = null,
+    val templateBusy: Boolean = false,
+    val templateConfirm: String? = null,
+    /** The open category's note while templates are on; null until read. */
+    val categoryNote: String? = null,
+    val bankLink: BankLinkUi? = null,
 )
 
 class ShellViewModel(
@@ -628,6 +698,11 @@ class ShellViewModel(
 
     fun setExperimental(enabled: Boolean) = setOpenBudgetPreference("flags.experimental", if (enabled) "true" else "false")
 
+    /** Settings → learn categories (spec 010 US3). */
+    fun setLearning(enabled: Boolean) = setOpenBudgetPreference("learn-categories", if (enabled) "true" else "false")
+
+    fun setGoalTemplates(enabled: Boolean) = setOpenBudgetPreference("flags.goalTemplatesEnabled", if (enabled) "true" else "false")
+
     fun exportBudget() {
         val budgetId = _state.value.settings.openBudgetId ?: return
         val name =
@@ -751,16 +826,21 @@ class ShellViewModel(
             for (month in windowMonths) {
                 if (_state.value.settings.openBudgetId != budgetId) return@launch
                 if (months.cached(month) != null) continue
-                val shell = library.readShell(budgetId, month) ?: continue
-                val review = library.readMonthReview(budgetId, month)
-                months.put(MonthSnapshot(month, shell, review))
+                // Warming is best effort: a month that fails here loads when it is opened.
+                val snapshot =
+                    runCatching {
+                        val shell = library.readShell(budgetId, month) ?: return@runCatching null
+                        MonthSnapshot(month, shell, library.readMonthReview(budgetId, month))
+                    }.getOrElse { return@launch } ?: continue
+                months.put(snapshot)
             }
         }
     }
 
     fun openCategoryBudget(categoryId: String) {
         push(ShellRoute.CategoryBudget(categoryId))
-        _state.update { it.copy(editError = null) }
+        _state.update { it.copy(editError = null, categoryNote = null) }
+        loadCategoryNote(categoryId)
     }
 
     fun openMoveCategory() {
@@ -934,6 +1014,14 @@ class ShellViewModel(
         }
         if (current.fillConfirm != null) {
             _state.update { it.copy(fillConfirm = null) }
+            return true
+        }
+        if (current.templateConfirm != null) {
+            _state.update { it.copy(templateConfirm = null) }
+            return true
+        }
+        if (current.accountForceConfirm != null) {
+            _state.update { it.copy(accountForceConfirm = null) }
             return true
         }
         if (current.route == ShellRoute.Home) return false
@@ -1921,7 +2009,8 @@ class ShellViewModel(
             this is ShellRoute.ImportReviewRoute
 
     private fun ShellRoute.isHomeFlow(): Boolean =
-        this is ShellRoute.ReviewCategory ||
+        this is StackRoute ||
+            this is ShellRoute.ReviewCategory ||
             pinsMonth() ||
             this is ShellRoute.ManageCategories
 
@@ -2058,6 +2147,8 @@ class ShellViewModel(
                     _state.value.formatPrefs.copy(firstDayOfWeekIdx = value.toIntOrNull() ?: 0)
                 "hideFraction" -> _state.value.formatPrefs.copy(hideFraction = value == "true")
                 "flags.experimental" -> _state.value.formatPrefs.copy(experimental = value == "true")
+                "learn-categories" -> _state.value.formatPrefs.copy(learnCategories = value == "true")
+                "flags.goalTemplatesEnabled" -> _state.value.formatPrefs.copy(goalTemplates = value == "true")
                 else -> _state.value.formatPrefs
             }
         _state.update {

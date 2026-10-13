@@ -120,9 +120,11 @@ one file at a time.
 
 - The phone layout ships before tablet, widget, or watch layouts.
 - No module exists only for organization.
-- Goal-template editing, custom reports, and server administration are out of
-  scope until the daily loop is fluid: see the month, move money, record
-  spending, sync.
+- The daily loop (see the month, move money, record spending, sync) is fluid:
+  specs 001–009 shipped it and its Principle I budgets pass. Goal templates
+  read from category notes and Actual's fixed reports (cash flow, net worth,
+  spending) are therefore in scope.
+- Custom reports and dashboards, and server administration, stay out of scope.
 
 ## Technical Constraints
 
@@ -150,7 +152,13 @@ remove or redefine a principle. MINOR: add a principle or materially expand
 one. PATCH: wording only. Plans and reviews MUST check these principles. A
 violation is listed with a justification before the work proceeds.
 
-**Version**: 1.0.1 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-11
+**Version**: 1.1.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-13
 
 **Amendment 1.0.1**: Wording only. Budget screens now live in
 `docs/design/metro-mockups.svg`. The principles are unchanged.
+
+**Amendment 1.1.0**: Principle VI materially changed. Its gate, "until the
+daily loop is fluid", has been met, so goal templates and Actual's fixed
+reports move into scope for spec 010 (actual parity). Custom reports and server
+administration remain out. Proposed in `specs/010-actual-parity/plan.md`
+(Complexity Tracking).

@@ -22,6 +22,7 @@ object ShellReader {
         metadata: BudgetMetadata,
         today: LocalDate,
         viewMonth: YearMonth = YearMonth.from(today),
+        showClosedAccounts: Boolean = true,
     ): MonthShell {
         val detailed = loadDetailed(session, viewMonth)
         val preferences =
@@ -43,7 +44,7 @@ object ShellReader {
                 """
                 SELECT id, name, offbudget, closed, sort_order
                 FROM accounts
-                WHERE IFNULL(tombstone, 0) = 0
+                WHERE IFNULL(tombstone, 0) = 0 ${if (showClosedAccounts) "" else "AND IFNULL(closed, 0) = 0"}
                 ORDER BY offbudget, sort_order, name, id
                 """.trimIndent(),
             )

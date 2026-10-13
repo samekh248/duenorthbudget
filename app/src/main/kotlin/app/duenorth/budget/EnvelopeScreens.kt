@@ -52,6 +52,8 @@ fun CategoryBudgetScreen(
     onMove: () -> Unit,
     onToggleCarryover: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    note: String? = null,
+    onSaveNote: (String) -> Unit = {},
 ) {
     val category = shell.groups.flatMap { it.categories }.first { it.id == categoryId }
     var amount by remember(category) { mutableStateOf(MoneyParse.formatMagnitude(category.budgetedMinor, shell.currency.decimals)) }
@@ -80,6 +82,8 @@ fun CategoryBudgetScreen(
         ) {
             onToggleCarryover(!category.carryover)
         }
+        // Only while budget templates are on (spec 010 US5).
+        if (note != null) CategoryNoteEditor(note, onSaveNote)
     }
 }
 

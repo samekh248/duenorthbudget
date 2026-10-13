@@ -25,6 +25,15 @@ class LocalActualServer(
     var online: Boolean = true
     var openIdCancelled: Boolean = false
 
+    /** Bank providers by path prefix (`simplefin`, `gocardless`, `pluggyai`) and whether each is configured. */
+    val configured: MutableMap<String, Boolean> = java.util.concurrent.ConcurrentHashMap()
+
+    /** `data` JSON for a provider path such as `/simplefin/accounts`. */
+    val providerData: MutableMap<String, String> = java.util.concurrent.ConcurrentHashMap()
+
+    /** Every `POST /secret`, by name. */
+    val secrets: MutableMap<String, String> = java.util.concurrent.ConcurrentHashMap()
+
     private val json = Json { ignoreUnknownKeys = true }
     private val clock = SyncClock("SERVER0000000001")
     private val files = LinkedHashMap<String, ServerFile>()
@@ -135,8 +144,44 @@ class LocalActualServer(
             method == "POST" && path == "/sync/upload-user-file" -> upload(exchange)
             method == "POST" && path == "/sync/sync" -> sync(exchange)
             method == "POST" && path == "/sync/user-get-key" -> key(exchange)
+            method == "POST" && (path == "/secret" || PROVIDERS.any { path.startsWith("/$it/") }) -> provider(exchange, path)
             else -> exchange.respond(404, ByteArray(0), null)
         }
+    }
+
+    private fun provider(
+        exchange: HttpExchange,
+        path: String,
+    ) {
+        if (!authorized(exchange)) {
+            exchange.respond(401, """{"status":"error","reason":"unauthorized"}""".toByteArray(), "application/json")
+            return
+        }
+        val body =
+            json
+                .parseToJsonElement(
+                    exchange.requestBody
+                        .readBytes()
+                        .toString(Charsets.UTF_8)
+                        .ifBlank { "{}" },
+                ).jsonObject
+        val data =
+            when {
+                path == "/secret" -> {
+                    val name = body["name"]?.jsonPrimitive?.content.orEmpty()
+                    secrets[name] = body["value"]?.jsonPrimitive?.content.orEmpty()
+                    if (name == "simplefin_token") configured["simplefin"] = true
+                    null
+                }
+                path.endsWith("/status") -> """{"configured":${configured[path.split('/')[1]] == true}}"""
+                else ->
+                    providerData[path] ?: run {
+                        exchange.respond(404, ByteArray(0), null)
+                        return
+                    }
+            }
+        val text = if (data == null) """{"status":"ok"}""" else """{"status":"ok","data":$data}"""
+        exchange.respond(200, text.toByteArray(), "application/json")
     }
 
     private fun loginMethods(exchange: HttpExchange) {
@@ -153,7 +198,10 @@ class LocalActualServer(
         val method = body["loginMethod"]?.jsonPrimitive?.content ?: "password"
         if (method == "openid") {
             val returnUrl = body["returnUrl"]?.jsonPrimitive?.content.orEmpty()
-            val redirect = "$baseUrl$openIdCallbackPath?returnUrl=${URLDecoder.decode(returnUrl.ifEmpty { "duenorth://oauth" }, Charsets.UTF_8)}"
+            val redirect = "$baseUrl$openIdCallbackPath?returnUrl=${URLDecoder.decode(
+                returnUrl.ifEmpty { "duenorth://oauth" },
+                Charsets.UTF_8,
+            )}"
             val text =
                 buildJsonObject {
                     put("status", "ok")
@@ -330,6 +378,10 @@ class LocalActualServer(
         val envelopes: MutableList<Envelope> = mutableListOf(),
     ) {
         fun remote() = RemoteFile(id, groupId, name, encryptKeyId)
+    }
+
+    private companion object {
+        val PROVIDERS = listOf("gocardless", "simplefin", "pluggyai")
     }
 }
 

@@ -101,18 +101,18 @@ flowchart LR
 
 ### Tests for User Story 2
 
-- [ ] T028 [P] [US2] Parity tests in `core-test/parity/AccountsParityTest.kt` against `parity/accounts/`: create on and off budget with and without balance (Starting Balance transaction, payee, category), rename, note, reorder, close at zero, close on→on, close on→off with category, force close with transfer partners, reopen
-- [ ] T029 [P] [US2] Validation tests in `core-test/AccountsBookTest.kt`: blank name refused, close with balance and no destination refused, on→off with no category refused, force close needs its own flag
+- [x] T028 [P] [US2] Parity tests in `core-test/parity/AccountsParityTest.kt` against `parity/accounts/`: create on and off budget with and without balance (Starting Balance transaction, payee, category), rename, note, reorder, close at zero, close on→on, close on→off with category, force close with transfer partners, reopen
+- [x] T029 [P] [US2] Validation tests in `core-test/AccountsBookTest.kt`: blank name refused, close with balance and no destination refused, on→off with no category refused, force close needs its own flag
 
 ### Implementation for User Story 2
 
-- [ ] T030 [US2] Create `core/…/core/Accounts.kt` (`AccountsBook`) per `contracts/accounts.md`, one journal step per action
-- [ ] T031 [US2] Add `showClosedAccounts` to `PhoneSettings` in `core/…/core/Models.kt` and filter closed accounts in `core/…/core/ShellReader.kt`
-- [ ] T032 [US2] Entry points in `core/…/core/BudgetLibrary.kt` and `SyncCoordinator.kt`
-- [ ] T033 [US2] Create `app/…/AccountScreens.kt`: add, edit (name, note), reorder, close with destination and category pickers, force close confirm, closed list with reopen
-- [ ] T034 [US2] Route handlers in new `app/…/ShellViewModel+Accounts.kt`; close paints within 100 ms of confirm
-- [ ] T035 [US2] Bar ids `add-account`, `show-closed`, `reorder` on the accounts list and `edit-account`, `close`, `undo` on the register `•••` in `app/…/ScreenBar.kt`
-- [ ] T036 [P] [US2] Compose tests in `app-test/AccountContentTest.kt` and Roborazzi light and dark in `app-test/AccountScreenshotTest.kt`
+- [x] T030 [US2] Create `core/…/core/Accounts.kt` (`AccountsBook`) per `contracts/accounts.md`, one journal step per action
+- [x] T031 [US2] Add `showClosedAccounts` to `PhoneSettings` in `core/…/core/Models.kt` and filter closed accounts in `core/…/core/ShellReader.kt`
+- [x] T032 [US2] Entry points in `core/…/core/BudgetLibrary.kt` and `SyncCoordinator.kt`
+- [x] T033 [US2] Create `app/…/AccountScreens.kt`: add, edit (name, note), reorder, close with destination and category pickers, force close confirm, closed list with reopen
+- [x] T034 [US2] Route handlers in new `app/…/ShellViewModel+Accounts.kt`; close paints within 100 ms of confirm
+- [x] T035 [US2] Bar ids `add-account`, `show-closed`, `reorder` on the accounts list and `edit-account`, `close`, `undo` on the register `•••` in `app/…/ScreenBar.kt`
+- [x] T036 [P] [US2] Compose tests in `app-test/AccountContentTest.kt` and Roborazzi light and dark in `app-test/AccountScreenshotTest.kt`
 
 **Checkpoint**: US1–US2 work on their own; accounts match desktop.
 
@@ -126,23 +126,23 @@ flowchart LR
 
 ### Tests for User Story 3
 
-- [ ] T037 [P] [US3] Recurrence tests in `core-test/ScheduleRulesBookTest.kt`: once, every N days/weeks/months/years, end after K, end on date, patterns and `skipWeekend` kept on save
-- [ ] T038 [P] [US3] Auto-post tests in `core-test/ScheduleAutoPostTest.kt`: one transaction when due, none when a match exists, a late open posts the due occurrence without duplicates, finishes within 1 s offline (SC-003)
-- [ ] T039 [P] [US3] Parity tests in `core-test/parity/RulesParityTest.kt` against `parity/schedules-rules/`: editor round-trip for each field and op, unknown conditions and actions written back byte-for-byte, stages ordered pre → default → post
-- [ ] T040 [P] [US3] Learning tests in `core-test/parity/LearningParityTest.kt`: on matches desktop's learned rule, off creates none, existing rules still run
-- [ ] T041 [P] [US3] Benchmark in `core-test/RuleSaveBenchmarkTest.kt`: save with 100 rules within 50 ms of save with none (SC-004)
+- [x] T037 [P] [US3] Recurrence tests in `core-test/ScheduleRulesBookTest.kt`: once, every N days/weeks/months/years, end after K, end on date, patterns and `skipWeekend` kept on save
+- [x] T038 [P] [US3] Auto-post tests in `core-test/ScheduleAutoPostTest.kt`: one transaction when due, none when a match exists, a late open posts the due occurrence without duplicates, finishes within 1 s offline (SC-003)
+- [x] T039 [P] [US3] Parity tests in `core-test/parity/RulesParityTest.kt` against `parity/schedules-rules/`: editor round-trip for each field and op, unknown conditions and actions written back byte-for-byte, stages ordered pre → default → post
+- [x] T040 [P] [US3] Learning tests in `core-test/parity/LearningParityTest.kt`: on matches desktop's learned rule, off creates none, existing rules still run
+- [x] T041 [P] [US3] Benchmark in `core-test/RuleSaveBenchmarkTest.kt`: save with 100 rules within 50 ms of save with none (SC-004)
 
 ### Implementation for User Story 3
 
-- [ ] T042 [US3] Add the schedule editor model and save (rule + schedule + next date in one step) in `core/…/core/Schedules.kt` per `contracts/schedules-rules.md`
-- [ ] T043 [US3] Add auto-post to `core/…/core/Schedules.kt` and run it after open and after each sync in `core/…/core/SyncCoordinator.kt`, one journal step per posted occurrence
-- [ ] T044 [US3] Add the rule editor model with raw passthrough, every op in the contract, and safe failure for unknown ops in `core/…/core/RuleEngine.kt`
-- [ ] T045 [US3] Cache ranked rules per open budget and clear the cache on any local or remote `rules` write in `core/…/core/RuleEngine.kt`
-- [ ] T046 [US3] Port `updateCategoryRules` and gate it on `learn-categories` in `core/…/core/RuleEngine.kt`; call it from transaction save in `core/…/core/Register.kt`
-- [ ] T047 [US3] Add the schedule editor to `app/…/ScheduleScreens.kt` and create `app/…/RuleScreens.kt` (list, editor, stage, "kept from the file" rows)
-- [ ] T048 [US3] Add the learning switch (`settings-learning`) in `app/…/SettingsScreens.kt`
-- [ ] T049 [US3] Route handlers in new `app/…/ShellViewModel+Rules.kt`; bar ids `add-schedule` and `rules` on Upcoming in `app/…/ScreenBar.kt`
-- [ ] T050 [P] [US3] Compose tests in `app-test/RuleContentTest.kt` and Roborazzi light and dark in `app-test/RuleScreenshotTest.kt` for the schedule editor, rule list, and rule editor
+- [x] T042 [US3] Add the schedule editor model and save (rule + schedule + next date in one step) in `core/…/core/Schedules.kt` per `contracts/schedules-rules.md`
+- [x] T043 [US3] Add auto-post to `core/…/core/Schedules.kt` and run it after open and after each sync in `core/…/core/SyncCoordinator.kt`, one journal step per posted occurrence
+- [x] T044 [US3] Add the rule editor model with raw passthrough, every op in the contract, and safe failure for unknown ops in `core/…/core/RuleEngine.kt`
+- [x] T045 [US3] Cache ranked rules per open budget and clear the cache on any local or remote `rules` write in `core/…/core/RuleEngine.kt`
+- [x] T046 [US3] Port `updateCategoryRules` and gate it on `learn-categories` in `core/…/core/RuleEngine.kt`; call it from transaction save in `core/…/core/Register.kt`
+- [x] T047 [US3] Add the schedule editor to `app/…/ScheduleScreens.kt` and create `app/…/RuleScreens.kt` (list, editor, stage, "kept from the file" rows)
+- [x] T048 [US3] Add the learning switch (`settings-learning`) in `app/…/SettingsScreens.kt`
+- [x] T049 [US3] Route handlers in new `app/…/ShellViewModel+Rules.kt`; bar ids `add-schedule` and `rules` on Upcoming in `app/…/ScreenBar.kt`
+- [x] T050 [P] [US3] Compose tests in `app-test/RuleContentTest.kt` and Roborazzi light and dark in `app-test/RuleScreenshotTest.kt` for the schedule editor, rule list, and rule editor
 
 **Checkpoint**: A desktop-built file can be maintained on the phone; rules and schedules sync both ways.
 
@@ -156,14 +156,14 @@ flowchart LR
 
 ### Tests for User Story 4
 
-- [ ] T051 [P] [US4] Parity tests in `core-test/parity/ReportsParityTest.kt` against `parity/reports/`: cash flow excludes on-budget transfers; net worth per month end with off-budget on and off; spending by category, group, and payee, largest first; deleted transactions and split parents excluded; empty range is zeros
+- [x] T051 [P] [US4] Parity tests in `core-test/parity/ReportsParityTest.kt` against `parity/reports/`: cash flow excludes on-budget transfers; net worth per month end with off-budget on and off; spending by category, group, and payee, largest first; deleted transactions and split parents excluded; empty range is zeros
 
 ### Implementation for User Story 4
 
-- [ ] T052 [US4] Create `core/…/core/Reports.kt` (`ReportsReader`) per `contracts/reports.md`; entry points in `core/…/core/BudgetLibrary.kt`
-- [ ] T053 [US4] Create `app/…/ReportScreens.kt`: `reports` pivot with cash flow, net worth, spending; shared range picker; flat accent bars; content-shaped placeholders while loading
-- [ ] T054 [US4] Route handlers in new `app/…/ShellViewModel+Reports.kt`, computed on `Dispatchers.IO`; Home menu id `reports` in `app/…/ScreenBar.kt`
-- [ ] T055 [P] [US4] Compose tests in `app-test/ReportContentTest.kt` (empty range, group-by switch) and Roborazzi light and dark in `app-test/ReportScreenshotTest.kt`
+- [x] T052 [US4] Create `core/…/core/Reports.kt` (`ReportsReader`) per `contracts/reports.md`; entry points in `core/…/core/BudgetLibrary.kt`
+- [x] T053 [US4] Create `app/…/ReportScreens.kt`: `reports` pivot with cash flow, net worth, spending; shared range picker; flat accent bars; content-shaped placeholders while loading
+- [x] T054 [US4] Route handlers in new `app/…/ShellViewModel+Reports.kt`, computed on `Dispatchers.IO`; Home menu id `reports` in `app/…/ScreenBar.kt`
+- [x] T055 [P] [US4] Compose tests in `app-test/ReportContentTest.kt` (empty range, group-by switch) and Roborazzi light and dark in `app-test/ReportScreenshotTest.kt`
 
 **Checkpoint**: Reports match desktop for the fixture file.
 
@@ -177,17 +177,17 @@ flowchart LR
 
 ### Tests for User Story 5
 
-- [ ] T056 [P] [US5] Parser tests in `core-test/TemplateParserTest.kt`: every form in `contracts/templates.md`, priorities, and named errors for bad lines
-- [ ] T057 [P] [US5] Parity tests in `core-test/parity/TemplatesParityTest.kt` against `parity/templates/`: fixed, up to, by with repeat, schedule (with and without `full`), percentage (with `previous`), average, remainder with weights, goal, priority ordering limited by to-budget, hidden skipped, apply only touches zeros, overwrite, and `goal` / `long_goal` / `goal_def` rows
-- [ ] T058 [P] [US5] Gate tests in `core-test/TemplateGateTest.kt`: either flag off means no budgeted change from notes; check with an invalid line writes nothing
+- [x] T056 [P] [US5] Parser tests in `core-test/TemplateParserTest.kt`: every form in `contracts/templates.md`, priorities, and named errors for bad lines
+- [x] T057 [P] [US5] Parity tests in `core-test/parity/TemplatesParityTest.kt` against `parity/templates/`: fixed, up to, by with repeat, schedule (with and without `full`), percentage (with `previous`), average, remainder with weights, goal, priority ordering limited by to-budget, hidden skipped, apply only touches zeros, overwrite, and `goal` / `long_goal` / `goal_def` rows
+- [x] T058 [P] [US5] Gate tests in `core-test/TemplateGateTest.kt`: either flag off means no budgeted change from notes; check with an invalid line writes nothing
 
 ### Implementation for User Story 5
 
-- [ ] T059 [US5] Create `core/…/core/Templates.kt` (`TemplateParser`, `TemplateEngine`) porting the 26.8.1 engine per research R12; one journal step per run
-- [ ] T060 [US5] Category note read and write through the `notes` dataset in `core/…/core/EnvelopeMonth.kt`; read `flags.goalTemplatesEnabled` in `core/…/core/BudgetLibrary.kt`
-- [ ] T061 [US5] Create `app/…/TemplateScreens.kt` (check result list, apply, overwrite confirm) and a category note editor on the category budget screen in `app/…/EnvelopeScreens.kt`
-- [ ] T062 [US5] Add the "budget templates" switch under experimental in `app/…/SettingsScreens.kt`; Home menu id `templates` only when both flags are on in `app/…/ScreenBar.kt`; handlers in new `app/…/ShellViewModel+Templates.kt`
-- [ ] T063 [P] [US5] Compose tests in `app-test/TemplateContentTest.kt` and Roborazzi light and dark in `app-test/TemplateScreenshotTest.kt`
+- [x] T059 [US5] Create `core/…/core/Templates.kt` (`TemplateParser`, `TemplateEngine`) porting the 26.8.1 engine per research R12; one journal step per run
+- [x] T060 [US5] Category note read and write through the `notes` dataset in `core/…/core/EnvelopeMonth.kt`; read `flags.goalTemplatesEnabled` in `core/…/core/BudgetLibrary.kt`
+- [x] T061 [US5] Create `app/…/TemplateScreens.kt` (check result list, apply, overwrite confirm) and a category note editor on the category budget screen in `app/…/EnvelopeScreens.kt`
+- [x] T062 [US5] Add the "budget templates" switch under experimental in `app/…/SettingsScreens.kt`; Home menu id `templates` only when both flags are on in `app/…/ScreenBar.kt`; handlers in new `app/…/ShellViewModel+Templates.kt`
+- [x] T063 [P] [US5] Compose tests in `app-test/TemplateContentTest.kt` and Roborazzi light and dark in `app-test/TemplateScreenshotTest.kt`
 
 **Checkpoint**: Templates match desktop, and stay inert when the flags are off.
 
@@ -201,16 +201,16 @@ flowchart LR
 
 ### Tests for User Story 6
 
-- [ ] T064 [P] [US6] Bank link tests in `core-test/BankLinkBookTest.kt` with a fake provider on `LocalActualServer`: status, SimpleFIN secret posted to `/secret` and absent from `db.sqlite` and `phone.json`, link writes `banks` and account columns, replace, remove clears them, unreachable server writes nothing
-- [ ] T065 [P] [US6] Undo end-to-end tests in `core-test/UndoFlowTest.kt`: assign, account edit, and transaction edit undone newest first offline; undo after a conflicting remote change shows a conflict; SC-007 under 100 ms
+- [x] T064 [P] [US6] Bank link tests in `core-test/BankLinkBookTest.kt` with a fake provider on `LocalActualServer`: status, SimpleFIN secret posted to `/secret` and absent from `db.sqlite` and `phone.json`, link writes `banks` and account columns, replace, remove clears them, unreachable server writes nothing
+- [x] T065 [P] [US6] Undo end-to-end tests in `core-test/UndoFlowTest.kt`: assign, account edit, and transaction edit undone newest first offline; undo after a conflicting remote change shows a conflict; SC-007 under 100 ms
 
 ### Implementation for User Story 6
 
-- [ ] T066 [US6] Add provider calls (`gocardless/*`, `simplefin/*`, `pluggyai/*`, `secret`) to `core/…/core/ActualTransport.kt`
-- [ ] T067 [US6] Add `BankLinkBook` (link, replace, remove) to `core/…/core/BankSync.kt` per `contracts/bank-link.md`, one journal step per change
-- [ ] T068 [US6] Create `app/…/BankLinkScreens.kt` (provider pick, GoCardless Custom Tab, SimpleFIN token field cleared after send, account match, remove) and handlers in new `app/…/ShellViewModel+BankLink.kt`; register menu id `bank-link`
-- [ ] T069 [US6] Undo control: menu id `undo` on Home and Register labelled with the newest step, absent when the stack is empty, conflict routed to the conflicts screen, in `app/…/ScreenBar.kt` and `app/…/ShellViewModel+Undo.kt`
-- [ ] T070 [P] [US6] Compose tests in `app-test/BankLinkContentTest.kt` and `app-test/UndoContentTest.kt`; Roborazzi light and dark in `app-test/BankLinkScreenshotTest.kt`
+- [x] T066 [US6] Add provider calls (`gocardless/*`, `simplefin/*`, `pluggyai/*`, `secret`) to `core/…/core/ActualTransport.kt`
+- [x] T067 [US6] Add `BankLinkBook` (link, replace, remove) to `core/…/core/BankSync.kt` per `contracts/bank-link.md`, one journal step per change
+- [x] T068 [US6] Create `app/…/BankLinkScreens.kt` (provider pick, GoCardless Custom Tab, SimpleFIN token field cleared after send, account match, remove) and handlers in new `app/…/ShellViewModel+BankLink.kt`; register menu id `bank-link`
+- [x] T069 [US6] Undo control: menu id `undo` on Home and Register labelled with the newest step, absent when the stack is empty, conflict routed to the conflicts screen, in `app/…/ScreenBar.kt` and `app/…/ShellViewModel+Undo.kt`
+- [x] T070 [P] [US6] Compose tests in `app-test/BankLinkContentTest.kt` and `app-test/UndoContentTest.kt`; Roborazzi light and dark in `app-test/BankLinkScreenshotTest.kt`
 
 **Checkpoint**: All six stories work on their own.
 
@@ -218,11 +218,11 @@ flowchart LR
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T071 [P] Extend the spec 001 fluidity budgets with a 100-rule save and an undo on the panorama
-- [ ] T072 [P] Offline sweep: run every quickstart scenario that does not need a bank or server with the network off and record the results in `specs/010-actual-parity/quickstart.md`
+- [x] T071 [P] Extend the spec 001 fluidity budgets with a 100-rule save and an undo on the panorama
+- [x] T072 [P] Offline sweep: run every quickstart scenario that does not need a bank or server with the network off and record the results in `specs/010-actual-parity/quickstart.md`
 - [ ] T073 Manual side-by-side with desktop Actual 26.8.1 for each quickstart scenario; one real link per provider where accounts exist
-- [ ] T074 Propose the constitution amendment for Principle VI (daily-loop gate met; templates and fixed reports allowed) in `.specify/memory/constitution.md`, bumping the version per Governance
-- [ ] T075 Record before-and-after light and dark screenshots for every visual change with `./gradlew :app:recordRoborazziDebug`, then run `./gradlew :core:budget:test :app:testDebugUnitTest :app:verifyRoborazziDebug`
+- [x] T074 Propose the constitution amendment for Principle VI (daily-loop gate met; templates and fixed reports allowed) in `.specify/memory/constitution.md`, bumping the version per Governance
+- [x] T075 Record before-and-after light and dark screenshots for every visual change with `./gradlew :app:recordRoborazziDebug`, then run `./gradlew :core:budget:test :app:testDebugUnitTest :app:verifyRoborazziDebug`
 
 ---
 

@@ -12,7 +12,7 @@ class ScreenBarTest {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
         assertEquals(listOf("add", "hold", "categories", "settings"), specs.filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("breakdown", "copy-last", "average", "zero"),
+            listOf("breakdown", "copy-last", "average", "zero", "accounts", "add-schedule", "rules", "reports"),
             specs.filter { !it.primary }.map { it.id },
         )
     }
@@ -34,7 +34,7 @@ class ScreenBarTest {
     @Test
     fun registerActions() {
         val ids = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
-        assertEquals(listOf("add", "transfer", "reconcile", "import"), ids)
+        assertEquals(listOf("add", "transfer", "reconcile", "import", "edit-account", "bank-link", "close"), ids)
     }
 
     @Test
