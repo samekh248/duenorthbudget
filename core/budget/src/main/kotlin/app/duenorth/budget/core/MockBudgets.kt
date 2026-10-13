@@ -21,6 +21,12 @@ object MockBudgets {
     const val FULL_TOUR = "full-tour"
     const val WIDE = "wide"
 
+    /** Debug builds create every new budget from this dataset. */
+    const val WALKTHROUGH = FULL_TOUR
+
+    /** Name pre-filled on the new budget forms in debug builds. */
+    const val WALKTHROUGH_NAME = "Walkthrough"
+
     val all: List<MockBudgetDataset> =
         listOf(
             MockBudgetDataset(

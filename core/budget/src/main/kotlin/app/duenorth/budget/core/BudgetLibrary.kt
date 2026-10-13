@@ -349,15 +349,19 @@ class BudgetLibrary(
      * Creates a local budget filled from a [MockBudgets] dataset (debug tooling).
      * Uses the dataset title as the budget name and USD unless the seed overrides currency.
      */
-    fun createFromMock(datasetId: String): CreateResult {
+    fun createFromMock(
+        datasetId: String,
+        name: String? = null,
+    ): CreateResult {
         val dataset = MockBudgets.byId(datasetId) ?: return CreateResult.Rejected(ShellCopy.UNKNOWN_SAMPLE)
+        val budgetName = name?.trim()?.ifEmpty { null } ?: dataset.title
         val id = ids()
         val dir = File(root, id)
         dir.mkdirs()
         return try {
             writeAtomically(
                 File(dir, "metadata.json"),
-                json.encodeToString(BudgetMetadata(id = id, budgetName = dataset.title)),
+                json.encodeToString(BudgetMetadata(id = id, budgetName = budgetName)),
             )
             sessions.use(File(dir, "db.sqlite")) { session ->
                 ActualSchema.create(session)

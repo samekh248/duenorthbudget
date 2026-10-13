@@ -80,6 +80,7 @@ fun SettingsScreen(
     onRemoveEncryptionPassword: (String) -> Unit,
     onRequestAdvanced: (AdvancedConfirm) -> Unit,
     modifier: Modifier = Modifier,
+    defaultBudgetName: String = "",
 ) {
     val budgetOpen = !openBudgetId.isNullOrBlank()
     Column(
@@ -109,6 +110,7 @@ fun SettingsScreen(
             budgets = budgets,
             openBudgetId = openBudgetId,
             createError = createError,
+            defaultName = defaultBudgetName,
             onOpen = onOpenBudget,
             onCreate = onCreateBudget,
         )
@@ -268,10 +270,11 @@ private fun BudgetsSection(
     budgets: List<BudgetSummary>,
     openBudgetId: String?,
     createError: String?,
+    defaultName: String,
     onOpen: (String) -> Unit,
     onCreate: (String, String) -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(defaultName) }
     SettingsHeading("budgets")
     budgets.forEach { budget ->
         val open = budget.id == openBudgetId
@@ -293,7 +296,7 @@ private fun BudgetsSection(
     }
     MetroOutlineButton("create budget", Modifier.testTag("settings-create")) {
         onCreate(name, "USD")
-        name = ""
+        name = defaultName
     }
 }
 
