@@ -37,6 +37,35 @@ class AutoHoldParityTest {
         }
     }
 
+    @Test
+    fun theShellShowsIncomeGroupsWithTheMonthFlag() {
+        val fixture = ParityFixture.load("month", "auto-hold-on")
+        val salary = fixture.id("categories", "Salary")
+        fixture.open().use { opened ->
+            fun salaryRow() =
+                opened.library
+                    .readShell(opened.budgetId, october)!!
+                    .incomeGroups
+                    .flatMap { it.categories }
+                    .single { it.id == salary }
+            assertEquals(false, salaryRow().autoHold)
+            opened.db { session -> MonthFillBook(session, fixture.today).setAutoHold(october, salary, AutoHoldChoice.ON) }
+            assertEquals(true, salaryRow().autoHold)
+            val shell = opened.library.readShell(opened.budgetId, october)!!
+            val income =
+                opened.db { session ->
+                    session
+                        .query("SELECT id FROM categories WHERE is_income = 1 AND tombstone = 0 AND hidden = 0")
+                        .map { it.str("id").orEmpty() }
+                        .toSet()
+                }
+            val incomeShown = shell.incomeGroups.flatMap { it.categories }.map { it.id }
+            val expenseShown = shell.groups.flatMap { it.categories }.map { it.id }
+            assertEquals(income, incomeShown.toSet())
+            assertEquals(emptySet<String>(), expenseShown.toSet() intersect income)
+        }
+    }
+
     private fun run(
         scenario: String,
         steps: List<Pair<YearMonth, AutoHoldChoice>>,

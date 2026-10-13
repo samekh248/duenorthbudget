@@ -9,14 +9,19 @@ import org.junit.Test
 class ScreenBarTest {
     @Test
     fun homeEnvelopeActions() {
-        val ids = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
-        assertEquals(listOf("add", "hold", "categories", "settings"), ids)
+        val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
+        assertEquals(listOf("add", "hold", "categories", "settings"), specs.filter { it.primary }.map { it.id })
+        assertEquals(
+            listOf("breakdown", "copy-last", "average", "zero"),
+            specs.filter { !it.primary }.map { it.id },
+        )
     }
 
     @Test
     fun homeTrackingOmitsHold() {
-        val ids = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.TRACKING).map { it.id }
-        assertEquals(listOf("add", "categories", "settings"), ids)
+        val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.TRACKING)
+        val ids = specs.map { it.id }
+        assertEquals(listOf("add", "categories", "settings"), specs.filter { it.primary }.map { it.id })
         assertFalse(ids.contains("hold"))
     }
 
@@ -30,6 +35,24 @@ class ScreenBarTest {
     fun registerActions() {
         val ids = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
         assertEquals(listOf("add", "transfer", "reconcile", "import"), ids)
+    }
+
+    @Test
+    fun envelopeIncomeCategoryHasNoSave() {
+        val income = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, incomeCategory = true)
+        assertTrue(income.isEmpty())
+        val tracking = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.TRACKING, incomeCategory = true)
+        assertEquals(listOf("save", "cancel"), tracking.map { it.id })
+    }
+
+    @Test
+    fun undoAppearsOnHomeAndRegisterOnlyWithAStep() {
+        listOf(ShellRoute.Home, ShellRoute.Register("a")).forEach { route ->
+            val none = ScreenBar.specsFor(route, hasBudget = true, mode = BudgetMode.ENVELOPE, undoLabel = null)
+            assertFalse(none.any { it.id == "undo" })
+            val some = ScreenBar.specsFor(route, hasBudget = true, mode = BudgetMode.ENVELOPE, undoLabel = "assign")
+            assertEquals("undo assign", some.single { it.id == "undo" }.label)
+        }
     }
 
     @Test
@@ -48,7 +71,8 @@ class ScreenBarTest {
             )
         routes.forEach { route ->
             val ids = ScreenBar.specsFor(route, hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
-            assertEquals(route.toString(), listOf("save", "cancel"), ids)
+            assertEquals(route.toString(), listOf("save", "cancel"), ids.take(2))
+            assertTrue(route.toString(), ids.drop(2).all { it == "to-budget" })
             assertFalse(ids.contains("hold"))
             assertFalse(ids.contains("settings"))
         }
