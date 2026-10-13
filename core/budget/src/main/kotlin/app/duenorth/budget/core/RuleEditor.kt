@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.math.BigDecimal
 import java.util.UUID
 
 object RuleEditorCopy {
@@ -343,4 +344,130 @@ class CategoryLearning(
         private const val LOOKAROUND_DAYS = 180L
         private const val MIN_MATCHES = 3
     }
+}
+
+/** Names for ids, so the editor reads "payee is Cafe" and turns typed names back into ids. */
+data class RuleNames(
+    val payees: Map<String, String> = emptyMap(),
+    val accounts: Map<String, String> = emptyMap(),
+    val categories: Map<String, String> = emptyMap(),
+) {
+    private fun table(field: String): Map<String, String>? =
+        when (field) {
+            "payee" -> payees
+            "account" -> accounts
+            "category" -> categories
+            else -> null
+        }
+
+    fun name(
+        field: String,
+        id: String,
+    ): String = table(field)?.get(id) ?: id
+
+    fun idFor(
+        field: String,
+        name: String,
+    ): String? =
+        table(field)
+            ?.entries
+            ?.firstOrNull { it.value.equals(name.trim(), ignoreCase = true) }
+            ?.key
+}
+
+/** Typed text to a rule part and back, for the fields and ops the editor offers. */
+object RuleValues {
+    private val textOps = setOf("contains", "doesNotContain", "matches")
+
+    /** Null when the text does not name a known payee, account, or category, or is not a valid amount or date. */
+    fun part(
+        field: String,
+        op: String,
+        text: String,
+        names: RuleNames,
+        decimals: Int,
+        action: Boolean,
+    ): RulePart? {
+        val value = value(field, op, text, names, decimals) ?: return null
+        return if (action) RulePart.action(field, op, value) else RulePart.condition(field, op, value)
+    }
+
+    private fun value(
+        field: String,
+        op: String,
+        text: String,
+        names: RuleNames,
+        decimals: Int,
+    ): JsonElement? {
+        val trimmed = text.trim()
+        return when (RuleFields.type(field)) {
+            "id" ->
+                when {
+                    op in textOps -> trimmed.takeIf { it.isNotEmpty() }?.let { JsonPrimitive(it) }
+                    op == "oneOf" || op == "notOneOf" -> {
+                        val ids = trimmed.split(',').filter { it.isNotBlank() }.map { names.idFor(field, it) ?: return null }
+                        if (ids.isEmpty()) null else JsonArray(ids.map { JsonPrimitive(it) })
+                    }
+                    else -> names.idFor(field, trimmed)?.let { JsonPrimitive(it) }
+                }
+            "number" ->
+                if (op == "isbetween") {
+                    val parts = trimmed.split(" and ", ",").map { it.trim() }.filter { it.isNotEmpty() }
+                    if (parts.size != 2) return null
+                    val low = MoneyFormat.parse(parts[0], decimals) ?: return null
+                    val high = MoneyFormat.parse(parts[1], decimals) ?: return null
+                    JsonObject(linkedMapOf("num1" to JsonPrimitive(low), "num2" to JsonPrimitive(high)))
+                } else {
+                    MoneyFormat.parse(trimmed, decimals)?.let { JsonPrimitive(it) }
+                }
+            "date" -> trimmed.takeIf { DATE.matches(it) }?.let { JsonPrimitive(it) }
+            "boolean" ->
+                when (trimmed.lowercase()) {
+                    "yes", "true", "cleared" -> JsonPrimitive(true)
+                    "no", "false", "uncleared" -> JsonPrimitive(false)
+                    else -> null
+                }
+            else -> JsonPrimitive(trimmed)
+        }
+    }
+
+    /** "payee is Cafe"; a kept part shows its stored field. */
+    fun describe(
+        part: RulePart,
+        names: RuleNames,
+        decimals: Int,
+    ): String {
+        val field = if (part.kept) part.raw["field"]?.let { (it as? JsonPrimitive)?.contentOrNull }.orEmpty() else part.field
+        return listOf(field, part.op, shown(part.field, part.value, names, decimals)).filter { it.isNotEmpty() }.joinToString(" ")
+    }
+
+    private fun shown(
+        field: String,
+        value: JsonElement?,
+        names: RuleNames,
+        decimals: Int,
+    ): String =
+        when (value) {
+            null, JsonNull -> ""
+            is JsonArray -> value.joinToString(", ") { shown(field, it, names, decimals) }
+            is JsonObject ->
+                value["num1"]?.let { low ->
+                    "${shown(field, low, names, decimals)} and ${shown(field, value["num2"], names, decimals)}"
+                } ?: value["start"]?.let { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
+            is JsonPrimitive -> {
+                val content = value.contentOrNull.orEmpty()
+                when {
+                    field == "amount" && !value.isString -> content.toLongOrNull()?.let { amountText(it, decimals) } ?: content
+                    RuleFields.type(field) == "id" -> names.name(field, content)
+                    else -> content
+                }
+            }
+        }
+
+    fun amountText(
+        minor: Long,
+        decimals: Int,
+    ): String = BigDecimal.valueOf(minor).movePointLeft(decimals).toPlainString()
+
+    private val DATE = Regex("""\d{4}-\d{2}-\d{2}""")
 }

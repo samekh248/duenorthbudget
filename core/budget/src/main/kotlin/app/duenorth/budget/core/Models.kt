@@ -73,6 +73,8 @@ data class FormatPrefs(
     val firstDayOfWeekIdx: Int = 0,
     val experimental: Boolean = false,
     val budgetType: String = "envelope",
+    /** Actual's `learn-categories`; absent means on (spec 010 US3). */
+    val learnCategories: Boolean = true,
 )
 
 data class PendingExport(

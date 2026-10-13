@@ -446,18 +446,7 @@ class SchedulesBook(
      * Returns false when nothing is due; the caller runs it once per undo step.
      */
     fun autoPostOne(): Boolean {
-        val todayIso = clock.today().toString()
-        val posting =
-            session
-                .query(
-                    "SELECT id FROM schedules WHERE IFNULL(posts_transaction, 0) = 1 AND IFNULL(completed, 0) = 0 AND IFNULL(tombstone, 0) = 0",
-                ).mapNotNull { it.str("id") }
-                .toSet()
-        if (posting.isEmpty()) return false
-        val due =
-            loadSchedules()
-                .filter { it.id in posting && !it.completed && it.nextIso <= todayIso }
-                .minByOrNull { it.nextIso } ?: return false
+        val due = nextAutoPost() ?: return false
         val date = ScheduleDates.fromIso(due.nextIso) ?: return false
         if (hasMatchingTransaction(due, date)) {
             advanceNextDate(due)
@@ -478,6 +467,23 @@ class SchedulesBook(
             }
         }
         return true
+    }
+
+    /** True when an auto-post schedule is due; a read, so callers can skip opening an undo step. */
+    fun hasAutoPostDue(): Boolean = nextAutoPost() != null
+
+    private fun nextAutoPost(): LoadedSchedule? {
+        val todayIso = clock.today().toString()
+        val posting =
+            session
+                .query(
+                    "SELECT id FROM schedules WHERE IFNULL(posts_transaction, 0) = 1 AND IFNULL(completed, 0) = 0 AND IFNULL(tombstone, 0) = 0",
+                ).mapNotNull { it.str("id") }
+                .toSet()
+        if (posting.isEmpty()) return null
+        return loadSchedules()
+            .filter { it.id in posting && !it.completed && it.nextIso <= todayIso }
+            .minByOrNull { it.nextIso }
     }
 
     private fun dateCondition(draft: ScheduleDraft): JsonObject {

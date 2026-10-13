@@ -40,7 +40,10 @@ import app.duenorth.budget.core.RefreshGate
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RemoteFile
+import app.duenorth.budget.core.RuleDraft
+import app.duenorth.budget.core.RuleSummary
 import app.duenorth.budget.core.SavedInstance
+import app.duenorth.budget.core.ScheduleDraft
 import app.duenorth.budget.core.ScheduleWriteResult
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.SyncCoordinator
@@ -168,6 +171,19 @@ sealed interface ShellRoute {
         val accountId: String,
     ) : ShellRoute,
         StackRoute
+
+    // Spec 010 US3: schedules and rules.
+    data class ScheduleEditor(
+        val scheduleId: String?,
+    ) : ShellRoute,
+        StackRoute
+
+    data object Rules : ShellRoute, StackRoute
+
+    data class RuleEditor(
+        val ruleId: String?,
+    ) : ShellRoute,
+        StackRoute
 }
 
 /** A spec 010 screen that goes back to the screen it was opened from. */
@@ -244,6 +260,9 @@ data class ShellUiState(
     val accountDetail: AccountDetail? = null,
     val accountsReorder: Boolean = false,
     val accountForceConfirm: String? = null,
+    val scheduleDraft: ScheduleDraft? = null,
+    val rulesList: List<RuleSummary> = emptyList(),
+    val ruleDraft: RuleDraft? = null,
 )
 
 class ShellViewModel(
@@ -650,6 +669,9 @@ class ShellViewModel(
     fun setHideFraction(hide: Boolean) = setOpenBudgetPreference("hideFraction", if (hide) "true" else "false")
 
     fun setExperimental(enabled: Boolean) = setOpenBudgetPreference("flags.experimental", if (enabled) "true" else "false")
+
+    /** Settings → learn categories (spec 010 US3). */
+    fun setLearning(enabled: Boolean) = setOpenBudgetPreference("learn-categories", if (enabled) "true" else "false")
 
     fun exportBudget() {
         val budgetId = _state.value.settings.openBudgetId ?: return
@@ -2086,6 +2108,7 @@ class ShellViewModel(
                     _state.value.formatPrefs.copy(firstDayOfWeekIdx = value.toIntOrNull() ?: 0)
                 "hideFraction" -> _state.value.formatPrefs.copy(hideFraction = value == "true")
                 "flags.experimental" -> _state.value.formatPrefs.copy(experimental = value == "true")
+                "learn-categories" -> _state.value.formatPrefs.copy(learnCategories = value == "true")
                 else -> _state.value.formatPrefs
             }
         _state.update {

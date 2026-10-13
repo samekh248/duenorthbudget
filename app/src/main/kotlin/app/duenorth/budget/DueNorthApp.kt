@@ -240,6 +240,11 @@ fun DueNorthApp(model: ShellViewModel) {
                     onReorder = model::toggleReorderAccounts,
                     onEditAccount = model::openEditAccount,
                     onCloseAccount = model::openCloseAccount,
+                    onAddSchedule = model::openNewSchedule,
+                    onRules = model::openRules,
+                    onAddRule = model::openNewRule,
+                    onDeleteSchedule = model::deleteOpenSchedule,
+                    onDeleteRule = model::deleteOpenRule,
                 )
             }
         val actions = ScreenBar.forState(state, handlers)
@@ -269,6 +274,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onPostSchedule = model::postSchedule,
                                 onSkipSchedule = model::skipSchedule,
                                 modifier = fill,
+                                onOpenSchedule = model::openSchedule,
                                 onSelectMonth = model::selectOpenMonth,
                                 onBudgetCategory = if (state.shell == null) null else model::openCategoryBudget,
                                 onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
@@ -312,6 +318,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onFirstDay = model::setFirstDay,
                                 onHideFraction = model::setHideFraction,
                                 onExperimental = model::setExperimental,
+                                onLearning = model::setLearning,
                                 onExport = model::exportBudget,
                                 onSetEncryptionPassword = model::setEncryptionPassword,
                                 onChangeEncryptionPassword = model::changeEncryptionPassword,
@@ -721,6 +728,40 @@ fun DueNorthApp(model: ShellViewModel) {
                                         onForceClose = { model.submitCloseAccount(null, null, forced = true) },
                                         modifier = fill,
                                     )
+                            }
+                        }
+                        is ShellRoute.ScheduleEditor -> {
+                            val draft = state.scheduleDraft
+                            val shell = state.shell
+                            if (draft == null || shell == null || draft.id != route.scheduleId) {
+                                Placeholder()
+                            } else {
+                                ScheduleEditorScreen(
+                                    draft = draft,
+                                    accounts = shell.accounts,
+                                    categories = state.categories.filter { !it.income || draft.amountMinor > 0 },
+                                    decimals = shell.currency.decimals,
+                                    error = state.editError,
+                                    onSave = model::submitSchedule,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        ShellRoute.Rules -> RulesScreen(state.rulesList, model::openRule, fill)
+                        is ShellRoute.RuleEditor -> {
+                            val draft = state.ruleDraft
+                            val shell = state.shell
+                            if (draft == null || shell == null || draft.id != route.ruleId) {
+                                Placeholder()
+                            } else {
+                                RuleEditorScreen(
+                                    draft = draft,
+                                    names = model.ruleNames(),
+                                    decimals = shell.currency.decimals,
+                                    error = state.editError,
+                                    onSave = model::submitRule,
+                                    modifier = fill,
+                                )
                             }
                         }
                         is ShellRoute.ToBudget -> {

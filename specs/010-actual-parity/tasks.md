@@ -101,18 +101,18 @@ flowchart LR
 
 ### Tests for User Story 2
 
-- [ ] T028 [P] [US2] Parity tests in `core-test/parity/AccountsParityTest.kt` against `parity/accounts/`: create on and off budget with and without balance (Starting Balance transaction, payee, category), rename, note, reorder, close at zero, close on→on, close on→off with category, force close with transfer partners, reopen
-- [ ] T029 [P] [US2] Validation tests in `core-test/AccountsBookTest.kt`: blank name refused, close with balance and no destination refused, on→off with no category refused, force close needs its own flag
+- [x] T028 [P] [US2] Parity tests in `core-test/parity/AccountsParityTest.kt` against `parity/accounts/`: create on and off budget with and without balance (Starting Balance transaction, payee, category), rename, note, reorder, close at zero, close on→on, close on→off with category, force close with transfer partners, reopen
+- [x] T029 [P] [US2] Validation tests in `core-test/AccountsBookTest.kt`: blank name refused, close with balance and no destination refused, on→off with no category refused, force close needs its own flag
 
 ### Implementation for User Story 2
 
-- [ ] T030 [US2] Create `core/…/core/Accounts.kt` (`AccountsBook`) per `contracts/accounts.md`, one journal step per action
-- [ ] T031 [US2] Add `showClosedAccounts` to `PhoneSettings` in `core/…/core/Models.kt` and filter closed accounts in `core/…/core/ShellReader.kt`
-- [ ] T032 [US2] Entry points in `core/…/core/BudgetLibrary.kt` and `SyncCoordinator.kt`
-- [ ] T033 [US2] Create `app/…/AccountScreens.kt`: add, edit (name, note), reorder, close with destination and category pickers, force close confirm, closed list with reopen
-- [ ] T034 [US2] Route handlers in new `app/…/ShellViewModel+Accounts.kt`; close paints within 100 ms of confirm
-- [ ] T035 [US2] Bar ids `add-account`, `show-closed`, `reorder` on the accounts list and `edit-account`, `close`, `undo` on the register `•••` in `app/…/ScreenBar.kt`
-- [ ] T036 [P] [US2] Compose tests in `app-test/AccountContentTest.kt` and Roborazzi light and dark in `app-test/AccountScreenshotTest.kt`
+- [x] T030 [US2] Create `core/…/core/Accounts.kt` (`AccountsBook`) per `contracts/accounts.md`, one journal step per action
+- [x] T031 [US2] Add `showClosedAccounts` to `PhoneSettings` in `core/…/core/Models.kt` and filter closed accounts in `core/…/core/ShellReader.kt`
+- [x] T032 [US2] Entry points in `core/…/core/BudgetLibrary.kt` and `SyncCoordinator.kt`
+- [x] T033 [US2] Create `app/…/AccountScreens.kt`: add, edit (name, note), reorder, close with destination and category pickers, force close confirm, closed list with reopen
+- [x] T034 [US2] Route handlers in new `app/…/ShellViewModel+Accounts.kt`; close paints within 100 ms of confirm
+- [x] T035 [US2] Bar ids `add-account`, `show-closed`, `reorder` on the accounts list and `edit-account`, `close`, `undo` on the register `•••` in `app/…/ScreenBar.kt`
+- [x] T036 [P] [US2] Compose tests in `app-test/AccountContentTest.kt` and Roborazzi light and dark in `app-test/AccountScreenshotTest.kt`
 
 **Checkpoint**: US1–US2 work on their own; accounts match desktop.
 
@@ -126,23 +126,23 @@ flowchart LR
 
 ### Tests for User Story 3
 
-- [ ] T037 [P] [US3] Recurrence tests in `core-test/ScheduleRulesBookTest.kt`: once, every N days/weeks/months/years, end after K, end on date, patterns and `skipWeekend` kept on save
-- [ ] T038 [P] [US3] Auto-post tests in `core-test/ScheduleAutoPostTest.kt`: one transaction when due, none when a match exists, a late open posts the due occurrence without duplicates, finishes within 1 s offline (SC-003)
-- [ ] T039 [P] [US3] Parity tests in `core-test/parity/RulesParityTest.kt` against `parity/schedules-rules/`: editor round-trip for each field and op, unknown conditions and actions written back byte-for-byte, stages ordered pre → default → post
-- [ ] T040 [P] [US3] Learning tests in `core-test/parity/LearningParityTest.kt`: on matches desktop's learned rule, off creates none, existing rules still run
-- [ ] T041 [P] [US3] Benchmark in `core-test/RuleSaveBenchmarkTest.kt`: save with 100 rules within 50 ms of save with none (SC-004)
+- [x] T037 [P] [US3] Recurrence tests in `core-test/ScheduleRulesBookTest.kt`: once, every N days/weeks/months/years, end after K, end on date, patterns and `skipWeekend` kept on save
+- [x] T038 [P] [US3] Auto-post tests in `core-test/ScheduleAutoPostTest.kt`: one transaction when due, none when a match exists, a late open posts the due occurrence without duplicates, finishes within 1 s offline (SC-003)
+- [x] T039 [P] [US3] Parity tests in `core-test/parity/RulesParityTest.kt` against `parity/schedules-rules/`: editor round-trip for each field and op, unknown conditions and actions written back byte-for-byte, stages ordered pre → default → post
+- [x] T040 [P] [US3] Learning tests in `core-test/parity/LearningParityTest.kt`: on matches desktop's learned rule, off creates none, existing rules still run
+- [x] T041 [P] [US3] Benchmark in `core-test/RuleSaveBenchmarkTest.kt`: save with 100 rules within 50 ms of save with none (SC-004)
 
 ### Implementation for User Story 3
 
-- [ ] T042 [US3] Add the schedule editor model and save (rule + schedule + next date in one step) in `core/…/core/Schedules.kt` per `contracts/schedules-rules.md`
-- [ ] T043 [US3] Add auto-post to `core/…/core/Schedules.kt` and run it after open and after each sync in `core/…/core/SyncCoordinator.kt`, one journal step per posted occurrence
-- [ ] T044 [US3] Add the rule editor model with raw passthrough, every op in the contract, and safe failure for unknown ops in `core/…/core/RuleEngine.kt`
-- [ ] T045 [US3] Cache ranked rules per open budget and clear the cache on any local or remote `rules` write in `core/…/core/RuleEngine.kt`
-- [ ] T046 [US3] Port `updateCategoryRules` and gate it on `learn-categories` in `core/…/core/RuleEngine.kt`; call it from transaction save in `core/…/core/Register.kt`
-- [ ] T047 [US3] Add the schedule editor to `app/…/ScheduleScreens.kt` and create `app/…/RuleScreens.kt` (list, editor, stage, "kept from the file" rows)
-- [ ] T048 [US3] Add the learning switch (`settings-learning`) in `app/…/SettingsScreens.kt`
-- [ ] T049 [US3] Route handlers in new `app/…/ShellViewModel+Rules.kt`; bar ids `add-schedule` and `rules` on Upcoming in `app/…/ScreenBar.kt`
-- [ ] T050 [P] [US3] Compose tests in `app-test/RuleContentTest.kt` and Roborazzi light and dark in `app-test/RuleScreenshotTest.kt` for the schedule editor, rule list, and rule editor
+- [x] T042 [US3] Add the schedule editor model and save (rule + schedule + next date in one step) in `core/…/core/Schedules.kt` per `contracts/schedules-rules.md`
+- [x] T043 [US3] Add auto-post to `core/…/core/Schedules.kt` and run it after open and after each sync in `core/…/core/SyncCoordinator.kt`, one journal step per posted occurrence
+- [x] T044 [US3] Add the rule editor model with raw passthrough, every op in the contract, and safe failure for unknown ops in `core/…/core/RuleEngine.kt`
+- [x] T045 [US3] Cache ranked rules per open budget and clear the cache on any local or remote `rules` write in `core/…/core/RuleEngine.kt`
+- [x] T046 [US3] Port `updateCategoryRules` and gate it on `learn-categories` in `core/…/core/RuleEngine.kt`; call it from transaction save in `core/…/core/Register.kt`
+- [x] T047 [US3] Add the schedule editor to `app/…/ScheduleScreens.kt` and create `app/…/RuleScreens.kt` (list, editor, stage, "kept from the file" rows)
+- [x] T048 [US3] Add the learning switch (`settings-learning`) in `app/…/SettingsScreens.kt`
+- [x] T049 [US3] Route handlers in new `app/…/ShellViewModel+Rules.kt`; bar ids `add-schedule` and `rules` on Upcoming in `app/…/ScreenBar.kt`
+- [x] T050 [P] [US3] Compose tests in `app-test/RuleContentTest.kt` and Roborazzi light and dark in `app-test/RuleScreenshotTest.kt` for the schedule editor, rule list, and rule editor
 
 **Checkpoint**: A desktop-built file can be maintained on the phone; rules and schedules sync both ways.
 

@@ -74,6 +74,7 @@ fun SettingsScreen(
     onFirstDay: (Int) -> Unit,
     onHideFraction: (Boolean) -> Unit,
     onExperimental: (Boolean) -> Unit,
+    onLearning: (Boolean) -> Unit = {},
     onExport: () -> Unit,
     onSetEncryptionPassword: (String) -> Unit,
     onChangeEncryptionPassword: (String, String) -> Unit,
@@ -130,6 +131,7 @@ fun SettingsScreen(
                 onHideFraction = onHideFraction,
             )
             MethodSection(formatPrefs.budgetType)
+            LearningSection(formatPrefs.learnCategories, onLearning)
             ExperimentalSection(formatPrefs.experimental, onExperimental)
             IdsSection(openBudgetId.orEmpty(), cloudFileId)
             SettingsActionRow("export", "settings-export", onExport)
@@ -398,6 +400,20 @@ private fun MethodSection(budgetType: String) {
     SettingsHeading("method", tag = "settings-method")
     val label = if (budgetType == "tracking") "tracking" else "envelope"
     MetroText(label, Metro.typography.subheader, Modifier.testTag("settings-method-value"))
+}
+
+/** Actual's "learn categories": a payee's usual category becomes a rule. */
+@Composable
+private fun LearningSection(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    SettingsHeading("rules", tag = "settings-rules")
+    ChoiceRow(
+        if (enabled) "learn categories  on" else "learn categories",
+        enabled,
+        "settings-learning",
+    ) { onToggle(!enabled) }
 }
 
 @Composable

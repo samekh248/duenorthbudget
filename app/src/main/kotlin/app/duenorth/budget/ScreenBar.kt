@@ -31,7 +31,7 @@ object ScreenBar {
                             spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
-                        ) + fills() + accounts() + undo(undoLabel)
+                        ) + fills() + accounts() + schedules() + undo(undoLabel)
                     else ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
@@ -39,7 +39,7 @@ object ScreenBar {
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
                             menu("breakdown", AppGlyph.Breakdown, MonthFillCopy.BREAKDOWN),
-                        ) + fills() + accounts() + undo(undoLabel)
+                        ) + fills() + accounts() + schedules() + undo(undoLabel)
                 }
             is ShellRoute.Register ->
                 listOf(
@@ -63,6 +63,19 @@ object ScreenBar {
             ShellRoute.AddAccount,
             is ShellRoute.EditAccount,
             -> saveCancel()
+            ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, RuleScreenCopy.ADD)) + undo(undoLabel)
+            is ShellRoute.ScheduleEditor ->
+                saveCancel() +
+                    if (route.scheduleId ==
+                        null
+                    ) {
+                        emptyList()
+                    } else {
+                        listOf(menu("delete-schedule", AppGlyph.Cancel, ScheduleScreenCopy.DELETE))
+                    }
+            is ShellRoute.RuleEditor ->
+                saveCancel() +
+                    if (route.ruleId == null) emptyList() else listOf(menu("delete-rule", AppGlyph.Cancel, RuleScreenCopy.DELETE))
             is ShellRoute.CategoryBudget ->
                 if (mode == BudgetMode.TRACKING) {
                     saveCancel()
@@ -124,6 +137,13 @@ object ScreenBar {
     /** Home `•••` → the account list (spec 010 US2). */
     private fun accounts() = listOf(menu("accounts", AppGlyph.Budgets, AccountScreenCopy.TITLE))
 
+    /** Home `•••` → new schedule and rules (spec 010 US3). */
+    private fun schedules() =
+        listOf(
+            menu("add-schedule", AppGlyph.Add, ScheduleScreenCopy.ADD),
+            menu("rules", AppGlyph.Categories, RuleScreenCopy.TITLE),
+        )
+
     /** Present only while there is a step to undo; the label names it. */
     private fun undo(label: String?) =
         if (label == null) emptyList() else listOf(menu("undo", AppGlyph.Undo, "${MonthActionCopy.UNDO} $label"))
@@ -161,6 +181,11 @@ class ScreenBarHandlers(
     val onReorder: () -> Unit = {},
     val onEditAccount: () -> Unit = {},
     val onCloseAccount: () -> Unit = {},
+    val onAddSchedule: () -> Unit = {},
+    val onRules: () -> Unit = {},
+    val onAddRule: () -> Unit = {},
+    val onDeleteSchedule: () -> Unit = {},
+    val onDeleteRule: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -192,6 +217,11 @@ class ScreenBarHandlers(
             "reorder" -> onReorder
             "edit-account" -> onEditAccount
             "close" -> onCloseAccount
+            "add-schedule" -> onAddSchedule
+            "rules" -> onRules
+            "add-rule" -> onAddRule
+            "delete-schedule" -> onDeleteSchedule
+            "delete-rule" -> onDeleteRule
             else -> ({})
         }
 }

@@ -637,9 +637,11 @@ class SyncCoordinator(
         block: (SqlSession) -> T,
     ): T? {
         restoreClock(budgetId)
-        return library.useDatabase(budgetId) { session ->
-            SyncSchema.withClock(session, syncClock) {
-                library.journal.step(session, budgetId, label) { block(session) }
+        return library.serial {
+            library.useDatabase(budgetId) { session ->
+                SyncSchema.withClock(session, syncClock) {
+                    library.journal.step(session, budgetId, label) { block(session) }
+                }
             }
         }
     }
@@ -647,7 +649,7 @@ class SyncCoordinator(
     /** Undoes the newest step; a cell changed since lands in [conflicts]. */
     fun undo(budgetId: String): UndoResult {
         restoreClock(budgetId)
-        return library.useDatabase(budgetId) { session -> library.journal.undo(session, budgetId, syncClock) }
+        return library.serial { library.useDatabase(budgetId) { session -> library.journal.undo(session, budgetId, syncClock) } }
             ?: UndoResult.Empty
     }
 

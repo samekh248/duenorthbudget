@@ -348,7 +348,7 @@ fun ForceCloseConfirmScreen(
 }
 
 @Composable
-private fun Choice(
+internal fun Choice(
     label: String,
     selected: Boolean,
     tag: String,

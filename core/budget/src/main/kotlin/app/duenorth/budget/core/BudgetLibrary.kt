@@ -128,6 +128,7 @@ class BudgetLibrary(
                 firstDayOfWeekIdx = value("firstDayOfWeekIdx")?.toIntOrNull()?.coerceIn(0, 6) ?: 0,
                 experimental = value("flags.experimental") == "true",
                 budgetType = value("budgetType") ?: "envelope",
+                learnCategories = value("learn-categories") != "false",
             )
         } ?: FormatPrefs()
 
@@ -410,7 +411,7 @@ class BudgetLibrary(
 
     /** Undoes the newest step on [budgetId]; see `contracts/undo.md`. */
     fun undo(budgetId: String): UndoResult =
-        open(budgetId) { session -> journal.undo(session, budgetId, SyncSchema.clockFor(session)) } ?: UndoResult.Empty
+        serial { open(budgetId) { session -> journal.undo(session, budgetId, SyncSchema.clockFor(session)) } } ?: UndoResult.Empty
 
     fun canUndo(budgetId: String): Boolean = journal.canUndo(budgetId)
 
@@ -494,7 +495,11 @@ class BudgetLibrary(
         budgetId: String,
         draft: TransactionDraft,
     ): WriteResult =
-        edit(budgetId, UndoCopy.SAVE_TRANSACTION) { RegisterBook(it).save(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+        edit(budgetId, UndoCopy.SAVE_TRANSACTION) { session ->
+            RegisterBook(session).save(draft).also {
+                if (it is WriteResult.Saved && draft.categoryId != null) CategoryLearning(session, ids).learnFrom(draft.id)
+            }
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun setTransactionCategory(
         budgetId: String,
@@ -638,6 +643,7 @@ class BudgetLibrary(
 
     /** Posts every due auto-post occurrence, one undo step each; returns how many steps ran. */
     fun autoPostSchedules(budgetId: String): Int {
+        if (open(budgetId) { SchedulesBook(it, clock, ids).hasAutoPostDue() } != true) return 0
         var steps = 0
         while (steps < MAX_AUTO_POST) {
             val ran = edit(budgetId, UndoCopy.AUTO_POST) { SchedulesBook(it, clock, ids).autoPostOne() } ?: false
@@ -752,6 +758,8 @@ class BudgetLibrary(
         return true
     }
 
+    private val editLock = Any()
+
     private companion object {
         const val MAX_AUTO_POST = 500
     }
@@ -773,7 +781,13 @@ class BudgetLibrary(
         id: String,
         label: String,
         block: (SqlSession) -> T,
-    ): T? = open(id) { session -> journal.step(session, id, label) { block(session) } }
+    ): T? =
+        // One step at a time: a capture belongs to the session, and auto-post runs from sync on
+        // another thread while the person edits.
+        serial { open(id) { session -> journal.step(session, id, label) { block(session) } } }
+
+    /** Journaled writes and undo run one at a time. */
+    internal fun <T> serial(block: () -> T): T = synchronized(editLock) { block() }
 
     private fun summary(dir: File): BudgetSummary? {
         val metadata = readMetadata(dir) ?: return null

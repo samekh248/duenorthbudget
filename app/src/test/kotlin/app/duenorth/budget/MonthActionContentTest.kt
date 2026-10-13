@@ -298,7 +298,10 @@ class MonthActionContentTest {
     @Test
     fun trackingHidesBreakdownToBudgetAndAutoHold() {
         val home = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.TRACKING).map { it.id }
-        assertEquals(listOf("add", "categories", "settings", "copy-last", "average", "zero"), home)
+        assertEquals(
+            listOf("add", "categories", "settings", "copy-last", "average", "zero", "accounts", "add-schedule", "rules"),
+            home,
+        )
         val category = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), hasBudget = true, mode = BudgetMode.TRACKING).map { it.id }
         assertFalse(category.contains("to-budget"))
         val envelope = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
