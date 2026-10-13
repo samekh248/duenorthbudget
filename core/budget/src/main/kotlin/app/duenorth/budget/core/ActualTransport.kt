@@ -2,6 +2,8 @@ package app.duenorth.budget.core
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -73,6 +75,17 @@ interface ActualTransport {
         token: String,
         fileId: String,
     ): KeyMaterial?
+
+    /**
+     * A bank provider call on the server (spec 010 US6): `gocardless/…`, `simplefin/…`,
+     * `pluggyai/…`, or `secret`. Returns the response's `data`, or [JsonNull] when it has none.
+     */
+    fun provider(
+        address: String,
+        token: String,
+        path: String,
+        body: JsonObject,
+    ): JsonElement = throw SyncNetworkException(IOException("bank providers are not supported"))
 }
 
 class SyncAuthException(
@@ -298,6 +311,31 @@ class HttpActualTransport : ActualTransport {
         val salt = data.string("salt") ?: return null
         val test = data.string("test") ?: return null
         return KeyMaterial(id, salt, test)
+    }
+
+    override fun provider(
+        address: String,
+        token: String,
+        path: String,
+        body: JsonObject,
+    ): JsonElement {
+        val response =
+            send(
+                "$address/$path",
+                "POST",
+                token,
+                contentType = "application/json",
+                body = body.toString().toByteArray(Charsets.UTF_8),
+            )
+        if (response.code == 401 || response.code == 403) throw SyncAuthException(SyncCopy.SIGN_IN_AGAIN)
+        if (response.code != 200) throw BankLinkException(BankLinkCopy.UNREACHABLE)
+        val root = runCatching { jsonObject(response.bytes) }.getOrNull() ?: throw BankLinkException(BankLinkCopy.UNREACHABLE)
+        if (root.string("status") != "ok") throw BankLinkException(root.string("reason") ?: BankLinkCopy.UNREACHABLE)
+        val data = root["data"] ?: return JsonNull
+        // Providers report their own failures inside `data`.
+        val error = (data as? JsonObject)?.let { it.string("error_code") ?: it.string("error_type") }
+        if (error != null) throw BankLinkException((data as JsonObject).string("reason") ?: error)
+        return data
     }
 
     private fun jsonObject(bytes: ByteArray): JsonObject = json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject

@@ -646,6 +646,48 @@ class SyncCoordinator(
         }
     }
 
+    /** Provider calls on the active server (spec 010 US6); null when signed out. */
+    fun bankClient(): BankLinkClient? {
+        val token = syncToken() ?: return null
+        val address = activeAddress() ?: return null
+        return BankLinkClient(transport, address, token)
+    }
+
+    /** Runs a provider call, turning network and auth failures into a reason to show. */
+    fun <T> bankCall(block: (BankLinkClient) -> T): Result<T> {
+        val client = bankClient() ?: return Result.failure(BankLinkException(BankLinkCopy.SIGN_IN_FIRST))
+        return try {
+            Result.success(block(client))
+        } catch (error: BankLinkException) {
+            Result.failure(error)
+        } catch (error: SyncAuthException) {
+            Result.failure(BankLinkException(SyncCopy.SIGN_IN_AGAIN))
+        } catch (error: SyncNetworkException) {
+            Result.failure(BankLinkException(BankLinkCopy.UNREACHABLE))
+        }
+    }
+
+    fun linkBankAccount(
+        budgetId: String,
+        accountId: String,
+        provider: BankProvider,
+        external: ExternalAccount,
+    ): BankLinkResult =
+        journaled(budgetId, UndoCopy.BANK_LINK) { BankLinkBook(it, ids).link(accountId, provider, external) }
+            ?: BankLinkResult.Rejected(SyncCopy.LAST_FAILED)
+
+    fun unlinkBankAccount(
+        budgetId: String,
+        accountId: String,
+    ): BankLinkResult =
+        journaled(budgetId, UndoCopy.BANK_LINK) { BankLinkBook(it, ids).remove(accountId) }
+            ?: BankLinkResult.Rejected(SyncCopy.LAST_FAILED)
+
+    fun bankLinkOf(
+        budgetId: String,
+        accountId: String,
+    ): Pair<BankProvider, String>? = library.useDatabase(budgetId) { BankLinkBook(it, ids).linked(accountId) }
+
     /** Undoes the newest step; a cell changed since lands in [conflicts]. */
     fun undo(budgetId: String): UndoResult {
         restoreClock(budgetId)

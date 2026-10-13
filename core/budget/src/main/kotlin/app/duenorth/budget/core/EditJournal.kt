@@ -24,6 +24,7 @@ object UndoCopy {
     const val AUTO_POST = "auto-post"
     const val TEMPLATES = "templates"
     const val CATEGORY_NOTE = "note"
+    const val BANK_LINK = "bank link"
 }
 
 /** One person-level action, as the cells it wrote. */
