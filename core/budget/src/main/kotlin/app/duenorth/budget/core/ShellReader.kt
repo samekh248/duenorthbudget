@@ -173,15 +173,18 @@ object ShellReader {
                 ORDER BY sort_order, id
                 """.trimIndent(),
             )
-        val categories =
+        // Hidden categories still count toward the month, as in Actual's sheet;
+        // they are only left out of the rows the screen shows.
+        val allCategories =
             session.query(
                 """
                 SELECT id, name, is_income, cat_group, hidden, sort_order
                 FROM categories
-                WHERE IFNULL(tombstone, 0) = 0 AND IFNULL(hidden, 0) = 0
+                WHERE IFNULL(tombstone, 0) = 0
                 ORDER BY sort_order, id
                 """.trimIndent(),
             )
+        val categories = allCategories.filter { !it.bool("hidden") }
         val spent = HashMap<Pair<Int, String>, Long>()
         session
             .query(
@@ -210,9 +213,11 @@ object ShellReader {
             )
         val buffers =
             if (mode == BudgetMode.ENVELOPE) {
-                session.query("SELECT id, buffered FROM zero_budget_months").associate { row ->
-                    row.long("id").toInt() to row.long("buffered")
-                }
+                session
+                    .query("SELECT id, buffered FROM zero_budget_months")
+                    .mapNotNull { row ->
+                        bufferMonth(row.str("id"))?.let { month -> month to row.long("buffered") }
+                    }.toMap()
             } else {
                 emptyMap()
             }
@@ -225,7 +230,7 @@ object ShellReader {
                 )
             }
         val categoryFacts =
-            categories.map { row ->
+            allCategories.map { row ->
                 ActualMonthMath.CategoryFact(
                     id = row.str("id").orEmpty(),
                     groupId = row.str("cat_group").orEmpty(),
@@ -272,6 +277,12 @@ object ShellReader {
             categoryRows = categoryRows,
         )
     }
+
+    /**
+     * `zero_budget_months.id` is `2026-09` in files desktop Actual writes and
+     * `202609` in files the phone created. Both mean the same month.
+     */
+    internal fun bufferMonth(id: String?): Int? = id?.replace("-", "")?.toIntOrNull()
 
     /**
      * Envelope-only. Adds the negation of card spending and of on-budget card payments
