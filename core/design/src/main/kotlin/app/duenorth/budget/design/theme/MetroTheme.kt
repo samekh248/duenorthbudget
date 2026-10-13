@@ -8,12 +8,10 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -41,8 +39,6 @@ object MetroFonts {
 
 @Immutable
 data class MetroTypography(
-    val panoramaTitle: TextStyle,
-    val logoSubtitle: TextStyle,
     val sectionHeader: TextStyle,
     val pageTitle: TextStyle,
     val header: TextStyle,
@@ -55,23 +51,7 @@ data class MetroTypography(
     companion object {
         fun create(family: FontFamily = MetroFonts.family): MetroTypography =
             MetroTypography(
-                // Due North wordmark. The 8.1 hub header is 78; this lockup stays.
-                panoramaTitle =
-                    TextStyle(
-                        fontFamily = family,
-                        fontWeight = MetroWeights.Light,
-                        fontSize = 118.sp,
-                        letterSpacing = (-0.04).em,
-                        lineHeight = TextUnit.Unspecified,
-                        platformStyle = PlatformTextStyle(includeFontPadding = true),
-                    ),
-                logoSubtitle =
-                    TextStyle(
-                        fontFamily = family,
-                        fontWeight = MetroWeights.Semilight,
-                        fontSize = 20.sp,
-                    ),
-                // Panorama section: PhoneTextExtraLargeStyle, SemiLight 42.667.
+                // Pivot header: PhoneTextExtraLargeStyle, SemiLight 42.667.
                 sectionHeader =
                     TextStyle(
                         fontFamily = family,
@@ -302,7 +282,6 @@ object MetroDimens {
     val AppBarGap = 20.dp
 
     val TouchTarget = 48.dp
-    val Peek = 40.dp
 
     /** Application bar closed height, as in due north tasks. */
     val AppBar = 72.dp

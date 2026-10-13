@@ -11,7 +11,7 @@ the phone's frame rate.
 
 - Every tap MUST show visible feedback within 100 ms (tilt, state change, or
   the result itself).
-- Scrolling, panorama swipes, and page transitions MUST hold 60 fps, and the
+- Scrolling, pivot swipes, and page transitions MUST hold 60 fps, and the
   phone's full rate (90 or 120 fps) on high-refresh screens, with no dropped
   frames a person can see.
 - Budget edits MUST appear on screen before the finger lifts. They MUST NOT
@@ -41,19 +41,22 @@ on 2026-10-04 as design C. Budget screens are drawn in
 follow Due North Tasks `docs/design/metro-mockups.svg` and the rules below.
 It replaces the first mockups (a dark pivot with no panorama).
 
-- The home screen is a panorama. An oversized lowercase "budget" title,
-  with "due north" directly under it, stays fully on screen and scrolls
-  sideways more slowly than the sections under it. The next section
-  always peeks in from the right. Sections snap.
+- The home screen is a pivot (changed from a panorama on 2026-10-13). A
+  small uppercase "DUE NORTH BUDGET" title sits over a row of pivot
+  headers. The selected header leads the row in the foreground color; the
+  others follow in loop order, dimmed, and the row slides as the person
+  swipes. Each item fills the full width with no peek. Tapping a header
+  opens that item. Items loop and snap. A panorama is kept only for a
+  hub-style landing page that previews several areas at once; the app has
+  none today.
 - Secondary screens use a pivot where they need tabs. Every screen has a
   bottom application bar: round outlined icon buttons and an ellipsis (`•••`)
   that expands labels and a menu.
 - Typography is the interface. Use a Segoe-style light and semilight sans
   (Selawik as the licensed stand-in). Page titles are oversized and lowercase.
-  Panorama sections stay extra-large semilight. Content text sits one step
+  Pivot headers stay extra-large semilight. Content text sits one step
   under the phone-kit sizes: header 48 semilight, subheader 26 semilight,
-  body 16, secondary text 14 semilight. The panorama wordmark stays the
-  Due North logo.
+  body 16, secondary text 14 semilight.
 - Content over chrome: no drop shadows, no gradients, no rounded cards, no
   elevation, no Material ripple. Flat color fills only.
 - Light (white, black text) and dark (pure black) MUST both exist. The
@@ -110,7 +113,7 @@ one file at a time.
 - Envelope math (to budget, available, cover, credit-card payment, rollover)
   has tests that do not draw the screen.
 - Sync has tests for offline edits, a later connection, and a conflict.
-- Fluidity budgets from Principle I run against the panorama, a long account
+- Fluidity budgets from Principle I run against the home pivot, a long account
   register, and a sync that arrives while the person is scrolling.
 
 ### VI. Phone First, Nothing Extra

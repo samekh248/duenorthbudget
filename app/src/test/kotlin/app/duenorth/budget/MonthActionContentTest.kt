@@ -210,7 +210,7 @@ class MonthActionContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    HomePanorama(
+                    HomePivot(
                         shell = shell,
                         review = null,
                         netWorth = null,
@@ -301,7 +301,7 @@ class MonthActionContentTest {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
-                    HomePanorama(
+                    HomePivot(
                         shell = shell.copy(mode = mode.value),
                         review = null,
                         netWorth = null,
