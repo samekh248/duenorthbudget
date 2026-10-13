@@ -149,7 +149,7 @@
 
 - [X] T032 [P] Roborazzi light and dark screenshots of the settings hub (instance + appearance visible) in `app/src/test/kotlin/app/duenorth/budget/SettingsScreenshotTest.kt`
 - [X] T033 Compose/offline check: settings opens with network off; theme change survives restart; open-budget edit still under 100 ms path in `app/src/test/kotlin/app/duenorth/budget/SettingsContentTest.kt`
-- [ ] T034 Run `./gradlew :core:budget:test :app:testDebugUnitTest :app:verifyRoborazziDebug` and walk `specs/009-settings-home/quickstart.md` scenarios; fix any regressions in sync conflict tests from spec 004
+- [X] T034 Run `./gradlew :core:budget:test :app:testDebugUnitTest :app:verifyRoborazziDebug` and walk `specs/009-settings-home/quickstart.md` scenarios; fix any regressions in sync conflict tests from spec 004
 
 ---
 
