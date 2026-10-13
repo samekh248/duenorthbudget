@@ -22,6 +22,8 @@ object UndoCopy {
     const val RENAME_PAYEE = "rename payee"
     const val IMPORT = "import"
     const val AUTO_POST = "auto-post"
+    const val TEMPLATES = "templates"
+    const val CATEGORY_NOTE = "note"
 }
 
 /** One person-level action, as the cells it wrote. */

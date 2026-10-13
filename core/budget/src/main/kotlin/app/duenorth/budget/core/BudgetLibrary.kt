@@ -129,6 +129,7 @@ class BudgetLibrary(
                 experimental = value("flags.experimental") == "true",
                 budgetType = value("budgetType") ?: "envelope",
                 learnCategories = value("learn-categories") != "false",
+                goalTemplates = value("flags.goalTemplatesEnabled") == "true",
             )
         } ?: FormatPrefs()
 
@@ -670,6 +671,36 @@ class BudgetLibrary(
             val currency = Currencies.byCode(code) ?: Currencies.byCode("USD")!!
             ReportsReader(session, clock.today()).page(range, includeOffBudget, groupBy, currency)
         }
+
+    /** Lists bad template lines across category notes; writes nothing (spec 010 US5). */
+    fun checkTemplates(budgetId: String): TemplateResult =
+        when {
+            !readFormatPrefs(budgetId).templatesOn -> TemplateResult.Rejected(TemplateCopy.OFF)
+            else -> open(budgetId) { TemplateEngine(it, clock.today()).check() } ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
+        }
+
+    /** Apply or overwrite [month]'s budgets from templates as one undo step; both flags must be on. */
+    fun applyTemplates(
+        budgetId: String,
+        month: YearMonth,
+        overwrite: Boolean,
+        confirmed: Boolean = false,
+    ): TemplateResult {
+        if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF)
+        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).run(month, overwrite, confirmed) }
+            ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    }
+
+    fun readCategoryNote(
+        budgetId: String,
+        categoryId: String,
+    ): String = open(budgetId) { CategoryNotes.read(it, categoryId) }.orEmpty()
+
+    fun saveCategoryNote(
+        budgetId: String,
+        categoryId: String,
+        note: String,
+    ): Boolean = edit(budgetId, UndoCopy.CATEGORY_NOTE) { CategoryNotes.write(it, categoryId, note) } != null
 
     fun listRules(budgetId: String): List<RuleSummary> = open(budgetId) { RuleEditorBook(it, ids).list() } ?: emptyList()
 

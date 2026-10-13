@@ -75,7 +75,11 @@ data class FormatPrefs(
     val budgetType: String = "envelope",
     /** Actual's `learn-categories`; absent means on (spec 010 US3). */
     val learnCategories: Boolean = true,
-)
+    /** Actual's `flags.goalTemplatesEnabled`; templates also need [experimental] (spec 010 US5). */
+    val goalTemplates: Boolean = false,
+) {
+    val templatesOn: Boolean get() = experimental && goalTemplates
+}
 
 data class PendingExport(
     val fileName: String,
