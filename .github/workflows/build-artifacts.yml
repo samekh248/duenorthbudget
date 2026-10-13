@@ -24,12 +24,16 @@ jobs:
         run: |
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           mkdir -p out/screenshots
+          KS=out/sign.keystore
+          keytool -genkeypair -keystore $KS -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
           "$BT/zipalign" -f -p 4 app/build/outputs/apk/release/app-release-unsigned.apk out/aligned.apk
-          "$BT/apksigner" sign --ks "$HOME/.android/debug.keystore" --ks-pass pass:android \
+          "$BT/apksigner" sign --ks $KS --ks-pass pass:android \
             --ks-key-alias androiddebugkey --key-pass pass:android \
             --out out/due-north-budget-release.apk out/aligned.apk
           "$BT/apksigner" verify out/due-north-budget-release.apk
-          rm out/aligned.apk
+          rm out/aligned.apk $KS
           cp app/build/outputs/apk/debug/app-debug.apk out/due-north-budget-debug.apk
           cp app/src/test/snapshots/*.png out/screenshots/
           ls -lR out
