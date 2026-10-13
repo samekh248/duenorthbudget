@@ -2,6 +2,7 @@ package app.duenorth.budget.core
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -29,6 +30,64 @@ data class UpcomingScheduleRow(
     val dueToday: Boolean,
     val status: String,
 )
+
+/** How a schedule repeats in the editor; `ONCE` stores a plain date. */
+enum class ScheduleRepeat(
+    val frequency: String?,
+) {
+    ONCE(null),
+    DAILY("daily"),
+    WEEKLY("weekly"),
+    MONTHLY("monthly"),
+    YEARLY("yearly"),
+}
+
+enum class ScheduleEnd(
+    val mode: String,
+) {
+    NEVER("never"),
+    AFTER("after_n_occurrences"),
+    ON_DATE("on_date"),
+}
+
+/**
+ * The schedule editor (`contracts/schedules-rules.md`). [keptDate] is the stored recurrence
+ * config; its patterns, `skipWeekend` and `weekendSolveMode` are written back unchanged.
+ */
+data class ScheduleDraft(
+    val id: String? = null,
+    val name: String = "",
+    val accountId: String = "",
+    val payeeName: String = "",
+    val amountMinor: Long = 0L,
+    /** `is`, `isapprox`, or `isbetween` (with [amount2Minor]). */
+    val amountOp: String = "is",
+    val amount2Minor: Long = 0L,
+    val categoryId: String? = null,
+    val repeat: ScheduleRepeat = ScheduleRepeat.MONTHLY,
+    val interval: Int = 1,
+    val startIso: String = "",
+    val end: ScheduleEnd = ScheduleEnd.NEVER,
+    val endOccurrences: Int = 1,
+    val endDateIso: String = "",
+    val postsTransaction: Boolean = false,
+    val keptDate: JsonObject? = null,
+) {
+    /** True when the stored config has parts the editor does not change. */
+    val hasKeptDateParts: Boolean
+        get() =
+            keptDate != null &&
+                (
+                    (keptDate["patterns"] as? JsonArray)?.isNotEmpty() == true ||
+                        keptDate["skipWeekend"]?.jsonPrimitive?.contentOrNull == "true"
+                )
+}
+
+object ScheduleEditorCopy {
+    const val CHOOSE_ACCOUNT = "choose an account"
+    const val ENTER_START = "enter a date"
+    const val AUTO_POST = "auto-post"
+}
 
 sealed interface ScheduleWriteResult {
     data object Posted : ScheduleWriteResult
@@ -79,11 +138,13 @@ class SchedulesBook(
         scheduleId: String,
         forceDuplicate: Boolean = false,
     ): ScheduleWriteResult {
-        val schedule = loadSchedules().firstOrNull { it.id == scheduleId }
-            ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
+        val schedule =
+            loadSchedules().firstOrNull { it.id == scheduleId }
+                ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
         if (schedule.completed) return ScheduleWriteResult.Rejected(ScheduleCopy.SCHEDULE_DONE)
-        val nextDate = ScheduleDates.fromIso(schedule.nextIso)
-            ?: return ScheduleWriteResult.Rejected(RegisterCopy.ENTER_DATE)
+        val nextDate =
+            ScheduleDates.fromIso(schedule.nextIso)
+                ?: return ScheduleWriteResult.Rejected(RegisterCopy.ENTER_DATE)
         if (!forceDuplicate && hasMatchingTransaction(schedule, nextDate)) {
             return ScheduleWriteResult.ConfirmDuplicate(ScheduleCopy.DUPLICATE)
         }
@@ -129,8 +190,9 @@ class SchedulesBook(
     }
 
     fun skip(scheduleId: String): ScheduleWriteResult {
-        val schedule = loadSchedules().firstOrNull { it.id == scheduleId }
-            ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
+        val schedule =
+            loadSchedules().firstOrNull { it.id == scheduleId }
+                ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
         if (schedule.completed) return ScheduleWriteResult.Rejected(ScheduleCopy.SCHEDULE_DONE)
         advanceNextDate(schedule)
         return ScheduleWriteResult.Skipped
@@ -157,12 +219,13 @@ class SchedulesBook(
         val amount = txn.long("amount")
         val categoryId = txn.str("category")
         val payeeName =
-            payeeId?.let { id ->
-                session
-                    .query("SELECT name FROM payees WHERE id = ?", listOf(id))
-                    .firstOrNull()
-                    ?.str("name")
-            }.orEmpty()
+            payeeId
+                ?.let { id ->
+                    session
+                        .query("SELECT name FROM payees WHERE id = ?", listOf(id))
+                        .firstOrNull()
+                        ?.str("name")
+                }.orEmpty()
         val dateCond =
             when (frequency) {
                 "once" ->
@@ -206,19 +269,270 @@ class SchedulesBook(
         scheduleId: String,
         amountMinor: Long,
     ): ScheduleWriteResult {
-        val schedule = loadSchedules().firstOrNull { it.id == scheduleId }
-            ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
+        val schedule =
+            loadSchedules().firstOrNull { it.id == scheduleId }
+                ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
         val updated = replaceAmountCondition(schedule.conditionsJson, amountMinor)
         rules.updateConditions(schedule.ruleId, updated)
         return ScheduleWriteResult.Posted
     }
 
     fun delete(scheduleId: String): ScheduleWriteResult {
-        val schedule = loadSchedules().firstOrNull { it.id == scheduleId }
-            ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
+        val schedule =
+            loadSchedules().firstOrNull { it.id == scheduleId }
+                ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
         SyncSchema.write(session, "schedules", scheduleId, "tombstone", 1)
         rules.delete(schedule.ruleId)
         return ScheduleWriteResult.Posted
+    }
+
+    /** The editor's view of an existing schedule; unknown date parts stay in [ScheduleDraft.keptDate]. */
+    fun draft(scheduleId: String): ScheduleDraft? {
+        val schedule = loadSchedules().firstOrNull { it.id == scheduleId } ?: return null
+        val posts =
+            session
+                .query("SELECT posts_transaction FROM schedules WHERE id = ?", listOf(scheduleId))
+                .firstOrNull()
+                ?.bool("posts_transaction") == true
+        val amountCond =
+            schedule.conditionsJson
+                .firstOrNull { it.jsonObject["field"]?.jsonPrimitive?.contentOrNull == "amount" }
+                ?.jsonObject
+        val amountOp = amountCond?.get("op")?.jsonPrimitive?.contentOrNull ?: "is"
+        val between = amountCond?.get("value") as? JsonObject
+        val dateValue = schedule.dateCondition["value"]
+        val config = dateValue as? JsonObject
+        val frequency = config?.get("frequency")?.jsonPrimitive?.contentOrNull
+        return ScheduleDraft(
+            id = schedule.id,
+            name = schedule.name,
+            accountId = schedule.accountId,
+            payeeName = if (schedule.payeeId == null) "" else schedule.payeeName,
+            amountMinor =
+                if (between != null) between["num1"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: 0L else schedule.amountMinor,
+            amountOp = amountOp,
+            amount2Minor =
+                between
+                    ?.get("num2")
+                    ?.jsonPrimitive
+                    ?.contentOrNull
+                    ?.toLongOrNull() ?: 0L,
+            categoryId = schedule.categoryId,
+            repeat = ScheduleRepeat.entries.firstOrNull { it.frequency == frequency } ?: ScheduleRepeat.ONCE,
+            interval = config?.get("interval")?.jsonPrimitive?.intOrNull ?: 1,
+            startIso = config?.get("start")?.jsonPrimitive?.contentOrNull ?: (dateValue as? JsonPrimitive)?.contentOrNull.orEmpty(),
+            end =
+                when (config?.get("endMode")?.jsonPrimitive?.contentOrNull) {
+                    "after_n_occurrences" -> ScheduleEnd.AFTER
+                    "on_date" -> ScheduleEnd.ON_DATE
+                    else -> ScheduleEnd.NEVER
+                },
+            endOccurrences = config?.get("endOccurrences")?.jsonPrimitive?.intOrNull ?: 1,
+            endDateIso =
+                config
+                    ?.get("endDate")
+                    ?.jsonPrimitive
+                    ?.contentOrNull
+                    .orEmpty(),
+            postsTransaction = posts,
+            keptDate = config,
+        )
+    }
+
+    /** Writes the rule, the schedule, and its next date: Actual's `schedule/create` and `schedule/update`. */
+    fun save(draft: ScheduleDraft): ScheduleWriteResult {
+        if (draft.accountId.isBlank()) return ScheduleWriteResult.Rejected(ScheduleEditorCopy.CHOOSE_ACCOUNT)
+        if (ScheduleDates.parseIso(draft.startIso) == null) return ScheduleWriteResult.Rejected(ScheduleEditorCopy.ENTER_START)
+        if (draft.end == ScheduleEnd.ON_DATE && ScheduleDates.parseIso(draft.endDateIso) == null) {
+            return ScheduleWriteResult.Rejected(ScheduleEditorCopy.ENTER_START)
+        }
+        val payeeId =
+            draft.payeeName
+                .trim()
+                .takeIf { it.isNotEmpty() }
+                ?.let { RegisterBook(session, ids).payeeIdForName(it) }
+        val date = dateCondition(draft)
+        val conditions =
+            buildJsonArray {
+                add(
+                    buildJsonObject {
+                        put("op", "is")
+                        put("field", "acct")
+                        put("value", draft.accountId)
+                    },
+                )
+                if (payeeId != null) {
+                    add(
+                        buildJsonObject {
+                            put("op", "is")
+                            put("field", "description")
+                            put("value", payeeId)
+                        },
+                    )
+                }
+                add(
+                    buildJsonObject {
+                        put("op", draft.amountOp)
+                        put("field", "amount")
+                        if (draft.amountOp == "isbetween") {
+                            put(
+                                "value",
+                                buildJsonObject {
+                                    put("num1", draft.amountMinor)
+                                    put("num2", draft.amount2Minor)
+                                },
+                            )
+                        } else {
+                            put("value", draft.amountMinor)
+                        }
+                    },
+                )
+                add(date)
+            }
+        val existing = draft.id?.let { id -> loadSchedules().firstOrNull { it.id == id } }
+        val scheduleId = existing?.id ?: draft.id ?: ids()
+        val actions =
+            buildJsonArray {
+                add(
+                    buildJsonObject {
+                        put("op", "link-schedule")
+                        put("value", scheduleId)
+                    },
+                )
+                if (!draft.categoryId.isNullOrBlank()) {
+                    add(
+                        buildJsonObject {
+                            put("op", "set")
+                            put("field", "category")
+                            put("value", draft.categoryId)
+                            put("type", "id")
+                        },
+                    )
+                }
+            }
+        val ruleId = existing?.ruleId ?: ids()
+        SyncSchema.writeRow(
+            session,
+            "rules",
+            ruleId,
+            "stage" to null,
+            "conditions_op" to "and",
+            "conditions" to conditions.toString(),
+            "actions" to actions.toString(),
+            "tombstone" to 0,
+        )
+        SyncSchema.writeRow(
+            session,
+            "schedules",
+            scheduleId,
+            "name" to draft.name.trim().ifEmpty { null },
+            "rule" to ruleId,
+            "active" to 0,
+            "completed" to 0,
+            "posts_transaction" to draft.postsTransaction,
+            "tombstone" to 0,
+        )
+        val next = ScheduleRecurrence.firstOnOrAfter(date, clock.today())
+        if (next == null) {
+            SyncSchema.write(session, "schedules", scheduleId, "completed", 1)
+        } else {
+            setBaseNextDate(scheduleId, next)
+        }
+        return ScheduleWriteResult.Posted
+    }
+
+    /**
+     * Posts or advances the first due auto-post occurrence (`advanceSchedulesService`).
+     * Returns false when nothing is due; the caller runs it once per undo step.
+     */
+    fun autoPostOne(): Boolean {
+        val todayIso = clock.today().toString()
+        val posting =
+            session
+                .query(
+                    "SELECT id FROM schedules WHERE IFNULL(posts_transaction, 0) = 1 AND IFNULL(completed, 0) = 0 AND IFNULL(tombstone, 0) = 0",
+                ).mapNotNull { it.str("id") }
+                .toSet()
+        if (posting.isEmpty()) return false
+        val due =
+            loadSchedules()
+                .filter { it.id in posting && !it.completed && it.nextIso <= todayIso }
+                .minByOrNull { it.nextIso } ?: return false
+        val date = ScheduleDates.fromIso(due.nextIso) ?: return false
+        if (hasMatchingTransaction(due, date)) {
+            advanceNextDate(due)
+            return true
+        }
+        val before = session.query("SELECT id FROM transactions").mapNotNull { it.str("id") }.toSet()
+        when (post(due.id, forceDuplicate = true)) {
+            ScheduleWriteResult.Posted -> {
+                // Actual posts scheduled transactions uncleared.
+                session
+                    .query("SELECT id FROM transactions WHERE schedule = ? AND IFNULL(tombstone, 0) = 0", listOf(due.id))
+                    .mapNotNull { it.str("id") }
+                    .filter { it !in before }
+                    .forEach { SyncSchema.write(session, "transactions", it, "cleared", 0) }
+            }
+            else -> {
+                advanceNextDate(due)
+            }
+        }
+        return true
+    }
+
+    private fun dateCondition(draft: ScheduleDraft): JsonObject {
+        val frequency = draft.repeat.frequency
+        if (frequency == null) {
+            return buildJsonObject {
+                put("op", "is")
+                put("field", "date")
+                put("value", draft.startIso)
+            }
+        }
+        val kept = draft.keptDate
+        val config = LinkedHashMap<String, JsonElement>()
+        config["start"] = JsonPrimitive(draft.startIso)
+        config["frequency"] = JsonPrimitive(frequency)
+        config["interval"] = JsonPrimitive(draft.interval.coerceAtLeast(1))
+        config["endMode"] = JsonPrimitive(draft.end.mode)
+        if (draft.end == ScheduleEnd.AFTER) config["endOccurrences"] = JsonPrimitive(draft.endOccurrences.coerceAtLeast(1))
+        if (draft.end == ScheduleEnd.ON_DATE) config["endDate"] = JsonPrimitive(draft.endDateIso)
+        config["patterns"] = kept?.get("patterns") ?: JsonArray(emptyList())
+        config["skipWeekend"] = kept?.get("skipWeekend") ?: JsonPrimitive(false)
+        config["weekendSolveMode"] = kept?.get("weekendSolveMode") ?: JsonPrimitive("after")
+        // Anything else desktop stored stays as it was.
+        kept?.forEach { (key, value) -> if (key !in config && key !in EDITED_DATE_KEYS) config[key] = value }
+        return buildJsonObject {
+            put("op", "isapprox")
+            put("field", "date")
+            put("value", JsonObject(config))
+        }
+    }
+
+    private fun setBaseNextDate(
+        scheduleId: String,
+        iso: String,
+    ) {
+        val now = System.currentTimeMillis()
+        val stored = ScheduleDates.toStored(iso)
+        val existing =
+            session
+                .query(
+                    "SELECT id FROM schedules_next_date WHERE schedule_id = ? AND IFNULL(tombstone, 0) = 0",
+                    listOf(scheduleId),
+                ).firstOrNull()
+                ?.str("id")
+        SyncSchema.writeRow(
+            session,
+            "schedules_next_date",
+            existing ?: ids(),
+            "schedule_id" to scheduleId,
+            "local_next_date" to stored,
+            "local_next_date_ts" to now,
+            "base_next_date" to stored,
+            "base_next_date_ts" to now,
+            "tombstone" to 0,
+        )
     }
 
     private data class LoadedSchedule(
@@ -262,29 +576,32 @@ class SchedulesBook(
             val payeeId = extractField(conditions, "payee", "description")
             val amount = extractAmount(conditions) ?: return@mapNotNull null
             val dateCond =
-                conditions.firstOrNull {
-                    val obj = it.jsonObject
-                    obj["field"]?.jsonPrimitive?.contentOrNull == "date"
-                }?.jsonObject ?: return@mapNotNull null
+                conditions
+                    .firstOrNull {
+                        val obj = it.jsonObject
+                        obj["field"]?.jsonPrimitive?.contentOrNull == "date"
+                    }?.jsonObject ?: return@mapNotNull null
             val nextIso =
                 ScheduleDates.storedToIso(row.str("next_date"))
                     ?: ScheduleRecurrence.firstDate(dateCond)
                     ?: return@mapNotNull null
             val payeeName =
-                payeeId?.let { id ->
-                    session
-                        .query("SELECT name FROM payees WHERE id = ?", listOf(id))
-                        .firstOrNull()
-                        ?.str("name")
-                }.orEmpty()
+                payeeId
+                    ?.let { id ->
+                        session
+                            .query("SELECT name FROM payees WHERE id = ?", listOf(id))
+                            .firstOrNull()
+                            ?.str("name")
+                    }.orEmpty()
             val categoryId = extractCategoryFromActions(row.str("rule") ?: "")
             val categoryLabel =
-                categoryId?.let { id ->
-                    session
-                        .query("SELECT name FROM categories WHERE id = ?", listOf(id))
-                        .firstOrNull()
-                        ?.str("name")
-                }.orEmpty()
+                categoryId
+                    ?.let { id ->
+                        session
+                            .query("SELECT name FROM categories WHERE id = ?", listOf(id))
+                            .firstOrNull()
+                            ?.str("name")
+                    }.orEmpty()
                     .ifBlank { RegisterCopy.NO_CATEGORY }
             LoadedSchedule(
                 id = row.str("id") ?: return@mapNotNull null,
@@ -312,10 +629,14 @@ class SchedulesBook(
                 ?.str("actions")
                 ?: return null
         val array = Json.parseToJsonElement(actions).jsonArray
-        return array.firstOrNull {
-            it.jsonObject["op"]?.jsonPrimitive?.contentOrNull == "set" &&
-                it.jsonObject["field"]?.jsonPrimitive?.contentOrNull == "category"
-        }?.jsonObject?.get("value")?.jsonPrimitive?.contentOrNull
+        return array
+            .firstOrNull {
+                it.jsonObject["op"]?.jsonPrimitive?.contentOrNull == "set" &&
+                    it.jsonObject["field"]?.jsonPrimitive?.contentOrNull == "category"
+            }?.jsonObject
+            ?.get("value")
+            ?.jsonPrimitive
+            ?.contentOrNull
     }
 
     private fun hasMatchingTransaction(
@@ -420,6 +741,8 @@ class SchedulesBook(
     }
 }
 
+private val EDITED_DATE_KEYS = setOf("start", "frequency", "interval", "endMode", "endOccurrences", "endDate")
+
 private fun linkScheduleActions(scheduleId: String): JsonArray =
     buildJsonArray {
         add(
@@ -516,16 +839,21 @@ private fun extractField(
     conditions: JsonArray,
     vararg names: String,
 ): String? =
-    conditions.firstOrNull {
-        val field = it.jsonObject["field"]?.jsonPrimitive?.contentOrNull
-        field in names
-    }?.jsonObject?.get("value")?.jsonPrimitive?.contentOrNull
+    conditions
+        .firstOrNull {
+            val field = it.jsonObject["field"]?.jsonPrimitive?.contentOrNull
+            field in names
+        }?.jsonObject
+        ?.get("value")
+        ?.jsonPrimitive
+        ?.contentOrNull
 
 private fun extractAmount(conditions: JsonArray): Long? {
     val cond =
-        conditions.firstOrNull {
-            it.jsonObject["field"]?.jsonPrimitive?.contentOrNull == "amount"
-        }?.jsonObject ?: return null
+        conditions
+            .firstOrNull {
+                it.jsonObject["field"]?.jsonPrimitive?.contentOrNull == "amount"
+            }?.jsonObject ?: return null
     val value = cond["value"] ?: return null
     return when {
         value is JsonPrimitive && value.contentOrNull != null ->
@@ -541,6 +869,11 @@ private fun extractAmount(conditions: JsonArray): Long? {
 
 private fun LocalDate.toActualDate(): Int = year * 10000 + monthValue * 100 + dayOfMonth
 
+/**
+ * Actual's recurrence configs (`{start, frequency, interval, endMode, endOccurrences, endDate,
+ * patterns, skipWeekend, weekendSolveMode}`) or a plain one-time date. Patterns and weekend moves
+ * are evaluated even though the phone's editor does not change them.
+ */
 object ScheduleRecurrence {
     fun firstDate(dateCond: JsonObject): String? {
         val value = dateCond["value"] ?: return null
@@ -548,6 +881,7 @@ object ScheduleRecurrence {
         return value.jsonObject["start"]?.jsonPrimitive?.contentOrNull
     }
 
+    /** The occurrence after [startIso] when [afterPost], else [startIso] itself; null when the schedule has ended. */
     fun nextDate(
         dateCond: JsonObject,
         startIso: String,
@@ -558,49 +892,19 @@ object ScheduleRecurrence {
             val iso = value.contentOrNull ?: return null
             return if (afterPost) null else iso
         }
-        val config = value.jsonObject
-        val frequency = config["frequency"]?.jsonPrimitive?.contentOrNull ?: return null
-        val interval = config["interval"]?.jsonPrimitive?.intOrNull ?: 1
-        val cursor = ScheduleDates.parseIso(startIso) ?: return null
-        val endMode = config["endMode"]?.jsonPrimitive?.contentOrNull ?: "never"
-        val maxCount = config["endOccurrences"]?.jsonPrimitive?.intOrNull
-        val endDate =
-            config["endDate"]?.jsonPrimitive?.contentOrNull?.let { ScheduleDates.parseIso(it) }
-        if (!afterPost) return cursor.toString()
-
-        val candidate =
-            when (frequency) {
-                "daily" -> cursor.plusDays(interval.toLong())
-                "weekly" -> cursor.plusWeeks(interval.toLong())
-                "monthly" -> cursor.plusMonths(interval.toLong())
-                "yearly" -> cursor.plusYears(interval.toLong())
-                else -> return null
-            }
-        if (endDate != null && candidate.isAfter(endDate)) return null
-        if (endMode == "after_n_occurrences" && maxCount != null) {
-            val posted =
-                sessionCount(config["start"]?.jsonPrimitive?.contentOrNull, startIso, frequency, interval)
-            if (posted + 1 >= maxCount) return null
-        }
-        return candidate.toString()
+        if (!afterPost) return startIso
+        val current = ScheduleDates.parseIso(startIso) ?: return null
+        return occurrences(value.jsonObject, current.plusDays(1)).firstOrNull()?.toString()
     }
 
-    private fun sessionCount(
-        startIso: String?,
-        currentIso: String,
-        frequency: String,
-        interval: Int,
-    ): Int {
-        val start = startIso?.let { ScheduleDates.parseIso(it) } ?: return 1
-        val current = ScheduleDates.parseIso(currentIso) ?: return 1
-        return when (frequency) {
-            "monthly" ->
-                ((current.year - start.year) * 12 + (current.monthValue - start.monthValue)) / interval + 1
-            "weekly" -> java.time.temporal.ChronoUnit.WEEKS.between(start, current).toInt() / interval + 1
-            "daily" -> java.time.temporal.ChronoUnit.DAYS.between(start, current).toInt() / interval + 1
-            "yearly" -> (current.year - start.year) / interval + 1
-            else -> 1
-        }
+    /** The first occurrence on or after [from]; null when there is none. */
+    fun firstOnOrAfter(
+        dateCond: JsonObject,
+        from: LocalDate,
+    ): String? {
+        val value = dateCond["value"] ?: return null
+        if (value is JsonPrimitive) return value.contentOrNull
+        return occurrences(value.jsonObject, from).firstOrNull()?.toString()
     }
 
     fun isFinished(
@@ -617,4 +921,102 @@ object ScheduleRecurrence {
         return false
     }
 
+    /** Occurrences on or after [from], in order, honouring the end mode. */
+    fun occurrences(
+        config: JsonObject,
+        from: LocalDate,
+        limit: Int = 64,
+    ): List<LocalDate> {
+        val start = config["start"]?.jsonPrimitive?.contentOrNull?.let { ScheduleDates.parseIso(it) } ?: return emptyList()
+        val frequency = config["frequency"]?.jsonPrimitive?.contentOrNull ?: return emptyList()
+        val interval = (config["interval"]?.jsonPrimitive?.intOrNull ?: 1).coerceAtLeast(1)
+        val endMode = config["endMode"]?.jsonPrimitive?.contentOrNull ?: "never"
+        val maxCount = if (endMode == "after_n_occurrences") config["endOccurrences"]?.jsonPrimitive?.intOrNull else null
+        val endDate =
+            if (endMode == "on_date") config["endDate"]?.jsonPrimitive?.contentOrNull?.let { ScheduleDates.parseIso(it) } else null
+        val patterns = (config["patterns"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+        val skipWeekend = config["skipWeekend"]?.jsonPrimitive?.contentOrNull == "true"
+        val solveBefore = config["weekendSolveMode"]?.jsonPrimitive?.contentOrNull == "before"
+        val out = ArrayList<LocalDate>()
+        var count = 0
+        var period = 0L
+        // Enough periods to reach [from] plus [limit] more, with a hard stop for broken configs.
+        while (out.size < limit && period < 20_000) {
+            val raw = periodDates(start, frequency, interval, period, patterns)
+            period++
+            for (date in raw) {
+                if (date < start) continue
+                if (endDate != null && date > endDate) return out
+                count++
+                if (maxCount != null && count > maxCount) return out
+                val moved = if (skipWeekend) moveOffWeekend(date, solveBefore) else date
+                if (moved >= from) out.add(moved)
+                if (out.size >= limit) return out
+            }
+        }
+        return out
+    }
+
+    private fun periodDates(
+        start: LocalDate,
+        frequency: String,
+        interval: Int,
+        period: Long,
+        patterns: List<JsonObject>,
+    ): List<LocalDate> {
+        val step = period * interval
+        return when (frequency) {
+            "daily" -> listOf(start.plusDays(step))
+            "weekly" -> listOf(start.plusWeeks(step))
+            "yearly" -> listOf(start.plusYears(step))
+            "monthly" -> {
+                if (patterns.isEmpty()) {
+                    listOf(start.plusMonths(step))
+                } else {
+                    val month =
+                        java.time.YearMonth
+                            .from(start)
+                            .plusMonths(step)
+                    patterns.mapNotNull { patternDate(month, it) }.distinct().sorted()
+                }
+            }
+            else -> emptyList()
+        }
+    }
+
+    /** `{type: "day", value: N}` (−1 = last day) or `{type: "MO".."SU", value: n}` (−1 = last). */
+    private fun patternDate(
+        month: java.time.YearMonth,
+        pattern: JsonObject,
+    ): LocalDate? {
+        val type = pattern["type"]?.jsonPrimitive?.contentOrNull ?: return null
+        val value = pattern["value"]?.jsonPrimitive?.intOrNull ?: return null
+        if (type == "day") {
+            val day = if (value < 0) month.lengthOfMonth() + value + 1 else value
+            return if (day in 1..month.lengthOfMonth()) month.atDay(day) else null
+        }
+        val weekday =
+            when (type) {
+                "MO" -> java.time.DayOfWeek.MONDAY
+                "TU" -> java.time.DayOfWeek.TUESDAY
+                "WE" -> java.time.DayOfWeek.WEDNESDAY
+                "TH" -> java.time.DayOfWeek.THURSDAY
+                "FR" -> java.time.DayOfWeek.FRIDAY
+                "SA" -> java.time.DayOfWeek.SATURDAY
+                "SU" -> java.time.DayOfWeek.SUNDAY
+                else -> return null
+            }
+        val matches = (1..month.lengthOfMonth()).map { month.atDay(it) }.filter { it.dayOfWeek == weekday }
+        return if (value < 0) matches.getOrNull(matches.size + value) else matches.getOrNull(value - 1)
+    }
+
+    private fun moveOffWeekend(
+        date: LocalDate,
+        before: Boolean,
+    ): LocalDate =
+        when (date.dayOfWeek) {
+            java.time.DayOfWeek.SATURDAY -> if (before) date.minusDays(1) else date.plusDays(2)
+            java.time.DayOfWeek.SUNDAY -> if (before) date.minusDays(2) else date.plusDays(1)
+            else -> date
+        }
 }

@@ -21,6 +21,7 @@ object UndoCopy {
     const val DELETE_SCHEDULE = "delete schedule"
     const val RENAME_PAYEE = "rename payee"
     const val IMPORT = "import"
+    const val AUTO_POST = "auto-post"
 }
 
 /** One person-level action, as the cells it wrote. */
@@ -162,7 +163,11 @@ class EditJournal(
             byCell[key] = first?.copy(new = cell.new) ?: cell
         }
         // A row created in this step counts as created for every one of its cells, with no old value.
-        val created = byCell.values.filter { !it.rowExisted }.map { it.dataset to it.row }.toSet()
+        val created =
+            byCell.values
+                .filter { !it.rowExisted }
+                .map { it.dataset to it.row }
+                .toSet()
         return byCell.values.map { if ((it.dataset to it.row) in created) it.copy(old = null, rowExisted = false) else it }
     }
 

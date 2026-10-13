@@ -502,8 +502,11 @@ class BudgetLibrary(
         categoryId: String?,
         force: Boolean,
     ): WriteResult =
-        edit(budgetId, UndoCopy.CATEGORIZE) { RegisterBook(it).setCategory(transactionId, categoryId, force) }
-            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+        edit(budgetId, UndoCopy.CATEGORIZE) { session ->
+            RegisterBook(session).setCategory(transactionId, categoryId, force).also {
+                if (it is WriteResult.Saved) CategoryLearning(session, ids).learnFrom(transactionId)
+            }
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun deleteTransaction(
         budgetId: String,
@@ -620,6 +623,59 @@ class BudgetLibrary(
         edit(budgetId, UndoCopy.DELETE_SCHEDULE) { SchedulesBook(it, clock).delete(scheduleId) }
             ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    /** Schedule editor (spec 010 US3). */
+    fun readScheduleDraft(
+        budgetId: String,
+        scheduleId: String,
+    ): ScheduleDraft? = open(budgetId) { SchedulesBook(it, clock, ids).draft(scheduleId) }
+
+    fun saveSchedule(
+        budgetId: String,
+        draft: ScheduleDraft,
+    ): ScheduleWriteResult =
+        edit(budgetId, UndoCopy.SAVE_SCHEDULE) { SchedulesBook(it, clock, ids).save(draft) }
+            ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** Posts every due auto-post occurrence, one undo step each; returns how many steps ran. */
+    fun autoPostSchedules(budgetId: String): Int {
+        var steps = 0
+        while (steps < MAX_AUTO_POST) {
+            val ran = edit(budgetId, UndoCopy.AUTO_POST) { SchedulesBook(it, clock, ids).autoPostOne() } ?: false
+            if (!ran) break
+            steps++
+        }
+        return steps
+    }
+
+    fun listRules(budgetId: String): List<RuleSummary> = open(budgetId) { RuleEditorBook(it, ids).list() } ?: emptyList()
+
+    fun readRuleDraft(
+        budgetId: String,
+        ruleId: String,
+    ): RuleDraft? = open(budgetId) { RuleEditorBook(it, ids).draft(ruleId) }
+
+    fun saveRule(
+        budgetId: String,
+        draft: RuleDraft,
+    ): RuleSaveResult =
+        edit(budgetId, RuleEditorCopy.SAVE_RULE) { RuleEditorBook(it, ids).save(draft) }
+            ?: RuleSaveResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun deleteRule(
+        budgetId: String,
+        ruleId: String,
+    ): RuleSaveResult =
+        edit(budgetId, RuleEditorCopy.DELETE_RULE) { RuleEditorBook(it, ids).delete(ruleId) }
+            ?: RuleSaveResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** Actual's `learn-categories` preference; absent means on. */
+    fun learningEnabled(budgetId: String): Boolean = preference(budgetId, "learn-categories") != "false"
+
+    fun setLearning(
+        budgetId: String,
+        enabled: Boolean,
+    ): Boolean = setPreference(budgetId, "learn-categories", enabled.toString())
+
     fun listPayees(budgetId: String): List<PayeeRow> = open(budgetId) { PayeeBook(it).list() } ?: emptyList()
 
     fun renamePayee(
@@ -694,6 +750,10 @@ class BudgetLibrary(
         if (settings.openBudgetId == target.id) return true
         save(settings.copy(openBudgetId = target.id))
         return true
+    }
+
+    private companion object {
+        const val MAX_AUTO_POST = 500
     }
 
     private fun <T> open(

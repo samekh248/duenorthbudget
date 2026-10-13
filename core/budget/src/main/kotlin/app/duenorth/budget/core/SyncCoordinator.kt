@@ -361,7 +361,14 @@ class SyncCoordinator(
         }
     }
 
+    /** Syncs, then posts any due auto-post schedules (spec 010 US3); posting needs no server. */
     fun sync(budgetId: String): SyncResult {
+        val result = syncNetwork(budgetId)
+        runCatching { library.autoPostSchedules(budgetId) }
+        return result
+    }
+
+    private fun syncNetwork(budgetId: String): SyncResult {
         val token = syncToken() ?: return fail(budgetId, "auth")
         val address = activeAddress() ?: return SyncResult("")
         val cloud = state(budgetId, "cloudFileId").orEmpty()
@@ -468,8 +475,8 @@ class SyncCoordinator(
     fun releaseMonthHold(
         budgetId: String,
         month: YearMonth,
-    ): EditResult {
-        return journaled(budgetId, UndoCopy.HOLD) { session ->
+    ): EditResult =
+        journaled(budgetId, UndoCopy.HOLD) { session ->
             when (
                 val outcome =
                     EnvelopeBook(session, syncClock).setHold(month.toActualMonth(), 0L, Long.MAX_VALUE)
@@ -478,7 +485,6 @@ class SyncCoordinator(
                 is EnvelopeEditResult.Rejected -> EditResult.Rejected(outcome.reason)
             }
         } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
-    }
 
     fun holdForNextMonth(
         budgetId: String,
@@ -648,14 +654,13 @@ class SyncCoordinator(
     private fun envelopeEdit(
         budgetId: String,
         block: EnvelopeBook.() -> EnvelopeEditResult,
-    ): EditResult {
-        return journaled(budgetId, UndoCopy.CATEGORY) { session ->
+    ): EditResult =
+        journaled(budgetId, UndoCopy.CATEGORY) { session ->
             when (val outcome = EnvelopeBook(session, syncClock).block()) {
                 EnvelopeEditResult.Saved -> EditResult.Saved
                 is EnvelopeEditResult.Rejected -> EditResult.Rejected(outcome.reason)
             }
         } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
-    }
 
     fun addTransaction(
         budgetId: String,
