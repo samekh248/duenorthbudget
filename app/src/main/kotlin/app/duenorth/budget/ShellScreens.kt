@@ -684,9 +684,14 @@ fun CreateBudgetScreen(
     onCreate: (String, String) -> Unit,
     modifier: Modifier = Modifier,
     defaultName: String = "",
+    defaultCurrency: String = "USD",
+    /** Onboarding keeps the draft so a restart resumes it (spec 011). */
+    onDraft: ((String, String) -> Unit)? = null,
 ) {
     var name by remember { mutableStateOf(defaultName) }
-    var currency by remember { mutableStateOf("USD") }
+    var currency by remember { mutableStateOf(defaultCurrency) }
+    val currencyIndex = Currencies.all.indexOfFirst { it.code == currency }.coerceAtLeast(0)
+    val currencyList = rememberLazyListState(initialFirstVisibleItemIndex = currencyIndex)
     Column(
         modifier
             .fillMaxSize()
@@ -695,11 +700,18 @@ fun CreateBudgetScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         MetroText("new budget", Metro.typography.header)
-        MetroField(name, { name = it }, "name")
+        MetroField(
+            name,
+            {
+                name = it
+                onDraft?.invoke(it, currency)
+            },
+            "name",
+        )
         if (error != null) {
             MetroText(error, Metro.typography.body, color = Metro.accent.text)
         }
-        LazyColumn(Modifier.weight(1f)) {
+        LazyColumn(Modifier.weight(1f), state = currencyList) {
             items(Currencies.all, key = { it.code }) { item ->
                 val selected = item.code == currency
                 MetroText(
@@ -708,8 +720,10 @@ fun CreateBudgetScreen(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
-                        .metroPress { currency = item.code }
-                        .padding(vertical = MetroDimens.Row),
+                        .metroPress {
+                            currency = item.code
+                            onDraft?.invoke(name, item.code)
+                        }.padding(vertical = MetroDimens.Row),
                     color = if (selected) Metro.accent.text else Metro.colors.foreground,
                 )
             }

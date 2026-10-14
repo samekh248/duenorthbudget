@@ -1,0 +1,296 @@
+package app.duenorth.budget
+
+import android.os.Looper
+import app.duenorth.budget.core.ActualTransport
+import app.duenorth.budget.core.BudgetClock
+import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.KeyMaterial
+import app.duenorth.budget.core.MemorySecretStore
+import app.duenorth.budget.core.OnboardingCopy
+import app.duenorth.budget.core.OnboardingPath
+import app.duenorth.budget.core.OnboardingStep
+import app.duenorth.budget.core.ProbeHttp
+import app.duenorth.budget.core.ProbeResponse
+import app.duenorth.budget.core.RemoteFile
+import app.duenorth.budget.core.ServerProbe
+import app.duenorth.budget.core.SignInMethod
+import app.duenorth.budget.core.SyncAuthException
+import app.duenorth.budget.core.SyncCoordinator
+import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.core.activeInstance
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
+import org.robolectric.annotation.Config
+import java.io.File
+import java.io.IOException
+import java.time.LocalDate
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [33])
+class OnboardingFlowTest {
+    private val transport = FakeTransport()
+
+    @Test
+    fun freshPhoneOpensOnWelcome() {
+        val (_, model) = model("fresh")
+        assertEquals(ShellRoute.Welcome, model.state.value.route)
+        assertNotNull(model.state.value.onboarding)
+        assertFalse(model.back())
+    }
+
+    @Test
+    fun phoneWithABudgetNeverSeesWelcome() {
+        val root = root("existing")
+        library(root).create("Home", "USD")
+        // A leftover progress file from an earlier install is dropped.
+        library(root).onboarding().write(
+            app.duenorth.budget.core
+                .OnboardingProgress(step = OnboardingStep.ADDRESS),
+        )
+        val model = model(root)
+        await { model.state.value.shell != null }
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        assertNull(model.state.value.onboarding)
+        assertNull(library(root).onboarding().read())
+    }
+
+    @Test
+    fun phoneOnlyPathCreatesABudgetWithNoServerQuestions() {
+        val (library, model) = model("phone")
+        model.onboardingChoosePhone()
+        assertEquals(ShellRoute.Create, model.state.value.route)
+        // Back from the new-budget page returns to welcome.
+        assertTrue(model.back())
+        assertEquals(ShellRoute.Welcome, model.state.value.route)
+        model.onboardingChoosePhone()
+        model.create("", "USD")
+        await { model.state.value.createError != null }
+        assertTrue(library.list().isEmpty())
+        model.create("Home", "EUR")
+        await { model.state.value.shell != null }
+        assertEquals(
+            "Home",
+            model.state.value.shell!!
+                .budgetName,
+        )
+        assertNull(model.state.value.onboarding)
+        await { library.onboarding().read() == null }
+        assertTrue(transport.logins.isEmpty())
+    }
+
+    @Test
+    fun serverPathSignsInNamesTheInstanceAndSendsANewBudget() {
+        val (library, model) = model("server")
+        model.onboardingChooseServer()
+        assertEquals(ShellRoute.OnboardingAddress, model.state.value.route)
+        model.onboardingAddress("budget.example.com")
+        model.onboardingCheck()
+        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        val progress =
+            model.state.value.onboarding!!
+                .progress
+        assertEquals("https://budget.example.com", progress.readyAddress)
+        assertEquals(setOf(SignInMethod.PASSWORD), progress.methods)
+        assertEquals("budget.example.com", progress.instanceLabel)
+
+        model.onboardingLabel("home server")
+        model.onboardingSignIn("wrong")
+        await {
+            model.state.value.onboarding
+                ?.signInError != null
+        }
+        assertEquals(
+            SyncCopy.SIGN_IN_FAILED,
+            model.state.value.onboarding!!
+                .signInError,
+        )
+        assertEquals(ShellRoute.OnboardingSignIn, model.state.value.route)
+
+        model.onboardingSignIn(FakeTransport.PASSWORD)
+        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        val active = library.settings().activeInstance()!!
+        assertEquals("home server", active.label)
+        assertEquals("https://budget.example.com", active.address)
+
+        model.onboardingNewBudget()
+        assertEquals(ShellRoute.Create, model.state.value.route)
+        model.create("Household", "USD")
+        await { model.state.value.shell != null }
+        await { transport.uploads.isNotEmpty() }
+        assertEquals("Household", transport.uploads.single())
+        assertNull(model.state.value.onboarding)
+    }
+
+    @Test
+    fun wrongAddressSaysWhyAndKeepsTheText() {
+        val (_, model) = model("wrong", http = { throw IOException("refused") })
+        model.onboardingChooseServer()
+        model.onboardingAddress("nowhere.example")
+        model.onboardingCheck()
+        await {
+            model.state.value.onboarding
+                ?.addressError != null
+        }
+        val ui = model.state.value.onboarding!!
+        assertEquals(OnboardingCopy.NOT_REACHED, ui.addressError)
+        assertEquals("nowhere.example", ui.progress.addressText)
+        assertEquals(ShellRoute.OnboardingAddress, model.state.value.route)
+        model.onboardingAddress("")
+        model.onboardingCheck()
+        assertEquals(
+            OnboardingCopy.ENTER_ADDRESS,
+            model.state.value.onboarding!!
+                .addressError,
+        )
+    }
+
+    @Test
+    fun leavingAndComingBackResumesTheSameStep() {
+        val root = root("resume")
+        val first = model(root)
+        first.onboardingChooseServer()
+        first.onboardingAddress("budget.example.com")
+        first.onboardingCheck()
+        await { first.state.value.route == ShellRoute.OnboardingSignIn }
+        first.onboardingLabel("home")
+        await { library(root).onboarding().read()?.instanceLabel == "home" }
+        val saved = File(root, "onboarding.json").readText()
+        assertFalse(saved.contains(FakeTransport.PASSWORD))
+
+        // A new view model over the same files is the app after a force stop.
+        val second = model(root)
+        await { second.state.value.route == ShellRoute.OnboardingSignIn }
+        val progress =
+            second.state.value.onboarding!!
+                .progress
+        assertEquals("budget.example.com", progress.addressText)
+        assertEquals("home", progress.instanceLabel)
+        assertEquals(OnboardingPath.SERVER, progress.path)
+
+        assertTrue(second.back())
+        assertEquals(ShellRoute.OnboardingAddress, second.state.value.route)
+        assertEquals(
+            "budget.example.com",
+            second.state.value.onboarding!!
+                .progress.addressText,
+        )
+        assertTrue(second.back())
+        assertEquals(ShellRoute.Welcome, second.state.value.route)
+    }
+
+    private fun model(
+        name: String,
+        http: ProbeHttp = readyHttp,
+    ): Pair<BudgetLibrary, ShellViewModel> {
+        val root = root(name)
+        return library(root) to model(root, http)
+    }
+
+    private fun model(
+        root: File,
+        http: ProbeHttp = readyHttp,
+    ): ShellViewModel {
+        val library = library(root)
+        val sync = SyncCoordinator(library, transport, MemorySecretStore(), clock)
+        val model = ShellViewModel(library, sync, probe = ServerProbe(http))
+        await { !model.state.value.loading }
+        return model
+    }
+
+    private fun root(name: String): File =
+        File(RuntimeEnvironment.getApplication().filesDir, "onboarding-$name").apply {
+            deleteRecursively()
+            mkdirs()
+        }
+
+    private fun library(root: File) = BudgetLibrary(root, AndroidSessionOpener(), clock)
+
+    private val clock = BudgetClock { LocalDate.of(2026, 10, 14) }
+
+    private val readyHttp =
+        ProbeHttp { url ->
+            if (url.endsWith("/account/needs-bootstrap")) {
+                ProbeResponse(200, """{"status":"ok","data":{"bootstrapped":true,"loginMethod":"password"}}""")
+            } else {
+                ProbeResponse(404, "")
+            }
+        }
+
+    private fun await(predicate: () -> Boolean) {
+        val deadline = System.nanoTime() + 5_000_000_000L
+        while (!predicate()) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            check(System.nanoTime() < deadline) { "timed out" }
+            Thread.sleep(10)
+        }
+    }
+
+    private class FakeTransport : ActualTransport {
+        val logins = mutableListOf<String>()
+        val uploads = java.util.Collections.synchronizedList(mutableListOf<String>())
+
+        override fun login(
+            address: String,
+            password: String,
+        ): String {
+            logins += address
+            if (password != PASSWORD) throw SyncAuthException(SyncCopy.SIGN_IN_FAILED)
+            return "token"
+        }
+
+        override fun loginMethods(address: String): List<String> = listOf("password")
+
+        override fun beginOpenId(
+            address: String,
+            returnUrl: String,
+        ): String = throw IOException("no browser")
+
+        override fun listFiles(
+            address: String,
+            token: String,
+        ): List<RemoteFile> = emptyList()
+
+        override fun download(
+            address: String,
+            token: String,
+            fileId: String,
+            onProgress: (received: Long, total: Long) -> Unit,
+        ): ByteArray = throw IOException("no files")
+
+        override fun upload(
+            address: String,
+            token: String,
+            fileId: String,
+            groupId: String?,
+            name: String,
+            bytes: ByteArray,
+        ): String {
+            uploads += name
+            return "group-1"
+        }
+
+        override fun sync(
+            address: String,
+            token: String,
+            body: ByteArray,
+        ): ByteArray = throw IOException("offline")
+
+        override fun encryptionKey(
+            address: String,
+            token: String,
+            fileId: String,
+        ): KeyMaterial? = null
+
+        companion object {
+            const val PASSWORD = "server-secret"
+        }
+    }
+}

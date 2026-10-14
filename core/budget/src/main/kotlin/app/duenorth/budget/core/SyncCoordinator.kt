@@ -148,11 +148,12 @@ class SyncCoordinator(
     fun connect(
         address: String,
         password: String,
+        label: String? = null,
     ): ConnectResult {
         val normalized = normalizeAddress(address) ?: return ConnectResult(emptyList(), SyncCopy.ADDRESS_FAILED)
         return try {
             val token = transport.login(normalized, password)
-            val instance = upsertConnectedInstance(normalized)
+            val instance = upsertConnectedInstance(normalized, label)
             secrets.put(tokenKey(instance.id), token)
             secrets.remove(LEGACY_TOKEN)
             library.setActiveInstanceId(instance.id)
@@ -192,11 +193,12 @@ class SyncCoordinator(
     fun completeOpenId(
         address: String,
         token: String,
+        label: String? = null,
     ): ConnectResult {
         val normalized = normalizeAddress(address) ?: return ConnectResult(emptyList(), SyncCopy.ADDRESS_FAILED)
         if (token.isBlank()) return ConnectResult(remoteFiles, SyncCopy.SIGN_IN_FAILED)
         return try {
-            val instance = upsertConnectedInstance(normalized)
+            val instance = upsertConnectedInstance(normalized, label)
             secrets.put(tokenKey(instance.id), token)
             secrets.remove(LEGACY_TOKEN)
             library.setActiveInstanceId(instance.id)
@@ -964,15 +966,19 @@ class SyncCoordinator(
 
     private fun activeAddress(): String? = library.settings().activeAddress()
 
-    private fun upsertConnectedInstance(address: String): SavedInstance {
+    private fun upsertConnectedInstance(
+        address: String,
+        label: String? = null,
+    ): SavedInstance {
         val settings = library.settings()
         val existing = settings.instances.firstOrNull { it.address == address }
+        val named = label?.trim()?.takeIf { it.isNotEmpty() }
         val instance =
-            existing
+            existing?.let { if (named == null) it else it.copy(label = named) }
                 ?: SavedInstance(
                     id = ids(),
                     address = address,
-                    label = runCatching { java.net.URL(address).host }.getOrNull()?.takeIf { it.isNotBlank() } ?: address,
+                    label = named ?: runCatching { java.net.URL(address).host }.getOrNull()?.takeIf { it.isNotBlank() } ?: address,
                 )
         library.upsertInstance(instance)
         return instance

@@ -5,6 +5,8 @@ import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.ReportsCopy
+import app.duenorth.budget.core.ShellCopy
+import app.duenorth.budget.core.SignInMethod
 import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.ScreenAction
@@ -25,8 +27,17 @@ object ScreenBar {
         incomeCategory: Boolean = false,
         showClosed: Boolean = false,
         templates: Boolean = false,
+        developerMode: Boolean = false,
+        passwordSignIn: Boolean = true,
     ): List<ScreenBarSpec> =
         when (route) {
+            // Spec 011: one primary action per onboarding page, in the bar where the thumb is.
+            ShellRoute.Welcome ->
+                if (developerMode) listOf(menu("sample-budgets", AppGlyph.Budgets, ShellCopy.SAMPLE_BUDGETS)) else emptyList()
+            ShellRoute.OnboardingAddress -> listOf(spec("next", AppGlyph.ChevronRight, OnboardingScreenCopy.NEXT))
+            ShellRoute.OnboardingSignIn ->
+                if (passwordSignIn) listOf(spec("sign-in", AppGlyph.ChevronRight, OnboardingScreenCopy.SIGN_IN)) else emptyList()
+            ShellRoute.OnboardingFiles -> listOf(spec("refresh", AppGlyph.Sync, OnboardingScreenCopy.REFRESH))
             ShellRoute.Home ->
                 when {
                     !hasBudget -> listOf(spec("settings", AppGlyph.Settings, "settings"))
@@ -122,6 +133,11 @@ object ScreenBar {
             income,
             state.settings.showClosedAccounts,
             state.formatPrefs.templatesOn,
+            state.developerMode,
+            state.onboarding
+                ?.progress
+                ?.methods
+                ?.contains(SignInMethod.PASSWORD) != false,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -206,6 +222,9 @@ class ScreenBarHandlers(
     val onReports: () -> Unit = {},
     val onTemplates: () -> Unit = {},
     val onBankLink: () -> Unit = {},
+    val onNext: () -> Unit = {},
+    val onRefresh: () -> Unit = {},
+    val onSamples: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -245,6 +264,10 @@ class ScreenBarHandlers(
             "reports" -> onReports
             "templates" -> onTemplates
             "bank-link" -> onBankLink
+            "next" -> onNext
+            "sign-in" -> onSave
+            "refresh" -> onRefresh
+            "sample-budgets" -> onSamples
             else -> ({})
         }
 }

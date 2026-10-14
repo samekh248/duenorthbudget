@@ -26,6 +26,8 @@ import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
+import app.duenorth.budget.core.OnboardingPath
+import app.duenorth.budget.core.OnboardingProgress
 import app.duenorth.budget.core.OpenResult
 import app.duenorth.budget.core.ParsedImportRow
 import app.duenorth.budget.core.PayeeRow
@@ -48,6 +50,9 @@ import app.duenorth.budget.core.RuleSummary
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.ScheduleDraft
 import app.duenorth.budget.core.ScheduleWriteResult
+import app.duenorth.budget.core.ServerAddress
+import app.duenorth.budget.core.ServerCheck
+import app.duenorth.budget.core.ServerProbe
 import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.SyncCoordinator
@@ -67,6 +72,7 @@ import app.duenorth.budget.core.withMoveAvailable
 import app.duenorth.budget.core.withReleaseHold
 import app.duenorth.budget.design.MonthWindow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -161,6 +167,15 @@ sealed interface ShellRoute {
     data object Settings : ShellRoute
 
     data object SampleBudgets : ShellRoute
+
+    // Spec 011: first-run onboarding.
+    data object Welcome : ShellRoute
+
+    data object OnboardingAddress : ShellRoute
+
+    data object OnboardingSignIn : ShellRoute
+
+    data object OnboardingFiles : ShellRoute
 
     // Spec 010 US2: account management.
     data object Accounts : ShellRoute, StackRoute
@@ -291,6 +306,8 @@ data class ShellUiState(
     /** The open category's note while templates are on; null until read. */
     val categoryNote: String? = null,
     val bankLink: BankLinkUi? = null,
+    /** First-run progress while the phone has no budget (spec 011); null otherwise. */
+    val onboarding: OnboardingUi? = null,
 )
 
 class ShellViewModel(
@@ -298,6 +315,7 @@ class ShellViewModel(
     internal val sync: SyncCoordinator,
     private val bankSyncTransport: BankSyncTransport = HttpBankSyncTransport(),
     private val developerMode: Boolean = false,
+    internal val probe: ServerProbe = ServerProbe(),
 ) : ViewModel() {
     internal val shellGate = RefreshGate<MonthShell>()
     private val registerGate = RefreshGate<RegisterPage>()
@@ -318,9 +336,17 @@ class ShellViewModel(
 
     private var writing = false
 
+    /** The running server check or sign-in, cancelled by back (spec 011 R11). */
+    internal var onboardingJob: Job? = null
+
+    /** `onboarding.json` writes, one at a time and in order. */
+    internal val onboardingWrites = Dispatchers.IO.limitedParallelism(1)
+
     init {
         viewModelScope.launch {
+            restoreOnboarding()
             reload()
+            resumeOnboarding()
             val id = _state.value.settings.openBudgetId ?: return@launch
             if (_state.value.locked) return@launch
             withContext(Dispatchers.IO) { runCatching { sync.sync(id) } }
@@ -601,16 +627,22 @@ class ShellViewModel(
                 _state.update { it.copy(serverError = SyncCopy.SIGN_IN_FAILED) }
                 return
             }
-        val address = _state.value.openIdPendingAddress ?: return
         viewModelScope.launch {
+            // After a restart the pending address lives only in onboarding.json (spec 011 R5).
+            val saved =
+                _state.value.onboarding?.progress
+                    ?: withContext(Dispatchers.IO) { library.onboarding().read() }
+            val onboarding = saved?.openIdPendingAddress != null
+            val address = _state.value.openIdPendingAddress ?: saved?.openIdPendingAddress ?: return@launch
+            val label = if (onboarding) saved?.instanceLabel else null
             _state.update { it.copy(syncing = true, syncProgress = 0f, serverError = null) }
-            val result = withContext(Dispatchers.IO) { sync.completeOpenId(address, token) }
+            val result = withContext(Dispatchers.IO) { sync.completeOpenId(address, token, label) }
             val settings = withContext(Dispatchers.IO) { library.settings() }
             _state.update {
                 it.copy(
                     syncing = false,
                     syncProgress = null,
-                    serverError = result.error,
+                    serverError = if (onboarding) null else result.error,
                     remoteFiles = if (result.error == null) result.files else it.remoteFiles,
                     settings = settings,
                     instances = settings.instances,
@@ -619,9 +651,10 @@ class ShellViewModel(
                     signedIn = sync.signedIn(),
                     openIdPendingAddress = null,
                     openIdRedirectUrl = null,
-                    route = ShellRoute.Settings,
+                    route = if (onboarding) it.route else ShellRoute.Settings,
                 )
             }
+            if (onboarding) finishBrowserSignIn(saved!!, result.error)
         }
     }
 
@@ -1026,6 +1059,7 @@ class ShellViewModel(
         }
         if (current.route == ShellRoute.Home) return false
         if (current.route == ShellRoute.BudgetPassword && current.locked) return false
+        onboardingBack()?.let { return it }
         if (current.route == ShellRoute.Create && current.shell == null) return false
         if (current.route.isRegisterFlow() || current.route.isHomeFlow()) {
             val previous = if (history.isEmpty()) ShellRoute.Home else history.removeLast()
@@ -1048,7 +1082,9 @@ class ShellViewModel(
         history.clear()
         _state.update {
             it.copy(
-                route = ShellRoute.Home,
+                // With no budget yet, every other page leads back to the welcome page,
+                // unless a download is opening one.
+                route = if (it.shell == null && it.onboarding != null && !it.syncing) ShellRoute.Welcome else ShellRoute.Home,
                 createError = null,
                 switchTarget = null,
                 writeError = null,
@@ -1427,8 +1463,15 @@ class ShellViewModel(
             when (val result = withContext(Dispatchers.IO) { createBudget(name, currency) }) {
                 is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
                 is CreateResult.Created -> {
+                    // A budget made on the server path is sent to that server in the background (spec 011 US5).
+                    val send =
+                        _state.value.onboarding
+                            ?.progress
+                            ?.path == OnboardingPath.SERVER && sync.signedIn()
+                    finishOnboarding()
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
+                    if (send) uploadNew()
                 }
             }
         }
@@ -1451,6 +1494,7 @@ class ShellViewModel(
             when (val result = withContext(Dispatchers.IO) { library.createFromMock(datasetId) }) {
                 is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
                 is CreateResult.Created -> {
+                    finishOnboarding()
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
                 }
@@ -1702,6 +1746,7 @@ class ShellViewModel(
                 }
             when (result) {
                 OpenResult.Opened -> {
+                    finishOnboarding()
                     _state.update {
                         it.copy(
                             syncing = false,
@@ -1719,7 +1764,12 @@ class ShellViewModel(
                     }
                 is OpenResult.Failed ->
                     _state.update {
-                        it.copy(syncing = false, syncProgress = null, serverError = result.reason, route = ShellRoute.Server)
+                        it.copy(
+                            syncing = false,
+                            syncProgress = null,
+                            serverError = result.reason,
+                            route = if (it.onboarding != null) ShellRoute.OnboardingFiles else ShellRoute.Server,
+                        )
                     }
             }
         }
@@ -1953,7 +2003,8 @@ class ShellViewModel(
             val route =
                 when {
                     loaded.locked -> ShellRoute.BudgetPassword
-                    visibleShell == null && current.route == ShellRoute.Home -> ShellRoute.Create
+                    visibleShell == null && current.route == ShellRoute.Home ->
+                        if (loaded.budgets.isEmpty()) onboardingRoute(current.onboarding?.progress) else ShellRoute.Create
                     else -> current.route
                 }
             val reviewMonth =
@@ -1970,6 +2021,11 @@ class ShellViewModel(
             }
             current.copy(
                 loading = false,
+                onboarding =
+                    when {
+                        loaded.budgets.isNotEmpty() -> current.onboarding.takeIf { route.isOnboarding() }
+                        else -> current.onboarding ?: OnboardingUi(OnboardingProgress())
+                    },
                 settings = loaded.settings,
                 budgets = loaded.budgets,
                 shell = visibleShell,
@@ -2189,10 +2245,8 @@ class ShellViewModel(
         viewModelScope.launch {
             val reachable =
                 withContext(Dispatchers.IO) {
-                    runCatching {
-                        sync.loginMethods(address)
-                        true
-                    }.getOrElse { false }
+                    val parsed = ServerAddress.parse(address) ?: return@withContext false
+                    runCatching { probe.check(parsed) is ServerCheck.Ready }.getOrElse { false }
                 }
             _state.update { it.copy(instanceReachable = reachable) }
         }

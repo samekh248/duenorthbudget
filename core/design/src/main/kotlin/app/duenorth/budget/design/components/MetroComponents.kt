@@ -29,6 +29,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
@@ -117,6 +118,7 @@ fun MetroField(
     hint: String,
     modifier: Modifier = Modifier,
     conceal: Boolean = false,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     val colors = Metro.colors
     val field = if (colors.isDark) Color.White else Color(0xFFBFBFBF)
@@ -139,6 +141,8 @@ fun MetroField(
             textStyle = Metro.typography.control.copy(color = ink),
             cursorBrush = SolidColor(Metro.accent.fill),
             visualTransformation = if (conceal) PasswordVisualTransformation() else VisualTransformation.None,
+            keyboardOptions = keyboardOptions,
+            singleLine = keyboardOptions != KeyboardOptions.Default,
             modifier = Modifier.fillMaxWidth(),
         )
     }

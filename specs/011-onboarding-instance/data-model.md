@@ -56,9 +56,9 @@ Validation: blank, whitespace inside, or an unparseable host gives no candidates
 | `Unreachable` | `reason: NoAnswer \| Timeout \| CertificateNotTrusted` | "the server could not be reached" / "the server's certificate is not trusted by this phone" |
 | `NotActual` | `httpStatus` | "that address is not an Actual server" |
 | `NotSetUp` | – | "this server is not set up yet. finish setting it up in Actual, then try again" |
-| `Unsupported` | `reason: OldServer \| SignIn(methods: List<String>)` | "this server is too old for the phone" / "this server only allows {method} sign-in, which the phone cannot use" |
+| `Unsupported` | `methods: List<String>` | "this server only allows {method} sign-in, which the phone cannot use" |
 
-`SignInMethod` is `Password` or `Browser` (Actual's `openid`). Other server methods, such as `header`, only appear in `Unsupported.SignIn`.
+`SignInMethod` is `Password` or `Browser` (Actual's `openid`). Other server methods, such as `header`, only appear in `Unsupported`. An Actual server too old to list its sign-ins is treated as password-only, which is what those servers had, rather than refused: the phone cannot read a server's version without signing in.
 
 `ServerCheckSummary` is the persisted shape: outcome name, address, secure flag, methods. It holds no response bodies.
 

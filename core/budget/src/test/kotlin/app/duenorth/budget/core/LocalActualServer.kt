@@ -25,6 +25,15 @@ class LocalActualServer(
     var online: Boolean = true
     var openIdCancelled: Boolean = false
 
+    /** `needs-bootstrap` answers `bootstrapped: false` when this is false (spec 011). */
+    var bootstrapped: Boolean = true
+
+    /** Serves a plain web page on every path, like an address that is not Actual. */
+    var htmlOnly: Boolean = false
+
+    /** When false, `needs-bootstrap` is missing (404), like an older server. */
+    var bootstrapRoute: Boolean = true
+
     /** Bank providers by path prefix (`simplefin`, `gocardless`, `pluggyai`) and whether each is configured. */
     val configured: MutableMap<String, Boolean> = java.util.concurrent.ConcurrentHashMap()
 
@@ -135,7 +144,12 @@ class LocalActualServer(
         }
         val path = exchange.requestURI.path
         val method = exchange.requestMethod
+        if (htmlOnly) {
+            exchange.respond(200, "<html><body>router login</body></html>".toByteArray(), "text/html")
+            return
+        }
         when {
+            method == "GET" && path == "/account/needs-bootstrap" && bootstrapRoute -> needsBootstrap(exchange)
             method == "GET" && path == "/account/login-methods" -> loginMethods(exchange)
             method == "POST" && path == "/account/login" -> login(exchange)
             method == "GET" && path == openIdCallbackPath -> openIdCallback(exchange)
@@ -182,6 +196,15 @@ class LocalActualServer(
             }
         val text = if (data == null) """{"status":"ok"}""" else """{"status":"ok","data":$data}"""
         exchange.respond(200, text.toByteArray(), "application/json")
+    }
+
+    private fun needsBootstrap(exchange: HttpExchange) {
+        val listed = methods.joinToString(",") { "{\"method\":\"$it\",\"active\":1,\"displayName\":\"$it\"}" }
+        val active = methods.firstOrNull() ?: "password"
+        val body =
+            "{\"status\":\"ok\",\"data\":{\"bootstrapped\":$bootstrapped,\"loginMethod\":\"$active\"," +
+                "\"availableLoginMethods\":[$listed],\"multiuser\":false}}"
+        exchange.respond(200, body.toByteArray(), "application/json")
     }
 
     private fun loginMethods(exchange: HttpExchange) {

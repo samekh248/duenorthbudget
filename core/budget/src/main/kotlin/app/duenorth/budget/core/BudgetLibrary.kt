@@ -46,6 +46,9 @@ class BudgetLibrary(
         return settings
     }
 
+    /** First-run progress beside `phone.json` (spec 011). */
+    fun onboarding(): OnboardingStore = OnboardingStore(File(root, "onboarding.json"))
+
     fun save(settings: PhoneSettings) {
         root.mkdirs()
         val cleaned =
