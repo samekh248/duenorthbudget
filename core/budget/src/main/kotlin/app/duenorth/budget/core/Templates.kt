@@ -15,9 +15,9 @@ import kotlin.math.roundToLong
 /** Words for spec 010's budget templates (`contracts/templates.md`). */
 object TemplateCopy {
     const val TITLE = "templates"
-    const val CHECK = "check templates"
-    const val APPLY = "apply templates"
-    const val OVERWRITE = "overwrite with templates"
+    const val CHECK = "check"
+    const val APPLY = "apply"
+    const val OVERWRITE = "overwrite"
     const val ALL_VALID = "all templates valid"
     const val OVERWRITE_CONFIRM = "this replaces every templated amount this month, including ones already budgeted"
     const val OFF = "turn on budget templates in settings first"

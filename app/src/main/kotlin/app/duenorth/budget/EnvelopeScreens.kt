@@ -37,6 +37,7 @@ import app.duenorth.budget.core.MoneyParse
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
@@ -73,14 +74,16 @@ fun CategoryBudgetScreen(
         MetroField(amount, { amount = it }, "budgeted", Modifier.testTag("category-budget-amount"))
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
         RememberFormSave { onSave(amount) }
-        if (!formSaveOnBar()) {
-            MetroButton("save") { onSave(amount) }
-        }
-        MetroButton(EnvelopeCopy.MOVE, onClick = onMove)
-        MetroButton(
-            if (category.carryover) "stop ${EnvelopeCopy.ROLLOVER}" else EnvelopeCopy.ROLLOVER,
-        ) {
-            onToggleCarryover(!category.carryover)
+        MetroButtonGrid {
+            if (!formSaveOnBar()) {
+                MetroButton("save") { onSave(amount) }
+            }
+            MetroButton(EnvelopeCopy.MOVE, onClick = onMove)
+            MetroButton(
+                if (category.carryover) "stop ${EnvelopeCopy.ROLLOVER}" else EnvelopeCopy.ROLLOVER,
+            ) {
+                onToggleCarryover(!category.carryover)
+            }
         }
         // Only while budget templates are on (spec 010 US5).
         if (note != null) CategoryNoteEditor(note, onSaveNote)
@@ -160,11 +163,13 @@ fun HoldMonthScreen(
         MetroField(amount, { amount = it }, "amount for next month")
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
         RememberFormSave { onSave(amount) }
-        if (!formSaveOnBar()) {
-            MetroButton(EnvelopeCopy.HOLD) { onSave(amount) }
-        }
-        if (shell.bufferedMinor != 0L) {
-            MetroButton(EnvelopeCopy.RELEASE, onClick = onRelease)
+        MetroButtonGrid {
+            if (!formSaveOnBar()) {
+                MetroButton(EnvelopeCopy.HOLD) { onSave(amount) }
+            }
+            if (shell.bufferedMinor != 0L) {
+                MetroButton(EnvelopeCopy.RELEASE, onClick = onRelease)
+            }
         }
     }
 }
@@ -269,26 +274,26 @@ private fun ManageGroupLine(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    // Row actions show for the selected row only, as a button grid under its name.
+    Column(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick = onSelect)
             .padding(vertical = MetroDimens.Row)
             .testTag("manage-group-${group.id}"),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         MetroText(
             group.name,
             Metro.typography.subheader,
-            Modifier.weight(1f),
             color = if (selected) Metro.accent.text else Metro.colors.foreground,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
-            MetroButton(EnvelopeCopy.MOVE_UP, onClick = onMoveEarlier)
-            MetroButton(EnvelopeCopy.MOVE_DOWN, onClick = onMoveLater)
-            MetroButton(EnvelopeCopy.DELETE, onClick = onDelete)
+        if (selected) {
+            MetroButtonGrid(Modifier.padding(top = MetroDimens.Row)) {
+                MetroButton(EnvelopeCopy.MOVE_UP, onClick = onMoveEarlier)
+                MetroButton(EnvelopeCopy.MOVE_DOWN, onClick = onMoveLater)
+                MetroButton(EnvelopeCopy.DELETE, onClick = onDelete)
+            }
         }
     }
 }
@@ -305,27 +310,26 @@ private fun ManageCategoryLine(
     modifier: Modifier = Modifier,
 ) {
     val label = if (category.hidden) "${category.name} (hidden)" else category.name
-    Row(
+    Column(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick = onSelect)
             .padding(start = MetroDimens.Gutter, top = MetroDimens.Row, bottom = MetroDimens.Row)
             .testTag("manage-category-${category.id}"),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         MetroText(
             label,
             Metro.typography.body,
-            Modifier.weight(1f),
             color = if (selected) Metro.accent.text else Metro.colors.foreground,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
-            MetroButton(EnvelopeCopy.MOVE_UP, onClick = onMoveEarlier)
-            MetroButton(EnvelopeCopy.MOVE_DOWN, onClick = onMoveLater)
-            MetroButton(if (category.hidden) EnvelopeCopy.SHOW else EnvelopeCopy.HIDE, onClick = onHide)
-            MetroButton(EnvelopeCopy.DELETE, onClick = onDelete)
+        if (selected) {
+            MetroButtonGrid(Modifier.padding(top = MetroDimens.Row)) {
+                MetroButton(EnvelopeCopy.MOVE_UP, onClick = onMoveEarlier)
+                MetroButton(EnvelopeCopy.MOVE_DOWN, onClick = onMoveLater)
+                MetroButton(if (category.hidden) EnvelopeCopy.SHOW else EnvelopeCopy.HIDE, onClick = onHide)
+                MetroButton(EnvelopeCopy.DELETE, onClick = onDelete)
+            }
         }
     }
 }

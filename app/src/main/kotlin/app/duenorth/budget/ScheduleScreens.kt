@@ -38,6 +38,7 @@ import app.duenorth.budget.core.ScheduleEnd
 import app.duenorth.budget.core.ScheduleRepeat
 import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
@@ -111,9 +112,9 @@ private fun DueLine(
                 Modifier.widthIn(max = 148.dp),
             )
         }
-        Row(Modifier.padding(top = MetroDimens.Gutter), horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
-            MetroButton(if (row.dueToday) "post" else "post early", Modifier.weight(1f)) { onPost(row.id) }
-            MetroButton("skip", Modifier.weight(1f)) { onSkip(row.id) }
+        MetroButtonGrid(Modifier.padding(top = MetroDimens.Gutter)) {
+            MetroButton(if (row.dueToday) "post" else "post early") { onPost(row.id) }
+            MetroButton("skip") { onSkip(row.id) }
         }
     }
 }
@@ -136,8 +137,10 @@ fun ScheduleDuplicateScreen(
             "A similar transaction is already in this account within two days of the due date.",
             Metro.typography.body,
         )
-        MetroButton("post anyway") { onPostAnyway() }
-        MetroButton("cancel") { onCancel() }
+        MetroButtonGrid {
+            MetroButton("post anyway") { onPostAnyway() }
+            MetroButton("cancel") { onCancel() }
+        }
     }
 }
 

@@ -29,7 +29,9 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -51,6 +54,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -117,6 +121,7 @@ fun MetroField(
     hint: String,
     modifier: Modifier = Modifier,
     conceal: Boolean = false,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     val colors = Metro.colors
     val field = if (colors.isDark) Color.White else Color(0xFFBFBFBF)
@@ -139,29 +144,81 @@ fun MetroField(
             textStyle = Metro.typography.control.copy(color = ink),
             cursorBrush = SolidColor(Metro.accent.fill),
             visualTransformation = if (conceal) PasswordVisualTransformation() else VisualTransformation.None,
+            keyboardOptions = keyboardOptions,
+            singleLine = keyboardOptions != KeyboardOptions.Default,
             modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
+/**
+ * A body button, laid out the Windows Phone way: every button is one cell of a two-column
+ * grid, so a lone button takes the left half of the row and pairs sit side by side at equal
+ * width. Group neighbouring buttons in [MetroButtonGrid]; commands for the whole page belong
+ * on the app bar instead.
+ */
 @Composable
 fun MetroButton(
     label: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    MetroActionButton(label, modifier.fillMaxWidth(), onClick)
+    val cell = if (LocalButtonCell.current) Modifier.fillMaxWidth() else Modifier.buttonCell()
+    MetroActionButton(label, modifier.then(cell), onClick)
 }
 
-/** Compact outlined action from the budget mockups (previous / hold / new budget). */
+/** Same button as [MetroButton]; kept for the screens that named the outlined style. */
 @Composable
 fun MetroOutlineButton(
     label: String,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    MetroActionButton(label, modifier, onClick)
+    MetroButton(label, modifier, onClick)
 }
+
+/**
+ * Buttons that belong together, two to a row at equal width, rows a gutter apart. An odd
+ * last button keeps the left cell, so a page's buttons always line up on the same grid.
+ */
+@Composable
+fun MetroButtonGrid(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val gutter = with(LocalDensity.current) { MetroDimens.Gutter.roundToPx() }
+    Layout(
+        content = { CompositionLocalProvider(LocalButtonCell provides true, content = content) },
+        modifier = modifier.fillMaxWidth(),
+    ) { measurables, constraints ->
+        val cell = ((constraints.maxWidth - gutter) / 2).coerceAtLeast(0)
+        val placeables = measurables.map { it.measure(Constraints.fixedWidth(cell)) }
+        val rows = placeables.chunked(2)
+        val heights = rows.map { row -> row.maxOf { it.height } }
+        val height = heights.sum() + gutter * (rows.size - 1).coerceAtLeast(0)
+        layout(constraints.maxWidth, height) {
+            var y = 0
+            rows.forEachIndexed { index, row ->
+                row.forEachIndexed { column, placeable -> placeable.place(column * (cell + gutter), y) }
+                y += heights[index] + gutter
+            }
+        }
+    }
+}
+
+private val LocalButtonCell = staticCompositionLocalOf { false }
+
+/** Half the row less half a gutter: the width of one [MetroButtonGrid] cell. A long label may grow it. */
+private fun Modifier.buttonCell(): Modifier =
+    layout { measurable, constraints ->
+        if (!constraints.hasBoundedWidth) {
+            val placeable = measurable.measure(constraints)
+            return@layout layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+        }
+        val cell = ((constraints.maxWidth - MetroDimens.Gutter.roundToPx()) / 2).coerceIn(constraints.minWidth, constraints.maxWidth)
+        val placeable = measurable.measure(constraints.copy(minWidth = cell))
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+    }
 
 @Composable
 private fun MetroActionButton(

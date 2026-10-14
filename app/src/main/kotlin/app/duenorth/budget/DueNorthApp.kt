@@ -38,8 +38,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.HttpActualTransport
+import app.duenorth.budget.core.ServerAddress
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.MotionPolicy
@@ -49,6 +51,7 @@ import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroTheme
 import java.io.File
 import java.time.YearMonth
+import java.util.Locale
 
 class DueNorthApplication : Application() {
     lateinit var library: BudgetLibrary
@@ -175,7 +178,8 @@ fun DueNorthApp(model: ShellViewModel) {
             state.confirmAdvanced != null ||
             (
                 state.route != ShellRoute.Home &&
-                    !(state.route == ShellRoute.Create && state.shell == null) &&
+                    state.route != ShellRoute.Welcome &&
+                    !(state.route == ShellRoute.Create && state.shell == null && state.onboarding == null) &&
                     !(state.route == ShellRoute.BudgetPassword && state.locked)
             )
     BackHandler(enabled = canBack) {
@@ -248,6 +252,10 @@ fun DueNorthApp(model: ShellViewModel) {
                     onReports = model::openReports,
                     onTemplates = model::openTemplates,
                     onBankLink = model::openBankLink,
+                    onNext = model::onboardingCheck,
+                    onRefresh = model::onboardingRefresh,
+                    onSamples = model::showSampleBudgets,
+                    onNewBudget = model::onboardingNewBudget,
                 )
             }
         val actions = ScreenBar.forState(state, handlers)
@@ -366,12 +374,63 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onChoose = model::createSample,
                                 modifier = fill,
                             )
-                        ShellRoute.Create ->
+                        ShellRoute.Create -> {
+                            val draft = state.onboarding?.progress
                             CreateBudgetScreen(
                                 error = state.createError,
                                 onCreate = model::create,
                                 modifier = fill,
-                                defaultName = state.defaultBudgetName,
+                                defaultName = draft?.createName?.ifBlank { null } ?: state.defaultBudgetName,
+                                defaultCurrency = draft?.createCurrency ?: Currencies.forLocale(Locale.getDefault()),
+                                onDraft = if (draft == null) null else model::onboardingCreateDraft,
+                            )
+                        }
+                        ShellRoute.Welcome ->
+                            WelcomeScreen(
+                                onServer = model::onboardingChooseServer,
+                                onPhone = model::onboardingChoosePhone,
+                                modifier = fill,
+                            )
+                        ShellRoute.OnboardingAddress -> {
+                            val onboarding = state.onboarding
+                            OnboardingAddressScreen(
+                                address = onboarding?.progress?.addressText.orEmpty(),
+                                checking = onboarding?.checking == true,
+                                error = onboarding?.addressError,
+                                onAddress = model::onboardingAddress,
+                                onNext = model::onboardingCheck,
+                                onPhone = model::onboardingChoosePhone,
+                                modifier = fill,
+                            )
+                        }
+                        ShellRoute.OnboardingSignIn -> {
+                            val onboarding = state.onboarding
+                            val ready = onboarding?.progress?.readyAddress.orEmpty()
+                            val host = ServerAddress.parse(ready)?.host ?: ready
+                            OnboardingSignInScreen(
+                                host = host,
+                                methods = onboarding?.progress?.methods.orEmpty(),
+                                label = onboarding?.progress?.instanceLabel.orEmpty(),
+                                checking = onboarding?.checking == true || state.syncing,
+                                error = onboarding?.signInError,
+                                onLabel = model::onboardingLabel,
+                                onSignIn = model::onboardingSignIn,
+                                onBrowser = model::onboardingBrowser,
+                                modifier = fill,
+                            )
+                        }
+                        ShellRoute.OnboardingFiles ->
+                            OnboardingFilesScreen(
+                                label =
+                                    state.activeInstance?.label
+                                        ?: state.onboarding
+                                            ?.progress
+                                            ?.instanceLabel
+                                            .orEmpty(),
+                                files = state.remoteFiles,
+                                error = state.serverError,
+                                onOpen = model::onboardingOpen,
+                                modifier = fill,
                             )
                         ShellRoute.ConfirmSwitch ->
                             ConfirmSwitchScreen(

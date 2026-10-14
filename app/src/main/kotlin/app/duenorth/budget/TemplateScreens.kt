@@ -19,6 +19,7 @@ import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.theme.Metro
@@ -55,14 +56,18 @@ fun TemplatesScreen(
         MetroText(monthLabel(month), Metro.typography.caption, color = Metro.colors.secondary)
         if (confirm != null) {
             MetroText(confirm, Metro.typography.subheader, Modifier.testTag("templates-confirm"))
-            MetroButton(TemplateCopy.OVERWRITE, Modifier.testTag("templates-confirm-yes"), onClick = onConfirm)
-            MetroButton(MonthActionCopy.KEEP, Modifier.testTag("templates-confirm-keep"), onClick = onKeep)
+            MetroButtonGrid {
+                MetroButton(TemplateCopy.OVERWRITE, Modifier.testTag("templates-confirm-yes"), onClick = onConfirm)
+                MetroButton(MonthActionCopy.KEEP, Modifier.testTag("templates-confirm-keep"), onClick = onKeep)
+            }
             return@Column
         }
         TemplateOutcome(result, busy)
-        MetroButton(TemplateCopy.APPLY, Modifier.testTag("templates-apply"), onClick = onApply)
-        MetroButton(TemplateCopy.OVERWRITE, Modifier.testTag("templates-overwrite"), onClick = onOverwrite)
-        MetroButton(TemplateCopy.CHECK, Modifier.testTag("templates-check"), onClick = onCheck)
+        MetroButtonGrid {
+            MetroButton(TemplateCopy.APPLY, Modifier.testTag("templates-apply"), onClick = onApply)
+            MetroButton(TemplateCopy.OVERWRITE, Modifier.testTag("templates-overwrite"), onClick = onOverwrite)
+            MetroButton(TemplateCopy.CHECK, Modifier.testTag("templates-check"), onClick = onCheck)
+        }
     }
 }
 

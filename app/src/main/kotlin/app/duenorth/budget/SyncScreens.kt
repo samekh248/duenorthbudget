@@ -26,6 +26,7 @@ import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
@@ -115,10 +116,12 @@ fun ServerScreen(
                     }
                 }
             }
-            if (conflictCount > 0) MetroButton("conflicts", onClick = onConflicts)
-            MetroButton("sync now", onClick = onSync)
-            MetroButton("send this budget", onClick = onUpload)
-            MetroButton("sign out", onClick = onSignOut)
+            MetroButtonGrid {
+                MetroButton("sync now", onClick = onSync)
+                MetroButton("send budget", onClick = onUpload)
+                if (conflictCount > 0) MetroButton("conflicts", onClick = onConflicts)
+                MetroButton("sign out", onClick = onSignOut)
+            }
         }
     }
 }
@@ -286,7 +289,9 @@ fun ConfirmReplaceScreen(
     ) {
         MetroText("replace $serverName", Metro.typography.header)
         MetroText("with $phoneName", Metro.typography.subheader)
-        MetroButton("replace", onClick = onReplace)
-        MetroButton("keep", onClick = onKeep)
+        MetroButtonGrid {
+            MetroButton("replace", onClick = onReplace)
+            MetroButton("keep", onClick = onKeep)
+        }
     }
 }

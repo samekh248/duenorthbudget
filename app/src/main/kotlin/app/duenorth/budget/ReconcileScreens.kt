@@ -29,6 +29,7 @@ import app.duenorth.budget.core.ReconcilePage
 import app.duenorth.budget.core.ReconcileRow
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
@@ -127,8 +128,10 @@ fun ReconcileScreen(
         LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid), state = list) {
             items(page.rows, key = { it.id }) { row -> ReconcileLine(row, page, onToggle) }
         }
-        MetroButton(ReconcileCopy.FINISH, Modifier.padding(top = MetroDimens.Grid, bottom = MetroDimens.Gutter), onClick = onFinish)
-        MetroButton(ReconcileCopy.CANCEL, onClick = onCancel)
+        MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
+            MetroButton(ReconcileCopy.FINISH, onClick = onFinish)
+            MetroButton(ReconcileCopy.CANCEL, onClick = onCancel)
+        }
     }
 }
 

@@ -52,6 +52,17 @@ object Currencies {
         )
 
     fun byCode(code: String): CurrencySpec? = all.firstOrNull { it.code == code }
+
+    /** The listed currency for the phone's region, or USD (spec 011 R9). */
+    fun forLocale(locale: java.util.Locale): String {
+        val code =
+            runCatching {
+                java.util.Currency
+                    .getInstance(locale)
+                    .currencyCode
+            }.getOrNull()
+        return code?.takeIf { byCode(it) != null } ?: "USD"
+    }
 }
 
 data class FormatOptions(

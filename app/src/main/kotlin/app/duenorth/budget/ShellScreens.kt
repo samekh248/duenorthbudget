@@ -65,6 +65,7 @@ import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.MetroAppBarHost
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroPivot
@@ -691,9 +692,14 @@ fun CreateBudgetScreen(
     onCreate: (String, String) -> Unit,
     modifier: Modifier = Modifier,
     defaultName: String = "",
+    defaultCurrency: String = "USD",
+    /** Onboarding keeps the draft so a restart resumes it (spec 011). */
+    onDraft: ((String, String) -> Unit)? = null,
 ) {
     var name by remember { mutableStateOf(defaultName) }
-    var currency by remember { mutableStateOf("USD") }
+    var currency by remember { mutableStateOf(defaultCurrency) }
+    val currencyIndex = Currencies.all.indexOfFirst { it.code == currency }.coerceAtLeast(0)
+    val currencyList = rememberLazyListState(initialFirstVisibleItemIndex = currencyIndex)
     Column(
         modifier
             .fillMaxSize()
@@ -702,11 +708,18 @@ fun CreateBudgetScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         MetroText("new budget", Metro.typography.header)
-        MetroField(name, { name = it }, "name")
+        MetroField(
+            name,
+            {
+                name = it
+                onDraft?.invoke(it, currency)
+            },
+            "name",
+        )
         if (error != null) {
             MetroText(error, Metro.typography.body, color = Metro.accent.text)
         }
-        LazyColumn(Modifier.weight(1f)) {
+        LazyColumn(Modifier.weight(1f), state = currencyList) {
             items(Currencies.all, key = { it.code }) { item ->
                 val selected = item.code == currency
                 MetroText(
@@ -715,8 +728,10 @@ fun CreateBudgetScreen(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
-                        .metroPress { currency = item.code }
-                        .padding(vertical = MetroDimens.Row),
+                        .metroPress {
+                            currency = item.code
+                            onDraft?.invoke(name, item.code)
+                        }.padding(vertical = MetroDimens.Row),
                     color = if (selected) Metro.accent.text else Metro.colors.foreground,
                 )
             }
@@ -759,15 +774,11 @@ fun BudgetsScreen(
                 )
             }
         }
-        MetroOutlineButton("new budget", Modifier.padding(top = 12.dp), onClick = onCreate)
-        if (onSamples != null) {
-            MetroOutlineButton(
-                ShellCopy.SAMPLE_BUDGETS,
-                Modifier
-                    .padding(top = MetroDimens.Gutter)
-                    .testTag("sample-budgets"),
-                onClick = onSamples,
-            )
+        MetroButtonGrid(Modifier.padding(top = 12.dp)) {
+            MetroButton("new budget", onClick = onCreate)
+            if (onSamples != null) {
+                MetroButton(ShellCopy.SAMPLE_BUDGETS, Modifier.testTag("sample-budgets"), onClick = onSamples)
+            }
         }
     }
 }
@@ -835,8 +846,10 @@ fun ConfirmSwitchScreen(
     ) {
         MetroText("open $opening", Metro.typography.header)
         MetroText("leave $leaving on the phone", Metro.typography.subheader)
-        MetroOutlineButton("open", onClick = onOpen)
-        MetroOutlineButton("stay", onClick = onStay)
+        MetroButtonGrid {
+            MetroButton("open", onClick = onOpen)
+            MetroButton("stay", onClick = onStay)
+        }
     }
 }
 

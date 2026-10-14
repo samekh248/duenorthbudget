@@ -19,8 +19,9 @@ Timeouts: 10 s connect, 15 s read. A TLS handshake failure stops at that candida
 | TLS handshake fails | `Unreachable(CertificateNotTrusted)` |
 | (1) and (2) both answer, but neither is Actual's JSON (`status` + `data`, or a `methods` list) | `NotActual(httpStatus)` |
 | (1) says `bootstrapped: false` | `NotSetUp` |
-| Actual JSON from neither endpoint's expected shape (e.g. both 404 on a server that otherwise answers like Actual) | `Unsupported(OldServer)` |
-| Methods listed, none of `password` / `openid` | `Unsupported(SignIn(methods))` |
+| Neither endpoint answers with Actual's JSON and the server answers 5xx (a proxy in front of a stopped server) | `Unreachable(NoAnswer)` |
+| Actual JSON, but no sign-in methods listed (an older server) | `Ready` with password only |
+| Methods listed, none of `password` / `openid` | `Unsupported(methods)` |
 | Methods include `password` and/or `openid` | `Ready(address, secure, methods)` |
 
 Method entries are accepted as plain strings or as objects with a `method` field; objects with `active: false` are ignored. Field names are checked against the Actual sync-server source when this is implemented.

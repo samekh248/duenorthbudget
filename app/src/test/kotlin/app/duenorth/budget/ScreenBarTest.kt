@@ -82,4 +82,21 @@ class ScreenBarTest {
     fun settingsRouteHasNoBarActions() {
         assertTrue(ScreenBar.specsFor(ShellRoute.Settings, hasBudget = true, mode = BudgetMode.ENVELOPE).isEmpty())
     }
+
+    @Test
+    fun onboardingPagesKeepOnePrimaryActionInTheBar() {
+        fun ids(
+            route: ShellRoute,
+            developerMode: Boolean = false,
+            password: Boolean = true,
+        ) = ScreenBar
+            .specsFor(route, hasBudget = false, mode = null, developerMode = developerMode, passwordSignIn = password)
+            .map { it.id }
+        assertTrue(ids(ShellRoute.Welcome).isEmpty())
+        assertEquals(listOf("sample-budgets"), ids(ShellRoute.Welcome, developerMode = true))
+        assertEquals(listOf("next"), ids(ShellRoute.OnboardingAddress))
+        assertEquals(listOf("sign-in"), ids(ShellRoute.OnboardingSignIn))
+        assertTrue(ids(ShellRoute.OnboardingSignIn, password = false).isEmpty())
+        assertEquals(listOf("new-budget", "refresh"), ids(ShellRoute.OnboardingFiles))
+    }
 }
