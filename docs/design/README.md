@@ -16,7 +16,9 @@ month panorama, accounts, the budgets list, and switching files, in light
 and dark. The shipped shell matches those four frames, except that the
 month now lists each group's categories under it (tap a category to
 assign; there is no separate group page), held amount under the list, outlined
-month/hold/file actions, and the same app bar. Surfaces that are not drawn
+month/hold/file actions, and the same app bar. The first-run onboarding pages
+(welcome, server address, sign in, pick a budget) are drawn in two more
+rows, light and dark, for spec 011. Surfaces that are not drawn
 here still follow the Due North Tasks reference,
 `docs/design/metro-mockups.svg` in
 [samekh248/duenorthtasks](https://github.com/samekh248/duenorthtasks).
