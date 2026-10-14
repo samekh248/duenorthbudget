@@ -30,6 +30,7 @@ import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroText
@@ -180,12 +181,12 @@ fun IncomeCategoryScreen(
                 Modifier.testTag("auto-hold-state"),
                 color = if (category.autoHold) Metro.accent.text else Metro.colors.secondary,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
-                MetroOutlineButton(IncomeCopy.HOLD_ON, Modifier.testTag("auto-hold-on")) { onAutoHold(AutoHoldChoice.ON) }
-                MetroOutlineButton(IncomeCopy.HOLD_OFF_MONTH, Modifier.testTag("auto-hold-off-month")) {
+            MetroButtonGrid {
+                MetroButton(IncomeCopy.HOLD_ON, Modifier.testTag("auto-hold-on")) { onAutoHold(AutoHoldChoice.ON) }
+                MetroButton(IncomeCopy.HOLD_OFF_MONTH, Modifier.testTag("auto-hold-off-month")) {
                     onAutoHold(AutoHoldChoice.OFF_THIS_MONTH)
                 }
-                MetroOutlineButton(IncomeCopy.HOLD_OFF, Modifier.testTag("auto-hold-off")) { onAutoHold(AutoHoldChoice.OFF) }
+                MetroButton(IncomeCopy.HOLD_OFF, Modifier.testTag("auto-hold-off")) { onAutoHold(AutoHoldChoice.OFF) }
             }
             if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
             MetroText(IncomeCopy.HOLD_NOTE, Metro.typography.caption, color = Metro.colors.secondary)

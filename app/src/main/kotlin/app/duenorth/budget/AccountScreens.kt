@@ -25,6 +25,7 @@ import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
@@ -342,8 +343,10 @@ fun ForceCloseConfirmScreen(
     ) {
         MetroText(AccountScreenCopy.FORCE_CLOSE, Metro.typography.header)
         MetroText(reason, Metro.typography.subheader)
-        MetroButton(AccountScreenCopy.FORCE_CLOSE, Modifier.testTag("account-force-close-yes"), onClick = onConfirm)
-        MetroButton(AccountScreenCopy.KEEP, Modifier.testTag("account-force-close-keep"), onClick = onKeep)
+        MetroButtonGrid {
+            MetroButton(AccountScreenCopy.FORCE_CLOSE, Modifier.testTag("account-force-close-yes"), onClick = onConfirm)
+            MetroButton(AccountScreenCopy.KEEP, Modifier.testTag("account-force-close-keep"), onClick = onKeep)
+        }
     }
 }
 

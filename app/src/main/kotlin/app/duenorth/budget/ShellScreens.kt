@@ -65,6 +65,7 @@ import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.MetroAppBarHost
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroPivot
@@ -773,15 +774,11 @@ fun BudgetsScreen(
                 )
             }
         }
-        MetroOutlineButton("new budget", Modifier.padding(top = 12.dp), onClick = onCreate)
-        if (onSamples != null) {
-            MetroOutlineButton(
-                ShellCopy.SAMPLE_BUDGETS,
-                Modifier
-                    .padding(top = MetroDimens.Gutter)
-                    .testTag("sample-budgets"),
-                onClick = onSamples,
-            )
+        MetroButtonGrid(Modifier.padding(top = 12.dp)) {
+            MetroButton("new budget", onClick = onCreate)
+            if (onSamples != null) {
+                MetroButton(ShellCopy.SAMPLE_BUDGETS, Modifier.testTag("sample-budgets"), onClick = onSamples)
+            }
         }
     }
 }
@@ -849,8 +846,10 @@ fun ConfirmSwitchScreen(
     ) {
         MetroText("open $opening", Metro.typography.header)
         MetroText("leave $leaving on the phone", Metro.typography.subheader)
-        MetroOutlineButton("open", onClick = onOpen)
-        MetroOutlineButton("stay", onClick = onStay)
+        MetroButtonGrid {
+            MetroButton("open", onClick = onOpen)
+            MetroButton("stay", onClick = onStay)
+        }
     }
 }
 

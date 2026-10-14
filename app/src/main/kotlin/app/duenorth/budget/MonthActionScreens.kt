@@ -29,6 +29,7 @@ import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.theme.Metro
@@ -153,12 +154,14 @@ fun FillConfirmScreen(
         MetroText(MonthActionCopy.fillTitle(confirm.kind), Metro.typography.header)
         MetroText(monthLabel(month), Metro.typography.caption, color = Metro.colors.secondary)
         MetroText(confirm.reason, Metro.typography.subheader)
-        MetroButton(
-            if (confirm.kind == MonthFillKind.ZERO) MonthActionCopy.ZERO else MonthActionCopy.REPLACE,
-            Modifier.testTag("fill-confirm-yes"),
-            onClick = onConfirm,
-        )
-        MetroButton(MonthActionCopy.KEEP, Modifier.testTag("fill-confirm-keep"), onClick = onKeep)
+        MetroButtonGrid {
+            MetroButton(
+                if (confirm.kind == MonthFillKind.ZERO) MonthActionCopy.ZERO else MonthActionCopy.REPLACE,
+                Modifier.testTag("fill-confirm-yes"),
+                onClick = onConfirm,
+            )
+            MetroButton(MonthActionCopy.KEEP, Modifier.testTag("fill-confirm-keep"), onClick = onKeep)
+        }
     }
 }
 

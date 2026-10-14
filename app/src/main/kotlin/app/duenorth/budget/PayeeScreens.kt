@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import app.duenorth.budget.core.PayeeRow
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
@@ -48,11 +49,13 @@ fun PayeesScreen(
                     Metro.typography.body,
                     Modifier.padding(top = MetroDimens.Gutter),
                 )
-                MetroButton("merge", Modifier.padding(top = MetroDimens.Grid)) {
-                    onConfirmMerge(editing!!.id, name)
-                    editing = null
+                MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
+                    MetroButton("merge") {
+                        onConfirmMerge(editing!!.id, name)
+                        editing = null
+                    }
+                    MetroButton("cancel") { onCancelMerge() }
                 }
-                MetroButton("cancel", Modifier.padding(top = MetroDimens.Gutter)) { onCancelMerge() }
             }
         } else if (editing != null) {
             Column(Modifier.padding(MetroDimens.Gutter)) {
@@ -62,10 +65,12 @@ fun PayeesScreen(
                 if (error != null) {
                     MetroText(error, Metro.typography.body, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)
                 }
-                MetroButton("save", Modifier.padding(top = MetroDimens.Grid)) {
-                    onRename(editing!!.id, name, false, rememberRule)
+                MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
+                    MetroButton("save") {
+                        onRename(editing!!.id, name, false, rememberRule)
+                    }
+                    MetroButton("cancel") { editing = null }
                 }
-                MetroButton("cancel", Modifier.padding(top = MetroDimens.Gutter)) { editing = null }
             }
         } else {
             if (error != null) {

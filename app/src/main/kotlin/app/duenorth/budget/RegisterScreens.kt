@@ -40,6 +40,7 @@ import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
@@ -248,15 +249,17 @@ fun TransactionForm(
             }
         }
         RememberFormSave(commit)
-        if (!formSaveOnBar()) {
-            MetroButton("save", Modifier.padding(top = 8.dp), onClick = commit)
-        }
-        if (row != null) {
-            if (row.transferId == null) {
-                MetroButton("split", Modifier.padding(top = 8.dp)) { onSplit(row.id) }
-                MetroButton("schedule", Modifier.padding(top = 8.dp)) { onSchedule(row.id) }
+        MetroButtonGrid(Modifier.padding(top = 8.dp)) {
+            if (!formSaveOnBar()) {
+                MetroButton("save", onClick = commit)
             }
-            MetroButton("delete", Modifier.padding(top = 8.dp)) { onDelete(row.id) }
+            if (row != null) {
+                if (row.transferId == null) {
+                    MetroButton("split") { onSplit(row.id) }
+                    MetroButton("schedule") { onSchedule(row.id) }
+                }
+                MetroButton("delete") { onDelete(row.id) }
+            }
         }
     }
 }
@@ -310,9 +313,6 @@ fun SplitForm(
                 )
             }
         }
-        MetroButton("add part", Modifier.padding(top = MetroDimens.Grid)) {
-            lines = lines + ("" to "")
-        }
         val commitSplit = {
             when (val parsed = RegisterEntry.split(row.amountMinor, page.currency.decimals, lines)) {
                 is EntryResult.Ok -> {
@@ -323,11 +323,16 @@ fun SplitForm(
             }
         }
         RememberFormSave(commitSplit)
-        if (!formSaveOnBar()) {
-            MetroButton("save", Modifier.padding(top = MetroDimens.Grid), onClick = commitSplit)
-        }
-        if (row.parent) {
-            MetroButton("one category", Modifier.padding(top = MetroDimens.Grid)) { onUnsplit(row.id) }
+        MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
+            MetroButton("add part") {
+                lines = lines + ("" to "")
+            }
+            if (!formSaveOnBar()) {
+                MetroButton("save", onClick = commitSplit)
+            }
+            if (row.parent) {
+                MetroButton("one category") { onUnsplit(row.id) }
+            }
         }
     }
 }
@@ -473,8 +478,10 @@ fun ReconcileWarningScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         MetroText(RegisterCopy.RECONCILE_WARN, Metro.typography.header)
-        MetroButton("change", onClick = onChange)
-        MetroButton("keep", onClick = onKeep)
+        MetroButtonGrid {
+            MetroButton("change", onClick = onChange)
+            MetroButton("keep", onClick = onKeep)
+        }
     }
 }
 

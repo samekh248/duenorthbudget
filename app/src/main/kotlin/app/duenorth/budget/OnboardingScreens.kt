@@ -40,8 +40,9 @@ import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.ServerAddress
 import app.duenorth.budget.core.SignInMethod
 import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
-import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
@@ -372,29 +373,12 @@ private class ButtonSpec(
     val onClick: () -> Unit,
 )
 
-/**
- * Buttons in a page body, Windows Phone style: at most two, side by side at equal
- * width on one row, so a single button takes the left half and never floats alone.
- */
+/** Body buttons on the shared Windows Phone grid: at most two, side by side at equal width. */
 @Composable
 private fun ButtonRow(vararg buttons: ButtonSpec?) {
     val shown = buttons.filterNotNull().take(2)
     if (shown.isEmpty()) return
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = MetroDimens.Gutter),
-        horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
-    ) {
-        shown.forEach { button ->
-            MetroOutlineButton(
-                button.label,
-                Modifier
-                    .weight(1f)
-                    .testTag(button.tag),
-                onClick = button.onClick,
-            )
-        }
-        if (shown.size == 1) Spacer(Modifier.weight(1f))
+    MetroButtonGrid(Modifier.padding(top = MetroDimens.Gutter)) {
+        shown.forEach { button -> MetroButton(button.label, Modifier.testTag(button.tag), onClick = button.onClick) }
     }
 }

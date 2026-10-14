@@ -24,6 +24,7 @@ import app.duenorth.budget.core.GoCardlessBank
 import app.duenorth.budget.core.GoCardlessLink
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
@@ -136,8 +137,10 @@ private fun GoCardlessSteps(
 ) {
     val link = ui.goCardless
     if (link != null) {
-        MetroButton(BankLinkCopy.SIGN_IN, Modifier.testTag("bank-signin")) { onOpenBank(link.link) }
-        MetroButton(BankLinkCopy.SIGNED_IN, Modifier.testTag("bank-signed-in"), onClick = onSignedIn)
+        MetroButtonGrid {
+            MetroButton(BankLinkCopy.SIGN_IN, Modifier.testTag("bank-signin")) { onOpenBank(link.link) }
+            MetroButton(BankLinkCopy.SIGNED_IN, Modifier.testTag("bank-signed-in"), onClick = onSignedIn)
+        }
         return
     }
     var country by remember { mutableStateOf("") }

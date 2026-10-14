@@ -29,6 +29,7 @@ import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroText
@@ -168,8 +169,10 @@ fun ConfirmInstanceSwitchScreen(
     ) {
         MetroText("open $opening", Metro.typography.header)
         MetroText("leave $leaving", Metro.typography.subheader)
-        MetroOutlineButton("open", onClick = onOpen)
-        MetroOutlineButton("stay", onClick = onStay)
+        MetroButtonGrid {
+            MetroButton("open", onClick = onOpen)
+            MetroButton("stay", onClick = onStay)
+        }
     }
 }
 
@@ -196,8 +199,10 @@ fun ConfirmAdvancedScreen(
     ) {
         MetroText(title, Metro.typography.header)
         MetroText("this changes the budget on this phone", Metro.typography.subheader)
-        MetroOutlineButton("confirm", Modifier.testTag("advanced-confirm"), onClick = onConfirm)
-        MetroOutlineButton("stay", Modifier.testTag("advanced-cancel"), onClick = onCancel)
+        MetroButtonGrid {
+            MetroButton("confirm", Modifier.testTag("advanced-confirm"), onClick = onConfirm)
+            MetroButton("stay", Modifier.testTag("advanced-cancel"), onClick = onCancel)
+        }
     }
 }
 
@@ -243,13 +248,13 @@ private fun InstanceSection(
                     .testTag("instance-${instance.id}"),
                 color = if (active) Metro.accent.text else Metro.colors.foreground,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
+            MetroButtonGrid {
                 if (!active) {
-                    MetroOutlineButton("make active", Modifier.testTag("instance-activate-${instance.id}")) {
+                    MetroButton("make active", Modifier.testTag("instance-activate-${instance.id}")) {
                         onMakeActive(instance.id)
                     }
                 }
-                MetroOutlineButton("remove", Modifier.testTag("instance-remove-${instance.id}")) {
+                MetroButton("remove", Modifier.testTag("instance-remove-${instance.id}")) {
                     onRemoveInstance(instance.id)
                 }
             }
@@ -260,14 +265,16 @@ private fun InstanceSection(
     if (serverError != null) {
         MetroText(serverError, Metro.typography.body, color = Metro.accent.text)
     }
-    MetroButton("sign in", Modifier.testTag("instance-connect")) { onConnect(address, password) }
-    if (openIdAvailable) {
-        MetroOutlineButton("sign in with browser", Modifier.testTag("instance-openid")) {
-            onBeginOpenId(address)
+    MetroButtonGrid {
+        MetroButton("sign in", Modifier.testTag("instance-connect")) { onConnect(address, password) }
+        if (openIdAvailable) {
+            MetroButton("use browser", Modifier.testTag("instance-openid")) {
+                onBeginOpenId(address)
+            }
         }
-    }
-    if (signedIn || activeInstance != null) {
-        MetroOutlineButton("sign out", Modifier.testTag("instance-sign-out"), onClick = onSignOut)
+        if (signedIn || activeInstance != null) {
+            MetroButton("sign out", Modifier.testTag("instance-sign-out"), onClick = onSignOut)
+        }
     }
 }
 
@@ -489,15 +496,17 @@ private fun EncryptionSection(
     }
     MetroField(current, { current = it }, "current password", Modifier.testTag("encryption-current"), conceal = true)
     MetroField(next, { next = it }, "replacement", Modifier.testTag("encryption-next"), conceal = true)
-    MetroOutlineButton("change password", Modifier.testTag("encryption-change")) {
-        onChange(current, next)
-        current = ""
-        next = ""
-    }
-    MetroOutlineButton("remove password", Modifier.testTag("encryption-remove")) {
-        onRemove(current.ifBlank { password })
-        current = ""
-        password = ""
+    MetroButtonGrid {
+        MetroButton("change password", Modifier.testTag("encryption-change")) {
+            onChange(current, next)
+            current = ""
+            next = ""
+        }
+        MetroButton("remove password", Modifier.testTag("encryption-remove")) {
+            onRemove(current.ifBlank { password })
+            current = ""
+            password = ""
+        }
     }
     if (error != null) {
         MetroText(error, Metro.typography.body, color = Metro.accent.text)
@@ -507,14 +516,16 @@ private fun EncryptionSection(
 @Composable
 private fun AdvancedSection(onRequest: (AdvancedConfirm) -> Unit) {
     SettingsHeading("advanced", tag = "settings-advanced")
-    MetroOutlineButton("rebuild totals", Modifier.testTag("settings-rebuild")) {
-        onRequest(AdvancedConfirm.Rebuild)
-    }
-    MetroOutlineButton("repair splits", Modifier.testTag("settings-repair")) {
-        onRequest(AdvancedConfirm.Repair)
-    }
-    MetroOutlineButton("reset sync", Modifier.testTag("settings-reset-sync")) {
-        onRequest(AdvancedConfirm.ResetSync)
+    MetroButtonGrid {
+        MetroButton("rebuild totals", Modifier.testTag("settings-rebuild")) {
+            onRequest(AdvancedConfirm.Rebuild)
+        }
+        MetroButton("repair splits", Modifier.testTag("settings-repair")) {
+            onRequest(AdvancedConfirm.Repair)
+        }
+        MetroButton("reset sync", Modifier.testTag("settings-reset-sync")) {
+            onRequest(AdvancedConfirm.ResetSync)
+        }
     }
 }
 
