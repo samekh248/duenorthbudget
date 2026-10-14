@@ -34,7 +34,7 @@
 - Pivot vs. panorama was decided from the constitution (Principle II), not left
   as a clarification.
 - Server selection reuses the spec 011 onboarding server path, per the
-  requester's follow-up. Spec 011's implementation is still in draft PR #41,
-  recorded as a dependency in Assumptions.
+  requester's follow-up. Spec 011's pages are on main (PR #41), so there is
+  no outstanding dependency.
 - Pivot terms ("pivot item", "application bar") are Metro 2 design vocabulary
   from the constitution, not implementation details.

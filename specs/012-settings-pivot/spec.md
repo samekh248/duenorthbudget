@@ -41,7 +41,7 @@ flowchart LR
         D["advanced<br/>experimental, export, ids,<br/>encryption, repair"]
         B --- S --- F --- A --- D
     end
-    S -->|add server| O["onboarding server path<br/>address, check, sign-in,<br/>name"]
+    S -->|add server| O["onboarding server path<br/>address, check,<br/>sign-in and name"]
     O -->|signed in| S
     B -->|new budget| N["new budget page"]
     D -->|encryption| E["budget password page"]
@@ -86,7 +86,7 @@ address and whether the phone is signed in and has reached it. Saved
 servers are listed under it. To add a server they press "add" in the
 application bar and go through the same pages as the onboarding server
 path: address, the phone checks the server, then only the sign-in that
-server uses, then the instance name. When they finish they return to the
+server uses, with the name the instance goes by on this phone. When they finish they return to the
 server item with the new server shown. Making another saved server active
 still goes through the confirm page that names the server left and the
 server opening.
@@ -219,8 +219,8 @@ the advanced item is showing.
   address, and status (signed in, signed out, or not reached), and list
   every saved server with the active one marked.
 - **FR-005**: Adding a server from settings MUST use the onboarding server
-  path from spec 011 (address, server check, the sign-in that server uses,
-  instance name), with the same checks and messages, and MUST return to
+  path from spec 011 (address, server check, then the sign-in that server
+  uses together with the instance's name on this phone), with the same checks and messages, and MUST return to
   the server item when finished or abandoned.
 - **FR-006**: The server item MUST NOT contain address or password fields.
 - **FR-007**: Making a saved server active MUST use the existing confirm
@@ -298,9 +298,9 @@ the advanced item is showing.
 - Five items is the right split. Format gets its own item because its
   four choices are per-budget and would make the budget item scroll;
   experimental features go to advanced because they are opt-in and rare.
-- The onboarding server pages from spec 011 are reused as-is. This spec
-  depends on spec 011's implementation (draft PR #41) landing first, or
-  on building those pages as part of this work.
+- The onboarding server pages from spec 011 (merged in PR #41) are
+  reused as-is: the address page, the sign-in page with its "name on this
+  phone" field, and the pick-a-budget page.
 - Settings opens on the budget item each time; remembering the last item
   across visits is not needed.
 - The confirm pages for switching servers and for advanced actions keep
