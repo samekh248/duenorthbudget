@@ -417,7 +417,14 @@ fun BudgetSection(
         }
         if (notice != null) MonthNotice(notice, Modifier.padding(top = MetroDimens.Row))
         if (shell.groups.isEmpty() && shell.incomeGroups.isEmpty()) {
-            MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.caption, Modifier.padding(top = MetroDimens.Grid).weight(1f))
+            Column(
+                Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                BudgetLogo(EMPTY_LOGO_HEIGHT)
+                MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.caption, Modifier.padding(top = MetroDimens.Grid))
+            }
         } else {
             LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid), state = list) {
                 if (shell.groups.any { it.categories.isNotEmpty() }) {
@@ -968,3 +975,6 @@ private fun arrivalModifier(
     }
     return Modifier.graphicsLayer { this.alpha = alpha.value }
 }
+
+/** The logo over "nothing to budget", sized like the Due North Tasks "all clear." logo. */
+private val EMPTY_LOGO_HEIGHT = 140.dp

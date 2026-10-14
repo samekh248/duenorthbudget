@@ -1,10 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    "Growth north": three rising bars whose tallest one is a north arrow, in the square-ended
+    strokes of the Due North Tasks mark. The stem stops at the arrowhead's point with a flat end
+    so the two strokes meet in one clean tip. Kept inside the 66dp safe zone so every launcher
+    mask shows all of it. Logo.kt draws and animates the same shapes.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M28,64 L54,28 L80,64 Z" />
+        android:pathData="M37,79 L37,67 M48,79 L48,57 M59,79 L59,33"
+        android:strokeWidth="5.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="butt" />
+    <path
+        android:pathData="M47,45 L59,33 L71,45"
+        android:strokeWidth="5.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="square"
+        android:strokeLineJoin="miter" />
 </vector>

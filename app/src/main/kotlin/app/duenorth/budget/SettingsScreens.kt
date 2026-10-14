@@ -68,6 +68,8 @@ fun SettingsScreen(
     onCreateBudget: (String, String) -> Unit,
     onTheme: (String) -> Unit,
     onAccent: (String) -> Unit,
+    launcherIcon: LauncherIcon = LauncherIcon.TILE,
+    onLauncherIcon: (LauncherIcon) -> Unit = {},
     onPayees: () -> Unit,
     onDateFormat: (String) -> Unit,
     onNumberFormat: (String) -> Unit,
@@ -122,6 +124,7 @@ fun SettingsScreen(
             onTheme = onTheme,
             onAccent = onAccent,
         )
+        LauncherIconSection(launcherIcon, onLauncherIcon)
         SettingsActionRow("payees", "settings-payees", onPayees)
         if (budgetOpen) {
             FormattingSection(
@@ -359,6 +362,22 @@ private fun AppearanceSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LauncherIconSection(
+    current: LauncherIcon,
+    onChoose: (LauncherIcon) -> Unit,
+) {
+    MetroText(
+        "app icon",
+        Metro.typography.caption,
+        Modifier.padding(top = MetroDimens.Gutter),
+        color = Metro.colors.secondary,
+    )
+    LauncherIcon.entries.forEach { icon ->
+        ChoiceRow(icon.label, current == icon, "settings-icon-${icon.name.lowercase()}") { onChoose(icon) }
     }
 }
 
