@@ -23,7 +23,8 @@ class LauncherActivityTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         assertEquals("Due North Budget", context.getString(R.string.app_name))
 
-        val activities = document.getElementsByTagName("activity")
+        // The launcher entries are aliases of MainActivity, one per icon style, the tile on by default.
+        val activities = document.getElementsByTagName("activity-alias")
         val launchers = mutableListOf<String>()
         for (index in 0 until activities.length) {
             val activity = activities.item(index)
@@ -43,9 +44,29 @@ class LauncherActivityTest {
                     }
                 }
             }
-            if (launcher) launchers.add(name)
+            if (launcher) {
+                assertEquals("app.duenorth.budget.MainActivity", activity.attributes.getNamedItem("android:targetActivity").nodeValue)
+                launchers.add(name + "=" + activity.attributes.getNamedItem("android:enabled").nodeValue)
+            }
         }
-        assertEquals(listOf("app.duenorth.budget.MainActivity"), launchers)
+        assertEquals(
+            setOf("app.duenorth.budget.LauncherTile=true", "app.duenorth.budget.LauncherClear=false"),
+            launchers.toSet(),
+        )
+        assertEquals(LauncherIcon.entries.map { it.alias }.toSet(), launchers.map { it.substringBefore("=") }.toSet())
+    }
+
+    @Test
+    fun choosingAnIconLeavesExactlyThatAliasOn() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        assertEquals(LauncherIcon.TILE, LauncherIcons.current(context))
+        LauncherIcons.set(context, LauncherIcon.CLEAR)
+        assertEquals(LauncherIcon.CLEAR, LauncherIcons.current(context))
+        val pm = context.packageManager
+        val tile = android.content.ComponentName(context, LauncherIcon.TILE.alias)
+        assertEquals(android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, pm.getComponentEnabledSetting(tile))
+        LauncherIcons.set(context, LauncherIcon.TILE)
+        assertEquals(LauncherIcon.TILE, LauncherIcons.current(context))
     }
 
     private fun packagedDebugManifest(): File {

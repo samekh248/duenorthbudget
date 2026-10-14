@@ -297,7 +297,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                         numberFormat = state.formatPrefs.numberFormat,
                                     ),
                             )
-                        ShellRoute.Settings ->
+                        ShellRoute.Settings -> {
+                            var launcherIcon by remember { mutableStateOf(LauncherIcons.current(context)) }
                             SettingsScreen(
                                 instances = state.instances,
                                 activeInstance = state.activeInstance,
@@ -322,6 +323,11 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onCreateBudget = model::createFromSettings,
                                 onTheme = model::setTheme,
                                 onAccent = model::setAccent,
+                                launcherIcon = launcherIcon,
+                                onLauncherIcon = {
+                                    LauncherIcons.set(context, it)
+                                    launcherIcon = it
+                                },
                                 onPayees = model::showPayees,
                                 onDateFormat = model::setDateFormat,
                                 onNumberFormat = model::setNumberFormat,
@@ -338,6 +344,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 modifier = fill,
                                 defaultBudgetName = state.defaultBudgetName,
                             )
+                        }
                         ShellRoute.ConfirmInstanceSwitch ->
                             ConfirmInstanceSwitchScreen(
                                 leaving =
