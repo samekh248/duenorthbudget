@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    "Growth north" in the magenta accent, for the transparent launcher icon: with no tile behind
+    it, the mark carries the color itself. Same shapes as ic_launcher_foreground.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M37,79 L37,67 M48,79 L48,57 M59,79 L59,33"
+        android:strokeWidth="5.5"
+        android:strokeColor="#D80073"
+        android:strokeLineCap="butt" />
+    <path
+        android:pathData="M47,45 L59,33 L71,45"
+        android:strokeWidth="5.5"
+        android:strokeColor="#D80073"
+        android:strokeLineCap="square"
+        android:strokeLineJoin="miter" />
+</vector>
