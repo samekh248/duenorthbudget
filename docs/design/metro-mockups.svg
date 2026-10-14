@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 1752 1852" width="1752" height="1852">
-  <rect x="-24" y="-24" width="1752" height="1852" fill="#F2F2F2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24 -24 1752 3700" width="1752" height="3700">
+  <rect x="-24" y="-24" width="1752" height="3700" fill="#F2F2F2"/>
   <!-- Metro 2 budget screens. Phone 390 by 844. Light row, then dark. -->
 
   <!-- home: budget (light) -->
@@ -239,4 +239,167 @@
     <text x="348" y="816" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="400" fill="#FFFFFF">&#8226;&#8226;&#8226;</text>
   </svg>
   <text x="1314" y="1802" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="16" font-weight="600" fill="#333">open another budget (dark)</text>
+  <!-- Spec 011 onboarding. Light row, then dark. -->
+  <!-- onboarding: welcome (light) -->
+  <svg x="0" y="1848" width="390" height="844" overflow="hidden">
+    <rect width="390" height="844" fill="#FFFFFF"/>
+    <text x="12" y="40" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="600" fill="#111111" letter-spacing="1">DUE NORTH BUDGET</text>
+    <text x="12" y="108" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="52" font-weight="300" fill="#111111">welcome</text>
+    <text x="12" y="168" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#111111">where is your budget?</text>
+    <text x="12" y="246" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#111111">on my Actual server</text>
+    <text x="12" y="272" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#5C5C5C">sync with a server you already run</text>
+    <text x="12" y="336" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#111111">only on this phone</text>
+    <text x="12" y="362" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#5C5C5C">start here, add a server later in settings</text>
+    <rect x="0" y="772" width="390" height="72" fill="#E5E5E5"/>
+    <g fill="none" stroke="#111111" stroke-width="1.6">
+    </g>
+    <text x="348" y="816" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="400" fill="#111111">&#8226;&#8226;&#8226;</text>
+  </svg>
+  <text x="0" y="2726" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="16" font-weight="600" fill="#333">onboarding: welcome (light)</text>
+
+  <!-- onboarding: server address (light) -->
+  <svg x="438" y="1848" width="390" height="844" overflow="hidden">
+    <rect width="390" height="844" fill="#FFFFFF"/>
+    <text x="12" y="40" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="600" fill="#111111" letter-spacing="1">DUE NORTH BUDGET</text>
+    <text x="12" y="108" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="52" font-weight="300" fill="#111111">server</text>
+    <text x="12" y="168" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#111111">where does Actual run?</text>
+    <text x="12" y="216" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="400" fill="#5C5C5C">address</text>
+    <rect x="12" y="226" width="366" height="48" fill="#FFFFFF" stroke="#111111" stroke-width="2"/>
+    <text x="24" y="257" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="350" fill="#111111">budget.example.com</text>
+    <text x="12" y="304" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#5C5C5C">tried as https:// first</text>
+    <g fill="#B0005E" transform="translate(0,336)"><rect x="12" y="0" width="6" height="6"/><rect x="26" y="0" width="6" height="6"/><rect x="40" y="0" width="6" height="6"/><rect x="54" y="0" width="6" height="6"/><rect x="68" y="0" width="6" height="6"/></g>
+    <text x="12" y="374" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#5C5C5C">checking budget.example.com</text>
+    <rect x="0" y="772" width="390" height="72" fill="#E5E5E5"/>
+    <g fill="none" stroke="#111111" stroke-width="1.6">
+      <circle cx="58" cy="808" r="22" stroke-width="2"/>
+      <g transform="translate(47,797)"><path d="M3 11h16M13 5l6 6-6 6"/></g>
+    </g>
+    <text x="348" y="816" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="400" fill="#111111">&#8226;&#8226;&#8226;</text>
+  </svg>
+  <text x="438" y="2726" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="16" font-weight="600" fill="#333">onboarding: server address (light)</text>
+
+  <!-- onboarding: sign in (light) -->
+  <svg x="876" y="1848" width="390" height="844" overflow="hidden">
+    <rect width="390" height="844" fill="#FFFFFF"/>
+    <text x="12" y="40" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="600" fill="#111111" letter-spacing="1">DUE NORTH BUDGET</text>
+    <text x="12" y="108" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="52" font-weight="300" fill="#111111">sign in</text>
+    <text x="12" y="168" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#111111">budget.example.com</text>
+    <text x="12" y="194" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#5C5C5C">Actual server · password sign-in</text>
+    <text x="12" y="240" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="400" fill="#5C5C5C">name on this phone</text>
+    <rect x="12" y="250" width="366" height="48" fill="#FFFFFF" stroke="#111111" stroke-width="2"/>
+    <text x="24" y="281" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="350" fill="#111111">home server</text>
+    <text x="12" y="336" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="400" fill="#5C5C5C">password</text>
+    <rect x="12" y="346" width="366" height="48" fill="#FFFFFF" stroke="#111111" stroke-width="2"/>
+    <text x="24" y="377" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="350" fill="#111111">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</text>
+    <rect x="0" y="772" width="390" height="72" fill="#E5E5E5"/>
+    <g fill="none" stroke="#111111" stroke-width="1.6">
+      <circle cx="58" cy="808" r="22" stroke-width="2"/>
+      <g transform="translate(47,797)"><circle cx="7" cy="11" r="4"/><path d="M11 11h9M17 11v4M20 11v3"/></g>
+    </g>
+    <text x="348" y="816" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="400" fill="#111111">&#8226;&#8226;&#8226;</text>
+  </svg>
+  <text x="876" y="2726" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="16" font-weight="600" fill="#333">onboarding: sign in (light)</text>
+
+  <!-- onboarding: pick a budget (light) -->
+  <svg x="1314" y="1848" width="390" height="844" overflow="hidden">
+    <rect width="390" height="844" fill="#FFFFFF"/>
+    <text x="12" y="40" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="600" fill="#111111" letter-spacing="1">DUE NORTH BUDGET</text>
+    <text x="12" y="108" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="52" font-weight="300" fill="#111111">pick a budget</text>
+    <text x="12" y="168" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#5C5C5C">on home server</text>
+    <text x="12" y="236" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#111111">Household</text>
+    <text x="12" y="262" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#5C5C5C">encrypted · asks for its password</text>
+    <text x="12" y="326" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#111111">Travel 2026</text>
+    <text x="12" y="352" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#5C5C5C">not on this phone yet</text>
+    <rect x="12" y="708" width="128" height="40" fill="none" stroke="#111111" stroke-width="2"/>
+    <text x="26" y="734" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="15" font-weight="400" fill="#111111">new budget</text>
+    <rect x="0" y="772" width="390" height="72" fill="#E5E5E5"/>
+    <g fill="none" stroke="#111111" stroke-width="1.6">
+      <circle cx="58" cy="808" r="22" stroke-width="2"/>
+      <g transform="translate(47,797)"><path d="M18 7a8 8 0 1 0 1 6"/><path d="M18 2v5h-5"/></g>
+    </g>
+    <text x="348" y="816" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="400" fill="#111111">&#8226;&#8226;&#8226;</text>
+  </svg>
+  <text x="1314" y="2726" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="16" font-weight="600" fill="#333">onboarding: pick a budget (light)</text>
+
+  <!-- onboarding: welcome (dark) -->
+  <svg x="0" y="2772" width="390" height="844" overflow="hidden">
+    <rect width="390" height="844" fill="#000000"/>
+    <text x="12" y="40" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="600" fill="#FFFFFF" letter-spacing="1">DUE NORTH BUDGET</text>
+    <text x="12" y="108" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="52" font-weight="300" fill="#FFFFFF">welcome</text>
+    <text x="12" y="168" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#FFFFFF">where is your budget?</text>
+    <text x="12" y="246" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#FFFFFF">on my Actual server</text>
+    <text x="12" y="272" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#A6A6A6">sync with a server you already run</text>
+    <text x="12" y="336" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#FFFFFF">only on this phone</text>
+    <text x="12" y="362" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#A6A6A6">start here, add a server later in settings</text>
+    <rect x="0" y="772" width="390" height="72" fill="#1F1F1F"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="1.6">
+    </g>
+    <text x="348" y="816" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="400" fill="#FFFFFF">&#8226;&#8226;&#8226;</text>
+  </svg>
+  <text x="0" y="3650" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="16" font-weight="600" fill="#333">onboarding: welcome (dark)</text>
+
+  <!-- onboarding: server address (dark) -->
+  <svg x="438" y="2772" width="390" height="844" overflow="hidden">
+    <rect width="390" height="844" fill="#000000"/>
+    <text x="12" y="40" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="600" fill="#FFFFFF" letter-spacing="1">DUE NORTH BUDGET</text>
+    <text x="12" y="108" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="52" font-weight="300" fill="#FFFFFF">server</text>
+    <text x="12" y="168" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#FFFFFF">where does Actual run?</text>
+    <text x="12" y="216" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="400" fill="#A6A6A6">address</text>
+    <rect x="12" y="226" width="366" height="48" fill="#000000" stroke="#FFFFFF" stroke-width="2"/>
+    <text x="24" y="257" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="350" fill="#FFFFFF">budget.example.com</text>
+    <text x="12" y="304" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#A6A6A6">tried as https:// first</text>
+    <g fill="#F0389A" transform="translate(0,336)"><rect x="12" y="0" width="6" height="6"/><rect x="26" y="0" width="6" height="6"/><rect x="40" y="0" width="6" height="6"/><rect x="54" y="0" width="6" height="6"/><rect x="68" y="0" width="6" height="6"/></g>
+    <text x="12" y="374" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#A6A6A6">checking budget.example.com</text>
+    <rect x="0" y="772" width="390" height="72" fill="#1F1F1F"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="1.6">
+      <circle cx="58" cy="808" r="22" stroke-width="2"/>
+      <g transform="translate(47,797)"><path d="M3 11h16M13 5l6 6-6 6"/></g>
+    </g>
+    <text x="348" y="816" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="400" fill="#FFFFFF">&#8226;&#8226;&#8226;</text>
+  </svg>
+  <text x="438" y="3650" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="16" font-weight="600" fill="#333">onboarding: server address (dark)</text>
+
+  <!-- onboarding: sign in (dark) -->
+  <svg x="876" y="2772" width="390" height="844" overflow="hidden">
+    <rect width="390" height="844" fill="#000000"/>
+    <text x="12" y="40" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="600" fill="#FFFFFF" letter-spacing="1">DUE NORTH BUDGET</text>
+    <text x="12" y="108" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="52" font-weight="300" fill="#FFFFFF">sign in</text>
+    <text x="12" y="168" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#FFFFFF">budget.example.com</text>
+    <text x="12" y="194" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#A6A6A6">Actual server · password sign-in</text>
+    <text x="12" y="240" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="400" fill="#A6A6A6">name on this phone</text>
+    <rect x="12" y="250" width="366" height="48" fill="#000000" stroke="#FFFFFF" stroke-width="2"/>
+    <text x="24" y="281" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="350" fill="#FFFFFF">home server</text>
+    <text x="12" y="336" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="400" fill="#A6A6A6">password</text>
+    <rect x="12" y="346" width="366" height="48" fill="#000000" stroke="#FFFFFF" stroke-width="2"/>
+    <text x="24" y="377" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="350" fill="#FFFFFF">&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;</text>
+    <rect x="0" y="772" width="390" height="72" fill="#1F1F1F"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="1.6">
+      <circle cx="58" cy="808" r="22" stroke-width="2"/>
+      <g transform="translate(47,797)"><circle cx="7" cy="11" r="4"/><path d="M11 11h9M17 11v4M20 11v3"/></g>
+    </g>
+    <text x="348" y="816" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="400" fill="#FFFFFF">&#8226;&#8226;&#8226;</text>
+  </svg>
+  <text x="876" y="3650" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="16" font-weight="600" fill="#333">onboarding: sign in (dark)</text>
+
+  <!-- onboarding: pick a budget (dark) -->
+  <svg x="1314" y="2772" width="390" height="844" overflow="hidden">
+    <rect width="390" height="844" fill="#000000"/>
+    <text x="12" y="40" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="13" font-weight="600" fill="#FFFFFF" letter-spacing="1">DUE NORTH BUDGET</text>
+    <text x="12" y="108" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="52" font-weight="300" fill="#FFFFFF">pick a budget</text>
+    <text x="12" y="168" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#A6A6A6">on home server</text>
+    <text x="12" y="236" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#FFFFFF">Household</text>
+    <text x="12" y="262" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#A6A6A6">encrypted · asks for its password</text>
+    <text x="12" y="326" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="26" font-weight="350" fill="#FFFFFF">Travel 2026</text>
+    <text x="12" y="352" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="14" font-weight="350" fill="#A6A6A6">not on this phone yet</text>
+    <rect x="12" y="708" width="128" height="40" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+    <text x="26" y="734" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="15" font-weight="400" fill="#FFFFFF">new budget</text>
+    <rect x="0" y="772" width="390" height="72" fill="#1F1F1F"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="1.6">
+      <circle cx="58" cy="808" r="22" stroke-width="2"/>
+      <g transform="translate(47,797)"><path d="M18 7a8 8 0 1 0 1 6"/><path d="M18 2v5h-5"/></g>
+    </g>
+    <text x="348" y="816" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="20" font-weight="400" fill="#FFFFFF">&#8226;&#8226;&#8226;</text>
+  </svg>
+  <text x="1314" y="3650" font-family="Selawik, 'Segoe UI', 'Open Sans', sans-serif" font-size="16" font-weight="600" fill="#333">onboarding: pick a budget (dark)</text>
+
 </svg>

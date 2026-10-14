@@ -203,7 +203,7 @@ the flow, and see that budget listed on the server.
 - The person backs out of browser sign-in without finishing. They return
   to the sign-in page, not signed in.
 - Two budgets on the server have the same name. Both show, told apart by
-  when each was last changed.
+  a short id (the server does not report when each was last changed).
 - The person cancels the budget password page. They return to the server's
   budget list, and the encrypted budget is not opened.
 - The phone has no budgets but has a saved instance (for example after a
@@ -300,9 +300,8 @@ the flow, and see that budget listed on the server.
   and browser sign-in. Other server sign-ins are named as unsupported.
 - No account creation, no server setup, no tour of features, and no
   marketing pages. The welcome page is a choice, not a carousel.
-- The welcome page is not drawn in `docs/design/metro-mockups.svg`. It
-  follows the Due North Tasks reference and Principle II until a mockup
-  frame is added during planning.
+- The welcome, server address, sign-in and file-list pages are drawn in
+  `docs/design/metro-mockups.svg` (onboarding rows, light and dark).
 - Currency preselection uses the phone's region. When the region has no
   matching currency, the default stays USD, as today.
 - QR codes, discovering servers on the local network, and importing a file
