@@ -60,4 +60,4 @@ Run on 2026-10-13 against branch `claude/project-thread-9z5oiv`, with every scen
 | 9 | Bank link | no (needs the server) | `BankLinkBookTest` against the localhost server, including the stopped-server case | pass (harness only) |
 | 10 | Undo | yes | `UndoFlowTest` (offline undo newest first, under 100 ms; conflict after a remote change), `UndoContentTest`, `BudgetLibraryTest` fluidity checks | pass |
 
-Not yet done: the same scenarios by hand on a phone in airplane mode, and the desktop side-by-side and real provider links in T073.
+Not yet done: the same scenarios by hand on a phone in airplane mode, and the desktop side-by-side and real provider links in T073. T073 was deferred on 2026-10-14 when spec 010 closed; the parity fixtures from @actual-app/api 26.8.1 remain the automated check against desktop behavior.
