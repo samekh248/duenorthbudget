@@ -229,8 +229,10 @@ the advanced item is showing.
 - **FR-008**: Sign out MUST be offered on the server item when a server
   is active, and MUST keep the budgets on the phone (spec 009).
 - **FR-009**: When a server is active and signed in, the server item MUST
-  offer the budgets on that server, opened with the onboarding
-  pick-a-budget page.
+  offer the budgets on that server. With no budget open this is the
+  onboarding pick-a-budget page. With a budget open it is the existing
+  server page, which also offers sending the open budget, sync now, and
+  conflicts (see research R5).
 - **FR-010**: The format item MUST hold the date format, number format,
   first day of the week, and hide decimals settings for the open budget,
   each saved to the budget file as today (spec 009).
