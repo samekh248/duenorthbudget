@@ -255,6 +255,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onNext = model::onboardingCheck,
                     onRefresh = model::onboardingRefresh,
                     onSamples = model::showSampleBudgets,
+                    onNewBudget = model::onboardingNewBudget,
                 )
             }
         val actions = ScreenBar.forState(state, handlers)
@@ -429,7 +430,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                 files = state.remoteFiles,
                                 error = state.serverError,
                                 onOpen = model::onboardingOpen,
-                                onNew = model::onboardingNewBudget,
                                 modifier = fill,
                             )
                         ShellRoute.ConfirmSwitch ->

@@ -54,6 +54,7 @@ object OnboardingScreenCopy {
     const val SERVER = "on my Actual server"
     const val SERVER_HINT = "sync with a server you already run"
     const val PHONE = "only on this phone"
+    const val PHONE_ONLY = "phone only"
     const val PHONE_HINT = "start here, add a server later in settings"
     const val SERVER_TITLE = "server"
     const val WHERE_SERVER = "where does Actual run?"
@@ -62,7 +63,7 @@ object OnboardingScreenCopy {
     const val SIGN_IN = "sign in"
     const val LABEL = "name on this phone"
     const val PASSWORD = "password"
-    const val BROWSER = "sign in with browser"
+    const val BROWSER = "use browser"
     const val PICK = "pick a budget"
     const val NEW_BUDGET = "new budget"
     const val ENCRYPTED = "encrypted · asks for its password"
@@ -254,13 +255,10 @@ fun OnboardingAddressScreen(
         if (error != null && !checking) {
             ErrorText(error, "onboarding-address-error")
             if (error != OnboardingCopy.ENTER_ADDRESS) {
-                Column(
-                    Modifier.padding(top = MetroDimens.Gutter),
-                    verticalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
-                ) {
-                    MetroOutlineButton(OnboardingScreenCopy.TRY_AGAIN, Modifier.testTag("onboarding-retry"), onClick = onNext)
-                    MetroOutlineButton(OnboardingScreenCopy.PHONE, Modifier.testTag("onboarding-phone"), onClick = onPhone)
-                }
+                ButtonRow(
+                    ButtonSpec(OnboardingScreenCopy.TRY_AGAIN, "onboarding-retry", onNext),
+                    ButtonSpec(OnboardingScreenCopy.PHONE_ONLY, "onboarding-phone", onPhone),
+                )
             }
         }
     }
@@ -307,25 +305,15 @@ fun OnboardingSignInScreen(
             )
             RememberFormSave { onSignIn(password) }
         }
-        if (SignInMethod.BROWSER in methods) {
-            MetroOutlineButton(
-                OnboardingScreenCopy.BROWSER,
-                Modifier
-                    .padding(top = MetroDimens.Grid)
-                    .testTag("onboarding-browser"),
-                onClick = onBrowser,
-            )
-        }
         if (checking) ProgressDots(Modifier.padding(top = MetroDimens.Grid))
         if (error != null && !checking) ErrorText(error, "onboarding-signin-error")
-        if (SignInMethod.PASSWORD in methods && !formSaveOnBar()) {
-            MetroOutlineButton(
-                OnboardingScreenCopy.SIGN_IN,
-                Modifier
-                    .padding(top = MetroDimens.Grid)
-                    .testTag("onboarding-signin-button"),
-            ) { onSignIn(password) }
-        }
+        // Password sign-in lives on the app bar; the body only carries the browser choice.
+        ButtonRow(
+            ButtonSpec(OnboardingScreenCopy.SIGN_IN, "onboarding-signin-button") { onSignIn(password) }
+                .takeIf { SignInMethod.PASSWORD in methods && !formSaveOnBar() },
+            ButtonSpec(OnboardingScreenCopy.BROWSER, "onboarding-browser", onBrowser)
+                .takeIf { SignInMethod.BROWSER in methods },
+        )
     }
 }
 
@@ -335,7 +323,6 @@ fun OnboardingFilesScreen(
     files: List<RemoteFile>,
     error: String?,
     onOpen: (RemoteFile) -> Unit,
-    onNew: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     OnboardingPage(OnboardingScreenCopy.PICK, "onboarding-files", modifier) {
@@ -376,12 +363,38 @@ fun OnboardingFilesScreen(
                 }
             }
         }
-        MetroOutlineButton(
-            OnboardingScreenCopy.NEW_BUDGET,
-            Modifier
-                .padding(vertical = MetroDimens.Gutter)
-                .testTag("onboarding-new"),
-            onClick = onNew,
-        )
+    }
+}
+
+private class ButtonSpec(
+    val label: String,
+    val tag: String,
+    val onClick: () -> Unit,
+)
+
+/**
+ * Buttons in a page body, Windows Phone style: at most two, side by side at equal
+ * width on one row, so a single button takes the left half and never floats alone.
+ */
+@Composable
+private fun ButtonRow(vararg buttons: ButtonSpec?) {
+    val shown = buttons.filterNotNull().take(2)
+    if (shown.isEmpty()) return
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = MetroDimens.Gutter),
+        horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
+    ) {
+        shown.forEach { button ->
+            MetroOutlineButton(
+                button.label,
+                Modifier
+                    .weight(1f)
+                    .testTag(button.tag),
+                onClick = button.onClick,
+            )
+        }
+        if (shown.size == 1) Spacer(Modifier.weight(1f))
     }
 }

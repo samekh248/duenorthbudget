@@ -207,7 +207,7 @@ fun ShellViewModel.onboardingSignIn(password: String) {
         }
 }
 
-/** `sign in with browser`: the address is saved first so the return survives a restart. */
+/** `use browser`: the address is saved first so the return survives a restart. */
 fun ShellViewModel.onboardingBrowser() {
     val address =
         state.value.onboarding

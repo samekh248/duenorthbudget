@@ -97,6 +97,6 @@ class ScreenBarTest {
         assertEquals(listOf("next"), ids(ShellRoute.OnboardingAddress))
         assertEquals(listOf("sign-in"), ids(ShellRoute.OnboardingSignIn))
         assertTrue(ids(ShellRoute.OnboardingSignIn, password = false).isEmpty())
-        assertEquals(listOf("refresh"), ids(ShellRoute.OnboardingFiles))
+        assertEquals(listOf("new-budget", "refresh"), ids(ShellRoute.OnboardingFiles))
     }
 }

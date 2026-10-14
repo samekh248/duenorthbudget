@@ -37,7 +37,11 @@ object ScreenBar {
             ShellRoute.OnboardingAddress -> listOf(spec("next", AppGlyph.ChevronRight, OnboardingScreenCopy.NEXT))
             ShellRoute.OnboardingSignIn ->
                 if (passwordSignIn) listOf(spec("sign-in", AppGlyph.ChevronRight, OnboardingScreenCopy.SIGN_IN)) else emptyList()
-            ShellRoute.OnboardingFiles -> listOf(spec("refresh", AppGlyph.Sync, OnboardingScreenCopy.REFRESH))
+            ShellRoute.OnboardingFiles ->
+                listOf(
+                    spec("new-budget", AppGlyph.Add, OnboardingScreenCopy.NEW_BUDGET),
+                    spec("refresh", AppGlyph.Sync, OnboardingScreenCopy.REFRESH),
+                )
             ShellRoute.Home ->
                 when {
                     !hasBudget -> listOf(spec("settings", AppGlyph.Settings, "settings"))
@@ -225,6 +229,7 @@ class ScreenBarHandlers(
     val onNext: () -> Unit = {},
     val onRefresh: () -> Unit = {},
     val onSamples: () -> Unit = {},
+    val onNewBudget: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -268,6 +273,7 @@ class ScreenBarHandlers(
             "sign-in" -> onSave
             "refresh" -> onRefresh
             "sample-budgets" -> onSamples
+            "new-budget" -> onNewBudget
             else -> ({})
         }
 }
