@@ -38,5 +38,5 @@
 - Defaults chosen instead of clarifications: the server path is offered but
   never forced; only password and browser sign-in are supported; server
   setup and feature tours are out of scope.
-- The welcome page has no mockup frame yet. Planning should add one to
-  `docs/design/metro-mockups.svg`.
+- The onboarding pages are drawn in
+  `docs/design/metro-mockups.svg` (added during planning).
