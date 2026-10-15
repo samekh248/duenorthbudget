@@ -38,6 +38,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryChoice
@@ -97,8 +100,8 @@ fun RegisterScreen(
         if (selection != null) {
             MetroText(
                 "${selection.size} ${RegisterCopy.SELECTED}",
-                Metro.typography.body,
-                Modifier.padding(top = MetroDimens.Gutter).testTag("register-selected-count"),
+                Metro.typography.body.copy(textAlign = TextAlign.End),
+                Modifier.fillMaxWidth().padding(top = MetroDimens.Gutter).testTag("register-selected-count"),
                 color = Metro.accent.text,
             )
         }
@@ -176,9 +179,9 @@ internal fun registerDays(rows: List<RegisterRow>): List<List<RegisterRow>> =
 /**
  * One transaction on the ledger: payee in the category rows' body type, with the
  * category and note on a quieter line under it, and the amount in the figure columns.
- * A thin bar in the left margin, running past a split's parts, is accent when the
- * transaction is cleared and faint when it is not. Every other row sits on a faint
- * full-width band. In select mode ([picked] not null) a checkbox leads the row and a
+ * A bar at the right edge, running past a split's parts, carries a centered "c": accent
+ * with a solid "c" when the transaction is cleared, faint with a dim "c" when it is not.
+ * Every other row sits on a faint full-width band. In select mode ([picked] not null) a checkbox leads the row and a
  * picked row takes an accent tint.
  */
 @Composable
@@ -198,19 +201,26 @@ private fun RegisterLine(
             banded -> band
             else -> Color.Transparent
         }
-    val bar = if (row.cleared) accent else Metro.colors.secondary.copy(alpha = 0.35f)
+    val bar = if (row.cleared) accent else Metro.colors.secondary.copy(alpha = 0.22f)
+    val letter = if (row.cleared) Metro.colors.background else Metro.colors.secondary.copy(alpha = 0.7f)
+    val measurer = rememberTextMeasurer()
+    val mark = Metro.typography.caption.copy(color = letter, fontWeight = FontWeight.SemiBold)
     Column(
         Modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .drawBehind {
-                // The band runs past the screen gutter to the edges; the bar sits in the gutter.
+                // The band runs past the screen gutter to the edges; the bar sits at the right edge.
                 val gutter = MetroDimens.Gutter.toPx()
                 drawRect(fill, Offset(-gutter, 0f), Size(size.width + 2 * gutter, size.height))
                 val inset = 6.dp.toPx()
-                drawRect(bar, Offset(-gutter + CLEARED_BAR_INSET.toPx(), inset), Size(CLEARED_BAR.toPx(), size.height - 2 * inset))
+                val left = size.width + gutter - CLEARED_BAR_INSET.toPx() - CLEARED_BAR.toPx()
+                drawRect(bar, Offset(left, inset), Size(CLEARED_BAR.toPx(), size.height - 2 * inset))
+                val c = measurer.measure(RegisterCopy.CLEARED_MARK, mark)
+                drawText(c, topLeft = Offset(left + (CLEARED_BAR.toPx() - c.size.width) / 2, (size.height - c.size.height) / 2))
             }.metroPress(onPress, onLongPress)
             .padding(vertical = REGISTER_ROW_AIR)
+            .padding(end = CLEARED_BAR + CLEARED_BAR_INSET + CLEARED_BAR_GAP - MetroDimens.Gutter)
             .semantics {
                 stateDescription = if (row.cleared) RegisterCopy.CLEARED else RegisterCopy.NOT_CLEARED
                 if (picked != null) selected = picked
@@ -295,8 +305,9 @@ private fun SelectBox(
     }
 }
 
-private val CLEARED_BAR = 3.dp
-private val CLEARED_BAR_INSET = 3.dp
+private val CLEARED_BAR = 16.dp
+private val CLEARED_BAR_INSET = 2.dp
+private val CLEARED_BAR_GAP = 6.dp
 private val SELECT_BOX = 32.dp
 
 private val REGISTER_ROW_AIR = 15.dp
