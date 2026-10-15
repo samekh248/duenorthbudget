@@ -351,7 +351,7 @@ class SyncCoordinator(
                 bytes
             }
         return try {
-            library.installDownloaded(file.fileId, file.name, plain)
+            library.installDownloaded(file.fileId, file.name, ActualFileFormat.database(plain))
             library.useDatabase(file.fileId) { session ->
                 SyncSchema.putState(session, "cloudFileId", file.fileId)
                 SyncSchema.putState(session, "groupId", file.groupId)
@@ -368,7 +368,8 @@ class SyncCoordinator(
             sync(file.fileId)
             OpenResult.Opened
         } catch (_: Exception) {
-            OpenResult.Failed(SyncCopy.ADDRESS_FAILED)
+            // The download arrived; it is the file that did not open.
+            OpenResult.Failed(SyncCopy.OPEN_FAILED)
         }
     }
 
@@ -895,7 +896,7 @@ class SyncCoordinator(
                     fileId = chosen,
                     groupId = groupId,
                     name = name,
-                    bytes = database.readBytes(),
+                    bytes = ActualFileFormat.pack(database.readBytes(), budgetId, name, chosen, groupId),
                 )
             library.useDatabase(budgetId) { session ->
                 SyncSchema.putState(session, "cloudFileId", chosen)

@@ -271,6 +271,23 @@ class SyncCoordinatorTest {
     }
 
     @Test
+    fun actualsZippedFileOpensAndUploadsGoBackZipped() {
+        scenario {
+            // Actual's own client stores a zip of db.sqlite and metadata.json on the server.
+            val zipped = ActualFileFormat.pack(budgetBytes(), "desktop-id", "Home", "unused", null)
+            val home = server.addFile("Home", zipped)
+            assertNull(sync.connect(server.baseUrl, "server-secret").error)
+            assertEquals(OpenResult.Opened, sync.open(home, replace = true))
+            assertEquals("Home", library.readShell(home.fileId)!!.budgetName)
+
+            val sent = sync.uploadNew(home.fileId) as UploadResult.Uploaded
+            val uploaded = server.bytes(sent.fileId)
+            assertTrue(ActualFileFormat.isZip(uploaded))
+            assertTrue(ActualFileFormat.database(uploaded).isNotEmpty())
+        }
+    }
+
+    @Test
     fun failedDownloadClearsNothing() {
         scenario {
             val local = (library.create("Trip", "JPY") as CreateResult.Created).id

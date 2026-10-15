@@ -119,6 +119,7 @@ object SyncCopy {
     const val SIGN_IN_FAILED = "that sign-in was not accepted"
     const val SIGN_IN_AGAIN = "sign in again"
     const val LAST_FAILED = "the last try failed"
+    const val OPEN_FAILED = "that budget could not be opened"
     const val PASSWORD_WRONG = "that password did not open this budget"
     const val ENTER_AMOUNT = "enter an amount"
     const val NO_SERVER_FILES = "no budgets on this server"
