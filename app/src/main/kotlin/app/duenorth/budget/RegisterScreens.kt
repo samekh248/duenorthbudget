@@ -260,14 +260,14 @@ private fun RegisterLine(
                     part.categoryName,
                     Metro.typography.caption,
                     Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter),
-                    color = Metro.colors.secondary,
+                    color = Metro.colors.foreground,
                     maxLines = 2,
                 )
                 MetroText(
                     MoneyFormat.format(part.amountMinor, page.currency),
                     Metro.typography.caption.copy(textAlign = TextAlign.End),
                     Modifier.weight(LEDGER_FIGURE * 2),
-                    color = Metro.colors.secondary,
+                    color = Metro.colors.foreground,
                     maxLines = 1,
                     softWrap = false,
                 )
