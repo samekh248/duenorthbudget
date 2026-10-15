@@ -546,8 +546,6 @@ fun DueNorthApp(model: ShellViewModel) {
                             } else {
                                 RegisterScreen(
                                     page = page,
-                                    filter = state.registerFilter,
-                                    onFilter = model::setRegisterFilter,
                                     onGesture = model::setRegisterGesture,
                                     onOpen = model::openEdit,
                                     onAdd = model::openNewTransaction,

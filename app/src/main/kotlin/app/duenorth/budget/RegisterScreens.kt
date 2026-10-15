@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -24,6 +27,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CategoryTarget
@@ -51,8 +55,6 @@ import java.util.UUID
 @Composable
 fun RegisterScreen(
     page: RegisterPage,
-    filter: String,
-    onFilter: (String) -> Unit,
     onGesture: (Boolean) -> Unit,
     onOpen: (String) -> Unit,
     onAdd: () -> Unit,
@@ -62,7 +64,7 @@ fun RegisterScreen(
     onFetch: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val rows = page.matching(filter)
+    val rows = page.rows
     val owed = page.account.type == "credit" && page.balanceMinor < 0
     Column(
         modifier
@@ -71,23 +73,12 @@ fun RegisterScreen(
             .padding(horizontal = MetroDimens.Gutter),
     ) {
         MetroText(page.account.name, Metro.typography.header, maxLines = 2)
-        Column(Modifier.padding(top = MetroDimens.Gutter)) {
-            MetroText(ShellCopy.BALANCE, Metro.typography.caption, color = Metro.colors.secondary)
-            MetroText(
-                MoneyFormat.format(page.balanceMinor, page.currency),
-                Metro.typography.header,
-                color = Metro.accent.text,
-                modifier = Modifier.testTag("register-balance"),
-            )
-            if (owed) {
-                MetroText(RegisterCopy.OWED, Metro.typography.caption, color = Metro.colors.secondary)
-            }
-        }
-        MetroField(
-            value = filter,
-            onValueChange = onFilter,
-            hint = "payee",
-            modifier = Modifier.padding(top = MetroDimens.Grid).testTag("payee-filter"),
+        BudgetTotal(
+            label = if (owed) "${ShellCopy.BALANCE} ${RegisterCopy.OWED}" else ShellCopy.BALANCE,
+            amount = MoneyFormat.format(page.balanceMinor, page.currency),
+            amountColor = Metro.accent.text,
+            amountTag = "register-balance",
+            modifier = Modifier.padding(top = MetroDimens.Gutter),
         )
         if (onFetch != null) {
             MetroButton(
@@ -117,40 +108,82 @@ private fun RegisterList(
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onGesture(it) }
     }
+    val days = registerDays(rows)
+    val position = rows.withIndex().associate { it.value.id to it.index }
     LazyColumn(modifier, state = list) {
-        items(rows, key = { it.id }) { row ->
-            RegisterLine(row, page, onOpen)
+        days.forEach { day ->
+            item(key = "day-${day.first().id}") {
+                MetroText(
+                    RegisterEntry.registerDateLabel(day.first().date),
+                    Metro.typography.caption,
+                    Modifier.padding(top = 16.dp, bottom = 4.dp).testTag("register-day-${day.first().date}"),
+                    color = Metro.accent.text,
+                )
+            }
+            items(day, key = { it.id }) { row ->
+                RegisterLine(row, page, onOpen, banded = position.getValue(row.id) % 2 == 1)
+            }
         }
     }
 }
 
+/** Runs of rows that share a date, in register order, each shown under its day heading. */
+internal fun registerDays(rows: List<RegisterRow>): List<List<RegisterRow>> =
+    rows.fold(mutableListOf<MutableList<RegisterRow>>()) { days, row ->
+        if (days.lastOrNull()?.first()?.date == row.date) days.last() += row else days += mutableListOf(row)
+        days
+    }
+
+/**
+ * One transaction on the ledger: payee in the category rows' body type, with the
+ * category, reconciled state and note on a quieter line under it, and the amount in the
+ * figure columns. Rows are unruled; every other one sits on a faint full-width band.
+ * Split parts follow, indented.
+ */
 @Composable
 private fun RegisterLine(
     row: RegisterRow,
     page: RegisterPage,
     onOpen: (String) -> Unit,
+    banded: Boolean = false,
 ) {
+    val band = if (Metro.colors.isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.035f)
     Column(
         Modifier
             .fillMaxWidth()
-            .metroPress { onOpen(row.id) }
-            .padding(vertical = MetroDimens.Row)
+            .heightIn(min = MetroDimens.TouchTarget)
+            .then(
+                if (banded) {
+                    // The band runs past the screen gutter to the edges.
+                    Modifier.drawBehind {
+                        val gutter = MetroDimens.Gutter.toPx()
+                        drawRect(band, Offset(-gutter, 0f), Size(size.width + 2 * gutter, size.height))
+                    }
+                } else {
+                    Modifier
+                },
+            ).metroPress { onOpen(row.id) }
+            .padding(vertical = REGISTER_ROW_AIR)
             .testTag("register-row-${row.id}"),
     ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter)) {
+                MetroText(row.payee, Metro.typography.body, maxLines = 2)
                 MetroText(
-                    RegisterEntry.registerDateLabel(row.date),
+                    registerDetail(row),
                     Metro.typography.caption,
+                    Modifier.testTag("register-detail-${row.id}"),
                     color = Metro.colors.secondary,
+                    maxLines = 2,
                 )
-                MetroText(row.payee, Metro.typography.subheader, maxLines = 2)
-                MetroText(row.categoryLabel, Metro.typography.body, color = Metro.colors.secondary, maxLines = 2)
             }
             MetroText(
                 MoneyFormat.format(row.amountMinor, page.currency),
-                Metro.typography.subheader,
-                Modifier.widthIn(max = 148.dp),
+                Metro.typography.body.copy(textAlign = TextAlign.End),
+                Modifier.weight(LEDGER_FIGURE * 2).testTag("register-amount-${row.id}"),
+                color = Metro.accent.text,
+                maxLines = 1,
+                softWrap = false,
             )
         }
         row.parts.forEach { part ->
@@ -158,12 +191,35 @@ private fun RegisterLine(
                 Modifier.fillMaxWidth().padding(start = MetroDimens.Gutter, top = MetroDimens.Gutter),
                 verticalAlignment = Alignment.Top,
             ) {
-                MetroText(part.categoryName, Metro.typography.body, Modifier.weight(1f), maxLines = 2)
-                MetroText(MoneyFormat.format(part.amountMinor, page.currency), Metro.typography.body)
+                MetroText(
+                    part.categoryName,
+                    Metro.typography.caption,
+                    Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter),
+                    color = Metro.colors.secondary,
+                    maxLines = 2,
+                )
+                MetroText(
+                    MoneyFormat.format(part.amountMinor, page.currency),
+                    Metro.typography.caption.copy(textAlign = TextAlign.End),
+                    Modifier.weight(LEDGER_FIGURE * 2),
+                    color = Metro.colors.secondary,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
     }
 }
+
+private val REGISTER_ROW_AIR = 15.dp
+
+/** The quieter line under a payee: category, reconciled, then the note. The date heads its day. */
+internal fun registerDetail(row: RegisterRow): String =
+    listOfNotNull(
+        row.categoryLabel.ifBlank { null },
+        if (row.reconciled) RegisterCopy.RECONCILED else null,
+        row.note.trim().ifBlank { null },
+    ).joinToString(" · ")
 
 @Composable
 fun TransactionForm(
