@@ -90,6 +90,9 @@ sealed interface ShellRoute {
 
     data object ConfirmSwitch : ShellRoute
 
+    /** A server budget was picked while the phone holds others: names what gets cleared. */
+    data object ConfirmReplaceBudget : ShellRoute
+
     data object ConfirmInstanceSwitch : ShellRoute
 
     data object Server : ShellRoute
@@ -292,6 +295,8 @@ data class ShellUiState(
     val switchInstanceTarget: SavedInstance? = null,
     val encryptionError: String? = null,
     val switchReturnRoute: ShellRoute = ShellRoute.Budgets,
+    /** The phone's budgets that picking [pendingFile] clears. */
+    val replaceBudgets: List<BudgetSummary> = emptyList(),
     val breakdown: ActualMonthMath.MonthBreakdown? = null,
     val fillConfirm: FillConfirm? = null,
     val monthNotice: String? = null,
@@ -788,6 +793,11 @@ class ShellViewModel(
                 )
             }
             probeReachability()
+            // A signed-in server goes straight to picking which of its budgets to use.
+            if (sync.signedIn()) {
+                openFromSettings(ShellRoute.OnboardingFiles, SettingsPage.SERVER)
+                onboardingRefresh()
+            }
         }
     }
 
@@ -1160,6 +1170,10 @@ class ShellViewModel(
         }
         if (current.route == ShellRoute.Home) return false
         if (current.route == ShellRoute.BudgetPassword && current.locked) return false
+        if (current.route == ShellRoute.ConfirmReplaceBudget) {
+            cancelReplaceBudget()
+            return true
+        }
         onboardingBack()?.let { return it }
         if (current.settingsReturn && current.route != ShellRoute.Settings) {
             returnToSettings()
@@ -1688,6 +1702,8 @@ class ShellViewModel(
     }
 
     fun requestRemote(file: RemoteFile) {
+        // Keep and failures come back to the list the budget was picked from.
+        _state.update { it.copy(switchReturnRoute = it.route.takeIf(::isServerList) ?: it.switchReturnRoute) }
         if (file.encryptKeyId != null && !sync.isUnlocked(file.fileId)) {
             _state.update {
                 it.copy(route = ShellRoute.BudgetPassword, pendingFile = file, passwordError = null, askEachTime = true)
@@ -1695,6 +1711,28 @@ class ShellViewModel(
             return
         }
         confirmOrOpen(file)
+    }
+
+    /** `use` on the replace confirmation: download the server budget, then clear the others. */
+    fun confirmReplaceBudget() {
+        val current = _state.value
+        val file = current.pendingFile ?: return
+        if (current.syncing) return
+        // The download's progress shows over the list it was picked from.
+        _state.update { it.copy(route = it.switchReturnRoute.takeIf(::isServerList) ?: ShellRoute.Server) }
+        beginOpen(file)
+    }
+
+    /** `keep` (or back) on the replace confirmation: the phone's budget stays, the list shows again. */
+    fun cancelReplaceBudget() {
+        _state.update {
+            it.copy(
+                route = it.switchReturnRoute.takeIf(::isServerList) ?: ShellRoute.Server,
+                pendingFile = null,
+                replaceBudgets = emptyList(),
+                passwordError = null,
+            )
+        }
     }
 
     fun submitPassword(
@@ -1834,27 +1872,36 @@ class ShellViewModel(
         saveSettings(_state.value.settings.copy(accent = id))
     }
 
+    /**
+     * A server budget replaces whatever is on the phone. When other budgets are there, the
+     * person sees which ones get cleared first; otherwise it opens straight away.
+     */
     private fun confirmOrOpen(file: RemoteFile) {
-        val current = _state.value.settings.openBudgetId
-        if (current != null && current != file.fileId) {
+        viewModelScope.launch {
+            val cleared = withContext(Dispatchers.IO) { library.list() }.filter { it.id != file.fileId }
+            if (cleared.isEmpty()) {
+                beginOpen(file)
+                return@launch
+            }
             _state.update {
                 it.copy(
-                    route = ShellRoute.ConfirmSwitch,
+                    route = ShellRoute.ConfirmReplaceBudget,
                     pendingFile = file,
-                    switchTarget = BudgetSummary(file.fileId, file.name, ""),
+                    replaceBudgets = cleared,
+                    passwordError = null,
                 )
             }
-        } else {
-            beginOpen(file)
         }
     }
+
+    private fun isServerList(route: ShellRoute): Boolean = route == ShellRoute.OnboardingFiles || route == ShellRoute.Server
 
     private fun beginOpen(file: RemoteFile) {
         viewModelScope.launch {
             _state.update { it.copy(syncing = true, syncProgress = 0f, serverError = null) }
             val result =
                 withContext(Dispatchers.IO) {
-                    sync.open(file) { received, total ->
+                    sync.open(file, replace = true) { received, total ->
                         _state.update { it.copy(syncing = true, syncProgress = syncFraction(received, total)) }
                     }
                 }
@@ -1866,8 +1913,10 @@ class ShellViewModel(
                             syncing = false,
                             syncProgress = null,
                             pendingFile = null,
+                            replaceBudgets = emptyList(),
                             locked = false,
                             route = ShellRoute.Home,
+                            settingsReturn = false,
                         )
                     }
                     reload()
@@ -1882,7 +1931,13 @@ class ShellViewModel(
                             syncing = false,
                             syncProgress = null,
                             serverError = result.reason,
-                            route = if (it.onboarding != null) ShellRoute.OnboardingFiles else ShellRoute.Server,
+                            replaceBudgets = emptyList(),
+                            route =
+                                when {
+                                    it.onboarding != null -> ShellRoute.OnboardingFiles
+                                    isServerList(it.switchReturnRoute) -> it.switchReturnRoute
+                                    else -> ShellRoute.Server
+                                },
                         )
                     }
             }

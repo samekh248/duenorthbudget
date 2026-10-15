@@ -76,8 +76,27 @@ class OnboardingScreenshotTest {
     @Test
     fun filesDark() = snap(ShellRoute.OnboardingFiles, "onboarding_files_dark", dark = true) { files() }
 
+    @Test
+    fun filesReplacingLight() =
+        snap(ShellRoute.OnboardingFiles, "budget_picker_replacing_light", dark = false) { files(replacing = listOf("Home")) }
+
+    @Test
+    fun filesReplacingDark() =
+        snap(ShellRoute.OnboardingFiles, "budget_picker_replacing_dark", dark = true) { files(replacing = listOf("Home")) }
+
+    @Test
+    fun confirmReplaceLight() =
+        snap(ShellRoute.ConfirmReplaceBudget, "budget_picker_confirm_light", dark = false) { confirmReplace() }
+
+    @Test
+    fun confirmReplaceDark() =
+        snap(ShellRoute.ConfirmReplaceBudget, "budget_picker_confirm_dark", dark = true) { confirmReplace() }
+
     @Composable
     private fun welcome() = WelcomeScreen(onServer = {}, onPhone = {})
+
+    @Composable
+    private fun confirmReplace() = ConfirmReplaceBudgetScreen(opening = "Household", clearing = listOf("Home"), onUse = {}, onKeep = {})
 
     @Composable
     private fun address(
@@ -106,7 +125,7 @@ class OnboardingScreenshotTest {
         )
 
     @Composable
-    private fun files() =
+    private fun files(replacing: List<String> = emptyList()) =
         OnboardingFilesScreen(
             label = "home server",
             files =
@@ -117,6 +136,7 @@ class OnboardingScreenshotTest {
                 ),
             error = null,
             onOpen = {},
+            replacing = replacing,
         )
 
     private fun snap(

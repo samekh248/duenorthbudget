@@ -311,8 +311,13 @@ class SyncCoordinator(
         memoryKeys.remove(budgetId)
     }
 
+    /**
+     * Downloads [file] and makes it the open budget. With [replace], every other budget on the
+     * phone is cleared once the download is in place, so the server file becomes the only one.
+     */
     fun open(
         file: RemoteFile,
+        replace: Boolean = false,
         onProgress: (Long, Long) -> Unit = { _, _ -> },
     ): OpenResult {
         val token = syncToken() ?: return OpenResult.Failed(SyncCopy.SIGN_IN_AGAIN)
@@ -346,7 +351,7 @@ class SyncCoordinator(
                 bytes
             }
         return try {
-            library.installDownloaded(file.fileId, file.name, plain)
+            library.installDownloaded(file.fileId, file.name, ActualFileFormat.database(plain))
             library.useDatabase(file.fileId) { session ->
                 SyncSchema.putState(session, "cloudFileId", file.fileId)
                 SyncSchema.putState(session, "groupId", file.groupId)
@@ -359,10 +364,22 @@ class SyncCoordinator(
                 }
             }
             library.switchTo(file.fileId)
+            if (replace) clearOthers(file.fileId)
             sync(file.fileId)
             OpenResult.Opened
         } catch (_: Exception) {
-            OpenResult.Failed(SyncCopy.ADDRESS_FAILED)
+            // The download arrived; it is the file that did not open.
+            OpenResult.Failed(SyncCopy.OPEN_FAILED)
+        }
+    }
+
+    /** Clears every budget on the phone except [keepId], with its saved key. */
+    fun clearOthers(keepId: String) {
+        library.list().filter { it.id != keepId }.forEach { budget ->
+            memoryKeys.remove(budget.id)
+            pendingMaterial.remove(budget.id)
+            secrets.remove(keySecret(budget.id))
+            library.delete(budget.id)
         }
     }
 
@@ -879,7 +896,7 @@ class SyncCoordinator(
                     fileId = chosen,
                     groupId = groupId,
                     name = name,
-                    bytes = database.readBytes(),
+                    bytes = ActualFileFormat.pack(database.readBytes(), budgetId, name, chosen, groupId),
                 )
             library.useDatabase(budgetId) { session ->
                 SyncSchema.putState(session, "cloudFileId", chosen)

@@ -215,9 +215,13 @@ class OnboardingFlowTest {
         await { model.state.value.route == ShellRoute.OnboardingSignIn }
         model.onboardingLabel("home server")
         model.onboardingSignIn(FakeTransport.PASSWORD)
-        await { model.state.value.route == ShellRoute.Settings }
-        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+        // Signing in goes on to the budget picker; back from it leaves the phone's budget alone.
+        await { model.state.value.route == ShellRoute.OnboardingFiles }
         assertEquals("home server", library(root).settings().activeInstance()?.label)
+        assertTrue(model.back())
+        assertEquals(ShellRoute.Settings, model.state.value.route)
+        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+        assertEquals(listOf("Home"), library(root).list().map { it.name })
         assertNull(model.state.value.onboarding)
         await { library(root).onboarding().read() == null }
     }
@@ -305,7 +309,8 @@ class OnboardingFlowTest {
         model.onboardingCheck()
         await { model.state.value.route == ShellRoute.OnboardingSignIn }
         model.onboardingSignIn(FakeTransport.PASSWORD)
-        await { model.state.value.route == ShellRoute.Settings }
+        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        assertTrue(model.back())
         val id =
             library(root)
                 .settings()
@@ -322,6 +327,99 @@ class OnboardingFlowTest {
         await { library(root).settings().instances.isEmpty() }
         assertEquals(ShellRoute.Settings, model.state.value.route)
         assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+    }
+
+    @Test
+    fun pickingAServerBudgetFromSettingsReplacesThePhonesBudget() {
+        val root = root("settings-pick")
+        library(root).create("Home", "USD")
+        transport.files += RemoteFile(fileId = "server-household", groupId = "g-1", name = "Household", encryptKeyId = null)
+        transport.downloads["server-household"] = budgetBytes("Household")
+        val model = model(root)
+        await { model.state.value.shell != null }
+        model.showSettings()
+        model.selectSettingsPage(SettingsPage.SERVER)
+        model.onboardingAddServer()
+        model.onboardingAddress("budget.example.com")
+        model.onboardingCheck()
+        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        model.onboardingSignIn(FakeTransport.PASSWORD)
+        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        assertEquals(listOf("Household"), model.state.value.remoteFiles.map { it.name })
+
+        // The confirmation names the budget being cleared; keep leaves it.
+        model.onboardingOpen(model.state.value.remoteFiles.single())
+        await { model.state.value.route == ShellRoute.ConfirmReplaceBudget }
+        assertEquals(listOf("Home"), model.state.value.replaceBudgets.map { it.name })
+        assertTrue(model.back())
+        assertEquals(ShellRoute.OnboardingFiles, model.state.value.route)
+        assertEquals(listOf("Home"), library(root).list().map { it.name })
+
+        model.onboardingOpen(model.state.value.remoteFiles.single())
+        await { model.state.value.route == ShellRoute.ConfirmReplaceBudget }
+        model.confirmReplaceBudget()
+        await {
+            model.state.value.shell
+                ?.budgetName == "Household"
+        }
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        assertEquals(listOf("Household"), library(root).list().map { it.name })
+        assertEquals("server-household", library(root).settings().openBudgetId)
+        assertNull(model.state.value.onboarding)
+        await { library(root).onboarding().read() == null }
+    }
+
+    @Test
+    fun switchingToASignedInServerOpensItsBudgetPicker() {
+        val root = root("settings-switch")
+        library(root).create("Home", "USD")
+        val model = model(root)
+        await { model.state.value.shell != null }
+        model.showSettings()
+        model.onboardingAddServer()
+        model.onboardingAddress("budget.example.com")
+        model.onboardingCheck()
+        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        model.onboardingSignIn(FakeTransport.PASSWORD)
+        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        assertTrue(model.back())
+        val id =
+            library(root)
+                .settings()
+                .activeInstance()!!
+                .id
+
+        model.confirmInstanceSwitch(id)
+        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        assertTrue(model.back())
+        assertEquals(ShellRoute.Settings, model.state.value.route)
+        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+    }
+
+    @Test
+    fun firstRunPickOpensWithoutAsking() {
+        transport.files += RemoteFile(fileId = "server-household", groupId = "g-1", name = "Household", encryptKeyId = null)
+        transport.downloads["server-household"] = budgetBytes("Household")
+        val (library, model) = model("first-pick")
+        model.onboardingChooseServer()
+        model.onboardingAddress("budget.example.com")
+        model.onboardingCheck()
+        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        model.onboardingSignIn(FakeTransport.PASSWORD)
+        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        model.onboardingOpen(model.state.value.remoteFiles.single())
+        await {
+            model.state.value.shell
+                ?.budgetName == "Household"
+        }
+        assertEquals(listOf("Household"), library.list().map { it.name })
+    }
+
+    /** An Actual file made on another "phone", as the server would hand it back. */
+    private fun budgetBytes(name: String): ByteArray {
+        val source = root("source-$name")
+        val made = library(source).create(name, "USD") as app.duenorth.budget.core.CreateResult.Created
+        return File(source, "${made.id}/db.sqlite").readBytes()
     }
 
     private fun model(
@@ -373,6 +471,8 @@ class OnboardingFlowTest {
 
     private class FakeTransport : ActualTransport {
         val logins = mutableListOf<String>()
+        val files = mutableListOf<RemoteFile>()
+        val downloads = mutableMapOf<String, ByteArray>()
         val uploads = java.util.Collections.synchronizedList(mutableListOf<String>())
 
         override fun login(
@@ -394,14 +494,14 @@ class OnboardingFlowTest {
         override fun listFiles(
             address: String,
             token: String,
-        ): List<RemoteFile> = emptyList()
+        ): List<RemoteFile> = files.toList()
 
         override fun download(
             address: String,
             token: String,
             fileId: String,
             onProgress: (received: Long, total: Long) -> Unit,
-        ): ByteArray = throw IOException("no files")
+        ): ByteArray = downloads[fileId] ?: throw IOException("no files")
 
         override fun upload(
             address: String,

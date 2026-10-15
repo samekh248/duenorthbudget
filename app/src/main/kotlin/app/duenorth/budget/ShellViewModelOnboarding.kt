@@ -89,18 +89,13 @@ fun ShellViewModel.onboardingAddServer() {
     openFromSettings(ShellRoute.OnboardingAddress, SettingsPage.SERVER)
 }
 
-/** The settings-origin path is over: drop its progress and show the server item. */
+/** The settings-origin path is over without a pick: drop its progress and show the server item. */
 private fun ShellViewModel.leaveSettingsOnboarding() {
     cancelOnboardingJob()
     mutate { it.copy(onboarding = null) }
     viewModelScope.launch(onboardingWrites) { library.onboarding().clear() }
     returnToSettings(SettingsPage.SERVER)
 }
-
-private fun ShellViewModel.fromSettings(): Boolean =
-    state.value.onboarding
-        ?.progress
-        ?.origin == OnboardingOrigin.SETTINGS
 
 /** After the first load, the file list needs the server's budgets again. */
 internal fun ShellViewModel.resumeOnboarding() {
@@ -226,21 +221,7 @@ fun ShellViewModel.onboardingSignIn(password: String) {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) { sync.connect(address, password, ui.progress.instanceLabel) }
             val settings = withContext(Dispatchers.IO) { library.settings() }
-            if (result.error == null && fromSettings() && state.value.shell != null) {
-                mutate {
-                    it.copy(
-                        remoteFiles = result.files,
-                        serverError = null,
-                        settings = settings,
-                        instances = settings.instances,
-                        activeInstance = settings.activeInstance(),
-                        instanceReachable = true,
-                        signedIn = sync.signedIn(),
-                    )
-                }
-                leaveSettingsOnboarding()
-                return@launch
-            }
+            // From first run or from settings, a signed-in server goes on to picking its budget.
             if (result.error == null) {
                 updateOnboarding {
                     it.copy(progress = it.progress.copy(step = OnboardingStep.FILES), checking = false, signInError = null)
@@ -279,10 +260,6 @@ internal fun ShellViewModel.finishBrowserSignIn(
     error: String?,
 ) {
     if (state.value.onboarding == null) mutate { it.copy(onboarding = OnboardingUi(saved)) }
-    if (error == null && saved.origin == OnboardingOrigin.SETTINGS && state.value.shell != null) {
-        leaveSettingsOnboarding()
-        return
-    }
     if (error == null) {
         updateOnboarding {
             it.copy(

@@ -220,11 +220,16 @@ the advanced item is showing.
   every saved server with the active one marked.
 - **FR-005**: Adding a server from settings MUST use the onboarding server
   path from spec 011 (address, server check, then the sign-in that server
-  uses together with the instance's name on this phone), with the same checks and messages, and MUST return to
-  the server item when finished or abandoned.
+  uses together with the instance's name on this phone), with the same checks and messages. After sign-in it
+  MUST show the pick-a-budget page for that server; back from any step returns to the server item.
+- **FR-005a**: Picking a server budget (from onboarding, from settings, or from the server page) MUST make it
+  the only budget on the phone. When the phone already holds other budgets, a confirmation MUST name each one
+  that gets cleared before anything is removed; "keep" returns to the list with nothing changed, and a failed
+  download clears nothing. Server copies are never touched.
 - **FR-006**: The server item MUST NOT contain address or password fields.
 - **FR-007**: Making a saved server active MUST use the existing confirm
-  page that names the server left and the server opening. Removing a
+  page that names the server left and the server opening, then, when signed in to it, the pick-a-budget page
+  for that server (FR-005a). Removing a
   saved server MUST ask for confirmation first.
 - **FR-008**: Sign out MUST be offered on the server item when a server
   is active, and MUST keep the budgets on the phone (spec 009).

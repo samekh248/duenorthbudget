@@ -295,3 +295,51 @@ fun ConfirmReplaceScreen(
         }
     }
 }
+
+/** Words on the budget picker's replace confirmation. */
+object ReplaceBudgetCopy {
+    const val USE = "use"
+    const val KEEP = "keep"
+    const val LOST = "changes that never synced to a server are lost"
+
+    fun use(name: String) = "use $name"
+
+    fun clears(names: List<String>) = "clears ${names(names)} from this phone"
+
+    /** The caption on the picker while the phone holds a budget. */
+    fun replaces(names: List<String>) = "picking one replaces ${names(names)} on this phone"
+
+    private fun names(names: List<String>): String =
+        when (names.size) {
+            0 -> ""
+            1 -> names.single()
+            else -> names.dropLast(1).joinToString(", ") + " and " + names.last()
+        }
+}
+
+/** A server budget was picked while the phone holds others: names each budget that gets cleared. */
+@Composable
+fun ConfirmReplaceBudgetScreen(
+    opening: String,
+    clearing: List<String>,
+    onUse: () -> Unit,
+    onKeep: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .padding(MetroDimens.Gutter)
+            .testTag("confirm-replace-budget"),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        MetroText(ReplaceBudgetCopy.use(opening), Metro.typography.header)
+        MetroText(ReplaceBudgetCopy.clears(clearing), Metro.typography.subheader, Modifier.testTag("replace-budget-clears"))
+        MetroText(ReplaceBudgetCopy.LOST, Metro.typography.body, color = Metro.colors.secondary)
+        MetroButtonGrid {
+            MetroButton(ReplaceBudgetCopy.USE, Modifier.testTag("replace-budget-use"), onClick = onUse)
+            MetroButton(ReplaceBudgetCopy.KEEP, Modifier.testTag("replace-budget-keep"), onClick = onKeep)
+        }
+    }
+}
