@@ -18,6 +18,13 @@ data class ScreenBarSpec(
     val primary: Boolean = true,
 )
 
+/** What the settings bar needs beyond the route (spec 012). */
+data class SettingsBar(
+    val page: SettingsPage = SettingsPage.BUDGET,
+    val signedIn: Boolean = false,
+    val serverActive: Boolean = false,
+)
+
 object ScreenBar {
     fun specsFor(
         route: ShellRoute,
@@ -29,8 +36,25 @@ object ScreenBar {
         templates: Boolean = false,
         developerMode: Boolean = false,
         passwordSignIn: Boolean = true,
+        settings: SettingsBar = SettingsBar(),
     ): List<ScreenBarSpec> =
         when (route) {
+            // Spec 012: each settings pivot item has its own bar.
+            ShellRoute.Settings ->
+                when (settings.page) {
+                    SettingsPage.BUDGET ->
+                        listOf(spec("settings-new", AppGlyph.Add, SettingsCopy.NEW)) +
+                            if (hasBudget) listOf(menu("settings-payees", AppGlyph.Payees, SettingsCopy.PAYEES)) else emptyList()
+                    SettingsPage.SERVER ->
+                        buildList {
+                            add(spec("add-server", AppGlyph.Add, SettingsCopy.ADD_SERVER))
+                            if (settings.signedIn) add(spec("server-budgets", AppGlyph.Budgets, SettingsCopy.SERVER_BUDGETS))
+                            if (settings.serverActive) add(menu("sign-out", AppGlyph.Cancel, SettingsCopy.SIGN_OUT))
+                        }
+                    SettingsPage.ADVANCED -> listOf(spec("export", AppGlyph.Save, SettingsCopy.EXPORT))
+                    SettingsPage.FORMAT, SettingsPage.APPEARANCE -> emptyList()
+                }
+            is ShellRoute.EncryptionPassword -> saveCancel()
             // Spec 011: one primary action per onboarding page, in the bar where the thumb is.
             ShellRoute.Welcome ->
                 if (developerMode) listOf(menu("sample-budgets", AppGlyph.Budgets, ShellCopy.SAMPLE_BUDGETS)) else emptyList()
@@ -142,6 +166,11 @@ object ScreenBar {
                 ?.progress
                 ?.methods
                 ?.contains(SignInMethod.PASSWORD) != false,
+            SettingsBar(
+                page = SettingsPage.visible(state.settings.openBudgetId != null, state.settingsPage),
+                signedIn = state.signedIn,
+                serverActive = state.activeInstance != null,
+            ),
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -230,6 +259,12 @@ class ScreenBarHandlers(
     val onRefresh: () -> Unit = {},
     val onSamples: () -> Unit = {},
     val onNewBudget: () -> Unit = {},
+    val onSettingsNew: () -> Unit = {},
+    val onSettingsPayees: () -> Unit = {},
+    val onAddServer: () -> Unit = {},
+    val onServerBudgets: () -> Unit = {},
+    val onSignOut: () -> Unit = {},
+    val onExport: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -274,6 +309,12 @@ class ScreenBarHandlers(
             "refresh" -> onRefresh
             "sample-budgets" -> onSamples
             "new-budget" -> onNewBudget
+            "settings-new" -> onSettingsNew
+            "settings-payees" -> onSettingsPayees
+            "add-server" -> onAddServer
+            "server-budgets" -> onServerBudgets
+            "sign-out" -> onSignOut
+            "export" -> onExport
             else -> ({})
         }
 }

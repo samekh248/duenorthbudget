@@ -297,6 +297,9 @@ class SyncCoordinator(
         return true
     }
 
+    /** Whether the budget has an encryption password, whether or not it is unlocked now. */
+    fun isEncrypted(budgetId: String): Boolean = state(budgetId, "encrypted") == "1"
+
     fun needsPassword(budgetId: String): Boolean {
         if (state(budgetId, "encrypted") != "1") return false
         return !isUnlocked(budgetId)

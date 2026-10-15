@@ -1,40 +1,28 @@
 package app.duenorth.budget
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetSummary
-import app.duenorth.budget.core.DateFormats
-import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.SavedInstance
-import app.duenorth.budget.core.SyncCopy
-import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
-import app.duenorth.budget.design.components.MetroOutlineButton
+import app.duenorth.budget.design.components.MetroPivot
 import app.duenorth.budget.design.components.MetroText
-import app.duenorth.budget.design.components.metroPress
-import app.duenorth.budget.design.theme.Accent
+import app.duenorth.budget.design.components.PivotItem
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 
@@ -44,110 +32,180 @@ enum class AdvancedConfirm {
     ResetSync,
 }
 
+/** The settings pivot items, in header order (spec 012 FR-002). */
+enum class SettingsPage(
+    val header: String,
+    val needsBudget: Boolean,
+) {
+    BUDGET("budget", false),
+    SERVER("server", false),
+    FORMAT("format", true),
+    APPEARANCE("appearance", false),
+    ADVANCED("advanced", true),
+    ;
+
+    companion object {
+        fun shown(budgetOpen: Boolean): List<SettingsPage> = entries.filter { budgetOpen || !it.needsBudget }
+
+        /** [page] when it is in the header row, otherwise the budget item (the budget closed). */
+        fun visible(
+            budgetOpen: Boolean,
+            page: SettingsPage,
+        ): SettingsPage = if (page in shown(budgetOpen)) page else BUDGET
+    }
+}
+
+enum class EncryptionMode {
+    SET,
+    CHANGE,
+    REMOVE,
+}
+
+object SettingsCopy {
+    const val TITLE = "SETTINGS"
+    const val NEW = "new"
+    const val PAYEES = "payees"
+    const val ADD_SERVER = "add"
+    const val SERVER_BUDGETS = "server budgets"
+    const val SIGN_OUT = "sign out"
+    const val EXPORT = "export"
+    const val NOT_CONNECTED = "not connected"
+    const val SIGNED_IN = "signed in"
+    const val SIGNED_OUT = "signed out"
+    const val NO_SERVER_HINT = "add the Actual server you run to sync this phone's budgets"
+    const val NO_BUDGET = "no budget open"
+    const val EXPORT_HINT = "save a copy of this budget as a zip file"
+    const val ENCRYPTED = "encrypted"
+    const val NOT_ENCRYPTED = "not encrypted"
+    const val SET_PASSWORD = "set password"
+    const val CHANGE_PASSWORD = "change password"
+    const val REMOVE_PASSWORD = "remove password"
+    const val NEW_PASSWORD = "new password"
+    const val CURRENT_PASSWORD = "current password"
+    const val REPLACEMENT = "replacement"
+    const val BUDGETS_STAY = "budgets on this phone stay"
+
+    fun method(budgetType: String) = if (budgetType == "tracking") "tracking budget" else "envelope budget"
+
+    fun encryptionTitle(mode: EncryptionMode) =
+        when (mode) {
+            EncryptionMode.SET -> SET_PASSWORD
+            EncryptionMode.CHANGE -> CHANGE_PASSWORD
+            EncryptionMode.REMOVE -> REMOVE_PASSWORD
+        }
+}
+
+/**
+ * Settings as a pivot (spec 012): budget, server, format, appearance, advanced. Format and
+ * advanced only show while a budget is open. Forms open their own pages; no item holds a field.
+ */
 @Composable
 fun SettingsScreen(
+    page: SettingsPage,
     instances: List<SavedInstance>,
     activeInstance: SavedInstance?,
     instanceReachable: Boolean?,
     signedIn: Boolean,
-    serverError: String?,
     budgets: List<BudgetSummary>,
     openBudgetId: String?,
     themeMode: String,
     accentId: String,
     formatPrefs: FormatPrefs,
     cloudFileId: String?,
-    createError: String?,
-    encryptionError: String?,
-    openIdAvailable: Boolean,
-    onConnect: (String, String) -> Unit,
-    onBeginOpenId: (String) -> Unit,
+    encrypted: Boolean,
+    onPage: (SettingsPage) -> Unit,
     onMakeActive: (String) -> Unit,
     onRemoveInstance: (String) -> Unit,
-    onSignOut: () -> Unit,
     onOpenBudget: (String) -> Unit,
-    onCreateBudget: (String, String) -> Unit,
     onTheme: (String) -> Unit,
     onAccent: (String) -> Unit,
-    launcherIcon: LauncherIcon = LauncherIcon.TILE,
-    onLauncherIcon: (LauncherIcon) -> Unit = {},
     onPayees: () -> Unit,
     onDateFormat: (String) -> Unit,
     onNumberFormat: (String) -> Unit,
     onFirstDay: (Int) -> Unit,
     onHideFraction: (Boolean) -> Unit,
     onExperimental: (Boolean) -> Unit,
-    onGoalTemplates: (Boolean) -> Unit = {},
-    onLearning: (Boolean) -> Unit = {},
     onExport: () -> Unit,
-    onSetEncryptionPassword: (String) -> Unit,
-    onChangeEncryptionPassword: (String, String) -> Unit,
-    onRemoveEncryptionPassword: (String) -> Unit,
+    onEncryption: (EncryptionMode) -> Unit,
     onRequestAdvanced: (AdvancedConfirm) -> Unit,
     modifier: Modifier = Modifier,
-    defaultBudgetName: String = "",
+    launcherIcon: LauncherIcon = LauncherIcon.TILE,
+    onLauncherIcon: (LauncherIcon) -> Unit = {},
+    onGoalTemplates: (Boolean) -> Unit = {},
+    onLearning: (Boolean) -> Unit = {},
+    scroll: Map<SettingsPage, Int> = emptyMap(),
+    onScroll: (SettingsPage, Int) -> Unit = { _, _ -> },
 ) {
     val budgetOpen = !openBudgetId.isNullOrBlank()
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .verticalScroll(rememberScrollState())
-            .testTag("settings-screen"),
-        verticalArrangement = Arrangement.spacedBy(MetroDimens.Grid),
-    ) {
-        MetroText("settings", Metro.typography.header)
-        InstanceSection(
-            instances = instances,
-            activeInstance = activeInstance,
-            instanceReachable = instanceReachable,
-            signedIn = signedIn,
-            serverError = serverError,
-            openIdAvailable = openIdAvailable,
-            onConnect = onConnect,
-            onBeginOpenId = onBeginOpenId,
-            onMakeActive = onMakeActive,
-            onRemoveInstance = onRemoveInstance,
-            onSignOut = onSignOut,
-        )
-        BudgetsSection(
-            budgets = budgets,
-            openBudgetId = openBudgetId,
-            createError = createError,
-            defaultName = defaultBudgetName,
-            onOpen = onOpenBudget,
-            onCreate = onCreateBudget,
-        )
-        AppearanceSection(
-            themeMode = themeMode,
-            accentId = accentId,
-            onTheme = onTheme,
-            onAccent = onAccent,
-        )
-        LauncherIconSection(launcherIcon, onLauncherIcon)
-        SettingsActionRow("payees", "settings-payees", onPayees)
-        if (budgetOpen) {
-            FormattingSection(
-                prefs = formatPrefs,
-                onDateFormat = onDateFormat,
-                onNumberFormat = onNumberFormat,
-                onFirstDay = onFirstDay,
-                onHideFraction = onHideFraction,
-            )
-            MethodSection(formatPrefs.budgetType)
-            LearningSection(formatPrefs.learnCategories, onLearning)
-            ExperimentalSection(formatPrefs.experimental, onExperimental, formatPrefs.goalTemplates, onGoalTemplates)
-            IdsSection(openBudgetId.orEmpty(), cloudFileId)
-            SettingsActionRow("export", "settings-export", onExport)
-            EncryptionSection(
-                error = encryptionError,
-                onSet = onSetEncryptionPassword,
-                onChange = onChangeEncryptionPassword,
-                onRemove = onRemoveEncryptionPassword,
-            )
-            AdvancedSection(onRequestAdvanced)
+    val pages = SettingsPage.shown(budgetOpen)
+    val selected = SettingsPage.visible(budgetOpen, page)
+    val items =
+        pages.map { item ->
+            PivotItem(item.header) {
+                SettingsItem(item, scroll[item] ?: 0, onScroll) {
+                    when (item) {
+                        SettingsPage.BUDGET ->
+                            BudgetItem(
+                                budgets = budgets,
+                                openBudgetId = openBudgetId,
+                                budgetType = formatPrefs.budgetType,
+                                learning = formatPrefs.learnCategories,
+                                onOpen = onOpenBudget,
+                                onPayees = onPayees,
+                                onLearning = onLearning,
+                            )
+                        SettingsPage.SERVER ->
+                            ServerItem(
+                                instances = instances,
+                                activeInstance = activeInstance,
+                                instanceReachable = instanceReachable,
+                                signedIn = signedIn,
+                                onMakeActive = onMakeActive,
+                                onRemove = onRemoveInstance,
+                            )
+                        SettingsPage.FORMAT ->
+                            FormatItem(
+                                prefs = formatPrefs,
+                                onDateFormat = onDateFormat,
+                                onNumberFormat = onNumberFormat,
+                                onFirstDay = onFirstDay,
+                                onHideFraction = onHideFraction,
+                            )
+                        SettingsPage.APPEARANCE ->
+                            AppearanceItem(
+                                themeMode = themeMode,
+                                accentId = accentId,
+                                launcherIcon = launcherIcon,
+                                onTheme = onTheme,
+                                onAccent = onAccent,
+                                onLauncherIcon = onLauncherIcon,
+                            )
+                        SettingsPage.ADVANCED ->
+                            AdvancedItem(
+                                experimental = formatPrefs.experimental,
+                                goalTemplates = formatPrefs.goalTemplates,
+                                budgetId = openBudgetId.orEmpty(),
+                                cloudFileId = cloudFileId,
+                                encrypted = encrypted,
+                                onExperimental = onExperimental,
+                                onGoalTemplates = onGoalTemplates,
+                                onExport = onExport,
+                                onEncryption = onEncryption,
+                                onRequest = onRequestAdvanced,
+                            )
+                    }
+                }
+            }
         }
+    // Keyed on the header row so a budget opening or closing rebuilds the pager at the right item.
+    androidx.compose.runtime.key(pages) {
+        MetroPivot(
+            title = SettingsCopy.TITLE,
+            items = items,
+            modifier = modifier.testTag("settings-screen"),
+            initialItem = pages.indexOf(selected).coerceAtLeast(0),
+            onSelected = { index -> pages.getOrNull(index)?.let(onPage) },
+        )
     }
 }
 
@@ -172,6 +230,31 @@ fun ConfirmInstanceSwitchScreen(
         MetroButtonGrid {
             MetroButton("open", onClick = onOpen)
             MetroButton("stay", onClick = onStay)
+        }
+    }
+}
+
+/** Settings → server → remove: names the server and says the phone's budgets stay (spec 012 FR-007). */
+@Composable
+fun ConfirmRemoveInstanceScreen(
+    name: String,
+    onRemove: () -> Unit,
+    onKeep: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .padding(MetroDimens.Gutter)
+            .testTag("confirm-remove-instance"),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        MetroText("remove $name", Metro.typography.header)
+        MetroText(SettingsCopy.BUDGETS_STAY, Metro.typography.subheader)
+        MetroButtonGrid {
+            MetroButton("remove", Modifier.testTag("remove-instance-confirm"), onClick = onRemove)
+            MetroButton("keep", Modifier.testTag("remove-instance-keep"), onClick = onKeep)
         }
     }
 }
@@ -206,378 +289,53 @@ fun ConfirmAdvancedScreen(
     }
 }
 
+/** One page per encryption password action; save sits on the app bar (spec 012 FR-013). */
 @Composable
-private fun InstanceSection(
-    instances: List<SavedInstance>,
-    activeInstance: SavedInstance?,
-    instanceReachable: Boolean?,
-    signedIn: Boolean,
-    serverError: String?,
-    openIdAvailable: Boolean,
-    onConnect: (String, String) -> Unit,
-    onBeginOpenId: (String) -> Unit,
-    onMakeActive: (String) -> Unit,
-    onRemoveInstance: (String) -> Unit,
-    onSignOut: () -> Unit,
-) {
-    var address by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    SettingsHeading("instance")
-    val status =
-        when {
-            activeInstance == null -> "not connected"
-            instanceReachable == false -> SyncCopy.NOT_REACHED
-            else -> activeInstance.label ?: activeInstance.address
-        }
-    MetroText(
-        status,
-        Metro.typography.subheader,
-        Modifier.testTag("instance-status"),
-        color = if (activeInstance != null) Metro.accent.text else Metro.colors.foreground,
-    )
-    instances.forEach { instance ->
-        val active = instance.id == activeInstance?.id
-        val label = instance.label ?: instance.address
-        Column(Modifier.padding(vertical = MetroDimens.Row)) {
-            MetroText(
-                if (active) "$label  active" else label,
-                Metro.typography.subheader,
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = MetroDimens.TouchTarget)
-                    .testTag("instance-${instance.id}"),
-                color = if (active) Metro.accent.text else Metro.colors.foreground,
-            )
-            MetroButtonGrid {
-                if (!active) {
-                    MetroButton("make active", Modifier.testTag("instance-activate-${instance.id}")) {
-                        onMakeActive(instance.id)
-                    }
-                }
-                MetroButton("remove", Modifier.testTag("instance-remove-${instance.id}")) {
-                    onRemoveInstance(instance.id)
-                }
-            }
-        }
-    }
-    MetroField(address, { address = it }, "address", Modifier.testTag("instance-address"))
-    MetroField(password, { password = it }, "password", Modifier.testTag("instance-password"), conceal = true)
-    if (serverError != null) {
-        MetroText(serverError, Metro.typography.body, color = Metro.accent.text)
-    }
-    MetroButtonGrid {
-        MetroButton("sign in", Modifier.testTag("instance-connect")) { onConnect(address, password) }
-        if (openIdAvailable) {
-            MetroButton("use browser", Modifier.testTag("instance-openid")) {
-                onBeginOpenId(address)
-            }
-        }
-        if (signedIn || activeInstance != null) {
-            MetroButton("sign out", Modifier.testTag("instance-sign-out"), onClick = onSignOut)
-        }
-    }
-}
-
-@Composable
-private fun BudgetsSection(
-    budgets: List<BudgetSummary>,
-    openBudgetId: String?,
-    createError: String?,
-    defaultName: String,
-    onOpen: (String) -> Unit,
-    onCreate: (String, String) -> Unit,
-) {
-    var name by remember { mutableStateOf(defaultName) }
-    SettingsHeading("budgets")
-    budgets.forEach { budget ->
-        val open = budget.id == openBudgetId
-        MetroText(
-            if (open) "${budget.name}  open" else budget.name,
-            Metro.typography.subheader,
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = MetroDimens.TouchTarget)
-                .metroPress { onOpen(budget.id) }
-                .padding(vertical = MetroDimens.Row)
-                .testTag("settings-budget-${budget.id}"),
-            color = if (open) Metro.accent.text else Metro.colors.foreground,
-        )
-    }
-    MetroField(name, { name = it }, "name", Modifier.testTag("settings-create-name"))
-    if (createError != null) {
-        MetroText(createError, Metro.typography.body, Modifier.testTag("settings-create-error"), color = Metro.accent.text)
-    }
-    MetroOutlineButton("create budget", Modifier.testTag("settings-create")) {
-        onCreate(name, "USD")
-        name = defaultName
-    }
-}
-
-@Composable
-private fun AppearanceSection(
-    themeMode: String,
-    accentId: String,
-    onTheme: (String) -> Unit,
-    onAccent: (String) -> Unit,
-) {
-    SettingsHeading("appearance")
-    ThemeMode.entries.forEach { mode ->
-        val selected = ThemeMode.fromStored(themeMode) == mode
-        val label =
-            when (mode) {
-                ThemeMode.SYSTEM -> "follow phone"
-                ThemeMode.LIGHT -> "light"
-                ThemeMode.DARK -> "dark"
-            }
-        MetroText(
-            label,
-            Metro.typography.subheader,
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = MetroDimens.TouchTarget)
-                .metroPress { onTheme(mode.stored()) }
-                .padding(vertical = MetroDimens.Row)
-                .testTag("settings-theme-${mode.stored()}"),
-            color = if (selected) Metro.accent.text else Metro.colors.foreground,
-        )
-    }
-    MetroText(
-        "accent",
-        Metro.typography.caption,
-        Modifier.padding(top = MetroDimens.Gutter, bottom = MetroDimens.Gutter),
-        color = Metro.colors.secondary,
-    )
-    val accents = Accent.entries
-    Column(verticalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
-        accents.chunked(5).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
-                row.forEach { accent ->
-                    val fill = accent.fill(Metro.colors.isDark)
-                    Box(
-                        Modifier
-                            .size(52.dp)
-                            .background(fill)
-                            .then(
-                                if (accent.id == accentId) {
-                                    Modifier.border(3.dp, Metro.colors.foreground)
-                                } else {
-                                    Modifier
-                                },
-                            ).metroPress { onAccent(accent.id) }
-                            .testTag("settings-accent-${accent.id}"),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LauncherIconSection(
-    current: LauncherIcon,
-    onChoose: (LauncherIcon) -> Unit,
-) {
-    MetroText(
-        "app icon",
-        Metro.typography.caption,
-        Modifier.padding(top = MetroDimens.Gutter),
-        color = Metro.colors.secondary,
-    )
-    LauncherIcon.entries.forEach { icon ->
-        ChoiceRow(icon.label, current == icon, "settings-icon-${icon.name.lowercase()}") { onChoose(icon) }
-    }
-}
-
-@Composable
-private fun FormattingSection(
-    prefs: FormatPrefs,
-    onDateFormat: (String) -> Unit,
-    onNumberFormat: (String) -> Unit,
-    onFirstDay: (Int) -> Unit,
-    onHideFraction: (Boolean) -> Unit,
-) {
-    SettingsHeading("formatting", tag = "settings-formatting")
-    MetroText("date format", Metro.typography.caption, color = Metro.colors.secondary)
-    DateFormats.choices.forEach { choice ->
-        ChoiceRow(choice, prefs.dateFormat == choice, "settings-date-$choice") { onDateFormat(choice) }
-    }
-    MetroText("number format", Metro.typography.caption, color = Metro.colors.secondary)
-    listOf(
-        FormatOptions.NUMBER_COMMA_DOT,
-        FormatOptions.NUMBER_DOT_COMMA,
-        FormatOptions.NUMBER_SPACE_DOT,
-        FormatOptions.NUMBER_COMMA_DOT_NO_GROUP,
-    ).forEach { choice ->
-        ChoiceRow(choice, prefs.numberFormat == choice, "settings-number-$choice") { onNumberFormat(choice) }
-    }
-    MetroText("first day of week", Metro.typography.caption, color = Metro.colors.secondary)
-    val days = listOf("sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday")
-    days.forEachIndexed { index, label ->
-        ChoiceRow(label, prefs.firstDayOfWeekIdx == index, "settings-first-day-$index") { onFirstDay(index) }
-    }
-    ChoiceRow(
-        if (prefs.hideFraction) "hide decimals  on" else "hide decimals",
-        prefs.hideFraction,
-        "settings-hide-fraction",
-    ) { onHideFraction(!prefs.hideFraction) }
-}
-
-@Composable
-private fun MethodSection(budgetType: String) {
-    SettingsHeading("method", tag = "settings-method")
-    val label = if (budgetType == "tracking") "tracking" else "envelope"
-    MetroText(label, Metro.typography.subheader, Modifier.testTag("settings-method-value"))
-}
-
-/** Actual's "learn categories": a payee's usual category becomes a rule. */
-@Composable
-private fun LearningSection(
-    enabled: Boolean,
-    onToggle: (Boolean) -> Unit,
-) {
-    SettingsHeading("rules", tag = "settings-rules")
-    ChoiceRow(
-        if (enabled) "learn categories  on" else "learn categories",
-        enabled,
-        "settings-learning",
-    ) { onToggle(!enabled) }
-}
-
-@Composable
-private fun ExperimentalSection(
-    enabled: Boolean,
-    onToggle: (Boolean) -> Unit,
-    templates: Boolean,
-    onTemplates: (Boolean) -> Unit,
-) {
-    SettingsHeading("experimental", tag = "settings-experimental")
-    ChoiceRow(
-        if (enabled) "experimental features  on" else "experimental features",
-        enabled,
-        "settings-experimental-toggle",
-    ) { onToggle(!enabled) }
-    // Actual's goal templates feature flag; it only counts while experimental features are on.
-    if (enabled) {
-        ChoiceRow(
-            if (templates) "budget templates  on" else "budget templates",
-            templates,
-            "settings-templates",
-        ) { onTemplates(!templates) }
-    }
-}
-
-@Composable
-private fun IdsSection(
-    budgetId: String,
-    cloudFileId: String?,
-) {
-    SettingsHeading("ids", tag = "settings-ids")
-    MetroText("budget $budgetId", Metro.typography.body, Modifier.testTag("settings-budget-id"))
-    if (!cloudFileId.isNullOrBlank()) {
-        MetroText("sync $cloudFileId", Metro.typography.body, Modifier.testTag("settings-cloud-id"))
-    }
-}
-
-@Composable
-private fun EncryptionSection(
+fun EncryptionPasswordScreen(
+    mode: EncryptionMode,
     error: String?,
     onSet: (String) -> Unit,
     onChange: (String, String) -> Unit,
     onRemove: (String) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    var password by remember { mutableStateOf("") }
-    var current by remember { mutableStateOf("") }
-    var next by remember { mutableStateOf("") }
-    SettingsHeading("encryption", tag = "settings-encryption")
-    MetroField(password, { password = it }, "new password", Modifier.testTag("encryption-password"), conceal = true)
-    MetroOutlineButton("set password", Modifier.testTag("encryption-set")) {
-        onSet(password)
-        password = ""
-    }
-    MetroField(current, { current = it }, "current password", Modifier.testTag("encryption-current"), conceal = true)
-    MetroField(next, { next = it }, "replacement", Modifier.testTag("encryption-next"), conceal = true)
-    MetroButtonGrid {
-        MetroButton("change password", Modifier.testTag("encryption-change")) {
-            onChange(current, next)
-            current = ""
-            next = ""
-        }
-        MetroButton("remove password", Modifier.testTag("encryption-remove")) {
-            onRemove(current.ifBlank { password })
-            current = ""
-            password = ""
+    // Passwords live only while the page is open.
+    var first by remember { mutableStateOf("") }
+    var second by remember { mutableStateOf("") }
+    val save: () -> Unit = {
+        when (mode) {
+            EncryptionMode.SET -> onSet(first)
+            EncryptionMode.CHANGE -> onChange(first, second)
+            EncryptionMode.REMOVE -> onRemove(first)
         }
     }
-    if (error != null) {
-        MetroText(error, Metro.typography.body, color = Metro.accent.text)
+    RememberFormSave(save)
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .padding(MetroDimens.Gutter)
+            .testTag("encryption-screen"),
+        verticalArrangement = Arrangement.spacedBy(MetroDimens.Grid),
+    ) {
+        MetroText(SettingsCopy.encryptionTitle(mode), Metro.typography.header)
+        when (mode) {
+            EncryptionMode.SET ->
+                MetroField(first, { first = it }, SettingsCopy.NEW_PASSWORD, Modifier.testTag("encryption-password"), conceal = true)
+            EncryptionMode.CHANGE -> {
+                MetroField(first, { first = it }, SettingsCopy.CURRENT_PASSWORD, Modifier.testTag("encryption-current"), conceal = true)
+                MetroField(second, { second = it }, SettingsCopy.REPLACEMENT, Modifier.testTag("encryption-next"), conceal = true)
+            }
+            EncryptionMode.REMOVE ->
+                MetroField(first, { first = it }, SettingsCopy.CURRENT_PASSWORD, Modifier.testTag("encryption-current"), conceal = true)
+        }
+        if (error != null) {
+            MetroText(error, Metro.typography.body, Modifier.testTag("encryption-error"), color = Metro.accent.text)
+        }
+        if (!formSaveOnBar()) {
+            MetroButtonGrid {
+                MetroButton(SettingsCopy.encryptionTitle(mode), Modifier.testTag("encryption-save"), onClick = save)
+            }
+        }
     }
-}
-
-@Composable
-private fun AdvancedSection(onRequest: (AdvancedConfirm) -> Unit) {
-    SettingsHeading("advanced", tag = "settings-advanced")
-    MetroButtonGrid {
-        MetroButton("rebuild totals", Modifier.testTag("settings-rebuild")) {
-            onRequest(AdvancedConfirm.Rebuild)
-        }
-        MetroButton("repair splits", Modifier.testTag("settings-repair")) {
-            onRequest(AdvancedConfirm.Repair)
-        }
-        MetroButton("reset sync", Modifier.testTag("settings-reset-sync")) {
-            onRequest(AdvancedConfirm.ResetSync)
-        }
-    }
-}
-
-@Composable
-private fun SettingsHeading(
-    text: String,
-    tag: String? = null,
-) {
-    MetroText(
-        text,
-        Metro.typography.groupHeader,
-        Modifier
-            .padding(top = MetroDimens.Gutter)
-            .then(if (tag != null) Modifier.testTag(tag) else Modifier),
-        color = Metro.colors.secondary,
-    )
-}
-
-@Composable
-private fun SettingsActionRow(
-    label: String,
-    tag: String,
-    onClick: () -> Unit,
-) {
-    MetroText(
-        label,
-        Metro.typography.subheader,
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress(onClick)
-            .padding(vertical = MetroDimens.Row)
-            .testTag(tag),
-    )
-}
-
-@Composable
-private fun ChoiceRow(
-    label: String,
-    selected: Boolean,
-    tag: String,
-    onClick: () -> Unit,
-) {
-    MetroText(
-        label,
-        Metro.typography.subheader,
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress(onClick)
-            .padding(vertical = MetroDimens.Row)
-            .testTag(tag),
-        color = if (selected) Metro.accent.text else Metro.colors.foreground,
-    )
 }

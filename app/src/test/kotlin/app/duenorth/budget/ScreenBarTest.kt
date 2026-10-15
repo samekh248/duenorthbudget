@@ -79,8 +79,35 @@ class ScreenBarTest {
     }
 
     @Test
-    fun settingsRouteHasNoBarActions() {
-        assertTrue(ScreenBar.specsFor(ShellRoute.Settings, hasBudget = true, mode = BudgetMode.ENVELOPE).isEmpty())
+    fun settingsBarFollowsThePivotItem() {
+        fun ids(
+            page: SettingsPage,
+            hasBudget: Boolean = true,
+            signedIn: Boolean = false,
+            serverActive: Boolean = false,
+        ) = ScreenBar
+            .specsFor(
+                ShellRoute.Settings,
+                hasBudget = hasBudget,
+                mode = BudgetMode.ENVELOPE,
+                settings = SettingsBar(page, signedIn, serverActive),
+            ).map { it.id }
+        assertEquals(listOf("settings-new", "settings-payees"), ids(SettingsPage.BUDGET))
+        assertEquals(listOf("settings-new"), ids(SettingsPage.BUDGET, hasBudget = false))
+        assertEquals(listOf("add-server"), ids(SettingsPage.SERVER))
+        assertEquals(listOf("add-server", "server-budgets", "sign-out"), ids(SettingsPage.SERVER, signedIn = true, serverActive = true))
+        assertTrue(ids(SettingsPage.FORMAT).isEmpty())
+        assertTrue(ids(SettingsPage.APPEARANCE).isEmpty())
+        assertEquals(listOf("export"), ids(SettingsPage.ADVANCED))
+        assertEquals(
+            listOf("save", "cancel"),
+            ScreenBar
+                .specsFor(
+                    ShellRoute.EncryptionPassword(EncryptionMode.SET),
+                    hasBudget = true,
+                    mode = BudgetMode.ENVELOPE,
+                ).map { it.id },
+        )
     }
 
     @Test

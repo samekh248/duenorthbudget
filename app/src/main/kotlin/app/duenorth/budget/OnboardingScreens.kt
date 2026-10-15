@@ -81,6 +81,9 @@ object OnboardingScreenCopy {
         }
 
     fun on(label: String) = "on $label"
+
+    /** Settings → add server, when another server is active (spec 012 research R6). */
+    fun replaces(current: String) = "signing in makes this your server; $current stays saved"
 }
 
 /** Small uppercase app title over an oversized lowercase page title (Metro 2). */
@@ -209,6 +212,8 @@ fun OnboardingAddressScreen(
     onNext: () -> Unit,
     onPhone: () -> Unit,
     modifier: Modifier = Modifier,
+    /** False when adding a server from settings: a budget is already on the phone. */
+    offerPhone: Boolean = true,
 ) {
     val parsed = ServerAddress.parse(address)
     OnboardingPage(OnboardingScreenCopy.SERVER_TITLE, "onboarding-address", modifier) {
@@ -258,7 +263,7 @@ fun OnboardingAddressScreen(
             if (error != OnboardingCopy.ENTER_ADDRESS) {
                 ButtonRow(
                     ButtonSpec(OnboardingScreenCopy.TRY_AGAIN, "onboarding-retry", onNext),
-                    ButtonSpec(OnboardingScreenCopy.PHONE_ONLY, "onboarding-phone", onPhone),
+                    ButtonSpec(OnboardingScreenCopy.PHONE_ONLY, "onboarding-phone", onPhone).takeIf { offerPhone },
                 )
             }
         }
@@ -276,6 +281,8 @@ fun OnboardingSignInScreen(
     onSignIn: (String) -> Unit,
     onBrowser: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The active server this sign-in replaces, when adding a server from settings. */
+    replacing: String? = null,
 ) {
     // Never saved to disk, and cleared when the server refuses it (spec 011 FR-011).
     var password by rememberSaveable { mutableStateOf("") }
@@ -287,6 +294,16 @@ fun OnboardingSignInScreen(
     OnboardingPage(OnboardingScreenCopy.SIGN_IN, "onboarding-signin", modifier) {
         MetroText(host, Metro.typography.subheader)
         MetroText(OnboardingScreenCopy.method(methods), Metro.typography.caption, color = Metro.colors.secondary)
+        if (replacing != null) {
+            MetroText(
+                OnboardingScreenCopy.replaces(replacing),
+                Metro.typography.caption,
+                Modifier
+                    .padding(top = MetroDimens.Row)
+                    .testTag("onboarding-replaces-active"),
+                color = Metro.colors.secondary,
+            )
+        }
         FieldLabel(OnboardingScreenCopy.LABEL)
         MetroField(label, onLabel, host, Modifier.testTag("onboarding-label"))
         if (SignInMethod.PASSWORD in methods) {

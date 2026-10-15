@@ -92,8 +92,6 @@ sealed interface ShellRoute {
 
     data object ConfirmInstanceSwitch : ShellRoute
 
-    data object Appearance : ShellRoute
-
     data object Server : ShellRoute
 
     data object BudgetPassword : ShellRoute
@@ -165,6 +163,16 @@ sealed interface ShellRoute {
     data object Payees : ShellRoute
 
     data object Settings : ShellRoute
+
+    /** Settings → advanced → encryption: one page per password action (spec 012). */
+    data class EncryptionPassword(
+        val mode: EncryptionMode,
+    ) : ShellRoute
+
+    /** Settings → server → remove asks first (spec 012). */
+    data class ConfirmRemoveInstance(
+        val instanceId: String,
+    ) : ShellRoute
 
     data object SampleBudgets : ShellRoute
 
@@ -308,6 +316,12 @@ data class ShellUiState(
     val bankLink: BankLinkUi? = null,
     /** First-run progress while the phone has no budget (spec 011); null otherwise. */
     val onboarding: OnboardingUi? = null,
+    /** The settings pivot item showing, kept while a settings page is open (spec 012). */
+    val settingsPage: SettingsPage = SettingsPage.BUDGET,
+    val settingsScroll: Map<SettingsPage, Int> = emptyMap(),
+    /** True while a page opened from settings is showing; back and finish return to settings. */
+    val settingsReturn: Boolean = false,
+    val budgetEncrypted: Boolean = false,
 )
 
 class ShellViewModel(
@@ -390,23 +404,18 @@ class ShellViewModel(
 
     fun showBudgets() {
         history.clear()
-        _state.update { it.copy(route = ShellRoute.Budgets, confirm = null, writeError = null) }
+        _state.update { it.copy(route = ShellRoute.Budgets, settingsReturn = false, confirm = null, writeError = null) }
     }
 
     fun showCreate() {
         history.clear()
-        _state.update { it.copy(route = ShellRoute.Create, createError = null, confirm = null) }
+        _state.update { it.copy(route = ShellRoute.Create, settingsReturn = false, createError = null, confirm = null) }
     }
 
     fun showSampleBudgets() {
         if (!developerMode) return
         history.clear()
         _state.update { it.copy(route = ShellRoute.SampleBudgets, createError = null, confirm = null) }
-    }
-
-    fun showAppearance() {
-        history.clear()
-        _state.update { it.copy(route = ShellRoute.Appearance, confirm = null) }
     }
 
     fun showPayees() {
@@ -564,8 +573,93 @@ class ShellViewModel(
 
     fun showSettings() {
         history.clear()
-        _state.update { it.copy(route = ShellRoute.Settings, confirm = null, createError = null, encryptionError = null) }
+        _state.update {
+            it.copy(
+                route = ShellRoute.Settings,
+                confirm = null,
+                createError = null,
+                encryptionError = null,
+                settingsPage = SettingsPage.BUDGET,
+                settingsScroll = emptyMap(),
+                settingsReturn = false,
+            )
+        }
         refreshSettingsSections()
+    }
+
+    fun selectSettingsPage(page: SettingsPage) {
+        _state.update { it.copy(settingsPage = page) }
+    }
+
+    fun saveSettingsScroll(
+        page: SettingsPage,
+        offset: Int,
+    ) {
+        _state.update { it.copy(settingsScroll = it.settingsScroll + (page to offset)) }
+    }
+
+    /** Opens a page from settings; back or finishing it comes back to the same item (spec 012 FR-015). */
+    internal fun openFromSettings(
+        route: ShellRoute,
+        page: SettingsPage = _state.value.settingsPage,
+    ) {
+        history.clear()
+        _state.update {
+            it.copy(
+                route = route,
+                settingsPage = page,
+                settingsReturn = true,
+                confirm = null,
+                createError = null,
+                encryptionError = null,
+                serverError = null,
+            )
+        }
+    }
+
+    internal fun returnToSettings(page: SettingsPage? = null) {
+        history.clear()
+        _state.update {
+            it.copy(
+                route = ShellRoute.Settings,
+                settingsPage = page ?: it.settingsPage,
+                settingsReturn = false,
+                createError = null,
+                encryptionError = null,
+                switchTarget = null,
+                switchInstanceTarget = null,
+                pendingFile = null,
+            )
+        }
+        refreshSettingsSections()
+    }
+
+    fun showSettingsCreate() = openFromSettings(ShellRoute.Create, SettingsPage.BUDGET)
+
+    fun showSettingsPayees() {
+        showPayees()
+        _state.update { it.copy(settingsReturn = true, settingsPage = SettingsPage.BUDGET) }
+    }
+
+    fun showEncryption(mode: EncryptionMode) = openFromSettings(ShellRoute.EncryptionPassword(mode), SettingsPage.ADVANCED)
+
+    /** Settings → server → server budgets: the server page with a budget open, the pick-a-budget page without (research R5). */
+    fun showServerBudgets() {
+        if (_state.value.shell == null) {
+            openFromSettings(ShellRoute.OnboardingFiles, SettingsPage.SERVER)
+            onboardingRefresh()
+        } else {
+            showServer()
+            _state.update { it.copy(settingsReturn = true, settingsPage = SettingsPage.SERVER) }
+        }
+    }
+
+    fun requestRemoveInstance(instanceId: String) = openFromSettings(ShellRoute.ConfirmRemoveInstance(instanceId), SettingsPage.SERVER)
+
+    fun confirmRemoveInstance() {
+        val id = (_state.value.route as? ShellRoute.ConfirmRemoveInstance)?.instanceId ?: return
+        removeInstance(id)
+        returnToSettings(SettingsPage.SERVER)
     }
 
     fun connectInstance(
@@ -659,6 +753,7 @@ class ShellViewModel(
     }
 
     fun requestInstanceSwitch(instanceId: String) {
+        _state.update { it.copy(settingsPage = SettingsPage.SERVER) }
         val settings = _state.value.settings
         val target = settings.instances.firstOrNull { it.id == instanceId } ?: return
         val current = settings.activeInstance()
@@ -688,6 +783,7 @@ class ShellViewModel(
                     remoteFiles = emptyList(),
                     switchInstanceTarget = null,
                     route = ShellRoute.Settings,
+                    settingsReturn = false,
                     signedIn = sync.signedIn(),
                 )
             }
@@ -697,7 +793,7 @@ class ShellViewModel(
 
     fun cancelInstanceSwitch() {
         _state.update {
-            it.copy(route = ShellRoute.Settings, switchInstanceTarget = null)
+            it.copy(route = ShellRoute.Settings, switchInstanceTarget = null, settingsReturn = false)
         }
     }
 
@@ -773,7 +869,7 @@ class ShellViewModel(
         viewModelScope.launch {
             when (val result = withContext(Dispatchers.IO) { sync.setEncryptionPassword(budgetId, password) }) {
                 is UnlockResult.Failed -> _state.update { it.copy(encryptionError = result.reason) }
-                UnlockResult.Unlocked -> _state.update { it.copy(encryptionError = null) }
+                UnlockResult.Unlocked -> encryptionSaved()
             }
         }
     }
@@ -791,7 +887,7 @@ class ShellViewModel(
                     }
             ) {
                 is UnlockResult.Failed -> _state.update { it.copy(encryptionError = result.reason) }
-                UnlockResult.Unlocked -> _state.update { it.copy(encryptionError = null) }
+                UnlockResult.Unlocked -> encryptionSaved()
             }
         }
     }
@@ -801,9 +897,14 @@ class ShellViewModel(
         viewModelScope.launch {
             when (val result = withContext(Dispatchers.IO) { sync.removeEncryptionPassword(budgetId, password) }) {
                 is UnlockResult.Failed -> _state.update { it.copy(encryptionError = result.reason) }
-                UnlockResult.Unlocked -> _state.update { it.copy(encryptionError = null) }
+                UnlockResult.Unlocked -> encryptionSaved()
             }
         }
+    }
+
+    private fun encryptionSaved() {
+        _state.update { it.copy(encryptionError = null) }
+        if (_state.value.route is ShellRoute.EncryptionPassword) returnToSettings(SettingsPage.ADVANCED) else refreshSettingsSections()
     }
 
     fun createFromSettings(
@@ -1060,6 +1161,10 @@ class ShellViewModel(
         if (current.route == ShellRoute.Home) return false
         if (current.route == ShellRoute.BudgetPassword && current.locked) return false
         onboardingBack()?.let { return it }
+        if (current.settingsReturn && current.route != ShellRoute.Settings) {
+            returnToSettings()
+            return true
+        }
         if (current.route == ShellRoute.Create && current.shell == null) return false
         if (current.route.isRegisterFlow() || current.route.isHomeFlow()) {
             val previous = if (history.isEmpty()) ShellRoute.Home else history.removeLast()
@@ -1469,8 +1574,17 @@ class ShellViewModel(
                             ?.progress
                             ?.path == OnboardingPath.SERVER && sync.signedIn()
                     finishOnboarding()
-                    _state.update { it.copy(createError = null, route = ShellRoute.Home) }
+                    val toSettings = _state.value.settingsReturn
+                    _state.update {
+                        it.copy(
+                            createError = null,
+                            route = if (toSettings) ShellRoute.Settings else ShellRoute.Home,
+                            settingsPage = if (toSettings) SettingsPage.BUDGET else it.settingsPage,
+                            settingsReturn = false,
+                        )
+                    }
                     reload()
+                    if (toSettings) refreshSettingsSections()
                     if (send) uploadNew()
                 }
             }
@@ -2032,6 +2146,7 @@ class ShellViewModel(
                 register = register,
                 upcoming = loaded.upcoming,
                 route = route,
+                settingsReturn = current.settingsReturn && route != ShellRoute.Home,
                 openMonth = reviewMonth,
                 monthReview = loaded.monthReview,
                 netWorth = loaded.netWorth,
@@ -2169,8 +2284,10 @@ class ShellViewModel(
                         }
                     }
                 }
+            val encrypted = budgetId != null && withContext(Dispatchers.IO) { sync.isEncrypted(budgetId) }
             _state.update {
                 it.copy(
+                    budgetEncrypted = encrypted,
                     settings = settings,
                     instances = settings.instances,
                     activeInstance = settings.activeInstance(),
