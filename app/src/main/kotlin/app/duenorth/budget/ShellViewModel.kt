@@ -321,6 +321,8 @@ data class ShellUiState(
     val bankLink: BankLinkUi? = null,
     /** First-run progress while the phone has no budget (spec 011); null otherwise. */
     val onboarding: OnboardingUi? = null,
+    /** The Home pivot item showing, kept while a page opened from Home is showing. */
+    val homeSection: Int = 0,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
     val settingsPage: SettingsPage = SettingsPage.BUDGET,
     val settingsScroll: Map<SettingsPage, Int> = emptyMap(),
@@ -590,6 +592,10 @@ class ShellViewModel(
             )
         }
         refreshSettingsSections()
+    }
+
+    fun selectHomeSection(index: Int) {
+        _state.update { it.copy(homeSection = index) }
     }
 
     fun selectSettingsPage(page: SettingsPage) {

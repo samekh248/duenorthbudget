@@ -26,6 +26,10 @@ data class SettingsBar(
 )
 
 object ScreenBar {
+    /** Home pivot item indexes the bar changes for. */
+    const val HOME_BUDGET = 0
+    const val HOME_ACCOUNTS = 1
+
     fun specsFor(
         route: ShellRoute,
         hasBudget: Boolean,
@@ -37,6 +41,7 @@ object ScreenBar {
         developerMode: Boolean = false,
         passwordSignIn: Boolean = true,
         settings: SettingsBar = SettingsBar(),
+        homeSection: Int = HOME_BUDGET,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -69,19 +74,26 @@ object ScreenBar {
             ShellRoute.Home ->
                 when {
                     !hasBudget -> listOf(spec("settings", AppGlyph.Settings, "settings"))
+                    // The accounts pivot item carries account management, so the month menu does not.
+                    homeSection == HOME_ACCOUNTS ->
+                        listOf(
+                            spec("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
+                            spec("accounts", AppGlyph.Budgets, AccountScreenCopy.MANAGE),
+                            spec("settings", AppGlyph.Settings, "settings"),
+                        ) + undo(undoLabel)
                     mode == BudgetMode.TRACKING ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
-                        ) + fills() + accounts() + schedules() + templates(templates) + undo(undoLabel)
+                        ) + fills() + schedules() + templates(templates) + undo(undoLabel)
                     else ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("hold", AppGlyph.Hold, "hold"),
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
-                        ) + fills() + accounts() + schedules() + templates(templates) + undo(undoLabel)
+                        ) + fills() + schedules() + templates(templates) + undo(undoLabel)
                 }
             is ShellRoute.Register ->
                 listOf(
@@ -170,6 +182,7 @@ object ScreenBar {
                 signedIn = state.signedIn,
                 serverActive = state.activeInstance != null,
             ),
+            state.homeSection,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -194,9 +207,6 @@ object ScreenBar {
             menu("average", AppGlyph.Average, MonthFillCopy.AVERAGE),
             menu("zero", AppGlyph.Zero, MonthFillCopy.ZERO),
         )
-
-    /** Home `•••` → the account list (spec 010 US2). */
-    private fun accounts() = listOf(menu("accounts", AppGlyph.Budgets, AccountScreenCopy.TITLE))
 
     /** Home `•••` → new schedule and rules (spec 010 US3). */
     private fun schedules() =

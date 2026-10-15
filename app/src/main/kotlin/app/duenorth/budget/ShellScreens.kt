@@ -86,6 +86,7 @@ fun HomePivot(
     monthWindow: MonthWindow,
     initialSection: Int = 0,
     onGesture: (Boolean) -> Unit,
+    onSection: (Int) -> Unit = {},
     onAccount: (String) -> Unit = {},
     onInbox: (String) -> Unit = {},
     onReviewCategory: (String) -> Unit = {},
@@ -196,6 +197,7 @@ fun HomePivot(
         modifier = modifier,
         initialItem = initialSection,
         onGesture = { pagerGesture = it },
+        onSelected = onSection,
     )
 }
 

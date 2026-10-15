@@ -17,6 +17,7 @@ import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -40,7 +41,10 @@ class AccountContentTest {
     @Test
     fun barEntriesForAccountsAndRegister() {
         val home = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE).map { it.id }
-        assertTrue("accounts" in home)
+        assertFalse("accounts" in home)
+        val accountsSection =
+            ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_ACCOUNTS).map { it.id }
+        assertTrue("accounts" in accountsSection && "add-account" in accountsSection)
         val accounts = ScreenBar.specsFor(ShellRoute.Accounts, true, BudgetMode.ENVELOPE)
         assertEquals(listOf("add-account", "show-closed", "reorder"), accounts.map { it.id })
         assertTrue(accounts.first().primary)
