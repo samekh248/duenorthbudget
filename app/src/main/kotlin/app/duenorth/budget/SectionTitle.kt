@@ -27,11 +27,13 @@ object HomeSections {
 object SectionTitleCopy {
     const val APP = "DUE NORTH BUDGET"
     const val SETTINGS = "SETTINGS"
+    const val RULES = "RULES"
 }
 
 /**
  * The small all-caps line over a drill-in page's title, naming the area the page sits
- * under (Windows Phone 8.1 title area). Pivots carry their own, so they get none.
+ * under (Windows Phone 8.1 title area). Pivots carry their own, and top-level views
+ * (the lists the app bar opens) are an area themselves, so neither gets one.
  */
 object SectionTitle {
     fun of(state: ShellUiState): String? {
@@ -48,7 +50,6 @@ object SectionTitle {
                 is ShellRoute.BankLink,
                 is ShellRoute.EditAccount,
                 is ShellRoute.CloseAccount,
-                ShellRoute.Accounts,
                 ShellRoute.AddAccount,
                 -> HomeSections.ACCOUNTS
                 is ShellRoute.CategoryBudget,
@@ -56,13 +57,11 @@ object SectionTitle {
                 is ShellRoute.ToBudget,
                 ShellRoute.HoldMonth,
                 ShellRoute.Breakdown,
-                ShellRoute.ManageCategories,
                 ShellRoute.Assign,
-                ShellRoute.Templates,
                 -> HomeSections.BUDGET
+                is ShellRoute.RuleEditor -> return SectionTitleCopy.RULES
                 is ShellRoute.ScheduleEditor -> HomeSections.DUE
                 is ShellRoute.ReviewCategory -> HomeSections.REVIEW
-                ShellRoute.Budgets,
                 ShellRoute.Create,
                 ShellRoute.SampleBudgets,
                 ShellRoute.Server,
@@ -75,7 +74,7 @@ object SectionTitle {
                 is ShellRoute.EncryptionPassword,
                 is ShellRoute.ConfirmRemoveInstance,
                 -> return SectionTitleCopy.APP
-                // Transactions, rules and payees open from several areas: name the one showing.
+                // Transactions open from several areas: name the one showing.
                 else -> HomeSections.headers.getOrNull(state.homeSection) ?: return SectionTitleCopy.APP
             }
         return fixed.uppercase()
@@ -90,6 +89,13 @@ object SectionTitle {
             ShellRoute.OnboardingAddress,
             ShellRoute.OnboardingSignIn,
             ShellRoute.OnboardingFiles,
+            // Top-level views.
+            ShellRoute.Accounts,
+            ShellRoute.Rules,
+            ShellRoute.Payees,
+            ShellRoute.Templates,
+            ShellRoute.ManageCategories,
+            ShellRoute.Budgets,
         )
 }
 

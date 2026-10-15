@@ -53,7 +53,8 @@ It replaces the first mockups (a dark pivot with no panorama).
   small uppercase line naming the home section it sits under (ACCOUNTS over
   "visa"), or SETTINGS when opened from settings, or DUE NORTH BUDGET when it
   sits under no section, over the oversized lowercase page title. Pivots carry
-  their own small title instead.
+  their own small title, and top-level views (the lists the app bar opens,
+  such as accounts, rules and payees) are an area themselves and get none.
 - Secondary screens use a pivot where they need tabs. Every screen has a
   bottom application bar: round outlined icon buttons and an ellipsis (`•••`)
   that expands labels and a menu.
