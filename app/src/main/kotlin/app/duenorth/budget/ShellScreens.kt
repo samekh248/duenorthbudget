@@ -27,6 +27,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -496,34 +497,57 @@ private fun GroupLine(
     modifier: Modifier = Modifier,
     formatOptions: FormatOptions = FormatOptions(),
 ) {
+    GroupHeading(
+        name = group.name,
+        tag = "group",
+        id = group.id,
+        modifier = modifier,
+        dim = group.hidden,
+    ) {
+        MetroText(
+            MoneyFormat.format(group.availableMinor, shell.currency, formatOptions),
+            Metro.typography.groupHeader,
+            it,
+        )
+    }
+}
+
+/** A group's name in the group-header type, with its total (or a control) at the end. */
+@Composable
+private fun GroupHeading(
+    name: String,
+    tag: String,
+    id: String,
+    modifier: Modifier = Modifier,
+    dim: Boolean = false,
+    trailing: @Composable (Modifier) -> Unit,
+) {
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .padding(top = MetroDimens.Row)
-            .testTag("group-${group.id}"),
+            .testTag("$tag-$id"),
         verticalAlignment = Alignment.Top,
     ) {
         MetroText(
-            group.name,
+            name,
             Metro.typography.groupHeader,
             Modifier
                 .weight(1f)
                 .padding(end = 12.dp)
-                .testTag("group-name-${group.id}"),
-            color = if (group.hidden) Metro.colors.secondary else Metro.colors.foreground,
+                .testTag("$tag-name-$id"),
+            color = if (dim) Metro.colors.secondary else Metro.colors.foreground,
             maxLines = 3,
         )
-        MetroText(
-            MoneyFormat.format(group.availableMinor, shell.currency, formatOptions),
-            Metro.typography.groupHeader,
-            Modifier
-                .widthIn(max = 148.dp)
-                .testTag("group-amount-${group.id}"),
-        )
+        trailing(Modifier.widthIn(max = 148.dp).testTag("$tag-amount-$id"))
     }
 }
 
+/**
+ * Accounts on the same ledger as the budget: a total up top, then on-budget and off-budget
+ * groups with their totals, and closed accounts folded away at the bottom, as Actual does.
+ */
 @Composable
 fun AccountsSection(
     accounts: List<AccountRow>,
@@ -547,52 +571,102 @@ fun AccountsSection(
     }
     val arrivals = remember { RowArrivals() }
     arrivals.prime(accounts.map { it.id })
-    val onBudget = accounts.filter { !it.offBudget }
-    val offBudget = accounts.filter { it.offBudget }
-    LazyColumn(modifier.fillMaxSize(), state = list) {
-        if (onBudget.isNotEmpty()) {
-            item { SectionLabel(ShellCopy.ON_BUDGET, first = true) }
-            items(onBudget, key = { it.id }) {
-                AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals), formatOptions)
+    val open = accounts.filter { !it.closed }
+    val groups =
+        listOf(
+            Triple("on-budget", ShellCopy.ON_BUDGET, open.filter { !it.offBudget }),
+            Triple("off-budget", ShellCopy.OFF_BUDGET, open.filter { it.offBudget }),
+        ).filter { it.third.isNotEmpty() }
+    val closed = accounts.filter { it.closed }
+    var showClosed by rememberSaveable { mutableStateOf(false) }
+    val money = { minor: Long -> MoneyFormat.format(minor, shell.currency, formatOptions) }
+    Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
+        BudgetTotal(
+            label = ShellCopy.ALL_ACCOUNTS,
+            amount = money(open.sumOf { it.balanceMinor }),
+            amountColor = Metro.accent.text,
+            amountTag = "accounts-total",
+        )
+        LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid), state = list) {
+            groups.forEach { (id, name, rows) ->
+                item(key = "account-group-$id") {
+                    GroupHeading(name, "account-group", id) {
+                        MetroText(money(rows.sumOf { a -> a.balanceMinor }), Metro.typography.groupHeader, it)
+                    }
+                }
+                items(rows, key = { it.id }) {
+                    AccountLine(it, money(it.balanceMinor), onAccount, arrivalModifier(it.id, arrivals))
+                }
+                item(key = "account-gap-$id") { GroupGap() }
             }
-        }
-        if (offBudget.isNotEmpty()) {
-            item { SectionLabel(ShellCopy.OFF_BUDGET, first = onBudget.isEmpty()) }
-            items(offBudget, key = { it.id }) {
-                AccountLine(it, shell, onAccount, arrivalModifier(it.id, arrivals), formatOptions)
+            if (closed.isNotEmpty()) {
+                item(key = "account-group-closed") {
+                    GroupHeading(
+                        ShellCopy.CLOSED_ACCOUNTS,
+                        "account-group",
+                        "closed",
+                        Modifier.metroPress { showClosed = !showClosed },
+                    ) {
+                        Box(it.graphicsLayer { rotationZ = if (showClosed) 180f else 0f }) {
+                            AppGlyphIcon(AppGlyph.ChevronDown)
+                        }
+                    }
+                }
+                if (showClosed) {
+                    items(closed, key = { it.id }) {
+                        AccountLine(it, money(it.balanceMinor), onAccount, arrivalModifier(it.id, arrivals), dim = true)
+                    }
+                }
             }
         }
     }
 }
 
+/** One account under its group, in the category rows' body type and ruled the same way. */
 @Composable
 private fun AccountLine(
     account: AccountRow,
-    shell: MonthShell,
+    balance: String,
     onAccount: (String) -> Unit,
     modifier: Modifier = Modifier,
-    formatOptions: FormatOptions = FormatOptions(),
+    dim: Boolean = false,
 ) {
-    Row(
+    Box(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onAccount(account.id) }
-            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
             .testTag("account-${account.id}"),
-        verticalAlignment = Alignment.Top,
     ) {
-        MetroText(
-            account.name,
-            Metro.typography.subheader,
-            Modifier.weight(1f).padding(end = 12.dp),
-            maxLines = 3,
-        )
-        MetroText(
-            MoneyFormat.format(account.balanceMinor, shell.currency, formatOptions),
-            Metro.typography.subheader,
-            Modifier.widthIn(max = 148.dp),
-        )
+        Row(
+            Modifier.fillMaxWidth().align(Alignment.CenterStart),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MetroText(
+                account.name,
+                Metro.typography.body,
+                Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter),
+                color = if (dim) Metro.colors.secondary else Metro.colors.foreground,
+                maxLines = 2,
+            )
+            MetroText(
+                balance,
+                Metro.typography.body.copy(textAlign = TextAlign.End),
+                Modifier.weight(LEDGER_FIGURE * 2).testTag("account-balance-${account.id}"),
+                color = if (dim) Metro.colors.secondary else Metro.accent.text,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+        Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter)) {
+            Spacer(Modifier.weight(LEDGER_NAME))
+            Box(
+                Modifier
+                    .weight(LEDGER_FIGURE * 3)
+                    .height(1.dp)
+                    .background(if (Metro.colors.isDark) Metro.colors.outline else Metro.colors.chrome),
+            )
+        }
     }
 }
 
@@ -653,23 +727,6 @@ private fun InboxLine(
             Modifier.widthIn(max = 148.dp),
         )
     }
-}
-
-@Composable
-private fun SectionLabel(
-    text: String,
-    first: Boolean = false,
-) {
-    MetroText(
-        text,
-        Metro.typography.groupHeader,
-        Modifier.padding(
-            start = MetroDimens.Gutter,
-            top = if (first) 0.dp else MetroDimens.Grid,
-            bottom = MetroDimens.Row,
-        ),
-        color = Metro.colors.secondary,
-    )
 }
 
 @Composable
