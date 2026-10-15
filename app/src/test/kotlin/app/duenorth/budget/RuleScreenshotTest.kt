@@ -42,10 +42,10 @@ class RuleScreenshotTest {
         )
 
     @Test
-    fun scheduleLight() = snap("schedule_editor_light", dark = false) { Schedule() }
+    fun scheduleLight() = snap("schedule_editor_light", dark = false) { SectionTitled("DUE") { Schedule() } }
 
     @Test
-    fun scheduleDark() = snap("schedule_editor_dark", dark = true) { Schedule() }
+    fun scheduleDark() = snap("schedule_editor_dark", dark = true) { SectionTitled("DUE") { Schedule() } }
 
     @Test
     fun rulesLight() = snap("rules_list_light", dark = false) { RulesScreen(rules, {}) }

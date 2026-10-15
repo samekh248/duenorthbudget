@@ -49,16 +49,17 @@ class RegisterScreenshotTest {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
                 Column(Modifier.width(390.dp).height(780.dp)) {
-                    RegisterScreen(
-                        page = page(),
-                        onGesture = {},
-                        onOpen = {},
-                        onAdd = {},
-                        onTransfer = {},
-                        onReconcile = {},
-                        selection = setOf("cafe", "coffee"),
-                        modifier = Modifier.weight(1f),
-                    )
+                    SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
+                        RegisterScreen(
+                            page = page(),
+                            onGesture = {},
+                            onOpen = {},
+                            onAdd = {},
+                            onTransfer = {},
+                            onReconcile = {},
+                            selection = setOf("cafe", "coffee"),
+                        )
+                    }
                     MetroAppBar(
                         actions =
                             listOf(
@@ -87,15 +88,16 @@ class RegisterScreenshotTest {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
                 Column(Modifier.width(390.dp).height(780.dp)) {
-                    RegisterScreen(
-                        page = page(),
-                        onGesture = {},
-                        onOpen = {},
-                        onAdd = {},
-                        onTransfer = {},
-                        onReconcile = {},
-                        modifier = Modifier.weight(1f),
-                    )
+                    SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
+                        RegisterScreen(
+                            page = page(),
+                            onGesture = {},
+                            onOpen = {},
+                            onAdd = {},
+                            onTransfer = {},
+                            onReconcile = {},
+                        )
+                    }
                     bar()
                 }
             }

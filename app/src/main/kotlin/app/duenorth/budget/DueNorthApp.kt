@@ -275,7 +275,7 @@ fun DueNorthApp(model: ShellViewModel) {
             progress = state.syncProgress,
         ) { modifier ->
             CompositionLocalProvider(LocalFormSaveHost provides formSaveHost) {
-                Box(modifier) {
+                SectionTitled(SectionTitle.of(state), modifier) {
                     val fill = Modifier.fillMaxSize()
                     when (val route = state.route) {
                         ShellRoute.Home ->

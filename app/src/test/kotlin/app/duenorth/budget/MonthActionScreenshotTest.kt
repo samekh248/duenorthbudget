@@ -35,10 +35,10 @@ class MonthActionScreenshotTest {
     private val parts = ActualMonthMath.MonthBreakdown(420_000, 35_000, -4_800, -375_000, -20_000, 55_200)
 
     @Test
-    fun breakdownLight() = snap("breakdown_light", dark = false) { BreakdownScreen(october, parts, usd) }
+    fun breakdownLight() = snap("breakdown_light", dark = false) { SectionTitled("BUDGET") { BreakdownScreen(october, parts, usd) } }
 
     @Test
-    fun breakdownDark() = snap("breakdown_dark", dark = true) { BreakdownScreen(october, parts, usd) }
+    fun breakdownDark() = snap("breakdown_dark", dark = true) { SectionTitled("BUDGET") { BreakdownScreen(october, parts, usd) } }
 
     @Test
     fun fillConfirmLight() = snap("fill_confirm_light", dark = false) { FillConfirm() }

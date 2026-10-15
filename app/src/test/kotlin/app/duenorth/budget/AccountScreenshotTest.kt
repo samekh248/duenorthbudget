@@ -34,10 +34,10 @@ class AccountScreenshotTest {
         )
 
     @Test
-    fun accountsLight() = snap("accounts_manage_light", dark = false) { List() }
+    fun accountsLight() = snap("accounts_manage_light", dark = false) { SectionTitled("ACCOUNTS") { List() } }
 
     @Test
-    fun accountsDark() = snap("accounts_manage_dark", dark = true) { List() }
+    fun accountsDark() = snap("accounts_manage_dark", dark = true) { SectionTitled("ACCOUNTS") { List() } }
 
     @Test
     fun closeLight() = snap("account_close_light", dark = false) { Close() }
