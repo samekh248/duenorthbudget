@@ -54,7 +54,7 @@ import java.io.File
 import java.time.YearMonth
 import java.util.Locale
 
-class DueNorthApplication : Application() {
+open class DueNorthApplication : Application() {
     lateinit var library: BudgetLibrary
     var developerMode: Boolean = false
         private set
