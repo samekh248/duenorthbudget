@@ -18,6 +18,7 @@ object RegisterCopy {
     const val SPLIT = "split"
     const val TRANSFER = "transfer"
     const val OWED = "owed"
+    const val RECONCILED = "reconciled"
     const val NO_TRANSACTIONS = "no transactions"
 }
 

@@ -2,13 +2,15 @@ package app.duenorth.budget
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -24,6 +26,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CategoryTarget
@@ -71,18 +74,13 @@ fun RegisterScreen(
             .padding(horizontal = MetroDimens.Gutter),
     ) {
         MetroText(page.account.name, Metro.typography.header, maxLines = 2)
-        Column(Modifier.padding(top = MetroDimens.Gutter)) {
-            MetroText(ShellCopy.BALANCE, Metro.typography.caption, color = Metro.colors.secondary)
-            MetroText(
-                MoneyFormat.format(page.balanceMinor, page.currency),
-                Metro.typography.header,
-                color = Metro.accent.text,
-                modifier = Modifier.testTag("register-balance"),
-            )
-            if (owed) {
-                MetroText(RegisterCopy.OWED, Metro.typography.caption, color = Metro.colors.secondary)
-            }
-        }
+        BudgetTotal(
+            label = if (owed) "${ShellCopy.BALANCE} ${RegisterCopy.OWED}" else ShellCopy.BALANCE,
+            amount = MoneyFormat.format(page.balanceMinor, page.currency),
+            amountColor = Metro.accent.text,
+            amountTag = "register-balance",
+            modifier = Modifier.padding(top = MetroDimens.Gutter),
+        )
         MetroField(
             value = filter,
             onValueChange = onFilter,
@@ -124,6 +122,11 @@ private fun RegisterList(
     }
 }
 
+/**
+ * One transaction on the ledger: payee in the category rows' body type, with the date,
+ * category, reconciled state and note on a quieter line under it, and the amount in the
+ * figure columns, ruled like the budget and accounts rows. Split parts follow, indented.
+ */
 @Composable
 private fun RegisterLine(
     row: RegisterRow,
@@ -133,24 +136,28 @@ private fun RegisterLine(
     Column(
         Modifier
             .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onOpen(row.id) }
-            .padding(vertical = MetroDimens.Row)
+            .padding(top = MetroDimens.Row)
             .testTag("register-row-${row.id}"),
     ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter)) {
+                MetroText(row.payee, Metro.typography.body, maxLines = 2)
                 MetroText(
-                    RegisterEntry.registerDateLabel(row.date),
+                    registerDetail(row),
                     Metro.typography.caption,
+                    Modifier.testTag("register-detail-${row.id}"),
                     color = Metro.colors.secondary,
+                    maxLines = 2,
                 )
-                MetroText(row.payee, Metro.typography.subheader, maxLines = 2)
-                MetroText(row.categoryLabel, Metro.typography.body, color = Metro.colors.secondary, maxLines = 2)
             }
             MetroText(
                 MoneyFormat.format(row.amountMinor, page.currency),
-                Metro.typography.subheader,
-                Modifier.widthIn(max = 148.dp),
+                Metro.typography.body.copy(textAlign = TextAlign.End),
+                Modifier.weight(LEDGER_FIGURE * 2).testTag("register-amount-${row.id}"),
+                maxLines = 1,
+                softWrap = false,
             )
         }
         row.parts.forEach { part ->
@@ -158,12 +165,43 @@ private fun RegisterLine(
                 Modifier.fillMaxWidth().padding(start = MetroDimens.Gutter, top = MetroDimens.Gutter),
                 verticalAlignment = Alignment.Top,
             ) {
-                MetroText(part.categoryName, Metro.typography.body, Modifier.weight(1f), maxLines = 2)
-                MetroText(MoneyFormat.format(part.amountMinor, page.currency), Metro.typography.body)
+                MetroText(
+                    part.categoryName,
+                    Metro.typography.caption,
+                    Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter),
+                    color = Metro.colors.secondary,
+                    maxLines = 2,
+                )
+                MetroText(
+                    MoneyFormat.format(part.amountMinor, page.currency),
+                    Metro.typography.caption.copy(textAlign = TextAlign.End),
+                    Modifier.weight(LEDGER_FIGURE * 2),
+                    color = Metro.colors.secondary,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = MetroDimens.Row)) {
+            Spacer(Modifier.weight(LEDGER_NAME))
+            Box(
+                Modifier
+                    .weight(LEDGER_FIGURE * 3)
+                    .height(1.dp)
+                    .background(if (Metro.colors.isDark) Metro.colors.outline else Metro.colors.chrome),
+            )
         }
     }
 }
+
+/** The quieter line under a payee: date, category, reconciled, then the note. */
+internal fun registerDetail(row: RegisterRow): String =
+    listOfNotNull(
+        RegisterEntry.registerDateLabel(row.date),
+        row.categoryLabel.ifBlank { null },
+        if (row.reconciled) RegisterCopy.RECONCILED else null,
+        row.note.trim().ifBlank { null },
+    ).joinToString(" · ")
 
 @Composable
 fun TransactionForm(

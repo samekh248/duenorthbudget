@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -56,9 +57,9 @@ class RegisterContentTest {
         }
         compose.onNodeWithTag("register-row-cafe").assertIsDisplayed()
         compose.onNodeWithText("Cafe").assertIsDisplayed()
-        compose.onNodeWithText("oct 7").assertIsDisplayed()
+        compose.onNodeWithTag("register-detail-cafe", useUnmergedTree = true).assertTextEquals("oct 7 · Groceries")
         compose.onNodeWithTag("register-balance").assertIsDisplayed()
-        compose.onNodeWithText(RegisterCopy.OWED).assertIsDisplayed()
+        compose.onNodeWithText("balance ${RegisterCopy.OWED}").assertIsDisplayed()
     }
 
     @Test

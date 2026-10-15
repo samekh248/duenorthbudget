@@ -470,7 +470,7 @@ private fun GroupGap() {
 }
 
 @Composable
-private fun BudgetTotal(
+internal fun BudgetTotal(
     label: String,
     amount: String,
     amountColor: Color,
