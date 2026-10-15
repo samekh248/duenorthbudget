@@ -76,27 +76,24 @@ object ScreenBar {
                 )
             ShellRoute.Home ->
                 when {
-                    !hasBudget -> listOf(spec("settings", AppGlyph.Settings, "settings"))
+                    !hasBudget -> settings()
                     // The accounts pivot item carries account management, so the month menu does not.
                     homeSection == HOME_ACCOUNTS ->
                         listOf(
                             spec("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
                             spec("accounts", AppGlyph.Budgets, AccountScreenCopy.MANAGE),
-                            spec("settings", AppGlyph.Settings, "settings"),
-                        ) + undo(undoLabel)
+                        ) + undo(undoLabel) + settings()
                     mode == BudgetMode.TRACKING ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
-                            spec("settings", AppGlyph.Settings, "settings"),
-                        ) + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel)
+                        ) + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel) + settings()
                     else ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("hold", AppGlyph.Hold, "hold"),
                             spec("categories", AppGlyph.Categories, "categories"),
-                            spec("settings", AppGlyph.Settings, "settings"),
-                        ) + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel)
+                        ) + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel) + settings()
                 }
             // Select mode swaps the register's bar for what can be done to the picked transactions.
             is ShellRoute.Register ->
@@ -236,6 +233,9 @@ object ScreenBar {
 
     /** Home `•••` → templates, only while experimental features and budget templates are both on (spec 010 US5). */
     private fun templates(on: Boolean) = if (on) listOf(menu("templates", AppGlyph.Average, TemplateCopy.TITLE)) else emptyList()
+
+    /** Every home `•••` ends with settings, as WP8.1 apps put it last in the menu. */
+    private fun settings() = listOf(menu("settings", AppGlyph.Settings, "settings"))
 
     /** Present only while there is a step to undo; the label names it. */
     private fun undo(label: String?) =

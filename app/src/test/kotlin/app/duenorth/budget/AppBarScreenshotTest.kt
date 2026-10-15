@@ -61,7 +61,8 @@ class AppBarScreenshotTest {
             ScreenAction("add", AppGlyph.Add, "add") {},
             ScreenAction("hold", AppGlyph.Hold, "hold") {},
             ScreenAction("categories", AppGlyph.Categories, "categories") {},
-            ScreenAction("settings", AppGlyph.Settings, "settings") {},
+            ScreenAction("rules", AppGlyph.Categories, "rules", primary = false) {},
+            ScreenAction("settings", AppGlyph.Settings, "settings", primary = false) {},
         )
 
     private val register =

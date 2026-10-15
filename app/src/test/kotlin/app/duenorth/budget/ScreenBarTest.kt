@@ -11,9 +11,9 @@ class ScreenBarTest {
     @Test
     fun homeEnvelopeActions() {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
-        assertEquals(listOf("add", "hold", "categories", "settings"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add", "hold", "categories"), specs.filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("show-hidden", "copy-last", "average", "zero", "add-schedule", "rules", "reports"),
+            listOf("show-hidden", "copy-last", "average", "zero", "add-schedule", "rules", "reports", "settings"),
             specs.filter { !it.primary }.map { it.id },
         )
     }
@@ -38,22 +38,34 @@ class ScreenBarTest {
                 mode = BudgetMode.ENVELOPE,
                 homeSection = ScreenBar.HOME_ACCOUNTS,
             )
-        assertEquals(listOf("add-account", "accounts", "settings"), specs.map { it.id })
-        assertTrue(specs.all { it.primary })
+        assertEquals(listOf("add-account", "accounts"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("settings"), specs.filter { !it.primary }.map { it.id })
     }
 
     @Test
     fun homeTrackingOmitsHold() {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.TRACKING)
         val ids = specs.map { it.id }
-        assertEquals(listOf("add", "categories", "settings"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add", "categories"), specs.filter { it.primary }.map { it.id })
         assertFalse(ids.contains("hold"))
     }
 
     @Test
     fun homeWithoutBudgetIsSettingsOnly() {
-        val ids = ScreenBar.specsFor(ShellRoute.Home, hasBudget = false, mode = null).map { it.id }
-        assertEquals(listOf("settings"), ids)
+        val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = false, mode = null)
+        assertEquals(listOf("settings"), specs.map { it.id })
+        assertFalse(specs.single().primary)
+    }
+
+    @Test
+    fun settingsIsTheLastMenuItemOnHome() {
+        listOf(BudgetMode.ENVELOPE, BudgetMode.TRACKING).forEach { mode ->
+            listOf(ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS).forEach { section ->
+                val specs = ScreenBar.specsFor(ShellRoute.Home, true, mode, undoLabel = "assign", homeSection = section)
+                assertEquals("settings", specs.last().id)
+                assertFalse(specs.last().primary)
+            }
+        }
     }
 
     @Test
