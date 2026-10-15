@@ -323,8 +323,10 @@ object ShellCopy {
     const val NOTHING_TO_BUDGET = "nothing to budget"
     const val NO_ACCOUNTS = "no accounts"
     const val NOTHING_TO_CATEGORIZE = "nothing to categorize"
-    const val ON_BUDGET = "on budget"
-    const val OFF_BUDGET = "off budget"
+    const val ON_BUDGET = "On budget"
+    const val OFF_BUDGET = "Off budget"
+    const val CLOSED_ACCOUNTS = "Closed accounts"
+    const val ALL_ACCOUNTS = "all accounts"
     const val SAMPLE_BUDGETS = "sample budgets"
 }
 
