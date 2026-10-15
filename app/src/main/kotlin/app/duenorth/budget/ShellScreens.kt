@@ -511,6 +511,7 @@ private fun GroupLine(
                 .weight(1f)
                 .padding(end = 12.dp)
                 .testTag("group-name-${group.id}"),
+            color = if (group.hidden) Metro.colors.secondary else Metro.colors.foreground,
             maxLines = 3,
         )
         MetroText(

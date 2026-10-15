@@ -74,6 +74,7 @@ fun IncomeGroupLine(
             Modifier
                 .weight(1f)
                 .padding(end = 12.dp),
+            color = if (group.hidden) Metro.colors.secondary else Metro.colors.foreground,
             maxLines = 2,
         )
         Column(horizontalAlignment = Alignment.End) {
@@ -115,6 +116,7 @@ fun IncomeCategoryLine(
             category.name,
             Metro.typography.body,
             Modifier.weight(LEDGER_NAME).padding(end = MetroDimens.Gutter),
+            color = if (category.hidden) Metro.colors.secondary else Metro.colors.foreground,
             maxLines = 2,
         )
         if (shell.mode == BudgetMode.TRACKING) {

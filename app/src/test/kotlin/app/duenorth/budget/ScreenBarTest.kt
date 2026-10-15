@@ -1,6 +1,7 @@
 package app.duenorth.budget
 
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.ShellCopy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -12,9 +13,20 @@ class ScreenBarTest {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
         assertEquals(listOf("add", "hold", "categories", "settings"), specs.filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("copy-last", "average", "zero", "add-schedule", "rules", "reports"),
+            listOf("show-hidden", "copy-last", "average", "zero", "add-schedule", "rules", "reports"),
             specs.filter { !it.primary }.map { it.id },
         )
+    }
+
+    @Test
+    fun showHiddenLabelFollowsTheSetting() {
+        fun label(shown: Boolean) =
+            ScreenBar
+                .specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, showHidden = shown)
+                .single { it.id == "show-hidden" }
+                .label
+        assertEquals(ShellCopy.SHOW_HIDDEN, label(false))
+        assertEquals(ShellCopy.HIDE_HIDDEN, label(true))
     }
 
     @Test

@@ -23,6 +23,7 @@ object ShellReader {
         today: LocalDate,
         viewMonth: YearMonth = YearMonth.from(today),
         showClosedAccounts: Boolean = true,
+        showHidden: Boolean = false,
     ): MonthShell {
         val detailed = loadDetailed(session, viewMonth)
         val preferences =
@@ -37,7 +38,8 @@ object ShellReader {
             }
         val currency = Currencies.byCode(preferences["currency"].orEmpty()) ?: Currencies.byCode("USD")!!
         val month = viewMonth
-        val groups = detailed.groups
+        // Hidden groups and categories stay out of the screen unless asked for, as in Actual.
+        val groups = detailed.groups.filter { showHidden || !it.bool("hidden") }
         val figures = detailed.figures
         val accounts =
             session.query(
@@ -92,7 +94,7 @@ object ShellReader {
                         val id = row.str("id").orEmpty()
                         val cats =
                             detailed.categoryRows
-                                .filter { it.groupId == id }
+                                .filter { it.groupId == id && (showHidden || !it.hidden) }
                                 .map { cat ->
                                     CategoryRow(
                                         id = cat.id,
@@ -101,6 +103,7 @@ object ShellReader {
                                         spentMinor = cat.spentMinor,
                                         availableMinor = cat.availableMinor,
                                         carryover = cat.carryover,
+                                        hidden = cat.hidden,
                                     )
                                 }
                         GroupRow(
@@ -108,6 +111,7 @@ object ShellReader {
                             name = row.str("name").orEmpty(),
                             availableMinor = figures.groupAvailable[id] ?: 0L,
                             categories = cats,
+                            hidden = row.bool("hidden"),
                         )
                     },
             incomeGroups =
@@ -117,14 +121,15 @@ object ShellReader {
                         val id = row.str("id").orEmpty()
                         val cats =
                             detailed.incomeRows
-                                .filter { it.groupId == id }
-                                .map { IncomeCategoryRow(it.id, it.name, it.budgetedMinor, it.receivedMinor, it.carryover) }
+                                .filter { it.groupId == id && (showHidden || !it.hidden) }
+                                .map { IncomeCategoryRow(it.id, it.name, it.budgetedMinor, it.receivedMinor, it.carryover, it.hidden) }
                         IncomeGroupRow(
                             id = id,
                             name = row.str("name").orEmpty(),
                             budgetedMinor = cats.sumOf { it.budgetedMinor },
                             receivedMinor = cats.sumOf { it.receivedMinor },
                             categories = cats,
+                            hidden = row.bool("hidden"),
                         )
                     },
             accounts =
@@ -158,6 +163,7 @@ object ShellReader {
         val spentMinor: Long,
         val availableMinor: Long,
         val carryover: Boolean,
+        val hidden: Boolean = false,
     )
 
     data class LoadedIncomeRow(
@@ -167,6 +173,7 @@ object ShellReader {
         val budgetedMinor: Long,
         val receivedMinor: Long,
         val carryover: Boolean,
+        val hidden: Boolean = false,
     )
 
     data class LoadedDetailed(
@@ -196,14 +203,14 @@ object ShellReader {
         val groups =
             session.query(
                 """
-                SELECT id, name, is_income, sort_order
+                SELECT id, name, is_income, hidden, sort_order
                 FROM category_groups
                 WHERE IFNULL(tombstone, 0) = 0
                 ORDER BY sort_order, id
                 """.trimIndent(),
             )
         // Hidden categories still count toward the month, as in Actual's sheet;
-        // they are only left out of the rows the screen shows.
+        // [read] leaves them out of the rows the screen shows unless asked for.
         val allCategories =
             session.query(
                 """
@@ -213,7 +220,6 @@ object ShellReader {
                 ORDER BY sort_order, id
                 """.trimIndent(),
             )
-        val categories = allCategories.filter { !it.bool("hidden") }
         val spent = HashMap<Pair<Int, String>, Long>()
         session
             .query(
@@ -285,7 +291,7 @@ object ShellReader {
                 buffers = buffers,
             )
         val categoryRows =
-            categories.mapNotNull { row ->
+            allCategories.mapNotNull { row ->
                 val id = row.str("id").orEmpty()
                 val stat = detailed.categories[id] ?: return@mapNotNull null
                 LoadedCategoryRow(
@@ -296,6 +302,7 @@ object ShellReader {
                     spentMinor = stat.spentMinor,
                     availableMinor = stat.availableMinor,
                     carryover = stat.carryover,
+                    hidden = row.bool("hidden"),
                 )
             }
         val target = viewMonth.toActualMonth()
@@ -304,7 +311,7 @@ object ShellReader {
                 .filter { it.long("month").toInt() == target }
                 .associateBy { it.str("category").orEmpty() }
         val incomeRows =
-            categories.filter { it.bool("is_income") }.map { row ->
+            allCategories.filter { it.bool("is_income") }.map { row ->
                 val id = row.str("id").orEmpty()
                 val assignment = targetAssignments[id]
                 LoadedIncomeRow(
@@ -314,6 +321,7 @@ object ShellReader {
                     budgetedMinor = assignment?.long("amount") ?: 0L,
                     receivedMinor = spent[target to id] ?: 0L,
                     carryover = assignment?.bool("carryover") == true,
+                    hidden = row.bool("hidden"),
                 )
             }
         return LoadedDetailed(

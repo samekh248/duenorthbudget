@@ -51,6 +51,13 @@ class ShellScreenshotTest {
             shell = sample().copy(headerMinor = 0, groups = emptyList(), accounts = emptyList(), inbox = emptyList()),
         )
 
+    // Home with show hidden categories on: hidden groups and categories come back dimmed.
+    @Test
+    fun homeHiddenShownLight() = snap("home_hidden_shown_light", dark = false, shell = withHidden())
+
+    @Test
+    fun homeHiddenShownDark() = snap("home_hidden_shown_dark", dark = true, shell = withHidden())
+
     @Test
     fun categoryLedgerLight() = categorySnap("category_ledger_light", dark = false)
 
@@ -191,6 +198,27 @@ class ShellScreenshotTest {
             }
         }
     }
+
+    private fun withHidden(): MonthShell =
+        sample().let { shell ->
+            shell.copy(
+                groups =
+                    shell.groups.map { group ->
+                        if (group.id == "g-every") {
+                            group.copy(categories = group.categories + CategoryRow("c-gym", "Gym", 0, 0, 0, false, hidden = true))
+                        } else {
+                            group
+                        }
+                    } +
+                        GroupRow(
+                            "g-old",
+                            "Old house",
+                            0,
+                            listOf(CategoryRow("c-hoa", "HOA", 0, 0, 0, false)),
+                            hidden = true,
+                        ),
+            )
+        }
 
     private fun sample(): MonthShell =
         MonthShell(

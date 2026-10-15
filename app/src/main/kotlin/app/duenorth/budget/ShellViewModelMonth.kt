@@ -16,6 +16,16 @@ import kotlinx.coroutines.withContext
 
 // Spec 010 phase 3 (T024): month actions and undo for the shell, as extensions of ShellViewModel. See contracts/month-actions.md and undo.md.
 
+/** Home `•••` → show or leave out hidden groups and categories. Remembered across launches. */
+fun ShellViewModel.toggleShowHiddenCategories() {
+    val settings = state.value.settings.let { it.copy(showHiddenCategories = !it.showHiddenCategories) }
+    mutate { it.copy(settings = settings) }
+    viewModelScope.launch {
+        withContext(Dispatchers.IO) { library.updateSettings { it.copy(showHiddenCategories = settings.showHiddenCategories) } }
+        refresh()
+    }
+}
+
 /** Opens the to-budget breakdown for the open month. Envelope only. */
 fun ShellViewModel.openBreakdown() {
     val shell = state.value.shell ?: return
