@@ -58,7 +58,10 @@ class ShellScreenshotTest {
     fun categoryLedgerDark() = categorySnap("category_ledger_dark", dark = true)
 
     @Test
-    fun accountsLight() = snap("accounts_light", dark = false, shell = sample(), section = 1)
+    fun accountsLight() = snap("accounts_light", dark = false, shell = sample().copy(accounts = manyAccounts()), section = 1)
+
+    @Test
+    fun accountsDark() = snap("accounts_dark", dark = true, shell = sample().copy(accounts = manyAccounts()), section = 1)
 
     @Test
     fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = 5)
@@ -191,6 +194,16 @@ class ShellScreenshotTest {
             }
         }
     }
+
+    private fun manyAccounts(): List<AccountRow> =
+        listOf(
+            AccountRow("checking", "Checking", offBudget = false, closed = false, balanceMinor = 226_000),
+            AccountRow("joint", "Joint checking", offBudget = false, closed = false, balanceMinor = 84_250),
+            AccountRow("card", "Credit card", offBudget = false, closed = false, balanceMinor = -41_870),
+            AccountRow("savings", "Savings", offBudget = true, closed = false, balanceMinor = 1_250_000),
+            AccountRow("mortgage", "Mortgage", offBudget = true, closed = false, balanceMinor = -18_400_000),
+            AccountRow("old-card", "Old card", offBudget = false, closed = true, balanceMinor = 0),
+        )
 
     private fun sample(): MonthShell =
         MonthShell(
