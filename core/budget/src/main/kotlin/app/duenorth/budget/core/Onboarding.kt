@@ -29,6 +29,13 @@ enum class CreateReturn {
     FILES,
 }
 
+/** Where the server path started: the first-run welcome page, or "add" in settings (spec 012). */
+@Serializable
+enum class OnboardingOrigin {
+    FIRST_RUN,
+    SETTINGS,
+}
+
 /**
  * First-run progress, kept in `onboarding.json` so leaving the app resumes the same step.
  * It never holds a password, a token, or a budget key.
@@ -46,6 +53,7 @@ data class OnboardingProgress(
     val createName: String = "",
     val createCurrency: String? = null,
     val createReturn: CreateReturn = CreateReturn.WELCOME,
+    val origin: OnboardingOrigin = OnboardingOrigin.FIRST_RUN,
 )
 
 class OnboardingStore(

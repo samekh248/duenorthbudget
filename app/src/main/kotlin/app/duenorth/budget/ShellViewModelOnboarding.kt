@@ -3,6 +3,7 @@ package app.duenorth.budget
 import androidx.lifecycle.viewModelScope
 import app.duenorth.budget.core.CreateReturn
 import app.duenorth.budget.core.OnboardingCopy
+import app.duenorth.budget.core.OnboardingOrigin
 import app.duenorth.budget.core.OnboardingPath
 import app.duenorth.budget.core.OnboardingProgress
 import app.duenorth.budget.core.OnboardingStep
@@ -51,6 +52,8 @@ internal suspend fun ShellViewModel.restoreOnboarding() {
         withContext(Dispatchers.IO) {
             val store = library.onboarding()
             val progress = store.read() ?: return@withContext null
+            // An add-server path started in settings resumes even with budgets on the phone (spec 012).
+            if (progress.origin == OnboardingOrigin.SETTINGS) return@withContext progress
             if (library.list().isNotEmpty()) {
                 store.clear()
                 null
@@ -58,8 +61,46 @@ internal suspend fun ShellViewModel.restoreOnboarding() {
                 progress
             }
         } ?: return
+    if (stored.origin == OnboardingOrigin.SETTINGS) {
+        mutate {
+            it.copy(
+                onboarding = OnboardingUi(stored),
+                route = onboardingRoute(stored),
+                settingsReturn = true,
+                settingsPage = SettingsPage.SERVER,
+            )
+        }
+        return
+    }
     mutate { it.copy(onboarding = OnboardingUi(stored)) }
 }
+
+/** Settings → server → add: the onboarding server path, starting on an empty address (spec 012 FR-005). */
+fun ShellViewModel.onboardingAddServer() {
+    cancelOnboardingJob()
+    val progress =
+        OnboardingProgress(
+            step = OnboardingStep.ADDRESS,
+            path = OnboardingPath.SERVER,
+            origin = OnboardingOrigin.SETTINGS,
+        )
+    mutate { it.copy(onboarding = OnboardingUi(progress)) }
+    viewModelScope.launch(onboardingWrites) { library.onboarding().write(progress) }
+    openFromSettings(ShellRoute.OnboardingAddress, SettingsPage.SERVER)
+}
+
+/** The settings-origin path is over: drop its progress and show the server item. */
+private fun ShellViewModel.leaveSettingsOnboarding() {
+    cancelOnboardingJob()
+    mutate { it.copy(onboarding = null) }
+    viewModelScope.launch(onboardingWrites) { library.onboarding().clear() }
+    returnToSettings(SettingsPage.SERVER)
+}
+
+private fun ShellViewModel.fromSettings(): Boolean =
+    state.value.onboarding
+        ?.progress
+        ?.origin == OnboardingOrigin.SETTINGS
 
 /** After the first load, the file list needs the server's budgets again. */
 internal fun ShellViewModel.resumeOnboarding() {
@@ -185,6 +226,21 @@ fun ShellViewModel.onboardingSignIn(password: String) {
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) { sync.connect(address, password, ui.progress.instanceLabel) }
             val settings = withContext(Dispatchers.IO) { library.settings() }
+            if (result.error == null && fromSettings() && state.value.shell != null) {
+                mutate {
+                    it.copy(
+                        remoteFiles = result.files,
+                        serverError = null,
+                        settings = settings,
+                        instances = settings.instances,
+                        activeInstance = settings.activeInstance(),
+                        instanceReachable = true,
+                        signedIn = sync.signedIn(),
+                    )
+                }
+                leaveSettingsOnboarding()
+                return@launch
+            }
             if (result.error == null) {
                 updateOnboarding {
                     it.copy(progress = it.progress.copy(step = OnboardingStep.FILES), checking = false, signInError = null)
@@ -223,6 +279,10 @@ internal fun ShellViewModel.finishBrowserSignIn(
     error: String?,
 ) {
     if (state.value.onboarding == null) mutate { it.copy(onboarding = OnboardingUi(saved)) }
+    if (error == null && saved.origin == OnboardingOrigin.SETTINGS && state.value.shell != null) {
+        leaveSettingsOnboarding()
+        return
+    }
     if (error == null) {
         updateOnboarding {
             it.copy(
@@ -284,7 +344,8 @@ fun ShellViewModel.onboardingCreateDraft(
 internal fun ShellViewModel.onboardingBack(): Boolean? {
     val current = state.value
     val ui = current.onboarding ?: return null
-    if (current.shell != null) return null
+    val settingsOrigin = ui.progress.origin == OnboardingOrigin.SETTINGS
+    if (current.shell != null && !settingsOrigin) return null
 
     fun step(
         to: OnboardingStep,
@@ -299,9 +360,21 @@ internal fun ShellViewModel.onboardingBack(): Boolean? {
     }
     return when (current.route) {
         ShellRoute.Welcome -> false
-        ShellRoute.OnboardingAddress -> step(OnboardingStep.WELCOME, ShellRoute.Welcome)
+        ShellRoute.OnboardingAddress ->
+            if (settingsOrigin) {
+                leaveSettingsOnboarding()
+                true
+            } else {
+                step(OnboardingStep.WELCOME, ShellRoute.Welcome)
+            }
         ShellRoute.OnboardingSignIn -> step(OnboardingStep.ADDRESS, ShellRoute.OnboardingAddress)
-        ShellRoute.OnboardingFiles -> step(OnboardingStep.SIGN_IN, ShellRoute.OnboardingSignIn)
+        ShellRoute.OnboardingFiles ->
+            if (settingsOrigin) {
+                leaveSettingsOnboarding()
+                true
+            } else {
+                step(OnboardingStep.SIGN_IN, ShellRoute.OnboardingSignIn)
+            }
         ShellRoute.Create ->
             if (ui.progress.createReturn == CreateReturn.FILES && sync.signedIn()) {
                 step(OnboardingStep.FILES, ShellRoute.OnboardingFiles)

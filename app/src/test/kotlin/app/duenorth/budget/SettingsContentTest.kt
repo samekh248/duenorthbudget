@@ -3,13 +3,19 @@ package app.duenorth.budget
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -18,11 +24,10 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.SavedInstance
-import app.duenorth.budget.core.ShellCopy
+import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -35,162 +40,146 @@ class SettingsContentTest {
     @get:Rule
     val compose = createHostComposeRule()
 
+    private val home = SavedInstance("i1", "http://192.168.1.10:5006", "home")
+    private val work = SavedInstance("i2", "https://work.example.com", null)
+    private val budgets = listOf(BudgetSummary("a", "Alpha", "USD"), BudgetSummary("b", "Beta", "USD"))
+
     @Test
-    fun listsBudgetsAndMarksOpen() {
-        compose.setContent {
-            MetroTheme {
-                Box(Modifier.width(390.dp).height(780.dp)) {
-                    SettingsScreen(
-                        instances = emptyList(),
-                        activeInstance = null,
-                        instanceReachable = null,
-                        signedIn = false,
-                        serverError = null,
-                        budgets =
-                            listOf(
-                                BudgetSummary("a", "Alpha", "USD"),
-                                BudgetSummary("b", "Beta", "USD"),
-                            ),
-                        openBudgetId = "b",
-                        themeMode = "system",
-                        accentId = "magenta",
-                        formatPrefs = FormatPrefs(),
-                        cloudFileId = null,
-                        createError = null,
-                        encryptionError = null,
-                        openIdAvailable = false,
-                        onConnect = { _, _ -> },
-                        onBeginOpenId = {},
-                        onMakeActive = {},
-                        onRemoveInstance = {},
-                        onSignOut = {},
-                        onOpenBudget = {},
-                        onCreateBudget = { _, _ -> },
-                        onTheme = {},
-                        onAccent = {},
-                        onPayees = {},
-                        onDateFormat = {},
-                        onNumberFormat = {},
-                        onFirstDay = {},
-                        onHideFraction = {},
-                        onExperimental = {},
-                        onExport = {},
-                        onSetEncryptionPassword = {},
-                        onChangeEncryptionPassword = { _, _ -> },
-                        onRemoveEncryptionPassword = {},
-                        onRequestAdvanced = {},
-                    )
-                }
-            }
+    fun headerRowHasFiveItemsWithABudgetOpen() {
+        show(SettingsPage.BUDGET)
+        listOf("budget", "server", "format", "appearance", "advanced").forEach {
+            compose.onNodeWithText(it).assertExists()
         }
-        compose.onNodeWithTag("settings-budget-a").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithTag("settings-budget-b").performScrollTo().assertTextEquals("Beta  open")
-        compose.onNodeWithTag("settings-formatting").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("settings-item-budget").assertIsDisplayed()
     }
 
     @Test
-    fun blankCreateIsRejected() {
-        var createdName: String? = "unset"
-        compose.setContent {
-            MetroTheme {
-                Box(Modifier.width(390.dp).height(780.dp)) {
-                    SettingsScreen(
-                        instances = emptyList(),
-                        activeInstance = null,
-                        instanceReachable = null,
-                        signedIn = false,
-                        serverError = null,
-                        budgets = emptyList(),
-                        openBudgetId = null,
-                        themeMode = "system",
-                        accentId = "magenta",
-                        formatPrefs = FormatPrefs(),
-                        cloudFileId = null,
-                        createError = ShellCopy.ENTER_NAME,
-                        encryptionError = null,
-                        openIdAvailable = false,
-                        onConnect = { _, _ -> },
-                        onBeginOpenId = {},
-                        onMakeActive = {},
-                        onRemoveInstance = {},
-                        onSignOut = {},
-                        onOpenBudget = {},
-                        onCreateBudget = { name, _ -> createdName = name },
-                        onTheme = {},
-                        onAccent = {},
-                        onPayees = {},
-                        onDateFormat = {},
-                        onNumberFormat = {},
-                        onFirstDay = {},
-                        onHideFraction = {},
-                        onExperimental = {},
-                        onExport = {},
-                        onSetEncryptionPassword = {},
-                        onChangeEncryptionPassword = { _, _ -> },
-                        onRemoveEncryptionPassword = {},
-                        onRequestAdvanced = {},
-                    )
-                }
-            }
-        }
-        compose.onNodeWithTag("settings-create-error").performScrollTo().assertTextEquals(ShellCopy.ENTER_NAME)
-        compose.onNodeWithTag("settings-create").performScrollTo().performClick()
-        assertEquals("", createdName)
-        assertTrue(createdName!!.trim().isEmpty())
+    fun formatAndAdvancedLeaveTheRowWithNoBudgetOpen() {
+        show(SettingsPage.ADVANCED, openBudgetId = null)
+        compose.onNodeWithText("format").assertDoesNotExist()
+        compose.onNodeWithText("advanced").assertDoesNotExist()
+        // The stored advanced item is not shown, so settings falls back to budget.
+        compose.onNodeWithTag("settings-item-budget").assertIsDisplayed()
+        compose.onNodeWithTag("settings-open-budget").assertTextEquals("no budget open")
+        compose.onNodeWithTag("settings-budget-a").assertIsDisplayed()
     }
 
     @Test
-    fun formattingAbsentWhenNoBudgetOpen() {
+    fun budgetItemShowsOpenBudgetMethodAndOthers() {
+        var opened: String? = null
+        show(SettingsPage.BUDGET, onOpenBudget = { opened = it })
+        compose.onNodeWithTag("settings-open-budget").assertTextEquals("Beta")
+        compose.onNodeWithTag("settings-method-value").assertTextEquals("envelope budget")
+        compose.onNodeWithTag("settings-budget-b").assertDoesNotExist()
+        compose.onNodeWithTag("settings-budget-a").performClick()
+        assertEquals("a", opened)
+    }
+
+    @Test
+    fun headerTapOpensItsItemAndReportsIt() {
+        var page: SettingsPage? = null
+        show(SettingsPage.BUDGET, onPage = { page = it })
+        compose.onNodeWithText("appearance").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("settings-item-appearance").assertIsDisplayed()
+        assertEquals(SettingsPage.APPEARANCE, page)
+    }
+
+    @Test
+    fun serverItemNamesActiveServerAndListsSaved() {
+        var removed: String? = null
+        show(SettingsPage.SERVER, instanceReachable = false, onRemove = { removed = it })
+        compose.onNodeWithTag("instance-status").assertTextEquals("home")
+        compose.onNodeWithTag("instance-address-line").assertTextEquals(home.address)
+        compose.onNodeWithTag("instance-state").assertTextEquals(SyncCopy.NOT_REACHED)
+        compose.onNodeWithTag("instance-i2").assertTextEquals(work.address)
+        compose.onNodeWithTag("instance-activate-i2").assertIsDisplayed()
+        compose.onNodeWithTag("instance-remove-i1").performClick()
+        assertEquals("i1", removed)
+    }
+
+    @Test
+    fun serverItemWithNoServerSaysNotConnected() {
+        show(SettingsPage.SERVER, instances = emptyList(), active = null)
+        compose.onNodeWithTag("instance-status").assertTextEquals("not connected")
+        compose.onNodeWithTag("instance-state").assertDoesNotExist()
+    }
+
+    @Test
+    fun noItemHoldsATextField() {
+        var current by mutableStateOf(SettingsPage.BUDGET)
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(780.dp)) {
-                    SettingsScreen(
-                        instances =
-                            listOf(SavedInstance("i1", "http://192.168.1.10:5006", "home")),
-                        activeInstance = SavedInstance("i1", "http://192.168.1.10:5006", "home"),
-                        instanceReachable = true,
-                        signedIn = true,
-                        serverError = null,
-                        budgets = listOf(BudgetSummary("a", "Alpha", "USD")),
-                        openBudgetId = null,
-                        themeMode = "light",
-                        accentId = "magenta",
-                        formatPrefs = FormatPrefs(),
-                        cloudFileId = null,
-                        createError = null,
-                        encryptionError = null,
-                        openIdAvailable = false,
-                        onConnect = { _, _ -> },
-                        onBeginOpenId = {},
-                        onMakeActive = {},
-                        onRemoveInstance = {},
-                        onSignOut = {},
-                        onOpenBudget = {},
-                        onCreateBudget = { _, _ -> },
-                        onTheme = {},
-                        onAccent = {},
-                        onPayees = {},
-                        onDateFormat = {},
-                        onNumberFormat = {},
-                        onFirstDay = {},
-                        onHideFraction = {},
-                        onExperimental = {},
-                        onExport = {},
-                        onSetEncryptionPassword = {},
-                        onChangeEncryptionPassword = { _, _ -> },
-                        onRemoveEncryptionPassword = {},
-                        onRequestAdvanced = {},
-                    )
+                    key(current) { Screen(current) }
                 }
             }
         }
-        compose.onNodeWithTag("settings-screen").assertIsDisplayed()
-        compose.onNodeWithTag("settings-formatting").assertDoesNotExist()
-        compose.onNodeWithTag("settings-export").assertDoesNotExist()
-        compose.onNodeWithTag("settings-encryption").assertDoesNotExist()
-        compose.onNodeWithTag("settings-advanced").assertDoesNotExist()
-        compose.onNodeWithTag("instance-status").assertIsDisplayed()
-        compose.onNodeWithText("appearance").performScrollTo().assertIsDisplayed()
+        SettingsPage.entries.forEach { page ->
+            current = page
+            compose.waitForIdle()
+            compose.onNodeWithTag("settings-item-${page.name.lowercase()}").assertIsDisplayed()
+            compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+        }
+    }
+
+    @Test
+    fun riskyActionsOnlyLiveOnAdvanced() {
+        var current by mutableStateOf(SettingsPage.ADVANCED)
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(780.dp)) {
+                    key(current) { Screen(current) }
+                }
+            }
+        }
+        compose.onNodeWithTag("settings-reset-sync").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("encryption-set").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("encryption-change").assertDoesNotExist()
+        val risky = listOf("settings-rebuild", "settings-repair", "settings-reset-sync", "encryption-set", "settings-export")
+        listOf(SettingsPage.BUDGET, SettingsPage.SERVER, SettingsPage.FORMAT, SettingsPage.APPEARANCE).forEach { page ->
+            current = page
+            compose.waitForIdle()
+            val item = hasAnyAncestor(hasTestTag("settings-item-${page.name.lowercase()}"))
+            risky.forEach { tag -> compose.onAllNodes(hasTestTag(tag) and item).assertCountEquals(0) }
+        }
+    }
+
+    @Test
+    fun encryptedBudgetOffersChangeAndRemove() {
+        show(SettingsPage.ADVANCED, encrypted = true)
+        compose.onNodeWithTag("settings-encryption-state").performScrollTo().assertTextEquals("encrypted")
+        compose.onNodeWithTag("encryption-change").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("encryption-remove").assertExists()
+        compose.onNodeWithTag("encryption-set").assertDoesNotExist()
+    }
+
+    @Test
+    fun encryptionPageAsksOnlyForWhatTheActionNeeds() {
+        var mode by mutableStateOf(EncryptionMode.SET)
+        var changed: Pair<String, String>? = null
+        compose.setContent {
+            MetroTheme {
+                EncryptionPasswordScreen(
+                    mode = mode,
+                    error = null,
+                    onSet = {},
+                    onChange = { a, b -> changed = a to b },
+                    onRemove = {},
+                )
+            }
+        }
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+        compose.onNodeWithTag("encryption-password").assertExists()
+        mode = EncryptionMode.CHANGE
+        compose.waitForIdle()
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(2)
+        compose.onNodeWithTag("encryption-save").performClick()
+        assertEquals("" to "", changed)
+        mode = EncryptionMode.REMOVE
+        compose.waitForIdle()
+        compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+        compose.onNodeWithTag("encryption-current").assertExists()
     }
 
     @Test
@@ -200,50 +189,93 @@ class SettingsContentTest {
             var mode by remember { mutableStateOf(theme) }
             MetroTheme(darkTheme = mode == ThemeMode.DARK.stored()) {
                 Box(Modifier.width(390.dp).height(780.dp)) {
-                    SettingsScreen(
-                        instances = emptyList(),
-                        activeInstance = null,
-                        instanceReachable = null,
-                        signedIn = false,
-                        serverError = null,
-                        budgets = emptyList(),
-                        openBudgetId = null,
+                    Screen(
+                        SettingsPage.APPEARANCE,
                         themeMode = mode,
-                        accentId = "magenta",
-                        formatPrefs = FormatPrefs(),
-                        cloudFileId = null,
-                        createError = null,
-                        encryptionError = null,
-                        openIdAvailable = false,
-                        onConnect = { _, _ -> },
-                        onBeginOpenId = {},
-                        onMakeActive = {},
-                        onRemoveInstance = {},
-                        onSignOut = {},
-                        onOpenBudget = {},
-                        onCreateBudget = { _, _ -> },
                         onTheme = {
                             mode = it
                             theme = it
                         },
-                        onAccent = {},
-                        onPayees = {},
-                        onDateFormat = {},
-                        onNumberFormat = {},
-                        onFirstDay = {},
-                        onHideFraction = {},
-                        onExperimental = {},
-                        onExport = {},
-                        onSetEncryptionPassword = {},
-                        onChangeEncryptionPassword = { _, _ -> },
-                        onRemoveEncryptionPassword = {},
-                        onRequestAdvanced = {},
                     )
                 }
             }
         }
         compose.onNodeWithTag("settings-theme-dark").performScrollTo().performClick()
         assertEquals(ThemeMode.DARK.stored(), theme)
-        assertTrue(theme == "dark")
+    }
+
+    private fun show(
+        page: SettingsPage,
+        openBudgetId: String? = "b",
+        instances: List<SavedInstance> = listOf(home, work),
+        active: SavedInstance? = home,
+        instanceReachable: Boolean? = true,
+        encrypted: Boolean = false,
+        onPage: (SettingsPage) -> Unit = {},
+        onOpenBudget: (String) -> Unit = {},
+        onRemove: (String) -> Unit = {},
+    ) {
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(780.dp)) {
+                    Screen(
+                        page,
+                        openBudgetId = openBudgetId,
+                        instances = instances,
+                        active = active,
+                        instanceReachable = instanceReachable,
+                        encrypted = encrypted,
+                        onPage = onPage,
+                        onOpenBudget = onOpenBudget,
+                        onRemove = onRemove,
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun Screen(
+        page: SettingsPage,
+        openBudgetId: String? = "b",
+        instances: List<SavedInstance> = listOf(home, work),
+        active: SavedInstance? = home,
+        instanceReachable: Boolean? = true,
+        encrypted: Boolean = false,
+        themeMode: String = "light",
+        onPage: (SettingsPage) -> Unit = {},
+        onOpenBudget: (String) -> Unit = {},
+        onRemove: (String) -> Unit = {},
+        onTheme: (String) -> Unit = {},
+    ) {
+        SettingsScreen(
+            page = page,
+            instances = instances,
+            activeInstance = active,
+            instanceReachable = instanceReachable,
+            signedIn = active != null,
+            budgets = budgets,
+            openBudgetId = openBudgetId,
+            themeMode = themeMode,
+            accentId = "magenta",
+            formatPrefs = FormatPrefs(),
+            cloudFileId = "cloud-1",
+            encrypted = encrypted,
+            onPage = onPage,
+            onMakeActive = {},
+            onRemoveInstance = onRemove,
+            onOpenBudget = onOpenBudget,
+            onTheme = onTheme,
+            onAccent = {},
+            onPayees = {},
+            onDateFormat = {},
+            onNumberFormat = {},
+            onFirstDay = {},
+            onHideFraction = {},
+            onExperimental = {},
+            onExport = {},
+            onEncryption = {},
+            onRequestAdvanced = {},
+        )
     }
 }

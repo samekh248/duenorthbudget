@@ -74,6 +74,7 @@ import app.duenorth.budget.design.metroTilt
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroWeights
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -670,6 +671,8 @@ fun MetroPivot(
     modifier: Modifier = Modifier,
     initialItem: Int = 0,
     onGesture: (Boolean) -> Unit = {},
+    /** Called with the item index once a swipe or header tap settles. */
+    onSelected: (Int) -> Unit = {},
 ) {
     val count = items.size
     val loops = if (count > 1) 200 else 1
@@ -685,6 +688,11 @@ fun MetroPivot(
     }
 
     fun itemOf(page: Int): Int = Math.floorMod(page - origin, count)
+
+    val selectedCallback by rememberUpdatedState(onSelected)
+    LaunchedEffect(pager, count) {
+        snapshotFlow { pager.settledPage }.drop(1).collect { selectedCallback(itemOf(it)) }
+    }
 
     fun goTo(index: Int) {
         scope.launch {

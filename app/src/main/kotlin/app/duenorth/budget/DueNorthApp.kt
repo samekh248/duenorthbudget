@@ -41,6 +41,7 @@ import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.HttpActualTransport
+import app.duenorth.budget.core.OnboardingOrigin
 import app.duenorth.budget.core.ServerAddress
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.ThemeMode
@@ -179,7 +180,7 @@ fun DueNorthApp(model: ShellViewModel) {
             (
                 state.route != ShellRoute.Home &&
                     state.route != ShellRoute.Welcome &&
-                    !(state.route == ShellRoute.Create && state.shell == null && state.onboarding == null) &&
+                    !(state.route == ShellRoute.Create && state.shell == null && state.onboarding == null && !state.settingsReturn) &&
                     !(state.route == ShellRoute.BudgetPassword && state.locked)
             )
     BackHandler(enabled = canBack) {
@@ -256,6 +257,12 @@ fun DueNorthApp(model: ShellViewModel) {
                     onRefresh = model::onboardingRefresh,
                     onSamples = model::showSampleBudgets,
                     onNewBudget = model::onboardingNewBudget,
+                    onSettingsNew = model::showSettingsCreate,
+                    onSettingsPayees = model::showSettingsPayees,
+                    onAddServer = model::onboardingAddServer,
+                    onServerBudgets = model::showServerBudgets,
+                    onSignOut = model::signOutInstance,
+                    onExport = model::exportBudget,
                 )
             }
         val actions = ScreenBar.forState(state, handlers)
@@ -301,27 +308,22 @@ fun DueNorthApp(model: ShellViewModel) {
                         ShellRoute.Settings -> {
                             var launcherIcon by remember { mutableStateOf(LauncherIcons.current(context)) }
                             SettingsScreen(
+                                page = state.settingsPage,
                                 instances = state.instances,
                                 activeInstance = state.activeInstance,
                                 instanceReachable = state.instanceReachable,
                                 signedIn = state.signedIn,
-                                serverError = state.serverError,
                                 budgets = state.budgets,
                                 openBudgetId = state.settings.openBudgetId,
                                 themeMode = state.settings.themeMode,
                                 accentId = state.settings.accent,
                                 formatPrefs = state.formatPrefs,
                                 cloudFileId = state.cloudFileId,
-                                createError = state.createError,
-                                encryptionError = state.encryptionError,
-                                openIdAvailable = state.openIdAvailable,
-                                onConnect = model::connectInstance,
-                                onBeginOpenId = model::beginOpenId,
+                                encrypted = state.budgetEncrypted,
+                                onPage = model::selectSettingsPage,
                                 onMakeActive = model::requestInstanceSwitch,
-                                onRemoveInstance = model::removeInstance,
-                                onSignOut = model::signOutInstance,
+                                onRemoveInstance = model::requestRemoveInstance,
                                 onOpenBudget = model::requestSwitch,
-                                onCreateBudget = model::createFromSettings,
                                 onTheme = model::setTheme,
                                 onAccent = model::setAccent,
                                 launcherIcon = launcherIcon,
@@ -329,7 +331,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                     LauncherIcons.set(context, it)
                                     launcherIcon = it
                                 },
-                                onPayees = model::showPayees,
+                                onPayees = model::showSettingsPayees,
                                 onDateFormat = model::setDateFormat,
                                 onNumberFormat = model::setNumberFormat,
                                 onFirstDay = model::setFirstDay,
@@ -338,12 +340,29 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onGoalTemplates = model::setGoalTemplates,
                                 onLearning = model::setLearning,
                                 onExport = model::exportBudget,
-                                onSetEncryptionPassword = model::setEncryptionPassword,
-                                onChangeEncryptionPassword = model::changeEncryptionPassword,
-                                onRemoveEncryptionPassword = model::removeEncryptionPassword,
+                                onEncryption = model::showEncryption,
                                 onRequestAdvanced = model::requestAdvanced,
+                                scroll = state.settingsScroll,
+                                onScroll = model::saveSettingsScroll,
                                 modifier = fill,
-                                defaultBudgetName = state.defaultBudgetName,
+                            )
+                        }
+                        is ShellRoute.EncryptionPassword ->
+                            EncryptionPasswordScreen(
+                                mode = route.mode,
+                                error = state.encryptionError,
+                                onSet = model::setEncryptionPassword,
+                                onChange = model::changeEncryptionPassword,
+                                onRemove = model::removeEncryptionPassword,
+                                modifier = fill,
+                            )
+                        is ShellRoute.ConfirmRemoveInstance -> {
+                            val instance = state.instances.find { it.id == route.instanceId }
+                            ConfirmRemoveInstanceScreen(
+                                name = instance?.label ?: instance?.address.orEmpty(),
+                                onRemove = model::confirmRemoveInstance,
+                                onKeep = { model.back() },
+                                modifier = fill,
                             )
                         }
                         ShellRoute.ConfirmInstanceSwitch ->
@@ -401,6 +420,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onNext = model::onboardingCheck,
                                 onPhone = model::onboardingChoosePhone,
                                 modifier = fill,
+                                offerPhone = onboarding?.progress?.origin != OnboardingOrigin.SETTINGS,
                             )
                         }
                         ShellRoute.OnboardingSignIn -> {
@@ -417,6 +437,10 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSignIn = model::onboardingSignIn,
                                 onBrowser = model::onboardingBrowser,
                                 modifier = fill,
+                                replacing =
+                                    state.activeInstance
+                                        ?.takeIf { onboarding?.progress?.origin == OnboardingOrigin.SETTINGS }
+                                        ?.let { it.label ?: it.address },
                             )
                         }
                         ShellRoute.OnboardingFiles ->
@@ -438,14 +462,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                 leaving = openName,
                                 onOpen = model::confirmSwitch,
                                 onStay = model::cancelSwitch,
-                                modifier = fill,
-                            )
-                        ShellRoute.Appearance ->
-                            AppearanceScreen(
-                                themeMode = state.settings.themeMode,
-                                accentId = state.settings.accent,
-                                onTheme = model::setTheme,
-                                onAccent = model::setAccent,
                                 modifier = fill,
                             )
                         ShellRoute.Payees ->

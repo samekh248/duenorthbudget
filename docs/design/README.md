@@ -18,7 +18,10 @@ month now lists each group's categories under it (tap a category to
 assign; there is no separate group page), held amount under the list, outlined
 month/hold/file actions, and the same app bar. The first-run onboarding pages
 (welcome, server address, sign in, pick a budget) are drawn in two more
-rows, light and dark, for spec 011. Surfaces that are not drawn
+rows, light and dark, for spec 011. Settings is a pivot (spec 012): a small
+"SETTINGS" title over budget, server, format, appearance and advanced headers;
+the budget, server and advanced items and the change-password page are drawn
+in the last two rows, light and dark. Surfaces that are not drawn
 here still follow the Due North Tasks reference,
 `docs/design/metro-mockups.svg` in
 [samekh248/duenorthtasks](https://github.com/samekh248/duenorthtasks).

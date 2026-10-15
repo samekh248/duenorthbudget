@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -56,7 +55,6 @@ import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ShellCopy
-import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.MonthWindow
@@ -73,7 +71,6 @@ import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.PivotItem
 import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
-import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import java.time.YearMonth
@@ -849,79 +846,6 @@ fun ConfirmSwitchScreen(
         MetroButtonGrid {
             MetroButton("open", onClick = onOpen)
             MetroButton("stay", onClick = onStay)
-        }
-    }
-}
-
-@Composable
-fun AppearanceScreen(
-    themeMode: String,
-    accentId: String,
-    onTheme: (String) -> Unit,
-    onAccent: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-    ) {
-        MetroText("appearance", Metro.typography.header)
-        ThemeMode.entries.forEach { mode ->
-            val selected = ThemeMode.fromStored(themeMode) == mode
-            val label =
-                when (mode) {
-                    ThemeMode.SYSTEM -> "follow phone"
-                    ThemeMode.LIGHT -> "light"
-                    ThemeMode.DARK -> "dark"
-                }
-            MetroText(
-                label,
-                Metro.typography.subheader,
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = MetroDimens.TouchTarget)
-                    .metroPress { onTheme(mode.stored()) }
-                    .padding(vertical = MetroDimens.Row),
-                color = if (selected) Metro.accent.text else Metro.colors.foreground,
-            )
-        }
-        MetroText(
-            "accent",
-            Metro.typography.caption,
-            Modifier.padding(top = MetroDimens.Grid, bottom = MetroDimens.Gutter),
-            color = Metro.colors.secondary,
-        )
-        AccentGrid(accentId, onAccent)
-    }
-}
-
-@Composable
-private fun AccentGrid(
-    selected: String,
-    onAccent: (String) -> Unit,
-) {
-    val accents = Accent.entries
-    Column(verticalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
-        accents.chunked(5).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
-                row.forEach { accent ->
-                    val fill = accent.fill(Metro.colors.isDark)
-                    Box(
-                        Modifier
-                            .size(52.dp)
-                            .background(fill)
-                            .then(
-                                if (accent.id == selected) {
-                                    Modifier.border(3.dp, Metro.colors.foreground)
-                                } else {
-                                    Modifier
-                                },
-                            ).metroPress { onAccent(accent.id) },
-                    )
-                }
-            }
         }
     }
 }

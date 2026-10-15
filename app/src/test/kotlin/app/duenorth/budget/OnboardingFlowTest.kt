@@ -186,6 +186,144 @@ class OnboardingFlowTest {
         assertEquals(ShellRoute.Welcome, second.state.value.route)
     }
 
+    @Test
+    fun addServerFromSettingsReturnsToTheServerItem() {
+        val root = root("settings-add")
+        library(root).create("Home", "USD")
+        val model = model(root)
+        await { model.state.value.shell != null }
+        model.showSettings()
+        model.selectSettingsPage(SettingsPage.SERVER)
+
+        model.onboardingAddServer()
+        assertEquals(ShellRoute.OnboardingAddress, model.state.value.route)
+        assertEquals(
+            "",
+            model.state.value.onboarding!!
+                .progress.addressText,
+        )
+        // Back from the address page: nothing saved, server item showing.
+        assertTrue(model.back())
+        assertEquals(ShellRoute.Settings, model.state.value.route)
+        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+        assertNull(model.state.value.onboarding)
+        assertTrue(library(root).settings().instances.isEmpty())
+
+        model.onboardingAddServer()
+        model.onboardingAddress("budget.example.com")
+        model.onboardingCheck()
+        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        model.onboardingLabel("home server")
+        model.onboardingSignIn(FakeTransport.PASSWORD)
+        await { model.state.value.route == ShellRoute.Settings }
+        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+        assertEquals("home server", library(root).settings().activeInstance()?.label)
+        assertNull(model.state.value.onboarding)
+        await { library(root).onboarding().read() == null }
+    }
+
+    @Test
+    fun settingsAddServerResumesAfterARestart() {
+        val root = root("settings-resume")
+        library(root).create("Home", "USD")
+        library(root).onboarding().write(
+            app.duenorth.budget.core.OnboardingProgress(
+                step = OnboardingStep.ADDRESS,
+                path = OnboardingPath.SERVER,
+                addressText = "budget.example.com",
+                origin = app.duenorth.budget.core.OnboardingOrigin.SETTINGS,
+            ),
+        )
+        val model = model(root)
+        await { model.state.value.shell != null }
+        assertEquals(ShellRoute.OnboardingAddress, model.state.value.route)
+        assertEquals(
+            "budget.example.com",
+            model.state.value.onboarding!!
+                .progress.addressText,
+        )
+        assertTrue(model.back())
+        assertEquals(ShellRoute.Settings, model.state.value.route)
+        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+    }
+
+    @Test
+    fun settingsPagesReturnToTheirItem() {
+        val root = root("settings-return")
+        library(root).create("Home", "USD")
+        val model = model(root)
+        await { model.state.value.shell != null }
+        model.showSettings()
+        assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
+
+        model.selectSettingsPage(SettingsPage.ADVANCED)
+        model.showEncryption(EncryptionMode.SET)
+        assertEquals(ShellRoute.EncryptionPassword(EncryptionMode.SET), model.state.value.route)
+        assertTrue(model.back())
+        assertEquals(ShellRoute.Settings, model.state.value.route)
+        assertEquals(SettingsPage.ADVANCED, model.state.value.settingsPage)
+
+        // Setting a password returns to advanced and shows the budget as encrypted.
+        model.showEncryption(EncryptionMode.SET)
+        model.setEncryptionPassword("secret")
+        await { model.state.value.route == ShellRoute.Settings && model.state.value.budgetEncrypted }
+        assertEquals(SettingsPage.ADVANCED, model.state.value.settingsPage)
+
+        model.showSettingsPayees()
+        assertEquals(ShellRoute.Payees, model.state.value.route)
+        assertTrue(model.back())
+        assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
+
+        // New budget from settings opens it and comes back to the budget item.
+        model.showSettingsCreate()
+        model.create("Trip", "EUR")
+        await {
+            model.state.value.shell
+                ?.budgetName == "Trip"
+        }
+        assertEquals(ShellRoute.Settings, model.state.value.route)
+        assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
+        assertFalse(model.state.value.settingsReturn)
+
+        // Leaving settings and coming back starts on the budget item.
+        model.selectSettingsPage(SettingsPage.APPEARANCE)
+        assertTrue(model.back())
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        model.showSettings()
+        assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
+    }
+
+    @Test
+    fun removingAServerAsksFirst() {
+        val root = root("settings-remove")
+        library(root).create("Home", "USD")
+        val model = model(root)
+        await { model.state.value.shell != null }
+        model.showSettings()
+        model.onboardingAddServer()
+        model.onboardingAddress("budget.example.com")
+        model.onboardingCheck()
+        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        model.onboardingSignIn(FakeTransport.PASSWORD)
+        await { model.state.value.route == ShellRoute.Settings }
+        val id =
+            library(root)
+                .settings()
+                .activeInstance()!!
+                .id
+
+        model.requestRemoveInstance(id)
+        assertEquals(ShellRoute.ConfirmRemoveInstance(id), model.state.value.route)
+        assertTrue(model.back())
+        assertEquals(1, library(root).settings().instances.size)
+
+        model.requestRemoveInstance(id)
+        model.confirmRemoveInstance()
+        await { library(root).settings().instances.isEmpty() }
+        assertEquals(ShellRoute.Settings, model.state.value.route)
+        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+    }
+
     private fun model(
         name: String,
         http: ProbeHttp = readyHttp,

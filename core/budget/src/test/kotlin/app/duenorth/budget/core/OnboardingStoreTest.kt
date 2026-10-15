@@ -30,6 +30,17 @@ class OnboardingStoreTest {
     }
 
     @Test
+    fun progressWithoutOriginReadsAsFirstRun() {
+        val dir = Files.createTempDirectory("onboarding").toFile()
+        val file = File(dir, "onboarding.json")
+        file.writeText("""{"step":"ADDRESS","addressText":"a.example"}""")
+        assertEquals(OnboardingOrigin.FIRST_RUN, OnboardingStore(file).read()?.origin)
+        val settings = OnboardingProgress(step = OnboardingStep.ADDRESS, origin = OnboardingOrigin.SETTINGS)
+        OnboardingStore(file).write(settings)
+        assertEquals(settings, OnboardingStore(file).read())
+    }
+
+    @Test
     fun progressHasNoPlaceForAPassword() {
         val dir = Files.createTempDirectory("onboarding").toFile()
         val file = File(dir, "onboarding.json")
