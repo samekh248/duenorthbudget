@@ -384,7 +384,7 @@ private fun <T> ListPicker(
     var open by remember { mutableStateOf(false) }
     Column(
         Modifier
-            .padding(top = MetroDimens.Row)
+            .padding(top = 4.dp)
             .fillMaxWidth()
             .border(MetroDimens.Stroke, if (open) Metro.accent.fill else Metro.colors.foreground)
             .testTag(tag),
