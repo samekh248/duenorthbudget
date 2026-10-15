@@ -42,6 +42,7 @@ object ScreenBar {
         passwordSignIn: Boolean = true,
         settings: SettingsBar = SettingsBar(),
         homeSection: Int = HOME_BUDGET,
+        showHidden: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -86,14 +87,14 @@ object ScreenBar {
                             spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
-                        ) + fills() + schedules() + templates(templates) + undo(undoLabel)
+                        ) + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel)
                     else ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("hold", AppGlyph.Hold, "hold"),
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
-                        ) + fills() + schedules() + templates(templates) + undo(undoLabel)
+                        ) + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel)
                 }
             is ShellRoute.Register ->
                 listOf(
@@ -183,6 +184,7 @@ object ScreenBar {
                 serverActive = state.activeInstance != null,
             ),
             state.homeSection,
+            state.settings.showHiddenCategories,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -199,6 +201,10 @@ object ScreenBar {
             spec("save", AppGlyph.Save, "save"),
             spec("cancel", AppGlyph.Cancel, "cancel"),
         )
+
+    /** Home `•••` → bring hidden groups and categories back into the month, or leave them out again. */
+    private fun hidden(shown: Boolean) =
+        listOf(menu("show-hidden", AppGlyph.Categories, if (shown) ShellCopy.HIDE_HIDDEN else ShellCopy.SHOW_HIDDEN))
 
     /** Desktop's month menu: copy last month, 3 month average, set to zero. */
     private fun fills() =
@@ -252,6 +258,7 @@ class ScreenBarHandlers(
     val onAccounts: () -> Unit = {},
     val onAddAccount: () -> Unit = {},
     val onShowClosed: () -> Unit = {},
+    val onShowHidden: () -> Unit = {},
     val onReorder: () -> Unit = {},
     val onEditAccount: () -> Unit = {},
     val onCloseAccount: () -> Unit = {},
@@ -300,6 +307,7 @@ class ScreenBarHandlers(
             "accounts" -> onAccounts
             "add-account" -> onAddAccount
             "show-closed" -> onShowClosed
+            "show-hidden" -> onShowHidden
             "reorder" -> onReorder
             "edit-account" -> onEditAccount
             "close" -> onCloseAccount

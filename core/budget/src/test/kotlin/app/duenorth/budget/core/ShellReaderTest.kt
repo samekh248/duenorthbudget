@@ -89,6 +89,57 @@ class ShellReaderTest {
         }
     }
 
+    @Test
+    fun hiddenGroupsAndCategoriesStayOutUnlessAskedFor() {
+        val file = File.createTempFile("shell", ".sqlite")
+        file.delete()
+        JdbcSessionOpener().use(file) { session ->
+            ActualSchema.create(session)
+            session.exec("INSERT INTO preferences (id, value) VALUES (?, ?)", listOf("budgetType", "envelope"))
+            listOf(
+                listOf("g-inc", "Income", 1, 0, 0),
+                listOf("g-old", "Old income", 1, 1, 1),
+                listOf("g-liv", "Living", 0, 0, 2),
+                listOf("g-gone", "Gone", 0, 1, 3),
+            ).forEach {
+                session.exec("INSERT INTO category_groups (id, name, is_income, hidden, sort_order) VALUES (?, ?, ?, ?, ?)", it)
+            }
+            listOf(
+                listOf("c-sal", "Salary", 1, "g-inc", 0, 0),
+                listOf("c-bonus", "Bonus", 1, "g-inc", 1, 1),
+                listOf("c-side", "Side job", 1, "g-old", 0, 0),
+                listOf("c-food", "Food", 0, "g-liv", 0, 0),
+                listOf("c-gym", "Gym", 0, "g-liv", 1, 1),
+                listOf("c-boat", "Boat", 0, "g-gone", 0, 0),
+            ).forEach {
+                session.exec("INSERT INTO categories (id, name, is_income, cat_group, hidden, sort_order) VALUES (?, ?, ?, ?, ?, ?)", it)
+            }
+            session.exec(
+                "INSERT INTO zero_budgets (id, month, category, amount, carryover) VALUES (?, ?, ?, ?, ?)",
+                listOf("b1", 202610, "c-gym", 5_000, 0),
+            )
+            val today = LocalDate.of(2026, 10, 7)
+            val shell = ShellReader.read(session, BudgetMetadata("home", "Home"), today)
+            assertEquals(listOf("g-liv"), shell.groups.map { it.id })
+            val living = shell.groups.single()
+            assertEquals(listOf("c-food"), living.categories.map { it.id })
+            assertEquals(listOf("g-inc"), shell.incomeGroups.map { it.id })
+            val income = shell.incomeGroups.single()
+            assertEquals(listOf("c-sal"), income.categories.map { it.id })
+            // Hidden categories still count toward the month.
+            assertEquals(-5_000L, shell.headerMinor)
+            assertEquals(5_000L, living.availableMinor)
+
+            val all = ShellReader.read(session, BudgetMetadata("home", "Home"), today, showHidden = true)
+            assertEquals(listOf("g-liv" to false, "g-gone" to true), all.groups.map { it.id to it.hidden })
+            assertEquals(listOf("c-food" to false, "c-gym" to true), all.groups[0].categories.map { it.id to it.hidden })
+            assertEquals(listOf("c-boat"), all.groups[1].categories.map { it.id })
+            assertEquals(listOf("g-inc" to false, "g-old" to true), all.incomeGroups.map { it.id to it.hidden })
+            assertEquals(listOf("c-sal" to false, "c-bonus" to true), all.incomeGroups[0].categories.map { it.id to it.hidden })
+            assertEquals(shell.headerMinor, all.headerMinor)
+        }
+    }
+
     private fun insertTxn(
         session: SqlSession,
         id: String,

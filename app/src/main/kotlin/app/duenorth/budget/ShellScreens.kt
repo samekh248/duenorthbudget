@@ -502,6 +502,7 @@ private fun GroupLine(
         tag = "group",
         id = group.id,
         modifier = modifier,
+        dim = group.hidden,
     ) {
         MetroText(
             MoneyFormat.format(group.availableMinor, shell.currency, formatOptions),
@@ -518,6 +519,7 @@ private fun GroupHeading(
     tag: String,
     id: String,
     modifier: Modifier = Modifier,
+    dim: Boolean = false,
     trailing: @Composable (Modifier) -> Unit,
 ) {
     Row(
@@ -535,6 +537,7 @@ private fun GroupHeading(
                 .weight(1f)
                 .padding(end = 12.dp)
                 .testTag("$tag-name-$id"),
+            color = if (dim) Metro.colors.secondary else Metro.colors.foreground,
             maxLines = 3,
         )
         trailing(Modifier.widthIn(max = 148.dp).testTag("$tag-amount-$id"))

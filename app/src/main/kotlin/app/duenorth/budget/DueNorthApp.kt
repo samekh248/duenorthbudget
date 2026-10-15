@@ -241,6 +241,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onAccounts = model::openAccounts,
                     onAddAccount = model::openAddAccount,
                     onShowClosed = model::toggleShowClosedAccounts,
+                    onShowHidden = model::toggleShowHiddenCategories,
                     onReorder = model::toggleReorderAccounts,
                     onEditAccount = model::openEditAccount,
                     onCloseAccount = model::openCloseAccount,

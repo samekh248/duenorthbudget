@@ -358,6 +358,7 @@ fun CategoryLine(
                 category.name,
                 Metro.typography.body,
                 Modifier.weight(LEDGER_NAME).padding(end = MetroDimens.Gutter),
+                color = if (category.hidden) Metro.colors.secondary else Metro.colors.foreground,
                 maxLines = 2,
             )
             LedgerCell(
@@ -419,5 +420,5 @@ internal fun RowScope.LedgerCell(
     )
 }
 
-internal const val LEDGER_NAME = 1.4f
+internal const val LEDGER_NAME = 1.8f
 internal const val LEDGER_FIGURE = 1f

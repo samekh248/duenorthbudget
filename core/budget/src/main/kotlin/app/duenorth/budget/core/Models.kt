@@ -235,6 +235,8 @@ data class PhoneSettings(
     val askEachTime: List<String> = emptyList(),
     /** Accounts list shows closed accounts (spec 010 US2, menu `show-closed`). */
     val showClosedAccounts: Boolean = false,
+    /** Home shows hidden category groups and categories (menu `show-hidden`). */
+    val showHiddenCategories: Boolean = false,
 )
 
 @Serializable
@@ -256,6 +258,7 @@ data class CategoryRow(
     val spentMinor: Long,
     val availableMinor: Long,
     val carryover: Boolean,
+    val hidden: Boolean = false,
 )
 
 /** An income category for the month: what came in, and in tracking files what was budgeted. */
@@ -266,6 +269,7 @@ data class IncomeCategoryRow(
     val receivedMinor: Long,
     /** Envelope auto-hold: this month's income is held for next month. */
     val autoHold: Boolean,
+    val hidden: Boolean = false,
 )
 
 data class IncomeGroupRow(
@@ -274,6 +278,7 @@ data class IncomeGroupRow(
     val budgetedMinor: Long,
     val receivedMinor: Long,
     val categories: List<IncomeCategoryRow> = emptyList(),
+    val hidden: Boolean = false,
 )
 
 data class GroupRow(
@@ -281,6 +286,7 @@ data class GroupRow(
     val name: String,
     val availableMinor: Long,
     val categories: List<CategoryRow> = emptyList(),
+    val hidden: Boolean = false,
 )
 
 data class AccountRow(
@@ -321,6 +327,8 @@ object ShellCopy {
     const val TO_BUDGET = "to budget"
     const val BALANCE = "balance"
     const val NOTHING_TO_BUDGET = "nothing to budget"
+    const val SHOW_HIDDEN = "show hidden categories"
+    const val HIDE_HIDDEN = "hide hidden categories"
     const val NO_ACCOUNTS = "no accounts"
     const val NOTHING_TO_CATEGORIZE = "nothing to categorize"
     const val ON_BUDGET = "On budget"

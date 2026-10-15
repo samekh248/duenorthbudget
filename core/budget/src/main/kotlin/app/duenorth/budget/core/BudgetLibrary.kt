@@ -397,7 +397,9 @@ class BudgetLibrary(
         return sessions.use(database) { session ->
             ActualSchema.ensure(session)
             SyncSchema.ensure(session)
-            ShellReader.read(session, metadata, clock.today(), viewMonth, settings().showClosedAccounts)
+            settings().let { settings ->
+                ShellReader.read(session, metadata, clock.today(), viewMonth, settings.showClosedAccounts, settings.showHiddenCategories)
+            }
         }
     }
 
