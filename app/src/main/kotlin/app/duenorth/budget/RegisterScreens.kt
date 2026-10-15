@@ -2,13 +2,10 @@ package app.duenorth.budget
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -125,7 +122,7 @@ private fun RegisterList(
 /**
  * One transaction on the ledger: payee in the category rows' body type, with the date,
  * category, reconciled state and note on a quieter line under it, and the amount in the
- * figure columns, ruled like the budget and accounts rows. Split parts follow, indented.
+ * figure columns, unruled like the accounts rows. Split parts follow, indented.
  */
 @Composable
 private fun RegisterLine(
@@ -138,7 +135,7 @@ private fun RegisterLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress { onOpen(row.id) }
-            .padding(top = MetroDimens.Row)
+            .padding(vertical = MetroDimens.Row)
             .testTag("register-row-${row.id}"),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -181,15 +178,6 @@ private fun RegisterLine(
                     softWrap = false,
                 )
             }
-        }
-        Row(Modifier.fillMaxWidth().padding(top = MetroDimens.Row)) {
-            Spacer(Modifier.weight(LEDGER_NAME))
-            Box(
-                Modifier
-                    .weight(LEDGER_FIGURE * 3)
-                    .height(1.dp)
-                    .background(if (Metro.colors.isDark) Metro.colors.outline else Metro.colors.chrome),
-            )
         }
     }
 }
