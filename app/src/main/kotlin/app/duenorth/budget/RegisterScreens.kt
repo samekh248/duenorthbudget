@@ -1,19 +1,19 @@
 package app.duenorth.budget
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -26,7 +26,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryChoice
@@ -62,6 +73,9 @@ fun RegisterScreen(
     onReconcile: () -> Unit,
     onImportFile: (() -> Unit)? = null,
     onFetch: (() -> Unit)? = null,
+    selection: Set<String>? = null,
+    onSelect: (String) -> Unit = {},
+    onToggleSelected: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val rows = page.rows
@@ -80,7 +94,15 @@ fun RegisterScreen(
             amountTag = "register-balance",
             modifier = Modifier.padding(top = MetroDimens.Gutter),
         )
-        if (onFetch != null) {
+        if (selection != null) {
+            MetroText(
+                "${selection.size} ${RegisterCopy.SELECTED}",
+                Metro.typography.body,
+                Modifier.padding(top = MetroDimens.Gutter).testTag("register-selected-count"),
+                color = Metro.accent.text,
+            )
+        }
+        if (onFetch != null && selection == null) {
             MetroButton(
                 ImportCopy.FETCH,
                 Modifier.padding(top = MetroDimens.Gutter).testTag("register-fetch"),
@@ -90,7 +112,15 @@ fun RegisterScreen(
         if (rows.isEmpty()) {
             MetroText(RegisterCopy.NO_TRANSACTIONS, Metro.typography.body, Modifier.padding(top = MetroDimens.Grid))
         } else {
-            RegisterList(rows, page, onGesture, onOpen, Modifier.weight(1f).padding(top = MetroDimens.Grid))
+            RegisterList(
+                rows,
+                page,
+                onGesture,
+                selection,
+                onPress = { id -> if (selection != null) onToggleSelected(id) else onOpen(id) },
+                onLongPress = { id -> if (selection == null) onSelect(id) else onToggleSelected(id) },
+                modifier = Modifier.weight(1f).padding(top = MetroDimens.Grid),
+            )
         }
     }
 }
@@ -100,7 +130,9 @@ private fun RegisterList(
     rows: List<RegisterRow>,
     page: RegisterPage,
     onGesture: (Boolean) -> Unit,
-    onOpen: (String) -> Unit,
+    selection: Set<String>?,
+    onPress: (String) -> Unit,
+    onLongPress: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // A new visit starts at the newest row. Scroll position is not saved.
@@ -121,7 +153,14 @@ private fun RegisterList(
                 )
             }
             items(day, key = { it.id }) { row ->
-                RegisterLine(row, page, onOpen, banded = position.getValue(row.id) % 2 == 1)
+                RegisterLine(
+                    row,
+                    page,
+                    banded = position.getValue(row.id) % 2 == 1,
+                    picked = selection?.let { row.id in it },
+                    onPress = { onPress(row.id) },
+                    onLongPress = { onLongPress(row.id) },
+                )
             }
         }
     }
@@ -136,37 +175,51 @@ internal fun registerDays(rows: List<RegisterRow>): List<List<RegisterRow>> =
 
 /**
  * One transaction on the ledger: payee in the category rows' body type, with the
- * category, reconciled state and note on a quieter line under it, and the amount in the
- * figure columns. Rows are unruled; every other one sits on a faint full-width band.
- * Split parts follow, indented.
+ * category and note on a quieter line under it, and the amount in the figure columns.
+ * A thin bar in the left margin, running past a split's parts, is accent when the
+ * transaction is cleared and faint when it is not. Every other row sits on a faint
+ * full-width band. In select mode ([picked] not null) a checkbox leads the row and a
+ * picked row takes an accent tint.
  */
 @Composable
 private fun RegisterLine(
     row: RegisterRow,
     page: RegisterPage,
-    onOpen: (String) -> Unit,
-    banded: Boolean = false,
+    banded: Boolean,
+    picked: Boolean?,
+    onPress: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
+    val accent = Metro.accent.text
     val band = if (Metro.colors.isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.035f)
+    val fill =
+        when {
+            picked == true -> accent.copy(alpha = 0.10f)
+            banded -> band
+            else -> Color.Transparent
+        }
+    val bar = if (row.cleared) accent else Metro.colors.secondary.copy(alpha = 0.35f)
     Column(
         Modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .then(
-                if (banded) {
-                    // The band runs past the screen gutter to the edges.
-                    Modifier.drawBehind {
-                        val gutter = MetroDimens.Gutter.toPx()
-                        drawRect(band, Offset(-gutter, 0f), Size(size.width + 2 * gutter, size.height))
-                    }
-                } else {
-                    Modifier
-                },
-            ).metroPress { onOpen(row.id) }
+            .drawBehind {
+                // The band runs past the screen gutter to the edges; the bar sits in the gutter.
+                val gutter = MetroDimens.Gutter.toPx()
+                drawRect(fill, Offset(-gutter, 0f), Size(size.width + 2 * gutter, size.height))
+                val inset = 6.dp.toPx()
+                drawRect(bar, Offset(-gutter + CLEARED_BAR_INSET.toPx(), inset), Size(CLEARED_BAR.toPx(), size.height - 2 * inset))
+            }.metroPress(onPress, onLongPress)
             .padding(vertical = REGISTER_ROW_AIR)
-            .testTag("register-row-${row.id}"),
+            .semantics {
+                stateDescription = if (row.cleared) RegisterCopy.CLEARED else RegisterCopy.NOT_CLEARED
+                if (picked != null) selected = picked
+            }.testTag("register-row-${row.id}"),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            if (picked != null) {
+                SelectBox(picked, Modifier.width(SELECT_BOX).padding(top = 2.dp).testTag("register-select-${row.id}"))
+            }
             Column(Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter)) {
                 MetroText(row.payee, Metro.typography.body, maxLines = 2)
                 MetroText(
@@ -181,14 +234,16 @@ private fun RegisterLine(
                 MoneyFormat.format(row.amountMinor, page.currency),
                 Metro.typography.body.copy(textAlign = TextAlign.End),
                 Modifier.weight(LEDGER_FIGURE * 2).testTag("register-amount-${row.id}"),
-                color = Metro.accent.text,
+                color = accent,
                 maxLines = 1,
                 softWrap = false,
             )
         }
         row.parts.forEach { part ->
             Row(
-                Modifier.fillMaxWidth().padding(start = MetroDimens.Gutter, top = MetroDimens.Gutter),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = MetroDimens.Gutter + if (picked != null) SELECT_BOX else 0.dp, top = MetroDimens.Gutter),
                 verticalAlignment = Alignment.Top,
             ) {
                 MetroText(
@@ -211,13 +266,45 @@ private fun RegisterLine(
     }
 }
 
+/** A square checkbox: accent with a check when [on], an outline when not. */
+@Composable
+private fun SelectBox(
+    on: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val accent = Metro.accent.text
+    val outline = Metro.colors.secondary
+    val mark = Metro.colors.background
+    Box(modifier) {
+        Canvas(Modifier.size(20.dp)) {
+            val stroke = 1.5.dp.toPx()
+            if (on) {
+                drawRect(accent)
+                val w = size.width
+                val check =
+                    Path().apply {
+                        moveTo(w * 0.24f, w * 0.52f)
+                        lineTo(w * 0.42f, w * 0.70f)
+                        lineTo(w * 0.77f, w * 0.32f)
+                    }
+                drawPath(check, mark, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            } else {
+                drawRect(outline, Offset(stroke / 2, stroke / 2), Size(size.width - stroke, size.height - stroke), style = Stroke(stroke))
+            }
+        }
+    }
+}
+
+private val CLEARED_BAR = 3.dp
+private val CLEARED_BAR_INSET = 3.dp
+private val SELECT_BOX = 32.dp
+
 private val REGISTER_ROW_AIR = 15.dp
 
-/** The quieter line under a payee: category, reconciled, then the note. The date heads its day. */
+/** The quieter line under a payee: category, then the note. The date heads its day; the bar shows cleared. */
 internal fun registerDetail(row: RegisterRow): String =
     listOfNotNull(
         row.categoryLabel.ifBlank { null },
-        if (row.reconciled) RegisterCopy.RECONCILED else null,
         row.note.trim().ifBlank { null },
     ).joinToString(" · ")
 

@@ -228,6 +228,9 @@ fun DueNorthApp(model: ShellViewModel) {
                             else -> formSaveHost.save()
                         }
                     },
+                    onClearSelected = { model.setSelectedCleared(true) },
+                    onUnclearSelected = { model.setSelectedCleared(false) },
+                    onEndSelecting = model::endSelecting,
                     onCancel = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.cancelImport()
@@ -548,6 +551,9 @@ fun DueNorthApp(model: ShellViewModel) {
                                     page = page,
                                     onGesture = model::setRegisterGesture,
                                     onOpen = model::openEdit,
+                                    selection = state.registerSelection,
+                                    onSelect = model::startSelecting,
+                                    onToggleSelected = model::toggleSelected,
                                     onAdd = model::openNewTransaction,
                                     onTransfer = model::openTransfer,
                                     onReconcile = model::openReconcile,

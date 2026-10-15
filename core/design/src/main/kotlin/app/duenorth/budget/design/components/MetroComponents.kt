@@ -6,7 +6,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -99,16 +101,25 @@ fun MetroText(
 }
 
 @Composable
-fun Modifier.metroPress(onClick: () -> Unit): Modifier {
+fun Modifier.metroPress(onClick: () -> Unit): Modifier = metroPress(onClick, onLongClick = null)
+
+/** [metroPress] that also answers a long press, as list items do to start select mode. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun Modifier.metroPress(
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+): Modifier {
     val animations = Metro.animations
     val pressedColor = if (Metro.colors.isDark) Color(0x73FFFFFF) else Color(0x40000000)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     return this
-        .clickable(
+        .combinedClickable(
             interactionSource = interaction,
             indication = null,
             role = Role.Button,
+            onLongClick = onLongClick,
             onClick = onClick,
         ).graphicsLayer {
             rotationZ = if (pressed && animations) 2.5f else 0f

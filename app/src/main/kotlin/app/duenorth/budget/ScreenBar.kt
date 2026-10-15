@@ -4,6 +4,7 @@ import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
+import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SignInMethod
@@ -43,6 +44,7 @@ object ScreenBar {
         settings: SettingsBar = SettingsBar(),
         homeSection: Int = HOME_BUDGET,
         showHidden: Boolean = false,
+        selecting: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -96,16 +98,25 @@ object ScreenBar {
                             spec("settings", AppGlyph.Settings, "settings"),
                         ) + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel)
                 }
+            // Select mode swaps the register's bar for what can be done to the picked transactions.
             is ShellRoute.Register ->
-                listOf(
-                    spec("add", AppGlyph.Add, "add"),
-                    spec("transfer", AppGlyph.Transfer, "transfer"),
-                    spec("reconcile", AppGlyph.Reconcile, "reconcile"),
-                    spec("import", AppGlyph.Import, "import"),
-                    menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT),
-                    menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE),
-                    menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE),
-                ) + undo(undoLabel)
+                if (selecting) {
+                    listOf(
+                        spec("clear-selected", AppGlyph.Reconcile, RegisterCopy.CLEAR),
+                        spec("unclear-selected", AppGlyph.Undo, RegisterCopy.UNCLEAR),
+                        spec("end-selecting", AppGlyph.Cancel, RegisterCopy.DONE),
+                    )
+                } else {
+                    listOf(
+                        spec("add", AppGlyph.Add, "add"),
+                        spec("transfer", AppGlyph.Transfer, "transfer"),
+                        spec("reconcile", AppGlyph.Reconcile, "reconcile"),
+                        spec("import", AppGlyph.Import, "import"),
+                        menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT),
+                        menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE),
+                        menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE),
+                    ) + undo(undoLabel)
+                }
             ShellRoute.Accounts ->
                 listOf(
                     spec("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
@@ -185,6 +196,7 @@ object ScreenBar {
             ),
             state.homeSection,
             state.settings.showHiddenCategories,
+            state.registerSelection != null,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -280,6 +292,9 @@ class ScreenBarHandlers(
     val onServerBudgets: () -> Unit = {},
     val onSignOut: () -> Unit = {},
     val onExport: () -> Unit = {},
+    val onClearSelected: () -> Unit = {},
+    val onUnclearSelected: () -> Unit = {},
+    val onEndSelecting: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -330,6 +345,9 @@ class ScreenBarHandlers(
             "server-budgets" -> onServerBudgets
             "sign-out" -> onSignOut
             "export" -> onExport
+            "clear-selected" -> onClearSelected
+            "unclear-selected" -> onUnclearSelected
+            "end-selecting" -> onEndSelecting
             else -> ({})
         }
 }
