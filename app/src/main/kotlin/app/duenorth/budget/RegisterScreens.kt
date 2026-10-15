@@ -153,6 +153,7 @@ private fun RegisterLine(
                 MoneyFormat.format(row.amountMinor, page.currency),
                 Metro.typography.body.copy(textAlign = TextAlign.End),
                 Modifier.weight(LEDGER_FIGURE * 2).testTag("register-amount-${row.id}"),
+                color = Metro.accent.text,
                 maxLines = 1,
                 softWrap = false,
             )
