@@ -48,7 +48,8 @@ class RegisterContentTest {
         }
         compose.onNodeWithTag("register-row-cafe").assertIsDisplayed()
         compose.onNodeWithText("Cafe").assertIsDisplayed()
-        compose.onNodeWithTag("register-detail-cafe", useUnmergedTree = true).assertTextEquals("oct 7 · Groceries")
+        compose.onNodeWithTag("register-detail-cafe", useUnmergedTree = true).assertTextEquals("Groceries")
+        compose.onNodeWithTag("register-day-20261007", useUnmergedTree = true).assertTextEquals("oct 7")
         compose.onNodeWithTag("register-balance").assertIsDisplayed()
         compose.onNodeWithText("balance ${RegisterCopy.OWED}").assertIsDisplayed()
     }

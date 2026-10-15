@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -104,30 +108,62 @@ private fun RegisterList(
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onGesture(it) }
     }
+    val days = registerDays(rows)
+    val position = rows.withIndex().associate { it.value.id to it.index }
     LazyColumn(modifier, state = list) {
-        items(rows, key = { it.id }) { row ->
-            RegisterLine(row, page, onOpen)
+        days.forEach { day ->
+            item(key = "day-${day.first().id}") {
+                MetroText(
+                    RegisterEntry.registerDateLabel(day.first().date),
+                    Metro.typography.caption,
+                    Modifier.padding(top = 16.dp, bottom = 4.dp).testTag("register-day-${day.first().date}"),
+                    color = Metro.accent.text,
+                )
+            }
+            items(day, key = { it.id }) { row ->
+                RegisterLine(row, page, onOpen, banded = position.getValue(row.id) % 2 == 1)
+            }
         }
     }
 }
 
+/** Runs of rows that share a date, in register order, each shown under its day heading. */
+internal fun registerDays(rows: List<RegisterRow>): List<List<RegisterRow>> =
+    rows.fold(mutableListOf<MutableList<RegisterRow>>()) { days, row ->
+        if (days.lastOrNull()?.first()?.date == row.date) days.last() += row else days += mutableListOf(row)
+        days
+    }
+
 /**
- * One transaction on the ledger: payee in the category rows' body type, with the date,
+ * One transaction on the ledger: payee in the category rows' body type, with the
  * category, reconciled state and note on a quieter line under it, and the amount in the
- * figure columns, unruled like the accounts rows. Split parts follow, indented.
+ * figure columns. Rows are unruled; every other one sits on a faint full-width band.
+ * Split parts follow, indented.
  */
 @Composable
 private fun RegisterLine(
     row: RegisterRow,
     page: RegisterPage,
     onOpen: (String) -> Unit,
+    banded: Boolean = false,
 ) {
+    val band = if (Metro.colors.isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.035f)
     Column(
         Modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress { onOpen(row.id) }
-            .padding(vertical = MetroDimens.Row)
+            .then(
+                if (banded) {
+                    // The band runs past the screen gutter to the edges.
+                    Modifier.drawBehind {
+                        val gutter = MetroDimens.Gutter.toPx()
+                        drawRect(band, Offset(-gutter, 0f), Size(size.width + 2 * gutter, size.height))
+                    }
+                } else {
+                    Modifier
+                },
+            ).metroPress { onOpen(row.id) }
+            .padding(vertical = REGISTER_ROW_AIR)
             .testTag("register-row-${row.id}"),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -175,10 +211,11 @@ private fun RegisterLine(
     }
 }
 
-/** The quieter line under a payee: date, category, reconciled, then the note. */
+private val REGISTER_ROW_AIR = 15.dp
+
+/** The quieter line under a payee: category, reconciled, then the note. The date heads its day. */
 internal fun registerDetail(row: RegisterRow): String =
     listOfNotNull(
-        RegisterEntry.registerDateLabel(row.date),
         row.categoryLabel.ifBlank { null },
         if (row.reconciled) RegisterCopy.RECONCILED else null,
         row.note.trim().ifBlank { null },
