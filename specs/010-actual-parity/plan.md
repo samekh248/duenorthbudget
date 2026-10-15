@@ -295,7 +295,7 @@ app/src/main/kotlin/app/duenorth/budget/
 
 | Where | Primary bar | `•••` menu adds |
 |---|---|---|
-| Home (envelope) | `add`, `hold`, `categories`, `settings` (unchanged) | `breakdown`, `copy-last`, `average`, `zero`, `templates`*, `reports`, `undo`† |
+| Home (envelope) | `add`, `hold`, `categories`, `settings` (unchanged) | `copy-last`, `average`, `zero`, `templates`*, `reports`, `undo`† |
 | Home (tracking) | `add`, `categories`, `settings` | `copy-last`, `average`, `zero`, `templates`*, `reports`, `undo`† |
 | Category budget | existing | `to-budget` (envelope), `auto-hold` (income only) |
 | Accounts list | `add-account` | `show-closed`, `reorder` |
@@ -304,7 +304,7 @@ app/src/main/kotlin/app/duenorth/budget/
 | Settings | — | learning switch row; templates switch row under experimental |
 
 \* Only when `flags.experimental` and `flags.goalTemplatesEnabled` are on.
-† Only when the undo stack is not empty (FR-015). Tapping the to-budget figure on Home also opens the breakdown.
+† Only when the undo stack is not empty (FR-015). Tapping the to-budget figure on Home opens the breakdown (the `breakdown` menu entry was removed as redundant).
 
 ## Risks
 

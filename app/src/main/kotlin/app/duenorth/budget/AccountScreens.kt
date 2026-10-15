@@ -36,6 +36,7 @@ import app.duenorth.budget.design.theme.MetroDimens
 object AccountScreenCopy {
     const val TITLE = "accounts"
     const val ADD = "add account"
+    const val MANAGE = "manage"
     const val SHOW_CLOSED = "show closed accounts"
     const val HIDE_CLOSED = "hide closed accounts"
     const val REORDER = "reorder"

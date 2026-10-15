@@ -235,7 +235,6 @@ fun DueNorthApp(model: ShellViewModel) {
                             else -> model.back()
                         }
                     },
-                    onBreakdown = model::openBreakdown,
                     onFill = { kind -> model.fillMonth(kind) },
                     onToBudget = model::openToBudget,
                     onUndo = model::undo,
@@ -284,7 +283,9 @@ fun DueNorthApp(model: ShellViewModel) {
                                 loading = state.loading,
                                 openMonth = state.openMonth,
                                 monthWindow = model.monthWindow(),
+                                initialSection = state.homeSection,
                                 onGesture = model::setGesture,
+                                onSection = model::selectHomeSection,
                                 onAccount = model::openAccount,
                                 onInbox = model::openInbox,
                                 onReviewCategory = model::openReviewCategory,
