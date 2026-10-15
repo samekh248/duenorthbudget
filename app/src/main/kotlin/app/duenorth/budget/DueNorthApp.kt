@@ -235,7 +235,6 @@ fun DueNorthApp(model: ShellViewModel) {
                             else -> model.back()
                         }
                     },
-                    onBreakdown = model::openBreakdown,
                     onFill = { kind -> model.fillMonth(kind) },
                     onToBudget = model::openToBudget,
                     onUndo = model::undo,

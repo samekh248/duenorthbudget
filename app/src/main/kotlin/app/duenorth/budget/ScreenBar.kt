@@ -81,7 +81,6 @@ object ScreenBar {
                             spec("hold", AppGlyph.Hold, "hold"),
                             spec("categories", AppGlyph.Categories, "categories"),
                             spec("settings", AppGlyph.Settings, "settings"),
-                            menu("breakdown", AppGlyph.Breakdown, MonthFillCopy.BREAKDOWN),
                         ) + fills() + accounts() + schedules() + templates(templates) + undo(undoLabel)
                 }
             is ShellRoute.Register ->
@@ -237,7 +236,6 @@ class ScreenBarHandlers(
     val onImport: () -> Unit,
     val onSave: () -> Unit,
     val onCancel: () -> Unit,
-    val onBreakdown: () -> Unit = {},
     val onFill: (MonthFillKind) -> Unit = {},
     val onToBudget: () -> Unit = {},
     val onUndo: () -> Unit = {},
@@ -284,7 +282,6 @@ class ScreenBarHandlers(
             "import" -> onImport
             "save" -> onSave
             "cancel" -> onCancel
-            "breakdown" -> onBreakdown
             "copy-last" -> ({ onFill(MonthFillKind.COPY_LAST) })
             "average" -> ({ onFill(MonthFillKind.AVERAGE) })
             "zero" -> ({ onFill(MonthFillKind.ZERO) })
