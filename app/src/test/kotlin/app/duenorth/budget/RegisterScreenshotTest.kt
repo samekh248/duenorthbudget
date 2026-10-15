@@ -50,8 +50,6 @@ class RegisterScreenshotTest {
                 Column(Modifier.width(390.dp).height(780.dp)) {
                     RegisterScreen(
                         page = page(),
-                        filter = "",
-                        onFilter = {},
                         onGesture = {},
                         onOpen = {},
                         onAdd = {},

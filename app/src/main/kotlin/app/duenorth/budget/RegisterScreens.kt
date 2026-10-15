@@ -51,8 +51,6 @@ import java.util.UUID
 @Composable
 fun RegisterScreen(
     page: RegisterPage,
-    filter: String,
-    onFilter: (String) -> Unit,
     onGesture: (Boolean) -> Unit,
     onOpen: (String) -> Unit,
     onAdd: () -> Unit,
@@ -62,7 +60,7 @@ fun RegisterScreen(
     onFetch: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val rows = page.matching(filter)
+    val rows = page.rows
     val owed = page.account.type == "credit" && page.balanceMinor < 0
     Column(
         modifier
@@ -77,12 +75,6 @@ fun RegisterScreen(
             amountColor = Metro.accent.text,
             amountTag = "register-balance",
             modifier = Modifier.padding(top = MetroDimens.Gutter),
-        )
-        MetroField(
-            value = filter,
-            onValueChange = onFilter,
-            hint = "payee",
-            modifier = Modifier.padding(top = MetroDimens.Grid).testTag("payee-filter"),
         )
         if (onFetch != null) {
             MetroButton(

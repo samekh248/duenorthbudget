@@ -242,7 +242,6 @@ data class ShellUiState(
     val defaultBudgetName: String = "",
     val shell: MonthShell? = null,
     val register: RegisterPage? = null,
-    val registerFilter: String = "",
     val categoryTarget: CategoryTarget? = null,
     val createError: String? = null,
     val writeError: String? = null,
@@ -1234,7 +1233,6 @@ class ShellViewModel(
 
     fun openAccount(accountId: String) {
         push(ShellRoute.Register(accountId))
-        _state.update { it.copy(registerFilter = "") }
         viewModelScope.launch { apply(load(accountId), accountId) }
     }
 
@@ -1497,10 +1495,6 @@ class ShellViewModel(
     fun setNetWorthIncludeOffBudget(include: Boolean) {
         saveSettings(_state.value.settings.copy(netWorthIncludeOffBudget = include))
         refreshNetWorth()
-    }
-
-    fun setRegisterFilter(text: String) {
-        _state.update { it.copy(registerFilter = text) }
     }
 
     fun submitTransaction(draft: TransactionDraft) {
@@ -2049,7 +2043,6 @@ class ShellViewModel(
                             route = ShellRoute.Register(accountId),
                             writeError = null,
                             confirm = null,
-                            registerFilter = "",
                         )
                     }
                 } else {

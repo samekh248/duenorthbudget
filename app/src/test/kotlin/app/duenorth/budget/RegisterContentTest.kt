@@ -3,19 +3,12 @@ package app.duenorth.budget
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
-import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextClearance
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountChoice
 import app.duenorth.budget.core.CategoryChoice
@@ -44,8 +37,6 @@ class RegisterContentTest {
                 Box(Modifier.width(390.dp).height(640.dp)) {
                     RegisterScreen(
                         page = sample(balance = -4_000, type = "credit"),
-                        filter = "",
-                        onFilter = {},
                         onGesture = {},
                         onOpen = {},
                         onAdd = {},
@@ -63,39 +54,6 @@ class RegisterContentTest {
     }
 
     @Test
-    fun payeeFilterHidesRowsWithoutDeletingThem() {
-        compose.setContent {
-            var filter by remember { mutableStateOf("") }
-            MetroTheme {
-                Box(Modifier.width(390.dp).height(640.dp)) {
-                    RegisterScreen(
-                        page =
-                            sample().copy(
-                                rows =
-                                    listOf(
-                                        row("cafe", "Cafe"),
-                                        row("bus", "Bus"),
-                                    ),
-                            ),
-                        filter = filter,
-                        onFilter = { filter = it },
-                        onGesture = {},
-                        onOpen = {},
-                        onAdd = {},
-                        onTransfer = {},
-                        onReconcile = {},
-                    )
-                }
-            }
-        }
-        compose.onNode(hasSetTextAction()).performTextInput("caf")
-        compose.onNodeWithText("Cafe").assertIsDisplayed()
-        compose.onNodeWithText("Bus").assertDoesNotExist()
-        compose.onNode(hasSetTextAction()).performTextClearance()
-        compose.onNodeWithText("Bus").assertIsDisplayed()
-    }
-
-    @Test
     fun fiveHundredRowsStayLazy() {
         val rows = (0 until 500).map { row("row-$it", "payee $it") }
         compose.setContent {
@@ -103,8 +61,6 @@ class RegisterContentTest {
                 Box(Modifier.width(390.dp).height(320.dp)) {
                     RegisterScreen(
                         page = sample().copy(rows = rows),
-                        filter = "",
-                        onFilter = {},
                         onGesture = {},
                         onOpen = {},
                         onAdd = {},
