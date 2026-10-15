@@ -256,6 +256,34 @@ class SyncCoordinatorTest {
     }
 
     @Test
+    fun pickingAServerFileReplacesTheBudgetsOnThePhone() {
+        scenario {
+            val local = (library.create("Trip", "JPY") as CreateResult.Created).id
+            val home = server.addFile("Home", budgetBytes())
+            assertNull(sync.connect(server.baseUrl, "server-secret").error)
+            assertEquals(OpenResult.Opened, sync.open(home, replace = true))
+            assertEquals(listOf("Home"), library.list().map { it.name })
+            assertFalse(File(root, local).exists())
+            assertEquals(home.fileId, library.settings().openBudgetId)
+            // The server keeps its own copy of what was opened.
+            assertTrue(server.bytes(home.fileId).isNotEmpty())
+        }
+    }
+
+    @Test
+    fun failedDownloadClearsNothing() {
+        scenario {
+            val local = (library.create("Trip", "JPY") as CreateResult.Created).id
+            val home = server.addFile("Home", budgetBytes())
+            assertNull(sync.connect(server.baseUrl, "server-secret").error)
+            server.online = false
+            assertEquals(OpenResult.Failed(SyncCopy.ADDRESS_FAILED), sync.open(home, replace = true))
+            assertEquals(listOf("Trip"), library.list().map { it.name })
+            assertEquals(local, library.settings().openBudgetId)
+        }
+    }
+
+    @Test
     fun emptyServerListAndRejectedTokenAskToSignInAgain() {
         scenario {
             val remote = server.addFile("Home", budgetBytes())

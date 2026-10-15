@@ -342,9 +342,18 @@ fun OnboardingFilesScreen(
     error: String?,
     onOpen: (RemoteFile) -> Unit,
     modifier: Modifier = Modifier,
+    replacing: List<String> = emptyList(),
 ) {
     OnboardingPage(OnboardingScreenCopy.PICK, "onboarding-files", modifier) {
         MetroText(OnboardingScreenCopy.on(label), Metro.typography.subheader, color = Metro.colors.secondary)
+        if (replacing.isNotEmpty()) {
+            MetroText(
+                ReplaceBudgetCopy.replaces(replacing),
+                Metro.typography.caption,
+                Modifier.padding(top = MetroDimens.Row).testTag("onboarding-files-replaces"),
+                color = Metro.colors.secondary,
+            )
+        }
         if (error != null) ErrorText(error, "onboarding-files-error")
         if (files.isEmpty()) {
             MetroText(

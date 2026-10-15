@@ -801,6 +801,24 @@ class BudgetLibrary(
         open(budgetId) { BankSyncBook(it, transport).previewFetch(accountId, serverAddress, token, today) }
             ?: (null to ShellCopy.NO_ACCOUNTS)
 
+    /**
+     * Clears one budget from the phone: its folder, the open-budget pointer when it is the open
+     * one, and its ask-each-time entry. The server copy is not touched (budget picker).
+     */
+    fun delete(id: String): Boolean {
+        if (id.isBlank() || id.contains('/') || id.contains('\\') || id == "." || id == "..") return false
+        val dir = File(root, id)
+        if (!dir.isDirectory) return false
+        updateSettings { settings ->
+            settings.copy(
+                openBudgetId = settings.openBudgetId.takeUnless { it == id },
+                askEachTime = settings.askEachTime - id,
+            )
+        }
+        journal.switchTo(null)
+        return dir.deleteRecursively()
+    }
+
     fun switchTo(id: String): Boolean {
         val target = summary(File(root, id)) ?: return false
         val settings = settings()

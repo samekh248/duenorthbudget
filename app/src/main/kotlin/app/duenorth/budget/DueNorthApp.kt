@@ -455,6 +455,18 @@ fun DueNorthApp(model: ShellViewModel) {
                                 error = state.serverError,
                                 onOpen = model::onboardingOpen,
                                 modifier = fill,
+                                replacing = state.budgets.map { it.name },
+                            )
+                        ShellRoute.ConfirmReplaceBudget ->
+                            ConfirmReplaceBudgetScreen(
+                                opening =
+                                    state.pendingFile
+                                        ?.name
+                                        .orEmpty(),
+                                clearing = state.replaceBudgets.map { it.name },
+                                onUse = model::confirmReplaceBudget,
+                                onKeep = model::cancelReplaceBudget,
+                                modifier = fill,
                             )
                         ShellRoute.ConfirmSwitch ->
                             ConfirmSwitchScreen(

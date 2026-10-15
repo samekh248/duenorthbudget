@@ -311,8 +311,13 @@ class SyncCoordinator(
         memoryKeys.remove(budgetId)
     }
 
+    /**
+     * Downloads [file] and makes it the open budget. With [replace], every other budget on the
+     * phone is cleared once the download is in place, so the server file becomes the only one.
+     */
     fun open(
         file: RemoteFile,
+        replace: Boolean = false,
         onProgress: (Long, Long) -> Unit = { _, _ -> },
     ): OpenResult {
         val token = syncToken() ?: return OpenResult.Failed(SyncCopy.SIGN_IN_AGAIN)
@@ -359,10 +364,21 @@ class SyncCoordinator(
                 }
             }
             library.switchTo(file.fileId)
+            if (replace) clearOthers(file.fileId)
             sync(file.fileId)
             OpenResult.Opened
         } catch (_: Exception) {
             OpenResult.Failed(SyncCopy.ADDRESS_FAILED)
+        }
+    }
+
+    /** Clears every budget on the phone except [keepId], with its saved key. */
+    fun clearOthers(keepId: String) {
+        library.list().filter { it.id != keepId }.forEach { budget ->
+            memoryKeys.remove(budget.id)
+            pendingMaterial.remove(budget.id)
+            secrets.remove(keySecret(budget.id))
+            library.delete(budget.id)
         }
     }
 
