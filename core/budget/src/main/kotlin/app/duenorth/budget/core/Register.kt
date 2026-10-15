@@ -19,6 +19,13 @@ object RegisterCopy {
     const val TRANSFER = "transfer"
     const val OWED = "owed"
     const val RECONCILED = "reconciled"
+    const val SELECTED = "selected"
+    const val CLEARED = "cleared"
+    const val NOT_CLEARED = "not cleared"
+    const val CLEARED_MARK = "c"
+    const val CLEAR = "clear"
+    const val UNCLEAR = "unclear"
+    const val DONE = "done"
     const val NO_TRANSACTIONS = "no transactions"
 }
 
@@ -51,6 +58,7 @@ data class RegisterRow(
     val partnerCategoryId: String?,
     val parent: Boolean,
     val parts: List<RegisterPart>,
+    val cleared: Boolean = false,
 )
 
 data class CategoryChoice(
@@ -145,6 +153,11 @@ sealed interface ForcedWrite {
 
     data class Transfer(
         val draft: TransferDraft,
+    ) : ForcedWrite
+
+    data class Cleared(
+        val transactionIds: List<String>,
+        val cleared: Boolean,
     ) : ForcedWrite
 }
 
@@ -380,6 +393,7 @@ class RegisterBook(
                         t.category AS category,
                         t.isParent AS isParent,
                         t.reconciled AS reconciled,
+                        t.cleared AS cleared,
                         t.transferred_id AS transferred_id,
                         COALESCE(p.name, '') AS payee,
                         COALESCE(c.name, '') AS category_name,
@@ -427,6 +441,7 @@ class RegisterBook(
                         partnerCategoryId = row.str("partner_category"),
                         parent = parent,
                         parts = parts[id].orEmpty(),
+                        cleared = row.bool("cleared"),
                     )
                 }
         return RegisterPage(
@@ -613,6 +628,33 @@ class RegisterBook(
             tombstone(txn.id)
             partner?.let { tombstone(it.id) }
             kids.forEach { tombstone(it.id) }
+            WriteResult.Saved
+        }
+
+    /**
+     * Clears or unclears [transactionIds] together, with a split's parts following their
+     * parent. Unclearing a reconciled transaction asks first and then unreconciles it, as Actual does.
+     */
+    fun setCleared(
+        transactionIds: List<String>,
+        cleared: Boolean,
+        force: Boolean,
+    ): WriteResult =
+        write {
+            val rows = transactionIds.mapNotNull { find(it) }.filter { !it.tombstone }
+            if (!cleared) {
+                guard(rows, force, ForcedWrite.Cleared(transactionIds, cleared))?.let { return@write it }
+            }
+            rows.forEach { txn ->
+                val targets = listOf(txn) + if (txn.parent) children(txn.id) else emptyList()
+                targets.forEach { target ->
+                    if (cleared) {
+                        setColumns(target.id, "cleared" to 1)
+                    } else {
+                        setColumns(target.id, "cleared" to 0, "reconciled" to 0)
+                    }
+                }
+            }
             WriteResult.Saved
         }
 

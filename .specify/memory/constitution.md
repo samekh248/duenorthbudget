@@ -49,6 +49,12 @@ It replaces the first mockups (a dark pivot with no panorama).
   opens that item. Items loop and snap. A panorama is kept only for a
   hub-style landing page that previews several areas at once; the app has
   none today.
+- Every page opened from a pivot keeps the Windows Phone 8.1 title area: a
+  small uppercase line naming the home section it sits under (ACCOUNTS over
+  "visa"), or SETTINGS when opened from settings, or DUE NORTH BUDGET when it
+  sits under no section, over the oversized lowercase page title. Pivots carry
+  their own small title, and top-level views (the lists the app bar opens,
+  such as accounts, rules and payees) are an area themselves and get none.
 - Secondary screens use a pivot where they need tabs. Every screen has a
   bottom application bar: round outlined icon buttons and an ellipsis (`•••`)
   that expands labels and a menu.
@@ -152,7 +158,7 @@ remove or redefine a principle. MINOR: add a principle or materially expand
 one. PATCH: wording only. Plans and reviews MUST check these principles. A
 violation is listed with a justification before the work proceeds.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-13
+**Version**: 1.2.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-15
 
 **Amendment 1.0.1**: Wording only. Budget screens now live in
 `docs/design/metro-mockups.svg`. The principles are unchanged.
@@ -162,3 +168,7 @@ daily loop is fluid", has been met, so goal templates and Actual's fixed
 reports move into scope for spec 010 (actual parity). Custom reports and server
 administration remain out. Proposed in `specs/010-actual-parity/plan.md`
 (Complexity Tracking).
+
+**Amendment 1.2.0**: Principle on Metro 2 expanded. Pages opened from a pivot
+now carry a small uppercase section title over the page title, so a person can
+tell where the page sits. Chosen by the owner on 2026-10-15.

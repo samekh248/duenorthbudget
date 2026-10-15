@@ -107,10 +107,10 @@ fun HomePivot(
     var listGesture by remember { mutableStateOf(false) }
     LaunchedEffect(pagerGesture, listGesture) { onGesture(pagerGesture || listGesture) }
     MetroPivot(
-        title = "DUE NORTH BUDGET",
+        title = SectionTitleCopy.APP,
         items =
             listOf(
-                PivotItem("budget") {
+                PivotItem(HomeSections.BUDGET) {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
@@ -138,7 +138,7 @@ fun HomePivot(
                         }
                     }
                 },
-                PivotItem("accounts") {
+                PivotItem(HomeSections.ACCOUNTS) {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
@@ -151,7 +151,7 @@ fun HomePivot(
                         )
                     }
                 },
-                PivotItem("due") {
+                PivotItem(HomeSections.DUE) {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
@@ -166,7 +166,7 @@ fun HomePivot(
                         )
                     }
                 },
-                PivotItem("review") {
+                PivotItem(HomeSections.REVIEW) {
                     MonthReviewSection(
                         review = review,
                         loading = loading,
@@ -174,14 +174,14 @@ fun HomePivot(
                         onCategory = onReviewCategory,
                     )
                 },
-                PivotItem("net worth") {
+                PivotItem(HomeSections.NET_WORTH) {
                     NetWorthSection(
                         page = netWorth,
                         loading = loading,
                         onIncludeOffBudget = onNetWorthIncludeOffBudget,
                     )
                 },
-                PivotItem("inbox") {
+                PivotItem(HomeSections.INBOX) {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {

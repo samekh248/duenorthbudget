@@ -63,6 +63,15 @@ class ScreenBarTest {
     }
 
     @Test
+    fun registerSelectModeSwapsTheBarForClearAndUnclear() {
+        val ids =
+            ScreenBar
+                .specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE, undoLabel = "assign", selecting = true)
+                .map { it.id }
+        assertEquals(listOf("clear-selected", "unclear-selected", "end-selecting"), ids)
+    }
+
+    @Test
     fun envelopeIncomeCategoryHasNoSave() {
         val income = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, incomeCategory = true)
         assertTrue(income.isEmpty())

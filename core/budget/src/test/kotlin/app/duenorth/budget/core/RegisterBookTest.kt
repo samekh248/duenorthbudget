@@ -297,6 +297,42 @@ class RegisterBookTest {
     }
 
     @Test
+    fun clearsAndUnclearsSeveralAtOnceWithSplitPartsFollowing() {
+        db { session, book ->
+            book.save(draft("cafe", amount = -500))
+            book.save(draft("market", amount = -3_000, payee = "Market"))
+            book.split("market", listOf(SplitPart("c-food", -2_000), SplitPart("c-house", -1_000)), false)
+            book.save(draft("bus", amount = -275))
+            // New entries start cleared, as in Actual.
+            assertTrue(book.read("checking")!!.rows.all { it.cleared })
+            val parts = { session.query("SELECT cleared FROM transactions WHERE parent_id = 'market'").map { it.bool("cleared") } }
+
+            assertTrue(book.setCleared(listOf("cafe", "market"), cleared = false, force = false) is WriteResult.Saved)
+            val rows = book.read("checking")!!.rows.associateBy { it.id }
+            assertFalse(rows.getValue("cafe").cleared)
+            assertFalse(rows.getValue("market").cleared)
+            assertTrue(rows.getValue("bus").cleared)
+            assertEquals(listOf(false, false), parts())
+
+            assertTrue(book.setCleared(listOf("cafe", "market"), cleared = true, force = false) is WriteResult.Saved)
+            assertTrue(book.read("checking")!!.rows.all { it.cleared })
+            assertEquals(listOf(true, true), parts())
+
+            // Unclearing a reconciled transaction asks first, then unreconciles it.
+            session.exec("UPDATE transactions SET reconciled = 1 WHERE id = 'cafe'")
+            val asked = book.setCleared(listOf("cafe", "market"), cleared = false, force = false) as WriteResult.Confirm
+            assertEquals(RegisterCopy.RECONCILE_WARN, asked.reason)
+            assertEquals(ForcedWrite.Cleared(listOf("cafe", "market"), false), asked.retry)
+            assertTrue(book.read("checking")!!.rows.first { it.id == "cafe" }.cleared)
+            book.setCleared(listOf("cafe", "market"), cleared = false, force = true)
+            val after = book.read("checking")!!.rows.associateBy { it.id }
+            assertFalse(after.getValue("cafe").cleared)
+            assertFalse(after.getValue("cafe").reconciled)
+            assertFalse(after.getValue("market").cleared)
+        }
+    }
+
+    @Test
     fun librarySaveIsVisibleOnTheShell() {
         val root =
             java.nio.file.Files

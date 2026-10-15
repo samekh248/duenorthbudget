@@ -242,6 +242,8 @@ data class ShellUiState(
     val defaultBudgetName: String = "",
     val shell: MonthShell? = null,
     val register: RegisterPage? = null,
+    /** Transactions picked in the register's select mode; null when not selecting. */
+    val registerSelection: Set<String>? = null,
     val categoryTarget: CategoryTarget? = null,
     val createError: String? = null,
     val writeError: String? = null,
@@ -1157,6 +1159,10 @@ class ShellViewModel(
 
     fun back(): Boolean {
         val current = _state.value
+        if (current.registerSelection != null && current.confirm == null) {
+            endSelecting()
+            return true
+        }
         if (current.confirm != null) {
             _state.update { it.copy(confirm = null) }
             return true
@@ -1233,6 +1239,7 @@ class ShellViewModel(
 
     fun openAccount(accountId: String) {
         push(ShellRoute.Register(accountId))
+        _state.update { it.copy(registerSelection = null) }
         viewModelScope.launch { apply(load(accountId), accountId) }
     }
 
@@ -1541,6 +1548,34 @@ class ShellViewModel(
         }
     }
 
+    /** A long press starts select mode with that transaction picked. */
+    fun startSelecting(transactionId: String) {
+        _state.update { it.copy(registerSelection = setOf(transactionId)) }
+    }
+
+    /** Picks or unpicks a transaction; unpicking the last one leaves select mode. */
+    fun toggleSelected(transactionId: String) {
+        _state.update {
+            val picked = it.registerSelection ?: return@update it
+            val next = if (transactionId in picked) picked - transactionId else picked + transactionId
+            it.copy(registerSelection = next.ifEmpty { null })
+        }
+    }
+
+    fun endSelecting() {
+        _state.update { it.copy(registerSelection = null) }
+    }
+
+    /** Clears or unclears every picked transaction as one undo step, then leaves select mode. */
+    fun setSelectedCleared(cleared: Boolean) {
+        val accountId = openAccountId() ?: return
+        val picked = _state.value.registerSelection?.toList() ?: return
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.setTransactionsCleared(id, picked, cleared, false) }
+            publish(result, accountId, stayOnRegister = true)
+        }
+    }
+
     fun deleteTransaction(transactionId: String) {
         val accountId = openAccountId() ?: return
         launchWrite { id ->
@@ -1564,6 +1599,8 @@ class ShellViewModel(
                         is ForcedWrite.Split -> library.splitTransaction(id, retry.transactionId, retry.parts, true)
                         is ForcedWrite.Unsplit -> library.unsplitTransaction(id, retry.transactionId, true)
                         is ForcedWrite.Transfer -> library.transfer(id, retry.draft)
+                        is ForcedWrite.Cleared ->
+                            library.setTransactionsCleared(id, retry.transactionIds, retry.cleared, true)
                     }
                 }
             publish(result, accountId, stay)
@@ -2043,6 +2080,7 @@ class ShellViewModel(
                             route = ShellRoute.Register(accountId),
                             writeError = null,
                             confirm = null,
+                            registerSelection = null,
                         )
                     }
                 } else {

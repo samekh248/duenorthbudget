@@ -10,6 +10,7 @@ import app.duenorth.budget.core.AccountChoice
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.RegisterAccount
+import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterPart
 import app.duenorth.budget.core.RegisterRow
@@ -36,6 +37,45 @@ class RegisterScreenshotTest {
     fun registerDark() = snapRegister("register_dark", dark = true)
 
     @Test
+    fun selectLight() = snapSelect("register_select_light", dark = false)
+
+    @Test
+    fun selectDark() = snapSelect("register_select_dark", dark = true)
+
+    private fun snapSelect(
+        name: String,
+        dark: Boolean,
+    ) {
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Column(Modifier.width(390.dp).height(780.dp)) {
+                    SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
+                        RegisterScreen(
+                            page = page(),
+                            onGesture = {},
+                            onOpen = {},
+                            onAdd = {},
+                            onTransfer = {},
+                            onReconcile = {},
+                            selection = setOf("cafe", "coffee"),
+                        )
+                    }
+                    MetroAppBar(
+                        actions =
+                            listOf(
+                                AppBarButton(AppGlyph.Reconcile, RegisterCopy.CLEAR, onClick = {}),
+                                AppBarButton(AppGlyph.Undo, RegisterCopy.UNCLEAR, onClick = {}),
+                                AppBarButton(AppGlyph.Cancel, RegisterCopy.DONE, onClick = {}),
+                            ).asScreenActions(),
+                        expanded = false,
+                        onExpandedChange = {},
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun entryLight() = snapEntry("entry_light", dark = false)
 
     @Test
@@ -48,15 +88,16 @@ class RegisterScreenshotTest {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
                 Column(Modifier.width(390.dp).height(780.dp)) {
-                    RegisterScreen(
-                        page = page(),
-                        onGesture = {},
-                        onOpen = {},
-                        onAdd = {},
-                        onTransfer = {},
-                        onReconcile = {},
-                        modifier = Modifier.weight(1f),
-                    )
+                    SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
+                        RegisterScreen(
+                            page = page(),
+                            onGesture = {},
+                            onOpen = {},
+                            onAdd = {},
+                            onTransfer = {},
+                            onReconcile = {},
+                        )
+                    }
                     bar()
                 }
             }
@@ -119,6 +160,7 @@ class RegisterScreenshotTest {
                         partnerOffBudget = null,
                         partnerCategoryId = null,
                         parent = true,
+                        cleared = false,
                         parts =
                             listOf(
                                 RegisterPart("a", "c-food", "Groceries", -2_000),
@@ -138,6 +180,7 @@ class RegisterScreenshotTest {
                         partnerOffBudget = null,
                         partnerCategoryId = null,
                         parent = false,
+                        cleared = false,
                         parts = emptyList(),
                     ),
                     RegisterRow(
@@ -153,6 +196,7 @@ class RegisterScreenshotTest {
                         partnerOffBudget = false,
                         partnerCategoryId = null,
                         parent = false,
+                        cleared = true,
                         parts = emptyList(),
                     ),
                     RegisterRow(
@@ -168,6 +212,7 @@ class RegisterScreenshotTest {
                         partnerOffBudget = null,
                         partnerCategoryId = null,
                         parent = false,
+                        cleared = true,
                         parts = emptyList(),
                     ),
                     RegisterRow(
@@ -183,6 +228,7 @@ class RegisterScreenshotTest {
                         partnerOffBudget = null,
                         partnerCategoryId = null,
                         parent = false,
+                        cleared = true,
                         parts = emptyList(),
                     ),
                 ),

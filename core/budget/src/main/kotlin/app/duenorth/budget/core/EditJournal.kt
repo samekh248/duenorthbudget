@@ -25,6 +25,8 @@ object UndoCopy {
     const val TEMPLATES = "templates"
     const val CATEGORY_NOTE = "note"
     const val BANK_LINK = "bank link"
+    const val CLEAR = "clear"
+    const val UNCLEAR = "unclear"
 }
 
 /** One person-level action, as the cells it wrote. */
