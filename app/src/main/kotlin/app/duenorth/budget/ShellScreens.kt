@@ -622,7 +622,7 @@ fun AccountsSection(
     }
 }
 
-/** One account under its group, in the category rows' body type and ruled the same way. */
+/** One account under its group, in the category rows' body type, without rules. */
 @Composable
 private fun AccountLine(
     account: AccountRow,
@@ -656,15 +656,6 @@ private fun AccountLine(
                 color = if (dim) Metro.colors.secondary else Metro.accent.text,
                 maxLines = 1,
                 softWrap = false,
-            )
-        }
-        Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter)) {
-            Spacer(Modifier.weight(LEDGER_NAME))
-            Box(
-                Modifier
-                    .weight(LEDGER_FIGURE * 3)
-                    .height(1.dp)
-                    .background(if (Metro.colors.isDark) Metro.colors.outline else Metro.colors.chrome),
             )
         }
     }
