@@ -237,6 +237,8 @@ data class PhoneSettings(
     val showClosedAccounts: Boolean = false,
     /** Home shows hidden category groups and categories (menu `show-hidden`). */
     val showHiddenCategories: Boolean = false,
+    /** The inbox's swipe preview has played; it plays once ever, on the first visit. */
+    val inboxSwipeShown: Boolean = false,
 )
 
 @Serializable

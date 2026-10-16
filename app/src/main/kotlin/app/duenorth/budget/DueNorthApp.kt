@@ -299,7 +299,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onAcceptInbox = model::acceptInbox,
                                 inboxFiled = state.inboxFiled,
                                 onInboxFiledShown = model::inboxFiledShown,
-                                inboxPeek = !state.inboxPeeked,
+                                inboxPeek = !state.settings.inboxSwipeShown,
                                 onInboxPeeked = model::inboxPeeked,
                                 inboxActions =
                                     remember(model) {
