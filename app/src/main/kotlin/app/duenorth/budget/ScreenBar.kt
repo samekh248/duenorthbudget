@@ -105,17 +105,12 @@ object ScreenBar {
                         spec("end-selecting", AppGlyph.Cancel, RegisterCopy.DONE),
                     )
                 } else {
-                    // A bank-linked account syncs from the server; WP8.1 fits four icons, so import moves to the menu.
+                    // A bank-linked account syncs from the server; import lives in the menu.
                     buildList {
                         add(spec("add", AppGlyph.Add, "add"))
-                        add(spec("transfer", AppGlyph.Transfer, "transfer"))
                         add(spec("reconcile", AppGlyph.Reconcile, "reconcile"))
-                        if (bankLinked) {
-                            add(spec("sync", AppGlyph.Sync, "sync"))
-                            add(menu("import", AppGlyph.Import, "import"))
-                        } else {
-                            add(spec("import", AppGlyph.Import, "import"))
-                        }
+                        if (bankLinked) add(spec("sync", AppGlyph.Sync, "sync"))
+                        add(menu("import", AppGlyph.Import, "import"))
                         add(menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT))
                         add(menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE))
                         add(menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE))
