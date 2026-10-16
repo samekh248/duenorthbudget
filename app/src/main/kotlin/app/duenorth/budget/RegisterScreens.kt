@@ -170,7 +170,7 @@ private fun RegisterList(
         days.forEach { day ->
             item(key = "day-${day.first().id}") {
                 MetroText(
-                    DateFormats.short(day.first().date, dateFormat()),
+                    RegisterEntry.registerDateLabel(day.first().date),
                     Metro.typography.caption,
                     Modifier.padding(top = 16.dp, bottom = 4.dp).testTag("register-day-${day.first().date}"),
                     color = Metro.accent.text,

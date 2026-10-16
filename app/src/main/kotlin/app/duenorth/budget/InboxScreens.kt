@@ -65,7 +65,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
-import app.duenorth.budget.core.DateFormats
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MoneyFormat
@@ -368,7 +367,7 @@ private fun InboxDayHeading(
         }
     }
     MetroText(
-        DateFormats.short(date, dateFormat()),
+        RegisterEntry.registerDateLabel(date),
         Metro.typography.caption,
         Modifier.collapse(height.value).padding(top = 16.dp, bottom = 4.dp).testTag("inbox-day-$date"),
         color = Metro.accent.text,

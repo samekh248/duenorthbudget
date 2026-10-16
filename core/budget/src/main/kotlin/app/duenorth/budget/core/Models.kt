@@ -153,26 +153,6 @@ object DateFormats {
     }
 
     /**
-     * A short day label that keeps [pattern]'s order of day and month: "oct 7" for month-first and
-     * year-first patterns, "7 oct" for day-first ones. Register and list headings use it.
-     */
-    fun short(
-        date: Int,
-        pattern: String,
-    ): String {
-        val month = (date / 100) % 100
-        val day = date % 100
-        if (month !in 1..12) return date.toString()
-        val name =
-            java.time.Month
-                .of(month)
-                .name
-                .lowercase()
-                .take(3)
-        return if (DatePick.columns(pattern).first() == DateColumn.DAY) "$day $name" else "$name $day"
-    }
-
-    /**
      * A typed date read in [pattern]'s order, with any separators, or as `yyyy-MM-dd`. Null when it is not a
      * real date.
      */
