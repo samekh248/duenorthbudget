@@ -11,17 +11,19 @@ class SectionTitleTest {
         settingsReturn: Boolean = false,
     ) = SectionTitle.of(ShellUiState(route = route, homeSection = homeSection, settingsReturn = settingsReturn))
 
+    private fun section(name: String) = HomeSections.headers.indexOf(name)
+
     @Test
     fun pivotsCarryTheirOwnTitle() {
         assertNull(title(ShellRoute.Home))
         assertNull(title(ShellRoute.Settings))
-        assertNull(title(ShellRoute.ReportPivot(0)))
+        assertNull(title(ShellRoute.ReportPivot(ReportItems.CASH_FLOW)))
         assertNull(title(ShellRoute.Welcome))
     }
 
     @Test
     fun topLevelViewsGetNone() {
-        assertNull(title(ShellRoute.Accounts, homeSection = 1))
+        assertNull(title(ShellRoute.Accounts, homeSection = section(HomeSections.ACCOUNTS)))
         assertNull(title(ShellRoute.Rules))
         assertNull(title(ShellRoute.Payees, settingsReturn = true))
         assertNull(title(ShellRoute.Templates))
@@ -33,8 +35,8 @@ class SectionTitleTest {
     @Test
     fun drillInsNameTheirSection() {
         assertEquals("ACCOUNTS", title(ShellRoute.Register("a1")))
-        assertEquals("ACCOUNTS", title(ShellRoute.Reconcile("a1"), homeSection = 3))
-        assertEquals("BUDGET", title(ShellRoute.CategoryBudget("c1"), homeSection = 1))
+        assertEquals("ACCOUNTS", title(ShellRoute.Reconcile("a1"), homeSection = section(HomeSections.REVIEW)))
+        assertEquals("BUDGET", title(ShellRoute.CategoryBudget("c1"), homeSection = section(HomeSections.ACCOUNTS)))
         assertEquals("DUE", title(ShellRoute.ScheduleEditor(null)))
         assertEquals("REVIEW", title(ShellRoute.ReviewCategory("c1")))
         assertEquals("RULES", title(ShellRoute.RuleEditor(null)))
@@ -45,8 +47,8 @@ class SectionTitleTest {
 
     @Test
     fun sharedPagesFollowTheHomeSectionShowing() {
-        assertEquals("ACCOUNTS", title(ShellRoute.EditTransaction("a1", "t1"), homeSection = 1))
-        assertEquals("INBOX", title(ShellRoute.EditTransaction("a1", "t1"), homeSection = 4))
+        assertEquals("ACCOUNTS", title(ShellRoute.EditTransaction("a1", "t1"), homeSection = section(HomeSections.ACCOUNTS)))
+        assertEquals("INBOX", title(ShellRoute.EditTransaction("a1", "t1"), homeSection = section(HomeSections.INBOX)))
     }
 
     @Test

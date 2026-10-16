@@ -65,23 +65,37 @@ class ShellScreenshotTest {
     fun categoryLedgerDark() = categorySnap("category_ledger_dark", dark = true)
 
     @Test
-    fun accountsLight() = snap("accounts_light", dark = false, shell = sample().copy(accounts = manyAccounts()), section = 1)
+    fun accountsLight() =
+        snap(
+            "accounts_light",
+            dark = false,
+            shell = sample().copy(accounts = manyAccounts()),
+            section = HomeSections.headers.indexOf(HomeSections.ACCOUNTS),
+        )
 
     @Test
-    fun accountsDark() = snap("accounts_dark", dark = true, shell = sample().copy(accounts = manyAccounts()), section = 1)
+    fun accountsDark() =
+        snap(
+            "accounts_dark",
+            dark = true,
+            shell = sample().copy(accounts = manyAccounts()),
+            section = HomeSections.headers.indexOf(HomeSections.ACCOUNTS),
+        )
 
     @Test
-    fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = 5)
+    fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX))
 
     @Test
-    fun inboxLight() = snap("inbox_light", dark = false, shell = sample(), section = 5)
+    fun inboxLight() = snap("inbox_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX))
 
     // Corner Coffee just filed: the confirmation sits in the row's own slot before it collapses.
     @Test
-    fun inboxFiledLight() = snap("inbox_filed_light", dark = false, shell = sample(), section = 5, filed = true)
+    fun inboxFiledLight() =
+        snap("inbox_filed_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX), filed = true)
 
     @Test
-    fun inboxFiledDark() = snap("inbox_filed_dark", dark = true, shell = sample(), section = 5, filed = true)
+    fun inboxFiledDark() =
+        snap("inbox_filed_dark", dark = true, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX), filed = true)
 
     // Edge to edge with a 32dp status bar (gray strip): the pivot title starts below it.
     @Test
@@ -149,7 +163,7 @@ class ShellScreenshotTest {
                             loading = false,
                             openMonth = shell.month,
                             monthWindow = MonthWindow.around(shell.month),
-                            initialSection = 4,
+                            initialSection = HomeSections.headers.indexOf(HomeSections.INBOX),
                             onGesture = {},
                             modifier = modifier,
                         )
