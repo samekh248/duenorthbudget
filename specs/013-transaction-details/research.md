@@ -64,9 +64,9 @@ All Technical Context items were known from the code; nothing was left as NEEDS 
 
 ## R11. Page title area
 
-- **Decision**: The big title is always "transaction". The small uppercase line follows the app's existing rule in `SectionTitle.of`, which names the home section showing (ACCOUNTS when opened from a register, INBOX when opened from the inbox), not the account name.
-- **Rationale**: The spec's assumption says the plan follows the app's own title rule if it names the section for this route, and constitution 1.2.0 (Principle II) defines that line as "the home section it sits under". `SectionTitle.of` already does this for `EditTransaction`; no change is needed there. The account name is still on the register page the person came from.
-- **Alternatives considered**: The account name ("VISA") as in the spec's illustration (contradicts the constitution's title rule; would need an amendment).
+- **Decision**: The small uppercase line follows the app's existing rule in `SectionTitle.of`, which names the home section showing (ACCOUNTS when opened from a register, INBOX when opened from the inbox). The big title is always "transaction". The account's name, as the person wrote it ("Visa"), sits directly under the page title in subheader size and secondary color, `FieldLabelGap` below it; the first field label follows one `FieldGroupGap` later. Tag `transaction-account`. Chosen by the owner on 2026-10-16.
+- **Rationale**: Constitution 1.2.0 (Principle II) defines the small line as the home section, so it stays ACCOUNTS. The owner still wants to see which account the transaction belongs to, which matters when the page is opened from the inbox, so the name goes in its own line under the title instead of replacing the section line. `SectionTitle.of` needs no change; `TransactionForm` draws the name from `page.account.name`.
+- **Alternatives considered**: The account name in the small line ("VISA", the spec's first illustration; contradicts the constitution). Section only, no account name (the owner asked for the name).
 
 ## R12. Commands on the application bar
 

@@ -22,7 +22,7 @@ Record screenshots only after a deliberate visual change:
 
 ## Scenarios
 
-1. **One screen (SC-001).** Open an existing transaction in a 40-category budget. Title area, date, payee, amount with toggle, category, and note are all visible with no scrolling. No buttons in the body.
+1. **One screen (SC-001).** Open an existing transaction in a 40-category budget. Title area reads ACCOUNTS, then "transaction", then the account name ("Visa") under it. Title area, date, payee, amount with toggle, category, and note are all visible with no scrolling. No buttons in the body.
 2. **Category, full screen (US1).** Tap the category box → "category" page, groups with headings, current choice in accent and on screen. Pick another → back on the form with every other edit kept. Repeat and press back → unchanged.
 3. **Category, in place.** In a budget with four or fewer categories, tap the box → choices unfold inside it with the accent border. Pick one → box folds.
 4. **Hidden category.** Give a transaction a category, hide that category in manage categories, reopen the transaction → box shows it; the list shows it with "(hidden)". Other hidden categories are not listed.

@@ -6,7 +6,7 @@
 
 ## Summary
 
-`TransactionForm` stops being a stack of unlabelled full-width boxes, a list of every category, and four body buttons, and becomes a labelled Windows Phone 8.1 form under the page title "transaction". Three shared Metro controls are added to `:core:design`: `MetroComboBox` (the settings `ListPicker`, moved and given the WP8.1 five-item rule), `MetroDatePicker` (three looping, snapping columns), and `MetroSegmentedToggle` (the owner's compact expense/income toggle). The category box unfolds in place for five or fewer choices and otherwise opens a grouped full-screen list; the date box shows the settings format with the weekday and opens the picker, so the date is never typed. Both pickers are overlays inside the form, so no unsaved edit is lost, and they swap the app bar through a small extension of the existing `FormSaveHost`. Date and amount boxes are measured from sample text so they are only as wide as their longest value and grow with the font; the amount and toggle share a `FlowRow`. The note becomes a 2–6 line box. Split, schedule and delete move into the `EditTransaction` app bar menu. Spacing uses two new `MetroDimens` steps (6 dp label gap, 24 dp group gap). Nothing stored or synced changes.
+`TransactionForm` stops being a stack of unlabelled full-width boxes, a list of every category, and four body buttons, and becomes a labelled Windows Phone 8.1 form: ACCOUNTS over the page title "transaction", with the account's name on its own line under the title. Three shared Metro controls are added to `:core:design`: `MetroComboBox` (the settings `ListPicker`, moved and given the WP8.1 five-item rule), `MetroDatePicker` (three looping, snapping columns), and `MetroSegmentedToggle` (the owner's compact expense/income toggle). The category box unfolds in place for five or fewer choices and otherwise opens a grouped full-screen list; the date box shows the settings format with the weekday and opens the picker, so the date is never typed. Both pickers are overlays inside the form, so no unsaved edit is lost, and they swap the app bar through a small extension of the existing `FormSaveHost`. Date and amount boxes are measured from sample text so they are only as wide as their longest value and grow with the font; the amount and toggle share a `FlowRow`. The note becomes a 2–6 line box. Split, schedule and delete move into the `EditTransaction` app bar menu. Spacing uses two new `MetroDimens` steps (6 dp label gap, 24 dp group gap). Nothing stored or synced changes.
 
 ```text
             :core:design                              :app
@@ -61,7 +61,7 @@
 | V. Test What the Person Can See | Light and dark screenshots for the form, both overlays, the in-place combo box, an error and a large font. Content tests for every acceptance scenario that a screenshot cannot show (edits kept, back, bar menus). | Pass |
 | VI. Phone First, Nothing Extra | Phone layout only. No new module; components go in the existing `:core:design`. | Pass |
 
-Post-design re-check: the same gates hold. The page's small title line follows constitution 1.2.0 (section, not account name; research R11), which the spec's assumption allows. No complexity exception needed.
+Post-design re-check: the same gates hold. The page's small title line follows constitution 1.2.0 (the section, ACCOUNTS), and the account name sits under the page title as the owner chose (research R11). No complexity exception needed.
 
 ## Project Structure
 
