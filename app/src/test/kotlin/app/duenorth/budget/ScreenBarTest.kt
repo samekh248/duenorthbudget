@@ -75,6 +75,13 @@ class ScreenBarTest {
     }
 
     @Test
+    fun bankLinkedRegisterSyncsFromTheBarAndMovesImportToTheMenu() {
+        val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE, bankLinked = true)
+        assertEquals(listOf("add", "transfer", "reconcile", "sync"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("import", "edit-account", "bank-link", "close"), specs.filterNot { it.primary }.map { it.id })
+    }
+
+    @Test
     fun registerSelectModeSwapsTheBarForClearAndUnclear() {
         val ids =
             ScreenBar

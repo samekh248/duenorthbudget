@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.EntryResult
-import app.duenorth.budget.core.ImportCopy
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MoneyParse
 import app.duenorth.budget.core.RegisterCopy
@@ -75,7 +74,6 @@ fun RegisterScreen(
     onTransfer: () -> Unit,
     onReconcile: () -> Unit,
     onImportFile: (() -> Unit)? = null,
-    onFetch: (() -> Unit)? = null,
     selection: Set<String>? = null,
     onSelect: (String) -> Unit = {},
     onToggleSelected: (String) -> Unit = {},
@@ -103,13 +101,6 @@ fun RegisterScreen(
                 Metro.typography.body.copy(textAlign = TextAlign.End),
                 Modifier.fillMaxWidth().padding(top = MetroDimens.Gutter).testTag("register-selected-count"),
                 color = Metro.accent.text,
-            )
-        }
-        if (onFetch != null && selection == null) {
-            MetroButton(
-                ImportCopy.FETCH,
-                Modifier.padding(top = MetroDimens.Gutter).testTag("register-fetch"),
-                onClick = onFetch,
             )
         }
         if (rows.isEmpty()) {

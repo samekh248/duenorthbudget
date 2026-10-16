@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountChoice
+import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.RegisterAccount
@@ -17,6 +18,7 @@ import app.duenorth.budget.core.RegisterRow
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.asScreenActions
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -41,6 +43,50 @@ class RegisterScreenshotTest {
 
     @Test
     fun selectDark() = snapSelect("register_select_dark", dark = true)
+
+    @Test
+    fun bankLinkedLight() = snapBankLinked("register_bank_linked_light", dark = false, expanded = false)
+
+    @Test
+    fun bankLinkedDark() = snapBankLinked("register_bank_linked_dark", dark = true, expanded = false)
+
+    @Test
+    fun bankLinkedMenuLight() = snapBankLinked("register_bank_linked_menu_light", dark = false, expanded = true)
+
+    @Test
+    fun bankLinkedMenuDark() = snapBankLinked("register_bank_linked_menu_dark", dark = true, expanded = true)
+
+    /** A bank-linked account: the register's own bar, sync among its icons. */
+    private fun snapBankLinked(
+        name: String,
+        dark: Boolean,
+        expanded: Boolean,
+    ) {
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Column(Modifier.width(390.dp).height(780.dp)) {
+                    SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
+                        RegisterScreen(
+                            page = page(),
+                            onGesture = {},
+                            onOpen = {},
+                            onAdd = {},
+                            onTransfer = {},
+                            onReconcile = {},
+                        )
+                    }
+                    MetroAppBar(
+                        actions =
+                            ScreenBar
+                                .specsFor(ShellRoute.Register("visa"), true, BudgetMode.ENVELOPE, bankLinked = true)
+                                .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                        expanded = expanded,
+                        onExpandedChange = {},
+                    )
+                }
+            }
+        }
+    }
 
     private fun snapSelect(
         name: String,

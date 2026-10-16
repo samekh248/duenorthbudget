@@ -45,6 +45,7 @@ object ScreenBar {
         homeSection: Int = HOME_BUDGET,
         showHidden: Boolean = false,
         selecting: Boolean = false,
+        bankLinked: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -104,15 +105,21 @@ object ScreenBar {
                         spec("end-selecting", AppGlyph.Cancel, RegisterCopy.DONE),
                     )
                 } else {
-                    listOf(
-                        spec("add", AppGlyph.Add, "add"),
-                        spec("transfer", AppGlyph.Transfer, "transfer"),
-                        spec("reconcile", AppGlyph.Reconcile, "reconcile"),
-                        spec("import", AppGlyph.Import, "import"),
-                        menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT),
-                        menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE),
-                        menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE),
-                    ) + undo(undoLabel)
+                    // A bank-linked account syncs from the server; WP8.1 fits four icons, so import moves to the menu.
+                    buildList {
+                        add(spec("add", AppGlyph.Add, "add"))
+                        add(spec("transfer", AppGlyph.Transfer, "transfer"))
+                        add(spec("reconcile", AppGlyph.Reconcile, "reconcile"))
+                        if (bankLinked) {
+                            add(spec("sync", AppGlyph.Sync, "sync"))
+                            add(menu("import", AppGlyph.Import, "import"))
+                        } else {
+                            add(spec("import", AppGlyph.Import, "import"))
+                        }
+                        add(menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT))
+                        add(menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE))
+                        add(menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE))
+                    } + undo(undoLabel)
                 }
             ShellRoute.Accounts ->
                 listOf(
@@ -194,6 +201,7 @@ object ScreenBar {
             state.homeSection,
             state.settings.showHiddenCategories,
             state.registerSelection != null,
+            state.registerBankLinked,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -262,6 +270,7 @@ class ScreenBarHandlers(
     val onTransfer: () -> Unit,
     val onReconcile: () -> Unit,
     val onImport: () -> Unit,
+    val onBankSync: () -> Unit = {},
     val onSave: () -> Unit,
     val onCancel: () -> Unit,
     val onFill: (MonthFillKind) -> Unit = {},
@@ -312,6 +321,7 @@ class ScreenBarHandlers(
             "transfer" -> onTransfer
             "reconcile" -> onReconcile
             "import" -> onImport
+            "sync" -> onBankSync
             "save" -> onSave
             "cancel" -> onCancel
             "copy-last" -> ({ onFill(MonthFillKind.COPY_LAST) })
