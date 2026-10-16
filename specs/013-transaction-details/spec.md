@@ -46,8 +46,8 @@ does not change what a transaction can hold or how it is saved.
  │ [note                  ] │       │ payee                    │
  │ category                 │       │ [Bus                   ] │
  │ no category              │       │ amount                   │
- │ Groceries                │       │ [12.40     ]  expense    │
- │ Household                │       │               income     │
+ │ Groceries                │       │ [12.40     ] [exp|inc]   │
+ │ Household                │       │                          │
  │ ... every category ...   │       │ category                 │
  │ [        save          ] │       │ [Groceries           ▾ ] │
  │ [        split         ] │       │ note                     │
@@ -169,15 +169,19 @@ existing transaction against the acceptance scenarios below.
    and padding, and it does not stretch to the screen edge.
 4. **Given** the amount box, **When** it is drawn, **Then** it is wide
    enough for an amount with up to seven whole digits and the budget's
-   decimal places, and no wider. The expense and income choice sits beside
-   it on the same row instead of on a row of its own.
-5. **Given** a long payee or note, **When** the person types it, **Then** the
+   decimal places, and no wider.
+5. **Given** the amount row, **When** it is drawn, **Then** the expense and
+   income choice is a compact two-part toggle on the same line as the amount
+   box: two adjacent segments ("expense", "income") in the control text size,
+   the same height as the amount box, the chosen segment filled with the
+   accent and the other outlined. Tapping either segment picks it.
+6. **Given** a long payee or note, **When** the person types it, **Then** the
    payee and note boxes span the content width (12 dp gutter on each side).
-6. **Given** the form, **When** it is drawn, **Then** every label-to-field
+7. **Given** the form, **When** it is drawn, **Then** every label-to-field
    gap is the same small step, every field-group-to-next-label gap is the
    same larger step, all gaps fall on the Metro 2 grid, and the left edges of
    the title, labels, and fields line up on the 12 dp gutter.
-7. **Given** a phone with the largest system font size, **When** the form
+8. **Given** a phone with the largest system font size, **When** the form
    opens, **Then** no label or value is clipped and the sized fields grow
    with the text.
 
@@ -297,8 +301,14 @@ there and no command buttons remain in the page body.
   produce, plus its chevron and padding, and MUST NOT stretch to the content
   width.
 - **FR-017**: The amount box MUST be sized to hold seven whole digits plus
-  the budget's decimal places, and the expense and income choice MUST sit on
-  the same row to its right.
+  the budget's decimal places.
+- **FR-017a**: The expense and income choice MUST be a compact two-segment
+  toggle on the same line as the amount box, to its right: segments in the
+  control text size, the same height as the amount box, the chosen segment
+  filled with the accent (text in the accent's contrast color) and the other
+  outlined in the foreground color. Together, the amount box and the toggle
+  MUST fit the content width of a Pixel 6a-class phone at the default font
+  size.
 - **FR-018**: Payee and note MUST span the content width.
 - **FR-019**: All sized fields MUST grow with the system font size and MUST
   NOT exceed the content width.
@@ -353,7 +363,8 @@ there and no command buttons remain in the page body.
 - **SC-003**: A person can change a transaction's date without using the
   keyboard, and no typed-date format error can occur.
 - **SC-004**: The date box and amount box each take less than half the
-  content width at the default font size.
+  content width at the default font size, and the amount box and the
+  expense/income toggle share one line.
 - **SC-005**: Every field on the screen can be identified by its label with
   a value filled in, in light and dark.
 - **SC-006**: No command buttons remain in the page body; all five commands
@@ -380,8 +391,11 @@ there and no command buttons remain in the page body.
   length, so they keep the full width.
 - Seven whole digits (up to 9,999,999) covers everyday transactions; larger
   amounts still type and scroll within the box.
-- Expense and income stay a two-word choice beside the amount rather than
-  becoming a combo box.
+- Expense and income stay a two-way choice rather than becoming a combo
+  box, drawn as a compact segmented toggle so it fits on the amount's line.
+  At font sizes where the amount box and toggle no longer fit side by side,
+  the toggle wraps to the line directly under the amount box rather than
+  shrinking below the 48 dp touch target.
 - The full-screen category list shows hidden categories only when the
   transaction already uses one; otherwise hidden categories are left out,
   matching the register's category picker.
