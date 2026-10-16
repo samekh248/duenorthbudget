@@ -79,6 +79,21 @@ class RegisterBookTest {
     }
 
     @Test
+    fun categoriesCarryHiddenFromThemselvesOrTheirGroup() {
+        db { session, book ->
+            session.exec("UPDATE categories SET hidden = 1 WHERE id = 'c-house'")
+            session.exec("UPDATE category_groups SET hidden = 1 WHERE id = 'g-pay'")
+            val hidden =
+                book
+                    .read("checking")!!
+                    .categories
+                    .filter { it.hidden }
+                    .map { it.id }
+            assertEquals(listOf("c-house", "c-pay"), hidden)
+        }
+    }
+
+    @Test
     fun fiveHundredRowsReadUnderASecond() {
         db { session, book ->
             session.transaction {

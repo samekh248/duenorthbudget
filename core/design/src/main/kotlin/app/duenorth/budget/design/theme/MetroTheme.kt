@@ -283,6 +283,12 @@ object MetroDimens {
 
     val TouchTarget = 48.dp
 
+    /** A form label to its own field: a quarter grid step, so the two read as one (spec 013). */
+    val FieldLabelGap = 6.dp
+
+    /** One form field group to the next label: a full grid step. */
+    val FieldGroupGap = 24.dp
+
     /** Application bar closed height, as in due north tasks. */
     val AppBar = 72.dp
 

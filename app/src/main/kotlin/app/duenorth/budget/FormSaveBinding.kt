@@ -5,9 +5,18 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import app.duenorth.budget.design.components.ScreenAction
 
 class FormSaveHost {
     private val handler = mutableStateOf<(() -> Unit)?>(null)
+    private val barOverride = mutableStateOf<List<ScreenAction>?>(null)
+
+    /** Actions a form's own page (a picker over the form) puts on the bar in place of the route's. */
+    val bar: List<ScreenAction>? get() = barOverride.value
+
+    fun overrideBar(actions: List<ScreenAction>?) {
+        barOverride.value = actions
+    }
 
     fun bind(save: () -> Unit) {
         handler.value = save
@@ -30,6 +39,19 @@ fun RememberFormSave(save: () -> Unit) {
     DisposableEffect(host, save) {
         host?.bind(save)
         onDispose { host?.clear() }
+    }
+}
+
+/**
+ * While composed, [actions] replace the route's application bar: a picker page drawn over a
+ * form (spec 013) shows its own done and cancel without leaving the form's route.
+ */
+@Composable
+fun RememberBarOverride(actions: List<ScreenAction>) {
+    val host = LocalFormSaveHost.current
+    DisposableEffect(host, actions) {
+        host?.overrideBar(actions)
+        onDispose { host?.overrideBar(null) }
     }
 }
 

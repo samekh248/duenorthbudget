@@ -271,9 +271,14 @@ fun DueNorthApp(model: ShellViewModel) {
                     onServerBudgets = model::showServerBudgets,
                     onSignOut = model::signOutInstance,
                     onExport = model::exportBudget,
+                    onSplitTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::openSplit) },
+                    onScheduleTransaction = {
+                        (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
+                    },
+                    onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::deleteTransaction) },
                 )
             }
-        val actions = ScreenBar.forState(state, handlers)
+        val actions = formSaveHost.bar ?: ScreenBar.forState(state, handlers)
         ShellChrome(
             actions,
             syncing = state.syncing || state.importFetchPending,
@@ -622,10 +627,9 @@ fun DueNorthApp(model: ShellViewModel) {
                                     initialDate = state.today,
                                     error = state.writeError,
                                     onSave = model::submitTransaction,
-                                    onDelete = model::deleteTransaction,
-                                    onSplit = model::openSplit,
-                                    onSchedule = model::createScheduleFromTransaction,
                                     modifier = fill,
+                                    dateFormat = state.formatPrefs.dateFormat,
+                                    numberFormat = state.formatPrefs.numberFormat,
                                 )
                             }
                         }

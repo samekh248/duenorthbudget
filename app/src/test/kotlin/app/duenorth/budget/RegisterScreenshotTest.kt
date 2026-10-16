@@ -163,8 +163,6 @@ class RegisterScreenshotTest {
                         initialDate = "2026-10-07",
                         error = null,
                         onSave = {},
-                        onDelete = {},
-                        onSplit = {},
                         modifier = Modifier.weight(1f),
                     )
                     bar()

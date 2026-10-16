@@ -19,6 +19,13 @@ data class ScreenBarSpec(
     val primary: Boolean = true,
 )
 
+/** Which commands a transaction's details page offers in its `•••` menu (spec 013). */
+enum class TransactionMenu {
+    NEW,
+    ORDINARY,
+    TRANSFER,
+}
+
 /** What the settings bar needs beyond the route (spec 012). */
 data class SettingsBar(
     val page: SettingsPage = SettingsPage.BUDGET,
@@ -46,6 +53,7 @@ object ScreenBar {
         showHidden: Boolean = false,
         selecting: Boolean = false,
         bankLinked: Boolean = false,
+        transaction: TransactionMenu = TransactionMenu.NEW,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -153,8 +161,20 @@ object ScreenBar {
                 }
             ShellRoute.Create,
             ShellRoute.Assign,
-            ShellRoute.AddTransaction,
             is ShellRoute.EditTransaction,
+            ->
+                saveCancel() +
+                    when (transaction) {
+                        TransactionMenu.NEW -> emptyList()
+                        TransactionMenu.ORDINARY ->
+                            listOf(
+                                menu("split-transaction", AppGlyph.Categories, RegisterCopy.SPLIT),
+                                menu("schedule-transaction", AppGlyph.Calendar, RegisterCopy.SCHEDULE),
+                                menu("delete-transaction", AppGlyph.Cancel, RegisterCopy.DELETE),
+                            )
+                        TransactionMenu.TRANSFER -> listOf(menu("delete-transaction", AppGlyph.Cancel, RegisterCopy.DELETE))
+                    }
+            ShellRoute.AddTransaction,
             is ShellRoute.SplitTransaction,
             is ShellRoute.TransferMoney,
             ShellRoute.HoldMonth,
@@ -197,6 +217,7 @@ object ScreenBar {
             state.settings.showHiddenCategories,
             state.registerSelection != null,
             state.registerBankLinked,
+            transactionMenu(state),
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -206,6 +227,13 @@ object ScreenBar {
                 run = handlers.bind(spec.id, state),
             )
         }
+    }
+
+    private fun transactionMenu(state: ShellUiState): TransactionMenu {
+        val route = state.route as? ShellRoute.EditTransaction ?: return TransactionMenu.NEW
+        val id = route.transactionId ?: return TransactionMenu.NEW
+        val row = state.register?.rows?.firstOrNull { it.id == id } ?: return TransactionMenu.NEW
+        return if (row.transferId != null) TransactionMenu.TRANSFER else TransactionMenu.ORDINARY
     }
 
     private fun saveCancel() =
@@ -299,6 +327,9 @@ class ScreenBarHandlers(
     val onClearSelected: () -> Unit = {},
     val onUnclearSelected: () -> Unit = {},
     val onEndSelecting: () -> Unit = {},
+    val onSplitTransaction: () -> Unit = {},
+    val onScheduleTransaction: () -> Unit = {},
+    val onDeleteTransaction: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -353,6 +384,9 @@ class ScreenBarHandlers(
             "clear-selected" -> onClearSelected
             "unclear-selected" -> onUnclearSelected
             "end-selecting" -> onEndSelecting
+            "split-transaction" -> onSplitTransaction
+            "schedule-transaction" -> onScheduleTransaction
+            "delete-transaction" -> onDeleteTransaction
             else -> ({})
         }
 }

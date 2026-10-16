@@ -36,7 +36,7 @@ Shown when the combo box is tapped with more than five choices. Covers the form'
 ### Date picker (`transaction-date-picker`)
 
 - Page title `choose date`.
-- Three columns in `DatePick.columns(pattern)` order: `date-column-month`, `date-column-day`, `date-column-year`. Each loops, snaps, and highlights its centre row; rows ≥ 48 dp.
+- Three `MetroPickerColumn`s in `DatePick.columns(pattern)` order: `date-column-month`, `date-column-day`, `date-column-year` (rows tagged `<column>-<position>`). Each loops, snaps, and highlights its centre row; rows ≥ 48 dp.
 - App bar override: `done` (Save glyph, id `picker-done`) applies; `cancel` (Cancel glyph, id `picker-cancel`) and back discard.
 - No keyboard is shown at any point (FR-008).
 
@@ -76,12 +76,14 @@ fun MetroSegmentedToggle(
 )
 
 @Composable
-fun MetroDatePicker(
-    date: Int,                  // yyyyMMdd
-    columns: List<DateColumn>,  // from DatePick.columns(pattern)
-    years: IntRange,
-    onChange: (Int) -> Unit,    // already clamped by DatePick
+fun MetroPickerColumn(          // one looping, snapping strip; the app composes three into the date picker
+    count: Int,
+    position: Int,
+    label: (Int) -> Pair<String, String>,   // main text, smaller line under it
+    onPick: (Int) -> Unit,                  // fires when a fling or tap settles
+    tag: String,
     modifier: Modifier = Modifier,
+    rowHeight: Dp = 72.dp,
 )
 
 @Composable

@@ -185,4 +185,18 @@ class ScreenBarTest {
         assertTrue(ids(ShellRoute.OnboardingSignIn, password = false).isEmpty())
         assertEquals(listOf("new-budget", "refresh"), ids(ShellRoute.OnboardingFiles))
     }
+
+    @Test
+    fun transactionCommandsFollowTheTransactionKind() {
+        fun menu(kind: TransactionMenu) =
+            ScreenBar
+                .specsFor(ShellRoute.EditTransaction("a", "t"), hasBudget = true, mode = BudgetMode.ENVELOPE, transaction = kind)
+        assertEquals(listOf("save", "cancel"), menu(TransactionMenu.ORDINARY).filter { it.primary }.map { it.id })
+        assertEquals(
+            listOf("split-transaction", "schedule-transaction", "delete-transaction"),
+            menu(TransactionMenu.ORDINARY).filter { !it.primary }.map { it.id },
+        )
+        assertEquals(listOf("delete-transaction"), menu(TransactionMenu.TRANSFER).filter { !it.primary }.map { it.id })
+        assertTrue(menu(TransactionMenu.NEW).none { !it.primary })
+    }
 }

@@ -16,6 +16,8 @@ object RegisterCopy {
     const val RECONCILE_WARN = "this reconciliation will no longer match"
     const val NO_CATEGORY = "no category"
     const val SPLIT = "split"
+    const val SCHEDULE = "schedule"
+    const val DELETE = "delete"
     const val TRANSFER = "transfer"
     const val OWED = "owed"
     const val RECONCILED = "reconciled"
@@ -66,6 +68,8 @@ data class CategoryChoice(
     val name: String,
     val groupName: String,
     val income: Boolean,
+    /** The category or its group is hidden in the budget (spec 013). */
+    val hidden: Boolean = false,
 )
 
 data class AccountChoice(
@@ -249,6 +253,21 @@ object RegisterEntry {
         if (month !in 1..12) return date.toString()
         return "${Month.of(month).name.lowercase().take(3)} $day"
     }
+
+    /** A transaction whose date was picked, not typed (spec 013), so only payee and amount can be rejected. */
+    fun transaction(
+        id: String,
+        accountId: String,
+        date: Int,
+        payee: String,
+        amountText: String,
+        decimals: Int,
+        expense: Boolean,
+        categoryId: String?,
+        note: String,
+        force: Boolean = false,
+    ): EntryResult<TransactionDraft> =
+        transaction(id, accountId, formatIso(date), payee, amountText, decimals, expense, categoryId, note, force)
 
     fun transaction(
         id: String,
@@ -868,7 +887,8 @@ class RegisterBook(
         session
             .query(
                 """
-                SELECT c.id AS id, c.name AS name, c.is_income AS is_income, COALESCE(g.name, '') AS group_name
+                SELECT c.id AS id, c.name AS name, c.is_income AS is_income, COALESCE(g.name, '') AS group_name,
+                    CASE WHEN IFNULL(c.hidden, 0) = 1 OR IFNULL(g.hidden, 0) = 1 THEN 1 ELSE 0 END AS hidden
                 FROM categories c
                 LEFT JOIN category_groups g ON g.id = c.cat_group
                 WHERE IFNULL(c.tombstone, 0) = 0
@@ -880,6 +900,7 @@ class RegisterBook(
                     name = row.str("name").orEmpty(),
                     groupName = row.str("group_name").orEmpty(),
                     income = row.bool("is_income"),
+                    hidden = row.bool("hidden"),
                 )
             }
 
@@ -1038,8 +1059,7 @@ class RegisterBook(
     private fun nextSort(): Double =
         session.query("SELECT COALESCE(MAX(sort_order), 0) AS sort FROM transactions").first().double("sort") + 1.0
 
-    fun applyRulesForImport(draft: TransactionDraft): TransactionDraft =
-        applyRules(draft, draft.note?.trim()?.ifEmpty { null })
+    fun applyRulesForImport(draft: TransactionDraft): TransactionDraft = applyRules(draft, draft.note?.trim()?.ifEmpty { null })
 
     fun payeeIdForName(name: String): String = payeeFor(name)
 
