@@ -60,10 +60,25 @@ object ShellReader {
                     GROUP BY t.acct
                     """.trimIndent(),
                 ).associate { row -> row.str("acct").orEmpty() to row.long("balance") }
+        val categoryNames =
+            session
+                .query("SELECT id, name FROM categories WHERE IFNULL(tombstone, 0) = 0")
+                .associate { row -> row.str("id").orEmpty() to row.str("name").orEmpty() }
         val inbox =
             session.query(
                 """
-                SELECT t.id AS id, t.amount AS amount, COALESCE(p.name, '') AS payee
+                SELECT t.id AS id, t.amount AS amount, COALESCE(p.name, '') AS payee,
+                    t.date AS date, t.acct AS account_id, COALESCE(a.name, '') AS account_name, COALESCE(t.notes, '') AS notes,
+                    (
+                        SELECT s.category FROM transactions s
+                        JOIN categories c ON c.id = s.category AND IFNULL(c.tombstone, 0) = 0
+                        WHERE t.description IS NOT NULL
+                            AND s.description = t.description
+                            AND IFNULL(s.tombstone, 0) = 0
+                            AND s.id <> t.id
+                        ORDER BY s.date DESC, s.sort_order DESC, s.id DESC
+                        LIMIT 1
+                    ) AS suggestion_id
                 FROM transactions t
                 JOIN accounts a
                     ON a.id = t.acct
@@ -146,10 +161,17 @@ object ShellReader {
             inbox =
                 inbox.map { row ->
                     val payee = row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE }
+                    val suggestion = row.str("suggestion_id")
                     InboxRow(
                         id = row.str("id").orEmpty(),
                         payee = payee,
                         amountMinor = row.long("amount"),
+                        date = row.long("date").toInt(),
+                        accountId = row.str("account_id").orEmpty(),
+                        accountName = row.str("account_name").orEmpty(),
+                        note = row.str("notes").orEmpty().trim(),
+                        suggestionId = suggestion,
+                        suggestionName = suggestion?.let { categoryNames[it] }.orEmpty(),
                     )
                 },
         )

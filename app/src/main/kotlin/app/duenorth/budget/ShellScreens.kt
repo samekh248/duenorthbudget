@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -102,7 +103,14 @@ fun HomePivot(
     formatOptions: FormatOptions = FormatOptions(),
     onToBudget: (() -> Unit)? = null,
     notice: String? = null,
+    onAcceptInbox: (String) -> Unit = onInbox,
+    inboxFiled: List<InboxFiled> = emptyList(),
+    onInboxFiledShown: (String) -> Unit = {},
+    /** Whether the inbox should preview its swipes the next time it is the open section. */
+    inboxPeek: Boolean = false,
+    onInboxPeeked: () -> Unit = {},
 ) {
+    var section by remember { mutableIntStateOf(initialSection) }
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
     LaunchedEffect(pagerGesture, listGesture) { onGesture(pagerGesture || listGesture) }
@@ -191,6 +199,11 @@ fun HomePivot(
                             onInbox = onInbox,
                             onAdd = onAddTransaction,
                             formatOptions = formatOptions,
+                            onAccept = onAcceptInbox,
+                            filed = inboxFiled,
+                            onFiledShown = onInboxFiledShown,
+                            peek = inboxPeek && section == HomeSections.headers.indexOf(HomeSections.INBOX),
+                            onPeeked = onInboxPeeked,
                         )
                     }
                 },
@@ -198,7 +211,10 @@ fun HomePivot(
         modifier = modifier,
         initialItem = initialSection,
         onGesture = { pagerGesture = it },
-        onSelected = onSection,
+        onSelected = {
+            section = it
+            onSection(it)
+        },
     )
 }
 
@@ -433,8 +449,10 @@ fun BudgetSection(
                 }
                 // Bands alternate down the whole list, carrying on across group headings.
                 val position =
-                    (shell.groups.flatMap { g -> g.categories.map { it.id } } + shell.incomeGroups.flatMap { g -> g.categories.map { it.id } })
-                        .withIndex()
+                    (
+                        shell.groups.flatMap { g -> g.categories.map { it.id } } +
+                            shell.incomeGroups.flatMap { g -> g.categories.map { it.id } }
+                    ).withIndex()
                         .associate { it.value to it.index }
                 shell.groups.forEach { group ->
                     item(key = group.id) {
@@ -614,7 +632,13 @@ fun AccountsSection(
                     }
                 }
                 items(rows, key = { it.id }) {
-                    AccountLine(it, money(it.balanceMinor), onAccount, arrivalModifier(it.id, arrivals), banded = ledgerBanded(position.getValue(it.id)))
+                    AccountLine(
+                        it,
+                        money(it.balanceMinor),
+                        onAccount,
+                        arrivalModifier(it.id, arrivals),
+                        banded = ledgerBanded(position.getValue(it.id)),
+                    )
                 }
                 item(key = "account-gap-$id") { GroupGap() }
             }
@@ -686,65 +710,6 @@ private fun AccountLine(
                 softWrap = false,
             )
         }
-    }
-}
-
-@Composable
-fun InboxSection(
-    shell: MonthShell,
-    onListGesture: (Boolean) -> Unit,
-    onInbox: (String) -> Unit = {},
-    modifier: Modifier = Modifier,
-    onAdd: (() -> Unit)? = null,
-    formatOptions: FormatOptions = FormatOptions(),
-) {
-    if (shell.inbox.isEmpty()) {
-        Column(modifier.padding(MetroDimens.Gutter), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            MetroText(ShellCopy.NOTHING_TO_CATEGORIZE, Metro.typography.body)
-            if (onAdd != null) MetroButton("add", onClick = onAdd)
-        }
-        return
-    }
-    val list = rememberLazyListState()
-    val arrivals = remember { RowArrivals() }
-    arrivals.prime(shell.inbox.map { it.id })
-    LaunchedEffect(list) {
-        snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
-    }
-    Column(modifier.fillMaxSize()) {
-        LazyColumn(Modifier.weight(1f), state = list) {
-            items(shell.inbox, key = { it.id }) { row ->
-                InboxLine(row, shell, onInbox, arrivalModifier(row.id, arrivals), formatOptions)
-            }
-        }
-        if (onAdd != null) {
-            MetroButton("add", Modifier.padding(MetroDimens.Gutter), onClick = onAdd)
-        }
-    }
-}
-
-@Composable
-private fun InboxLine(
-    row: InboxRow,
-    shell: MonthShell,
-    onInbox: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    formatOptions: FormatOptions = FormatOptions(),
-) {
-    Row(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress { onInbox(row.id) }
-            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row),
-        verticalAlignment = Alignment.Top,
-    ) {
-        MetroText(row.payee, Metro.typography.subheader, Modifier.weight(1f).padding(end = 12.dp), maxLines = 3)
-        MetroText(
-            MoneyFormat.format(row.amountMinor, shell.currency, formatOptions),
-            Metro.typography.subheader,
-            Modifier.widthIn(max = 148.dp),
-        )
     }
 }
 
