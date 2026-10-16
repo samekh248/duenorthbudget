@@ -189,14 +189,17 @@ sealed interface EntryResult<out T> {
 }
 
 object MoneyParse {
+    /**
+     * A typed amount read with the Settings [numberFormat]: its group separator is ignored and its decimal
+     * separator ends the whole part. The default reads "1,234.56", as before format settings reached the forms.
+     */
     fun parseMagnitude(
         text: String,
         decimals: Int,
+        numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
     ): Long? {
         val body =
-            text
-                .trim()
-                .replace(",", "")
+            normalize(text.trim(), decimals, numberFormat)
                 .removePrefix("+")
                 .removePrefix("-")
         if (body.isEmpty()) return null
@@ -224,6 +227,50 @@ object MoneyParse {
         val whole = absolute / scale
         val fraction = (absolute % scale).toString().padStart(decimals, '0')
         return "$whole.$fraction"
+    }
+
+    /**
+     * An amount as it starts out in a box: the format's separators, no symbol, no sign. With hide decimals on,
+     * the fraction is left off only when it is zero, so saving never drops cents the person cannot see.
+     */
+    fun editText(
+        minor: Long,
+        decimals: Int,
+        options: FormatOptions = FormatOptions(),
+    ): String {
+        val absolute = if (minor == Long.MIN_VALUE) Long.MAX_VALUE else kotlin.math.abs(minor)
+        val (groupSep, decimalSep) = MoneyFormat.separators(options.numberFormat)
+        val scale = scale(decimals)
+        val whole = MoneyFormat.group(absolute / scale, groupSep)
+        val fraction = absolute % scale
+        if (decimals == 0 || (options.hideFraction && fraction == 0L)) return whole
+        return whole + decimalSep + fraction.toString().padStart(decimals, '0')
+    }
+
+    /** [text] rewritten as plain digits with "." for the decimal point, or left for the checks to reject. */
+    private fun normalize(
+        text: String,
+        decimals: Int,
+        numberFormat: String,
+    ): String =
+        when (numberFormat) {
+            FormatOptions.NUMBER_DOT_COMMA ->
+                if (dotIsDecimal(text, decimals)) text else text.replace(".", "").replace(",", ".")
+            FormatOptions.NUMBER_SPACE_DOT -> text.filterNot { it == ' ' || it == '\u00A0' || it == '\u202F' }
+            else -> text.replace(",", "")
+        }
+
+    /**
+     * In "1.234,56" a lone "." followed by fewer than three digits cannot be a group separator, so it is the
+     * decimal point a keyboard without a comma key typed. "12.50" reads as twelve and a half, not 1250.
+     */
+    private fun dotIsDecimal(
+        text: String,
+        decimals: Int,
+    ): Boolean {
+        if (',' in text || text.count { it == '.' } != 1) return false
+        val after = text.substringAfter('.').length
+        return after in 1..decimals && after < 3
     }
 
     private fun scale(decimals: Int): Long {
@@ -266,8 +313,9 @@ object RegisterEntry {
         categoryId: String?,
         note: String,
         force: Boolean = false,
+        numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
     ): EntryResult<TransactionDraft> =
-        transaction(id, accountId, formatIso(date), payee, amountText, decimals, expense, categoryId, note, force)
+        transaction(id, accountId, formatIso(date), payee, amountText, decimals, expense, categoryId, note, force, numberFormat)
 
     fun transaction(
         id: String,
@@ -280,11 +328,13 @@ object RegisterEntry {
         categoryId: String?,
         note: String,
         force: Boolean = false,
+        numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
     ): EntryResult<TransactionDraft> {
         val date = parseDate(dateText) ?: return EntryResult.Rejected(RegisterCopy.ENTER_DATE)
         if (payee.trim().isEmpty()) return EntryResult.Rejected(RegisterCopy.ENTER_PAYEE)
         val magnitude =
-            MoneyParse.parseMagnitude(amountText, decimals) ?: return EntryResult.Rejected(RegisterCopy.ENTER_AMOUNT)
+            MoneyParse.parseMagnitude(amountText, decimals, numberFormat)
+                ?: return EntryResult.Rejected(RegisterCopy.ENTER_AMOUNT)
         if (magnitude == 0L) return EntryResult.Rejected(RegisterCopy.AMOUNT_ZERO)
         val signed = if (expense) -magnitude else magnitude
         return EntryResult.Ok(

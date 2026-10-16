@@ -355,6 +355,7 @@ fun TransactionForm(
     modifier: Modifier = Modifier,
     dateFormat: String = FormatPrefs().dateFormat,
     numberFormat: String = FormatPrefs().numberFormat,
+    hideFraction: Boolean = FormatPrefs().hideFraction,
 ) {
     val draftId = remember(row?.id, page.account.id) { row?.id ?: UUID.randomUUID().toString() }
     var date by remember(row?.id) {
@@ -364,7 +365,12 @@ fun TransactionForm(
         mutableStateOf(if (row == null || row.payee == ShellCopy.NO_PAYEE) "" else row.payee)
     }
     var amount by remember(row?.id) {
-        mutableStateOf(row?.let { MoneyParse.formatMagnitude(it.amountMinor, page.currency.decimals) }.orEmpty())
+        mutableStateOf(
+            row
+                ?.let {
+                    MoneyParse.editText(it.amountMinor, page.currency.decimals, FormatOptions(hideFraction, numberFormat))
+                }.orEmpty(),
+        )
     }
     var expense by remember(row?.id) { mutableStateOf(row?.amountMinor?.let { it <= 0L } ?: true) }
     var note by remember(row?.id) { mutableStateOf(row?.note.orEmpty()) }
@@ -390,6 +396,7 @@ fun TransactionForm(
                     expense = expense,
                     categoryId = if (showCategories) categoryId else null,
                     note = note,
+                    numberFormat = numberFormat,
                 )
         ) {
             is EntryResult.Ok -> {

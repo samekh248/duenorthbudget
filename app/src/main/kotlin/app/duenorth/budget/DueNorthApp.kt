@@ -630,6 +630,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                     modifier = fill,
                                     dateFormat = state.formatPrefs.dateFormat,
                                     numberFormat = state.formatPrefs.numberFormat,
+                                    hideFraction = state.formatPrefs.hideFraction,
                                 )
                             }
                         }

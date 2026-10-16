@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountChoice
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.RegisterAccount
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterPage
@@ -265,6 +266,25 @@ class RegisterContentTest {
     }
 
     @Test
+    fun amountIsShownAndReadInTheChosenNumberFormat() {
+        var saved: TransactionDraft? = null
+        val host = form(numberFormat = FormatOptions.NUMBER_DOT_COMMA, onSave = { saved = it })
+        compose.onNodeWithText("12,40").assertIsDisplayed()
+        compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextReplacement("1.234,56")
+        compose.runOnIdle { host.save() }
+        assertEquals(-123_456L, saved?.amountMinor)
+    }
+
+    @Test
+    fun hideDecimalsKeepsCentsWhileEditing() {
+        var saved: TransactionDraft? = null
+        val host = form(hideFraction = true, onSave = { saved = it })
+        compose.onNodeWithText("12.40").assertIsDisplayed()
+        compose.runOnIdle { host.save() }
+        assertEquals(-1_240L, saved?.amountMinor)
+    }
+
+    @Test
     fun noteLineBreaksReadAsSpacesInTheRegister() {
         val row = sample().rows.first().copy(note = "first line\n  second")
         assertEquals("Groceries · first line second", registerDetail(row))
@@ -274,6 +294,8 @@ class RegisterContentTest {
         page: RegisterPage = sample(),
         row: RegisterRow? = sample().rows.first(),
         dateFormat: String = "MM/dd/yyyy",
+        numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
+        hideFraction: Boolean = false,
         onSave: (TransactionDraft) -> Unit = {},
     ): FormSaveHost {
         val host = FormSaveHost()
@@ -288,6 +310,8 @@ class RegisterContentTest {
                             error = null,
                             onSave = onSave,
                             dateFormat = dateFormat,
+                            numberFormat = numberFormat,
+                            hideFraction = hideFraction,
                         )
                     }
                 }

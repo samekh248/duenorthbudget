@@ -75,6 +75,7 @@
 - [ ] T026 Transaction details, category list and date picker frames in `docs/design/metro-mockups.svg` (light and dark)
 - [X] T027 Run `./gradlew ktlintCheck :core:budget:test :core:design:test :app:testDebugUnitTest :app:verifyRoborazziDebug`
 - [ ] T028 Build a debug APK and before/after screenshots for the PR
+- [X] T029 Amount box shows and reads the Settings number format; hide decimals never drops cents while editing (`MoneyParse.editText`, `parseMagnitude(numberFormat)`), tested in `AmountFormatTest.kt` and `RegisterContentTest.kt`
 
 ## Dependencies
 

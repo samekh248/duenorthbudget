@@ -265,7 +265,8 @@ object MoneyFormat {
         return if (negative) -minor else minor
     }
 
-    private fun separators(numberFormat: String): Pair<String, String> =
+    /** The group and decimal separators of a Settings number format, in that order. */
+    internal fun separators(numberFormat: String): Pair<String, String> =
         when (numberFormat) {
             FormatOptions.NUMBER_DOT_COMMA -> "." to ","
             FormatOptions.NUMBER_SPACE_DOT -> " " to "."
@@ -273,7 +274,7 @@ object MoneyFormat {
             else -> "," to "."
         }
 
-    private fun group(
+    internal fun group(
         value: Long,
         separator: String,
     ): String {
