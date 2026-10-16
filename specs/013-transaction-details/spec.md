@@ -46,7 +46,7 @@ does not change what a transaction can hold or how it is saved.
  │ [note                  ] │       │ payee                    │
  │ category                 │       │ [Bus                   ] │
  │ no category              │       │ amount                   │
- │ Groceries                │       │ [12.40     ] [exp|inc]   │
+ │ Groceries                │       │ [12.40   ] ◉exp ○inc    │
  │ Household                │       │                          │
  │ ... every category ...   │       │ category                 │
  │ [        save          ] │       │ [Groceries           ▾ ] │
@@ -171,10 +171,11 @@ existing transaction against the acceptance scenarios below.
    enough for an amount with up to seven whole digits and the budget's
    decimal places, and no wider.
 5. **Given** the amount row, **When** it is drawn, **Then** the expense and
-   income choice is a compact two-part toggle on the same line as the amount
-   box: two adjacent segments ("expense", "income") in the control text size,
-   the same height as the amount box, the chosen segment filled with the
-   accent and the other outlined. Tapping either segment picks it.
+   income choice is a pair of Windows Phone 8.1 radio buttons on the same
+   line as the amount box ("◉ expense ○ income"): a round outlined mark with
+   an accent dot for the chosen one, each label in the control text size,
+   vertically centred on the amount box. Tapping a radio button or its label
+   picks it.
 6. **Given** a long payee or note, **When** the person types it, **Then** the
    payee and note boxes span the content width (12 dp gutter on each side).
 7. **Given** the form, **When** it is drawn, **Then** every label-to-field
@@ -302,13 +303,13 @@ there and no command buttons remain in the page body.
   width.
 - **FR-017**: The amount box MUST be sized to hold seven whole digits plus
   the budget's decimal places.
-- **FR-017a**: The expense and income choice MUST be a compact two-segment
-  toggle on the same line as the amount box, to its right: segments in the
-  control text size, the same height as the amount box, the chosen segment
-  filled with the accent (text in the accent's contrast color) and the other
-  outlined in the foreground color. Together, the amount box and the toggle
-  MUST fit the content width of a Pixel 6a-class phone at the default font
-  size.
+- **FR-017a**: The expense and income choice MUST be a pair of Windows Phone
+  8.1 radio buttons on the same line as the amount box, to its right: a round
+  outlined mark in the foreground color with an accent dot inside the chosen
+  one, and its label in the control text size. Each radio button's tap area
+  (mark plus label) MUST be at least 48 dp tall. Together, the amount box and
+  the radio buttons MUST fit the content width of a Pixel 6a-class phone at
+  the default font size.
 - **FR-018**: Payee and note MUST span the content width.
 - **FR-019**: All sized fields MUST grow with the system font size and MUST
   NOT exceed the content width.
@@ -364,7 +365,7 @@ there and no command buttons remain in the page body.
   keyboard, and no typed-date format error can occur.
 - **SC-004**: The date box and amount box each take less than half the
   content width at the default font size, and the amount box and the
-  expense/income toggle share one line.
+  expense/income radio buttons share one line.
 - **SC-005**: Every field on the screen can be identified by its label with
   a value filled in, in light and dark.
 - **SC-006**: No command buttons remain in the page body; all five commands
@@ -391,10 +392,11 @@ there and no command buttons remain in the page body.
   length, so they keep the full width.
 - Seven whole digits (up to 9,999,999) covers everyday transactions; larger
   amounts still type and scroll within the box.
-- Expense and income stay a two-way choice rather than becoming a combo
-  box, drawn as a compact segmented toggle so it fits on the amount's line.
-  At font sizes where the amount box and toggle no longer fit side by side,
-  the toggle wraps to the line directly under the amount box rather than
+- Expense and income use the Windows Phone 8.1 radio button, the platform's
+  control for picking one of a few named options. A toggle switch was set
+  aside because it reads as on/off, and Windows Phone 8.1 has no segmented
+  control. At font sizes where the amount box and radio buttons no longer fit
+  side by side, the radio buttons wrap to the line directly under the amount box rather than
   shrinking below the 48 dp touch target.
 - The full-screen category list shows hidden categories only when the
   transaction already uses one; otherwise hidden categories are left out,
