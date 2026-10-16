@@ -159,7 +159,7 @@ private fun RegisterList(
                 RegisterLine(
                     row,
                     page,
-                    banded = position.getValue(row.id) % 2 == 1,
+                    banded = ledgerBanded(position.getValue(row.id)),
                     picked = selection?.let { row.id in it },
                     onPress = { onPress(row.id) },
                     onLongPress = { onLongPress(row.id) },
@@ -194,11 +194,10 @@ private fun RegisterLine(
     onLongPress: () -> Unit,
 ) {
     val accent = Metro.accent.text
-    val band = if (Metro.colors.isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.035f)
     val fill =
         when {
             picked == true -> accent.copy(alpha = 0.10f)
-            banded -> band
+            banded -> ledgerBand
             else -> Color.Transparent
         }
     val bar = if (row.cleared) accent else Metro.colors.secondary.copy(alpha = 0.22f)
@@ -209,10 +208,10 @@ private fun RegisterLine(
         Modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
+            .ledgerFill(fill)
             .drawBehind {
-                // The band runs past the screen gutter to the edges; the bar sits at the right edge.
+                // The bar sits at the right edge, past the screen gutter.
                 val gutter = MetroDimens.Gutter.toPx()
-                drawRect(fill, Offset(-gutter, 0f), Size(size.width + 2 * gutter, size.height))
                 val inset = 6.dp.toPx()
                 val left = size.width + gutter - CLEARED_BAR_INSET.toPx() - CLEARED_BAR.toPx()
                 drawRect(bar, Offset(left, inset), Size(CLEARED_BAR.toPx(), size.height - 2 * inset))

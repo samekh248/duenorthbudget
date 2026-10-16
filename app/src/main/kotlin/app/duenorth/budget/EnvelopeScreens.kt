@@ -341,12 +341,14 @@ fun CategoryLine(
     onOpen: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
     formatOptions: FormatOptions = FormatOptions(),
+    banded: Boolean = false,
 ) {
     val money = shell.currency
     Box(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
+            .ledgerFill(if (banded) ledgerBand else Color.Transparent)
             .then(if (onOpen != null) Modifier.metroPress { onOpen(category.id) } else Modifier)
             .testTag("category-${category.id}"),
     ) {
@@ -378,16 +380,6 @@ fun CategoryLine(
                 Metro.typography.body,
                 Metro.accent.text,
                 "category-available-${category.id}",
-            )
-        }
-        Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter)) {
-            Spacer(Modifier.weight(LEDGER_NAME))
-            Box(
-                Modifier
-                    .weight(LEDGER_FIGURE * 3)
-                    .height(1.dp)
-                    .background(if (Metro.colors.isDark) Metro.colors.outline else Metro.colors.chrome)
-                    .testTag("category-rule-${category.id}"),
             )
         }
     }

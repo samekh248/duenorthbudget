@@ -305,7 +305,6 @@ class ShellContentTest {
         val available = compose.onNodeWithTag("category-available-c-food", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val headBudgeted = compose.onNodeWithTag("ledger-budgeted", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val headAvailable = compose.onNodeWithTag("ledger-available", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val rule = compose.onNodeWithTag("category-rule-c-food", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("name stays left of budgeted: $name vs $budgeted", name.right <= budgeted.left + 1f)
         assertTrue("spent follows budgeted: $budgeted vs $spent", budgeted.right <= spent.left + 1f)
         assertTrue("available follows spent: $spent vs $available", spent.right <= available.left + 1f)
@@ -314,9 +313,6 @@ class ShellContentTest {
             "available column lines up: $available vs $headAvailable",
             kotlin.math.abs(available.right - headAvailable.right) <= 1f,
         )
-        assertTrue("rule starts at the figures: $rule vs $name", rule.left + 1f >= name.right)
-        assertTrue("rule ends with available: $rule vs $available", kotlin.math.abs(rule.right - available.right) <= 1f)
-        assertTrue("rule sits under the figures: $rule vs $available", rule.top >= available.top)
     }
 
     @Test

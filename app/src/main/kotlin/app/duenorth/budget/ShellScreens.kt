@@ -431,6 +431,11 @@ fun BudgetSection(
                 if (shell.groups.any { it.categories.isNotEmpty() }) {
                     item(key = "ledger-headings") { LedgerHeadings() }
                 }
+                // Bands alternate down the whole list, carrying on across group headings.
+                val position =
+                    (shell.groups.flatMap { g -> g.categories.map { it.id } } + shell.incomeGroups.flatMap { g -> g.categories.map { it.id } })
+                        .withIndex()
+                        .associate { it.value to it.index }
                 shell.groups.forEach { group ->
                     item(key = group.id) {
                         GroupLine(
@@ -441,7 +446,13 @@ fun BudgetSection(
                         )
                     }
                     items(group.categories, key = { "category-${it.id}" }) { category ->
-                        CategoryLine(category, shell, onCategory, formatOptions = formatOptions)
+                        CategoryLine(
+                            category,
+                            shell,
+                            onCategory,
+                            formatOptions = formatOptions,
+                            banded = ledgerBanded(position.getValue(category.id)),
+                        )
                     }
                     item(key = "gap-${group.id}") { GroupGap() }
                 }
@@ -454,7 +465,13 @@ fun BudgetSection(
                         )
                     }
                     items(group.categories, key = { "income-category-${it.id}" }) { category ->
-                        IncomeCategoryLine(category, shell, onCategory, formatOptions = formatOptions)
+                        IncomeCategoryLine(
+                            category,
+                            shell,
+                            onCategory,
+                            formatOptions = formatOptions,
+                            banded = ledgerBanded(position.getValue(category.id)),
+                        )
                     }
                     item(key = "income-gap-${group.id}") { GroupGap() }
                 }
@@ -578,6 +595,8 @@ fun AccountsSection(
             Triple("off-budget", ShellCopy.OFF_BUDGET, open.filter { it.offBudget }),
         ).filter { it.third.isNotEmpty() }
     val closed = accounts.filter { it.closed }
+    // Bands alternate down the whole list, carrying on across group headings.
+    val position = (groups.flatMap { it.third } + closed).withIndex().associate { it.value.id to it.index }
     var showClosed by rememberSaveable { mutableStateOf(false) }
     val money = { minor: Long -> MoneyFormat.format(minor, shell.currency, formatOptions) }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
@@ -595,7 +614,7 @@ fun AccountsSection(
                     }
                 }
                 items(rows, key = { it.id }) {
-                    AccountLine(it, money(it.balanceMinor), onAccount, arrivalModifier(it.id, arrivals))
+                    AccountLine(it, money(it.balanceMinor), onAccount, arrivalModifier(it.id, arrivals), banded = ledgerBanded(position.getValue(it.id)))
                 }
                 item(key = "account-gap-$id") { GroupGap() }
             }
@@ -614,7 +633,14 @@ fun AccountsSection(
                 }
                 if (showClosed) {
                     items(closed, key = { it.id }) {
-                        AccountLine(it, money(it.balanceMinor), onAccount, arrivalModifier(it.id, arrivals), dim = true)
+                        AccountLine(
+                            it,
+                            money(it.balanceMinor),
+                            onAccount,
+                            arrivalModifier(it.id, arrivals),
+                            dim = true,
+                            banded = ledgerBanded(position.getValue(it.id)),
+                        )
                     }
                 }
             }
@@ -622,7 +648,7 @@ fun AccountsSection(
     }
 }
 
-/** One account under its group, in the category rows' body type, without rules. */
+/** One account under its group, in the category rows' body type, on a band when [banded]. */
 @Composable
 private fun AccountLine(
     account: AccountRow,
@@ -630,11 +656,13 @@ private fun AccountLine(
     onAccount: (String) -> Unit,
     modifier: Modifier = Modifier,
     dim: Boolean = false,
+    banded: Boolean = false,
 ) {
     Box(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
+            .ledgerFill(if (banded) ledgerBand else Color.Transparent)
             .metroPress { onAccount(account.id) }
             .testTag("account-${account.id}"),
     ) {
