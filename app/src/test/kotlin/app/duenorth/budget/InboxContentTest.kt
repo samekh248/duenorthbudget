@@ -1,5 +1,8 @@
 package app.duenorth.budget
 
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -19,12 +22,14 @@ import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.YearMonth
+import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
@@ -47,14 +52,28 @@ class InboxContentTest {
         val accepted = mutableListOf<String>()
         val opened = mutableListOf<String>()
         show(sampleInbox(), onAccept = { accepted += it }, onInbox = { opened += it })
-        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { swipeRight() }
+        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { swipeRight(startX = width * 0.2f, endX = right) }
         compose.waitForIdle()
         assertEquals(listOf("coffee"), accepted)
-        compose.onNodeWithTag("inbox-row-shell").performTouchInput { swipeLeft() }
+        compose.onNodeWithTag("inbox-row-shell").performTouchInput { swipeLeft(startX = width * 0.8f, endX = left) }
         compose.waitForIdle()
         assertEquals(listOf("shell"), opened)
         compose.onNodeWithTag("inbox-row-atm").performClick()
         assertEquals(listOf("shell", "atm"), opened)
+    }
+
+    @Test
+    fun dragsFromTheEdgesAreLeftToThePivot() {
+        val accepted = mutableListOf<String>()
+        val opened = mutableListOf<String>()
+        var pivotDragged = 0f
+        show(sampleInbox(), onAccept = { accepted += it }, onInbox = { opened += it }, onPivotDrag = { pivotDragged += abs(it) })
+        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { swipeRight(startX = width * 0.05f, endX = right) }
+        compose.onNodeWithTag("inbox-row-shell").performTouchInput { swipeLeft(startX = width * 0.95f, endX = left) }
+        compose.waitForIdle()
+        assertEquals(emptyList<String>(), accepted)
+        assertEquals(emptyList<String>(), opened)
+        assertTrue(pivotDragged > 0f)
     }
 
     @Test
@@ -85,10 +104,13 @@ class InboxContentTest {
         onInbox: (String) -> Unit = {},
         filed: List<InboxFiled> = emptyList(),
         onFiledShown: (String) -> Unit = {},
+        onPivotDrag: (Float) -> Unit = {},
     ) {
         compose.setContent {
             MetroTheme {
-                Box(Modifier.width(390.dp).height(780.dp)) {
+                // Stands in for the pivot, which takes horizontal drags the rows leave alone.
+                val pivot = rememberDraggableState(onPivotDrag)
+                Box(Modifier.width(390.dp).height(780.dp).draggable(pivot, Orientation.Horizontal)) {
                     InboxSection(
                         shell = shell(inbox),
                         onListGesture = {},

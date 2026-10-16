@@ -4,7 +4,10 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +35,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
@@ -347,12 +351,22 @@ private fun InboxLine(
                 .ledgerFill(if (offset.value != 0f) Metro.colors.background else fill)
                 .ledgerFill(if (offset.value != 0f) fill else Color.Transparent)
                 .pointerInput(row.id) {
-                    detectHorizontalDragGestures(
-                        onDragEnd = { settle() },
-                        onDragCancel = { settle() },
-                    ) { change, dx ->
-                        change.consume()
-                        scope.launch { offset.snapTo(offset.value + dx) }
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        // Drags that start near either edge are left to the pivot, so its swipe still works over the list.
+                        val edge = size.width * SWIPE_DEAD_ZONE
+                        if (down.position.x < edge || down.position.x > size.width - edge) return@awaitEachGesture
+                        val drag =
+                            awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
+                                change.consume()
+                                scope.launch { offset.snapTo(offset.value + over) }
+                            } ?: return@awaitEachGesture
+                        horizontalDrag(drag.id) { change ->
+                            val dx = change.positionChange().x
+                            change.consume()
+                            scope.launch { offset.snapTo(offset.value + dx) }
+                        }
+                        settle()
                     }
                 }.metroPress { categorize(row.id) }
                 .padding(vertical = INBOX_ROW_AIR),
@@ -418,6 +432,9 @@ private val INBOX_ROW_AIR = 15.dp
 
 /** A swipe past this share of the row's width files it; less springs back. */
 private const val COMMIT = 0.35f
+
+/** The share of the row at each side where a drag belongs to the pivot, not the row. */
+internal const val SWIPE_DEAD_ZONE = 0.1f
 private const val PEEK_REACH = 0.3f
 private const val PEEK_DELAY_MS = 500L
 private const val PEEK_MS = 320
