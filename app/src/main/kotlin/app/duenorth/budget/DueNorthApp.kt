@@ -221,6 +221,11 @@ fun DueNorthApp(model: ShellViewModel) {
                         importAccountId = accountId
                         importLauncher.launch("*/*")
                     },
+                    onBankSync = {
+                        val accountId =
+                            (state.route as? ShellRoute.Register)?.accountId ?: return@ScreenBarHandlers
+                        model.fetchBankTransactions(accountId)
+                    },
                     onSave = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.confirmImport()
@@ -294,7 +299,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onAcceptInbox = model::acceptInbox,
                                 inboxFiled = state.inboxFiled,
                                 onInboxFiledShown = model::inboxFiledShown,
-                                inboxPeek = !state.inboxPeeked,
+                                inboxPeek = !state.settings.inboxSwipeShown,
                                 onInboxPeeked = model::inboxPeeked,
                                 inboxActions =
                                     remember(model) {
@@ -574,12 +579,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                         importAccountId = route.accountId
                                         importLauncher.launch("*/*")
                                     },
-                                    onFetch =
-                                        if (state.registerBankLinked) {
-                                            { model.fetchBankTransactions(route.accountId) }
-                                        } else {
-                                            null
-                                        },
                                     modifier = fill,
                                 )
                             }

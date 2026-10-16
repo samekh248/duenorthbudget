@@ -34,6 +34,15 @@ class InstanceSettingsTest {
     }
 
     @Test
+    fun inboxSwipePreviewIsRememberedAcrossLaunches() {
+        val root = tempRoot()
+        val library = BudgetLibrary(root, JdbcSessionOpener(), BudgetClock { LocalDate.of(2026, 10, 7) })
+        assertTrue(!library.settings().inboxSwipeShown)
+        library.updateSettings { it.copy(inboxSwipeShown = true) }
+        assertTrue(BudgetLibrary(root, JdbcSessionOpener(), BudgetClock { LocalDate.of(2026, 10, 7) }).settings().inboxSwipeShown)
+    }
+
+    @Test
     fun atMostOneActiveAndRemoveNonActiveLeavesBudgets() {
         val root = tempRoot()
         val library = BudgetLibrary(root, JdbcSessionOpener(), BudgetClock { LocalDate.of(2026, 10, 7) })

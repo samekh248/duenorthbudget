@@ -513,13 +513,36 @@ object AppGlyphInk {
                 drawLine(color, Offset(w / 2, 1.dp.toPx()), Offset(w / 2, 4.dp.toPx()), strokeWidth = 1.6.dp.toPx())
                 drawLine(color, Offset(w / 2, h - 1.dp.toPx()), Offset(w / 2, h - 4.dp.toPx()), strokeWidth = 1.6.dp.toPx())
             }
+            // Two arrows chasing each other round a circle, the WP8.1 sync mark (distinct from transfer's straight arrows).
             AppGlyph.Sync -> {
-                drawLine(color, Offset(4.dp.toPx(), 7.dp.toPx()), Offset(16.dp.toPx(), 7.dp.toPx()), strokeWidth = 1.6.dp.toPx())
-                drawLine(color, Offset(13.dp.toPx(), 4.dp.toPx()), Offset(17.dp.toPx(), 7.dp.toPx()), strokeWidth = 1.6.dp.toPx())
-                drawLine(color, Offset(13.dp.toPx(), 10.dp.toPx()), Offset(17.dp.toPx(), 7.dp.toPx()), strokeWidth = 1.6.dp.toPx())
-                drawLine(color, Offset(18.dp.toPx(), 15.dp.toPx()), Offset(6.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.6.dp.toPx())
-                drawLine(color, Offset(9.dp.toPx(), 12.dp.toPx()), Offset(5.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.6.dp.toPx())
-                drawLine(color, Offset(9.dp.toPx(), 18.dp.toPx()), Offset(5.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                val radius = 6.5.dp.toPx()
+                val center = Offset(w / 2, h / 2)
+                val head = 3.dp.toPx()
+                listOf(200f, 20f).forEach { start ->
+                    drawArc(
+                        color,
+                        startAngle = start,
+                        sweepAngle = 130f,
+                        useCenter = false,
+                        topLeft = Offset(center.x - radius, center.y - radius),
+                        size =
+                            androidx.compose.ui.geometry
+                                .Size(radius * 2, radius * 2),
+                        style = stroke,
+                    )
+                    val end = Math.toRadians((start + 130f).toDouble())
+                    val tip = Offset(center.x + radius * kotlin.math.cos(end).toFloat(), center.y + radius * kotlin.math.sin(end).toFloat())
+                    val heading = kotlin.math.atan2(kotlin.math.cos(end), -kotlin.math.sin(end))
+                    listOf(150.0, -150.0).forEach { spread ->
+                        val back = heading + Math.toRadians(spread)
+                        drawLine(
+                            color,
+                            tip,
+                            Offset(tip.x + head * kotlin.math.cos(back).toFloat(), tip.y + head * kotlin.math.sin(back).toFloat()),
+                            strokeWidth = 1.6.dp.toPx(),
+                        )
+                    }
+                }
             }
             AppGlyph.Payees -> {
                 drawCircle(color, radius = 3.5.dp.toPx(), center = Offset(w / 2, 7.dp.toPx()), style = stroke)

@@ -12,5 +12,4 @@ object ImportCopy {
     const val CONFIRM = "confirm"
     const val CANCEL = "cancel"
     const val IMPORT_FILE = "import file"
-    const val FETCH = "fetch"
 }

@@ -343,8 +343,6 @@ data class ShellUiState(
     val homeSection: Int = 0,
     /** Inbox rows just filed, kept on screen while their confirmation plays. */
     val inboxFiled: List<InboxFiled> = emptyList(),
-    /** Whether the inbox has already shown its swipe preview this run. */
-    val inboxPeeked: Boolean = false,
     /** Set while a transaction form was opened from the inbox, so saving it goes back home. */
     val editFromInbox: Boolean = false,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
@@ -1451,8 +1449,13 @@ class ShellViewModel(
         _state.update { state -> state.copy(inboxFiled = state.inboxFiled.filterNot { it.row.id == transactionId }) }
     }
 
+    /** The swipe preview plays on the first inbox visit ever, so this is remembered across launches. */
     fun inboxPeeked() {
-        _state.update { it.copy(inboxPeeked = true) }
+        if (_state.value.settings.inboxSwipeShown) return
+        _state.update { it.copy(settings = it.settings.copy(inboxSwipeShown = true)) }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { library.updateSettings { it.copy(inboxSwipeShown = true) } }
+        }
     }
 
     private fun fileInbox(
