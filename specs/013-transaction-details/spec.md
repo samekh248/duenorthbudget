@@ -38,9 +38,9 @@ does not change what a transaction can hold or how it is saved.
 ```text
  Today                              After
  ┌──────────────────────────┐       ┌──────────────────────────┐
- │ Bus                      │       │ VISA                     │
+ │ Bus                      │       │ ACCOUNTS                 │
  │ [2026-10-01            ] │       │ transaction              │
- │ [Bus                   ] │       │                          │
+ │ [Bus                   ] │       │ Visa                     │
  │ [12.40                 ] │       │ date                     │
  │ expense  income          │       │ [Thu 10/1/2026 ▾]        │
  │ [note                  ] │       │ payee                    │
@@ -157,9 +157,11 @@ existing transaction against the acceptance scenarios below.
 **Acceptance Scenarios**:
 
 1. **Given** a transaction in the "Visa" account, **When** the details
-   screen opens, **Then** the top of the page reads "VISA" in the small
-   uppercase title line over "transaction" in the page-title size, and the
-   payee is no longer used as the page title.
+   screen opens, **Then** the top of the page reads "ACCOUNTS" in the small
+   uppercase title line, then "transaction" in the page-title size, then
+   "Visa" (the account name as stored) in the subheader size and secondary
+   color on its own line under the title. The payee is no longer used as the
+   page title.
 2. **Given** any field with a value, **When** the screen is shown, **Then**
    the field's name ("date", "payee", "amount", "category", "note") is shown
    above it in lowercase secondary text, and stays shown after a value is
@@ -257,9 +259,11 @@ there and no command buttons remain in the page body.
 **Page**
 
 - **FR-001**: The transaction details screen MUST show the Windows Phone 8.1
-  title area: the account's name in the small uppercase title line over the
-  lowercase page title "transaction". This holds for new and existing
-  transactions.
+  title area: "ACCOUNTS" in the small uppercase title line, over the
+  lowercase page title "transaction", followed by the account's name as
+  stored, in the subheader size and secondary color, a small step (6 dp)
+  under the title. The first field label sits one 24 dp grid step below the
+  account name. This holds for new and existing transactions.
 - **FR-002**: Every field MUST have a persistent lowercase label above it in
   secondary text. Placeholder text inside a field MAY remain as a hint but
   MUST NOT be the only label.
@@ -389,10 +393,9 @@ there and no command buttons remain in the page body.
   for five or fewer items, opens a full-screen picker above that), and page
   commands on the application bar. The five-item threshold is the
   platform's own rule.
-- The small title line names the account the register is open on (for
-  example "VISA"), matching the constitution's example of a page opened
-  from a section. If the app's title rule names the section ("ACCOUNTS")
-  for this route instead, the plan follows the app's existing rule.
+- The small title line names the home section (ACCOUNTS), and the account
+  the register is open on gets its own line under the page title (decided
+  2026-10-16).
 - The page title is "transaction" for both new and existing transactions.
   The payee shows in its own field.
 - "Make the field only as long as it needs to be" applies to fields whose
