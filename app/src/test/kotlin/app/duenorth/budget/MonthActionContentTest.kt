@@ -224,7 +224,6 @@ class MonthActionContentTest {
                     HomePivot(
                         shell = shell,
                         review = null,
-                        netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
                         openMonth = shell.month,
@@ -323,7 +322,6 @@ class MonthActionContentTest {
                     HomePivot(
                         shell = shell.copy(mode = mode.value),
                         review = null,
-                        netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
                         openMonth = shell.month,

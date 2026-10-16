@@ -1,6 +1,6 @@
 # Contract: Reports
 
-Reader: `ReportsReader` (read only). Screen: `ReportScreens.kt`, a pivot titled `reports` with items `cash flow`, `net worth`, `spending`. Opened from Home `•••` → `reports`.
+Reader: `ReportsReader` (read only). Opened from Home `•••` → `reports`, the reporting hub: a top-level view titled `reports` that lists `net worth` (today's total; opens the on/off budget totals that used to be a home pivot item), `cash flow`, `net worth by month`, and `spending`. Tag `reports-hub`. The last three open `ReportScreens.kt`'s pivot titled `reports`, with items `cash flow`, `net worth`, `spending`, at the one tapped.
 
 ## Range
 

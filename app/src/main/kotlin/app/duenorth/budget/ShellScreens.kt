@@ -54,7 +54,6 @@ import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
-import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.monthLabel
@@ -80,7 +79,6 @@ import java.time.YearMonth
 fun HomePivot(
     shell: MonthShell?,
     review: MonthReviewPage?,
-    netWorth: NetWorthPage?,
     upcoming: List<UpcomingScheduleRow>,
     loading: Boolean,
     openMonth: YearMonth,
@@ -91,7 +89,6 @@ fun HomePivot(
     onAccount: (String) -> Unit = {},
     onInbox: (String) -> Unit = {},
     onReviewCategory: (String) -> Unit = {},
-    onNetWorthIncludeOffBudget: (Boolean) -> Unit = {},
     onPostSchedule: (String) -> Unit = {},
     onSkipSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -172,13 +169,6 @@ fun HomePivot(
                         loading = loading,
                         onListGesture = { listGesture = it },
                         onCategory = onReviewCategory,
-                    )
-                },
-                PivotItem(HomeSections.NET_WORTH) {
-                    NetWorthSection(
-                        page = netWorth,
-                        loading = loading,
-                        onIncludeOffBudget = onNetWorthIncludeOffBudget,
                     )
                 },
                 PivotItem(HomeSections.INBOX) {
@@ -433,8 +423,10 @@ fun BudgetSection(
                 }
                 // Bands alternate down the whole list, carrying on across group headings.
                 val position =
-                    (shell.groups.flatMap { g -> g.categories.map { it.id } } + shell.incomeGroups.flatMap { g -> g.categories.map { it.id } })
-                        .withIndex()
+                    (
+                        shell.groups.flatMap { g -> g.categories.map { it.id } } +
+                            shell.incomeGroups.flatMap { g -> g.categories.map { it.id } }
+                    ).withIndex()
                         .associate { it.value to it.index }
                 shell.groups.forEach { group ->
                     item(key = group.id) {
@@ -614,7 +606,13 @@ fun AccountsSection(
                     }
                 }
                 items(rows, key = { it.id }) {
-                    AccountLine(it, money(it.balanceMinor), onAccount, arrivalModifier(it.id, arrivals), banded = ledgerBanded(position.getValue(it.id)))
+                    AccountLine(
+                        it,
+                        money(it.balanceMinor),
+                        onAccount,
+                        arrivalModifier(it.id, arrivals),
+                        banded = ledgerBanded(position.getValue(it.id)),
+                    )
                 }
                 item(key = "account-gap-$id") { GroupGap() }
             }

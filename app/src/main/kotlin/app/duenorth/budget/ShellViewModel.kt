@@ -216,8 +216,17 @@ sealed interface ShellRoute {
     ) : ShellRoute,
         StackRoute
 
-    // Spec 010 US4.
+    // Spec 010 US4. Reports is the reporting hub; each report opens from it.
     data object Reports : ShellRoute, StackRoute
+
+    /** Reports → net worth: today's on and off budget totals. */
+    data object NetWorth : ShellRoute, StackRoute
+
+    /** Reports → a report over a month range, opened at its pivot [item]. */
+    data class ReportPivot(
+        val item: Int,
+    ) : ShellRoute,
+        StackRoute
 
     // Spec 010 US5.
     data object Templates : ShellRoute, StackRoute

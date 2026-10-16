@@ -19,6 +19,13 @@ object ReportsCopy {
     const val UNCATEGORIZED = "uncategorized"
     const val NO_PAYEE = "no payee"
     const val NOTHING = "nothing in this range"
+
+    // The reports hub: one line per report, under what it shows.
+    const val NET_WORTH_TODAY = "on and off budget, as of today"
+    const val CASH_FLOW_NOTE = "income and expenses by month"
+    const val NET_WORTH_BY_MONTH = "net worth by month"
+    const val NET_WORTH_BY_MONTH_NOTE = "how the total moved over time"
+    const val SPENDING_NOTE = "by category, group or payee"
 }
 
 /** Inclusive month range. */

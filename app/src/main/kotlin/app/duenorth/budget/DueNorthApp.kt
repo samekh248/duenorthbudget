@@ -282,7 +282,6 @@ fun DueNorthApp(model: ShellViewModel) {
                             HomePivot(
                                 shell = state.shell,
                                 review = state.monthReview,
-                                netWorth = state.netWorth,
                                 upcoming = state.upcoming,
                                 loading = state.loading,
                                 openMonth = state.openMonth,
@@ -293,7 +292,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onAccount = model::openAccount,
                                 onInbox = model::openInbox,
                                 onReviewCategory = model::openReviewCategory,
-                                onNetWorthIncludeOffBudget = model::setNetWorthIncludeOffBudget,
                                 onPostSchedule = model::postSchedule,
                                 onSkipSchedule = model::skipSchedule,
                                 modifier = fill,
@@ -855,6 +853,20 @@ fun DueNorthApp(model: ShellViewModel) {
                         }
                         ShellRoute.Rules -> RulesScreen(state.rulesList, model::openRule, fill)
                         ShellRoute.Reports ->
+                            ReportsHubScreen(
+                                netWorth = state.netWorth,
+                                onNetWorth = model::openNetWorth,
+                                onReport = model::openReport,
+                                modifier = fill,
+                            )
+                        ShellRoute.NetWorth ->
+                            NetWorthSection(
+                                page = state.netWorth,
+                                loading = state.loading,
+                                onIncludeOffBudget = model::setNetWorthIncludeOffBudget,
+                                modifier = fill,
+                            )
+                        is ShellRoute.ReportPivot ->
                             ReportsScreen(
                                 page = state.reports,
                                 loading = state.reportsLoading,
@@ -866,6 +878,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onGroupBy = model::setReportGroupBy,
                                 onIncludeOffBudget = model::setReportIncludeOffBudget,
                                 modifier = fill,
+                                initialItem = route.item,
                             )
                         is ShellRoute.BankLink -> {
                             val ui = state.bankLink

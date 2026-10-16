@@ -7,6 +7,9 @@ import androidx.compose.ui.test.performClick
 import app.duenorth.budget.ParityTestSupport.await
 import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsCopy
@@ -96,6 +99,8 @@ class ReportContentTest {
         val (model, _) = household("reports")
         model.openReports()
         assertEquals(ShellRoute.Reports, model.state.value.route)
+        model.openReport(ReportItems.CASH_FLOW)
+        assertEquals(ShellRoute.ReportPivot(ReportItems.CASH_FLOW), model.state.value.route)
         await { model.state.value.reports != null && !model.state.value.reportsLoading }
         assertEquals(
             6,
@@ -121,6 +126,50 @@ class ReportContentTest {
         assertEquals(0L, empty.cashFlow.incomeMinor)
         assertTrue(empty.spending.rows.isEmpty())
         model.back()
+        assertEquals(ShellRoute.Reports, model.state.value.route)
+        model.back()
         assertEquals(ShellRoute.Home, model.state.value.route)
+    }
+
+    @Test
+    fun hubListsEveryReportAndOpensIt() {
+        val opened = mutableStateOf<Int?>(null)
+        val netWorth = mutableStateOf(false)
+        val page =
+            NetWorthPage(
+                currency = Currencies.byCode("USD")!!,
+                onBudgetMinor = 100_000,
+                offBudgetMinor = 25_000,
+                includeOffBudget = true,
+            )
+        compose.setContent {
+            MetroTheme {
+                ReportsHubScreen(
+                    netWorth = page,
+                    onNetWorth = { netWorth.value = true },
+                    onReport = { opened.value = it },
+                )
+            }
+        }
+        compose.onNodeWithText("${MoneyFormat.format(125_000, page.currency)} today").assertExists()
+        compose.onNodeWithTag("reports-hub-networth").performClick()
+        assertTrue(netWorth.value)
+        compose.onNodeWithTag("reports-hub-cashflow").performClick()
+        assertEquals(ReportItems.CASH_FLOW, opened.value)
+        compose.onNodeWithTag("reports-hub-networth-months").performClick()
+        assertEquals(ReportItems.NET_WORTH, opened.value)
+        compose.onNodeWithTag("reports-hub-spending").performClick()
+        assertEquals(ReportItems.SPENDING, opened.value)
+    }
+
+    @Test
+    fun netWorthOpensFromReportsNotHome() {
+        assertTrue(ReportsCopy.NET_WORTH !in HomeSections.headers)
+        val (model, _) = household("networth")
+        model.openReports()
+        model.openNetWorth()
+        assertEquals(ShellRoute.NetWorth, model.state.value.route)
+        model.back()
+        assertEquals(ShellRoute.Reports, model.state.value.route)
     }
 }
