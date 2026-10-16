@@ -88,7 +88,7 @@ class InboxContentTest {
         )
         compose.onNodeWithTag("inbox-row-coffee").performTouchInput { longClick() }
         compose.onNodeWithTag("inbox-menu").assertIsDisplayed()
-        listOf("accept dining", "categorize", "edit", "split", "schedule", "delete", "go to visa").forEach {
+        listOf("accept", "categorize", "edit", "split", "schedule", "delete", "go to visa").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
         compose.onNodeWithText("split").performClick()

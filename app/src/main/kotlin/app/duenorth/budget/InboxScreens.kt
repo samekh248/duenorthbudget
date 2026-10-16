@@ -198,9 +198,7 @@ internal fun inboxMenuItems(
     actions: InboxActions,
 ): List<Pair<String, () -> Unit>> =
     listOfNotNull(
-        row.suggestionName.takeIf { row.suggestionId != null && it.isNotBlank() }?.let { name ->
-            "${InboxCopy.ACCEPT} ${name.lowercase()}" to { onAccept(row.id) }
-        },
+        row.suggestionId?.let { InboxCopy.ACCEPT to { onAccept(row.id) } },
         InboxCopy.CATEGORIZE to { onCategorize(row.id) },
         InboxCopy.EDIT to { actions.onDetails(row.id) },
         InboxCopy.SPLIT to { actions.onSplit(row.id) },
