@@ -52,7 +52,7 @@ does not change what a transaction can hold or how it is saved.
  │ [        save          ] │       │ [Groceries           ▾ ] │
  │ [        split         ] │       │ note                     │
  │ [       schedule       ] │       │ [                      ] │
- │ [        delete        ] │       │                          │
+ │ [        delete        ] │       │ [                      ] │
  │  (o)  (o)           ...  │       │  (✓)  (✕)           ...  │
  └──────────────────────────┘       └──────────────────────────┘
                                      ... menu: split, schedule, delete
@@ -177,6 +177,8 @@ existing transaction against the acceptance scenarios below.
    accent and the other outlined. Tapping either segment picks it.
 6. **Given** a long payee or note, **When** the person types it, **Then** the
    payee and note boxes span the content width (12 dp gutter on each side).
+   The note box wraps long text onto new lines instead of scrolling
+   sideways.
 7. **Given** the form, **When** it is drawn, **Then** every label-to-field
    gap is the same small step, every field-group-to-next-label gap is the
    same larger step, all gaps fall on the Metro 2 grid, and the left edges of
@@ -221,6 +223,9 @@ there and no command buttons remain in the page body.
 
 ### Edge Cases
 
+- A note with line breaks: the register's one-line detail under the payee
+  shows the note with each line break read as a space, cut to fit as today.
+  The note keeps its line breaks when stored and synced.
 - A budget with only "no category" and one other category: the combo box
   unfolds in place (five or fewer choices).
 - A budget with hundreds of categories: the full-screen list scrolls
@@ -310,6 +315,10 @@ there and no command buttons remain in the page body.
   MUST fit the content width of a Pixel 6a-class phone at the default font
   size.
 - **FR-018**: Payee and note MUST span the content width.
+- **FR-018a**: The note MUST be a multiline box: it opens two lines tall,
+  wraps long text, accepts line breaks from the keyboard's return key, and
+  grows with its text up to six lines, then scrolls inside the box. The page
+  MUST keep the line being typed visible above the keyboard.
 - **FR-019**: All sized fields MUST grow with the system font size and MUST
   NOT exceed the content width.
 - **FR-020**: Spacing MUST use two steps on the Metro 2 grid: a small step
