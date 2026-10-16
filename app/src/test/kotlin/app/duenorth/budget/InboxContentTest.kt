@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.longClick
@@ -111,6 +113,23 @@ class InboxContentTest {
         assertEquals(emptyList<String>(), accepted)
         assertEquals(emptyList<String>(), opened)
         assertTrue(pivotDragged > 0f)
+    }
+
+    @Test
+    fun theMenuStaysClearOfTheNavigationBar() {
+        val items = inboxMenuItems(sampleInbox().first(), {}, {}, InboxActions())
+        var screen = 0
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(780.dp).onSizeChanged { screen = it.height }) {
+                    // A row near the bottom: the menu cannot fit below it above a 48px navigation bar.
+                    InboxMenuPanel(Rect(0f, 1_900f, 1_000f, 2_000f), items, onDismiss = {}, safeBottom = 48)
+                }
+            }
+        }
+        val menu = compose.onNodeWithTag("inbox-menu").fetchSemanticsNode().boundsInRoot
+        assertTrue(menu.bottom <= screen - 48)
+        assertTrue(menu.bottom <= 1_900f)
     }
 
     @Test

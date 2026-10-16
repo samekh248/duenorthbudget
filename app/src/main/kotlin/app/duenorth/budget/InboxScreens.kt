@@ -14,10 +14,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -48,6 +51,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
@@ -219,12 +223,16 @@ private fun InboxMenu(
     items: List<Pair<String, () -> Unit>>,
     onDismiss: () -> Unit,
 ) {
+    // Read before the popup: its own window does not get the screen's insets.
+    val density = LocalDensity.current
+    val top = WindowInsets.statusBars.getTop(density)
+    val bottom = WindowInsets.navigationBars.getBottom(density)
     Popup(
         popupPositionProvider = WholeWindow,
         onDismissRequest = onDismiss,
         properties = PopupProperties(focusable = true),
     ) {
-        InboxMenuPanel(anchor, items, onDismiss)
+        InboxMenuPanel(anchor, items, onDismiss, safeTop = top, safeBottom = bottom)
     }
 }
 
@@ -242,6 +250,8 @@ internal fun InboxMenuPanel(
     anchor: Rect,
     items: List<Pair<String, () -> Unit>>,
     onDismiss: () -> Unit,
+    safeTop: Int = 0,
+    safeBottom: Int = 0,
 ) {
     val scrim = Metro.colors.background.copy(alpha = MENU_SCRIM)
     Layout(
@@ -265,6 +275,8 @@ internal fun InboxMenuPanel(
                                 run()
                             }.padding(horizontal = MENU_INSET, vertical = 8.dp),
                         maxLines = 1,
+                        // Ellipsis rather than clip, so descenders such as g and y are never cut at the line's edge.
+                        softWrap = false,
                     )
                 }
             }
@@ -279,7 +291,14 @@ internal fun InboxMenuPanel(
     ) { measurables, constraints ->
         val panel = measurables.single().measure(constraints.copy(minWidth = constraints.maxWidth, minHeight = 0))
         val below = anchor.bottom.roundToInt()
-        val y = if (below + panel.height <= constraints.maxHeight) below else (anchor.top.roundToInt() - panel.height).coerceAtLeast(0)
+        // Keep the panel clear of the navigation bar and the status bar.
+        val limit = constraints.maxHeight - safeBottom
+        val y =
+            if (below + panel.height <= limit) {
+                below
+            } else {
+                (anchor.top.roundToInt() - panel.height).coerceIn(safeTop, (limit - panel.height).coerceAtLeast(safeTop))
+            }
         layout(constraints.maxWidth, constraints.maxHeight) { panel.place(0, y) }
     }
 }
