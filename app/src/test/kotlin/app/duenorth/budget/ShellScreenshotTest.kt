@@ -95,7 +95,6 @@ class ShellScreenshotTest {
                     HomePivot(
                         shell = shell,
                         review = null,
-                        netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
                         openMonth = shell.month,
@@ -132,12 +131,11 @@ class ShellScreenshotTest {
                         HomePivot(
                             shell = shell,
                             review = null,
-                            netWorth = null,
                             upcoming = emptyList(),
                             loading = false,
                             openMonth = shell.month,
                             monthWindow = MonthWindow.around(shell.month),
-                            initialSection = 5,
+                            initialSection = 4,
                             onGesture = {},
                             modifier = modifier,
                         )

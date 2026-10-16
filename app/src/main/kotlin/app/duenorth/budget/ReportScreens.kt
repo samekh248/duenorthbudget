@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsCopy
@@ -39,6 +40,7 @@ import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroPivot
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.PivotItem
+import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import java.time.YearMonth
@@ -48,8 +50,73 @@ import kotlin.math.abs
 
 private val MONTH = DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)
 
+/** The [ReportsScreen] pivot items, in order; [ShellRoute.ReportPivot] opens one. */
+object ReportItems {
+    const val CASH_FLOW = 0
+    const val NET_WORTH = 1
+    const val SPENDING = 2
+}
+
 /**
- * Home `•••` → reports: a pivot with cash flow, net worth, and spending over one shared range.
+ * Home `•••` → reports: the reporting hub, a top-level view listing every report.
+ * Net worth shows today's total on its line and opens the on/off budget totals; the rest
+ * open the range pivot at their item.
+ */
+@Composable
+fun ReportsHubScreen(
+    netWorth: NetWorthPage?,
+    onNetWorth: () -> Unit,
+    onReport: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .testTag("reports-hub"),
+    ) {
+        MetroText(ReportsCopy.TITLE, Metro.typography.header, Modifier.padding(MetroDimens.Gutter))
+        LazyColumn(Modifier.fillMaxSize()) {
+            item {
+                HubLine(
+                    ReportsCopy.NET_WORTH,
+                    netWorth?.let { "${MoneyFormat.format(it.totalMinor, it.currency)} today" } ?: ReportsCopy.NET_WORTH_TODAY,
+                    "reports-hub-networth",
+                    onNetWorth,
+                )
+            }
+            item { HubLine(ReportsCopy.CASH_FLOW, ReportsCopy.CASH_FLOW_NOTE, "reports-hub-cashflow") { onReport(ReportItems.CASH_FLOW) } }
+            item {
+                HubLine(ReportsCopy.NET_WORTH_BY_MONTH, ReportsCopy.NET_WORTH_BY_MONTH_NOTE, "reports-hub-networth-months") {
+                    onReport(ReportItems.NET_WORTH)
+                }
+            }
+            item { HubLine(ReportsCopy.SPENDING, ReportsCopy.SPENDING_NOTE, "reports-hub-spending") { onReport(ReportItems.SPENDING) } }
+        }
+    }
+}
+
+@Composable
+private fun HubLine(
+    title: String,
+    note: String,
+    tag: String,
+    onOpen: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .metroPress(onOpen)
+            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
+            .testTag(tag),
+    ) {
+        MetroText(title, Metro.typography.subheader)
+        MetroText(note, Metro.typography.body, color = Metro.colors.secondary)
+    }
+}
+
+/**
+ * Reports → cash flow, net worth by month, or spending: a pivot with cash flow, net worth, and spending over one shared range.
  * While a report computes, content-shaped placeholders fade in (`contracts/reports.md`).
  */
 @Composable

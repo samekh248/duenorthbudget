@@ -15,7 +15,7 @@ class SectionTitleTest {
     fun pivotsCarryTheirOwnTitle() {
         assertNull(title(ShellRoute.Home))
         assertNull(title(ShellRoute.Settings))
-        assertNull(title(ShellRoute.Reports))
+        assertNull(title(ShellRoute.ReportPivot(0)))
         assertNull(title(ShellRoute.Welcome))
     }
 
@@ -27,6 +27,7 @@ class SectionTitleTest {
         assertNull(title(ShellRoute.Templates))
         assertNull(title(ShellRoute.ManageCategories))
         assertNull(title(ShellRoute.Budgets))
+        assertNull(title(ShellRoute.Reports))
     }
 
     @Test
@@ -37,6 +38,7 @@ class SectionTitleTest {
         assertEquals("DUE", title(ShellRoute.ScheduleEditor(null)))
         assertEquals("REVIEW", title(ShellRoute.ReviewCategory("c1")))
         assertEquals("RULES", title(ShellRoute.RuleEditor(null)))
+        assertEquals("REPORTS", title(ShellRoute.NetWorth))
         assertEquals("ACCOUNTS", title(ShellRoute.EditAccount("a1")))
         assertEquals("DUE NORTH BUDGET", title(ShellRoute.Server))
     }
@@ -44,7 +46,7 @@ class SectionTitleTest {
     @Test
     fun sharedPagesFollowTheHomeSectionShowing() {
         assertEquals("ACCOUNTS", title(ShellRoute.EditTransaction("a1", "t1"), homeSection = 1))
-        assertEquals("INBOX", title(ShellRoute.EditTransaction("a1", "t1"), homeSection = 5))
+        assertEquals("INBOX", title(ShellRoute.EditTransaction("a1", "t1"), homeSection = 4))
     }
 
     @Test

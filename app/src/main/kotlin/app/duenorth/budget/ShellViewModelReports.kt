@@ -11,9 +11,19 @@ import java.time.LocalDate
 
 // Spec 010 US4 (T054): reports, computed on Dispatchers.IO. See contracts/reports.md.
 
-/** Home `•••` → reports. */
+/** Home `•••` → reports: the hub every report opens from. */
 fun ShellViewModel.openReports() {
     push(ShellRoute.Reports)
+}
+
+/** Reports → net worth, the totals that used to sit on home. */
+fun ShellViewModel.openNetWorth() {
+    push(ShellRoute.NetWorth)
+}
+
+/** Reports → cash flow, net worth by month, or spending: one pivot over a shared range. */
+fun ShellViewModel.openReport(item: Int) {
+    push(ShellRoute.ReportPivot(item))
     loadReports()
 }
 
@@ -32,7 +42,7 @@ fun ShellViewModel.setReportGroupBy(groupBy: SpendingGroupBy) {
     loadReports()
 }
 
-/** The same include choice as the home net worth (spec 006). */
+/** The same include choice as reports → net worth (spec 006). */
 fun ShellViewModel.setReportIncludeOffBudget(include: Boolean) {
     setNetWorthIncludeOffBudget(include)
     mutate { current -> current.copy(reports = current.reports?.let { it.copy(netWorth = it.netWorth.copy(includeOffBudget = include)) }) }

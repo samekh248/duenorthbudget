@@ -54,7 +54,6 @@ class ShellContentTest {
                     HomePivot(
                         shell = shell,
                         review = null,
-                        netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
                         openMonth = shell?.month ?: YearMonth.of(2026, 10),
@@ -83,7 +82,6 @@ class ShellContentTest {
                     HomePivot(
                         shell = shell,
                         review = null,
-                        netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
                         openMonth = shell.month,
@@ -121,7 +119,6 @@ class ShellContentTest {
                     HomePivot(
                         shell = shell,
                         review = null,
-                        netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
                         openMonth = openMonth.value,

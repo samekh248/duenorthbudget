@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -18,10 +19,9 @@ object HomeSections {
     const val ACCOUNTS = "accounts"
     const val DUE = "due"
     const val REVIEW = "review"
-    const val NET_WORTH = "net worth"
     const val INBOX = "inbox"
 
-    val headers = listOf(BUDGET, ACCOUNTS, DUE, REVIEW, NET_WORTH, INBOX)
+    val headers = listOf(BUDGET, ACCOUNTS, DUE, REVIEW, INBOX)
 }
 
 object SectionTitleCopy {
@@ -62,6 +62,9 @@ object SectionTitle {
                 is ShellRoute.RuleEditor -> return SectionTitleCopy.RULES
                 is ShellRoute.ScheduleEditor -> HomeSections.DUE
                 is ShellRoute.ReviewCategory -> HomeSections.REVIEW
+                // Reports is a top-level view, and its pages sit under it.
+                ShellRoute.NetWorth -> ReportsCopy.TITLE
+                is ShellRoute.ReportPivot -> return null
                 ShellRoute.Create,
                 ShellRoute.SampleBudgets,
                 ShellRoute.Server,
@@ -84,7 +87,6 @@ object SectionTitle {
         setOf(
             ShellRoute.Home,
             ShellRoute.Settings,
-            ShellRoute.Reports,
             ShellRoute.Welcome,
             ShellRoute.OnboardingAddress,
             ShellRoute.OnboardingSignIn,
@@ -96,6 +98,7 @@ object SectionTitle {
             ShellRoute.Templates,
             ShellRoute.ManageCategories,
             ShellRoute.Budgets,
+            ShellRoute.Reports,
         )
 }
 
