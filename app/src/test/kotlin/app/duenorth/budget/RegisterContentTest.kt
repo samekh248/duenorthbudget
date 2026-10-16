@@ -145,7 +145,7 @@ class RegisterContentTest {
     fun titleAreaAndLabelsWithNoBodyButtons() {
         form()
         compose.onNodeWithTag("transaction-account", useUnmergedTree = true).assertTextEquals("Checking")
-        compose.onNodeWithText(TransactionFormCopy.TITLE).assertIsDisplayed()
+        compose.onNodeWithText("transaction").assertDoesNotExist()
         listOf("date", "payee", "amount", "category", "note").forEach {
             compose
                 .onAllNodesWithText(it)
