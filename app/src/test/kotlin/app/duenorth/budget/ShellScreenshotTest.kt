@@ -73,6 +73,16 @@ class ShellScreenshotTest {
     @Test
     fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = 5)
 
+    @Test
+    fun inboxLight() = snap("inbox_light", dark = false, shell = sample(), section = 5)
+
+    // Corner Coffee just filed: the confirmation sits in the row's own slot before it collapses.
+    @Test
+    fun inboxFiledLight() = snap("inbox_filed_light", dark = false, shell = sample(), section = 5, filed = true)
+
+    @Test
+    fun inboxFiledDark() = snap("inbox_filed_dark", dark = true, shell = sample(), section = 5, filed = true)
+
     // Edge to edge with a 32dp status bar (gray strip): the pivot title starts below it.
     @Test
     fun homeUnderStatusBarDark() = statusBarSnap("home_status_bar_dark", dark = true, inset = 32.dp)
@@ -88,12 +98,15 @@ class ShellScreenshotTest {
         dark: Boolean,
         shell: MonthShell,
         section: Int = 0,
+        filed: Boolean = false,
     ) {
+        val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
+        val justFiled = if (filed) listOf(InboxFiled(shell.inbox.first(), 0, "Dining")) else emptyList()
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
                 Column(Modifier.width(390.dp).height(780.dp)) {
                     HomePivot(
-                        shell = shell,
+                        shell = shown,
                         review = null,
                         upcoming = emptyList(),
                         loading = false,
@@ -102,6 +115,7 @@ class ShellScreenshotTest {
                         initialSection = section,
                         onGesture = {},
                         modifier = Modifier.weight(1f),
+                        inboxFiled = justFiled,
                     )
                     MetroAppBar(
                         actions =
@@ -277,6 +291,24 @@ class ShellScreenshotTest {
                     AccountRow("checking", "Checking", offBudget = false, closed = false, balanceMinor = 226_000),
                     AccountRow("savings", "Savings", offBudget = true, closed = false, balanceMinor = 10_000),
                 ),
-            inbox = listOf(InboxRow("cafe", "Cafe", -2_500), InboxRow("bus", "Bus", -1_000)),
+            inbox =
+                listOf(
+                    InboxRow("coffee", "Corner Coffee", -575, 20261015, "visa", "Visa", "", "c-dining", "Dining"),
+                    InboxRow("amazon", "Amazon", -6_318, 20261015, "visa", "Visa", "2 items", "c-house", "Household"),
+                    InboxRow("shell", "Shell", -4_210, 20261014, "checking", "Checking", "", "c-gas", "Gas"),
+                    InboxRow("acme", "Acme Payroll", 185_000, 20261014, "checking", "Checking", "", "c-pay", "Paycheck"),
+                    InboxRow(
+                        "rent",
+                        "Riverside Property Management",
+                        -120_000,
+                        20261012,
+                        "checking",
+                        "Checking",
+                        "October rent",
+                        "c-rent",
+                        "Rent",
+                    ),
+                    InboxRow("atm", "(no payee)", -2_000, 20261011, "checking", "Checking", "ATM withdrawal"),
+                ),
         )
 }

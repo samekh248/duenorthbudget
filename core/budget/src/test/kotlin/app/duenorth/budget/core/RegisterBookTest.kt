@@ -155,6 +155,26 @@ class RegisterBookTest {
     }
 
     @Test
+    fun inboxRowsCarryDateAccountNoteAndThePayeesLastCategory() {
+        db { session, book ->
+            book.save(draft("old", category = "c-house", date = 20261001))
+            book.save(draft("last", category = "c-food", date = 20261003))
+            book.save(draft("new", category = null, date = 20261007, note = " latte "))
+            book.save(draft("stranger", category = null, payee = "Kiosk", date = 20261006))
+            val inbox = shell(session).inbox
+            assertEquals(listOf("new", "stranger"), inbox.map { it.id })
+            val new = inbox.first()
+            assertEquals(20261007, new.date)
+            assertEquals("checking", new.accountId)
+            assertEquals("Checking", new.accountName)
+            assertEquals("latte", new.note)
+            assertEquals("c-food", new.suggestionId)
+            assertEquals("Groceries", new.suggestionName)
+            assertEquals(null, inbox.last().suggestionId)
+        }
+    }
+
+    @Test
     fun splitRefusesABadSumAndUnsplitRestoresOneCategory() {
         db { session, book ->
             book.save(draft("market", amount = -3_000, payee = "Market"))
@@ -323,7 +343,13 @@ class RegisterBookTest {
             val asked = book.setCleared(listOf("cafe", "market"), cleared = false, force = false) as WriteResult.Confirm
             assertEquals(RegisterCopy.RECONCILE_WARN, asked.reason)
             assertEquals(ForcedWrite.Cleared(listOf("cafe", "market"), false), asked.retry)
-            assertTrue(book.read("checking")!!.rows.first { it.id == "cafe" }.cleared)
+            assertTrue(
+                book
+                    .read("checking")!!
+                    .rows
+                    .first { it.id == "cafe" }
+                    .cleared,
+            )
             book.setCleared(listOf("cafe", "market"), cleared = false, force = true)
             val after = book.read("checking")!!.rows.associateBy { it.id }
             assertFalse(after.getValue("cafe").cleared)

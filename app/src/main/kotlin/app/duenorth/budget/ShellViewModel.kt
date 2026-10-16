@@ -20,6 +20,7 @@ import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
+import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.MoneyFormat
@@ -241,6 +242,13 @@ sealed interface ShellRoute {
 /** A spec 010 screen that goes back to the screen it was opened from. */
 interface StackRoute
 
+/** An inbox row just filed under [categoryName], shown at [index] while its confirmation plays. */
+data class InboxFiled(
+    val row: InboxRow,
+    val index: Int,
+    val categoryName: String,
+)
+
 data class ShellUiState(
     val loading: Boolean = true,
     val route: ShellRoute = ShellRoute.Home,
@@ -333,6 +341,12 @@ data class ShellUiState(
     val onboarding: OnboardingUi? = null,
     /** The Home pivot item showing, kept while a page opened from Home is showing. */
     val homeSection: Int = 0,
+    /** Inbox rows just filed, kept on screen while their confirmation plays. */
+    val inboxFiled: List<InboxFiled> = emptyList(),
+    /** Whether the inbox has already shown its swipe preview this run. */
+    val inboxPeeked: Boolean = false,
+    /** Set while a transaction form was opened from the inbox, so saving it goes back home. */
+    val editFromInbox: Boolean = false,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
     val settingsPage: SettingsPage = SettingsPage.BUDGET,
     val settingsScroll: Map<SettingsPage, Int> = emptyMap(),
@@ -1248,7 +1262,7 @@ class ShellViewModel(
 
     fun openAccount(accountId: String) {
         push(ShellRoute.Register(accountId))
-        _state.update { it.copy(registerSelection = null) }
+        _state.update { it.copy(registerSelection = null, editFromInbox = false) }
         viewModelScope.launch { apply(load(accountId), accountId) }
     }
 
@@ -1387,6 +1401,84 @@ class ShellViewModel(
         _state.update { it.copy(importReview = review, importError = null) }
     }
 
+    /** Swipe right: files the row under the category its payee last went to, or opens the picker when there is none. */
+    fun acceptInbox(transactionId: String) {
+        val inbox = _state.value.shell?.inbox ?: return
+        val index = inbox.indexOfFirst { it.id == transactionId }
+        val row = inbox.getOrNull(index) ?: return
+        val categoryId = row.suggestionId
+        if (categoryId == null) {
+            openInbox(transactionId)
+            return
+        }
+        fileInbox(row, index, categoryId, row.suggestionName, fromPicker = false)
+    }
+
+    /** A tap on an inbox row opens its transaction, as the register does. */
+    fun openInboxDetails(transactionId: String) {
+        openFromInbox(transactionId) { accountId -> ShellRoute.EditTransaction(accountId, transactionId) }
+    }
+
+    fun openInboxSplit(transactionId: String) {
+        openFromInbox(transactionId) { accountId -> ShellRoute.SplitTransaction(accountId, transactionId) }
+    }
+
+    fun deleteInbox(transactionId: String) {
+        val row =
+            _state.value.shell
+                ?.inbox
+                ?.firstOrNull { it.id == transactionId } ?: return
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.deleteTransaction(id, transactionId, false) }
+            publish(result, row.accountId, stayOnRegister = false)
+        }
+    }
+
+    private fun openFromInbox(
+        transactionId: String,
+        route: (String) -> ShellRoute,
+    ) {
+        val row =
+            _state.value.shell
+                ?.inbox
+                ?.firstOrNull { it.id == transactionId } ?: return
+        push(route(row.accountId))
+        _state.update { it.copy(editFromInbox = true, registerSelection = null) }
+        viewModelScope.launch { apply(load(row.accountId), row.accountId) }
+    }
+
+    fun inboxFiledShown(transactionId: String) {
+        _state.update { state -> state.copy(inboxFiled = state.inboxFiled.filterNot { it.row.id == transactionId }) }
+    }
+
+    fun inboxPeeked() {
+        _state.update { it.copy(inboxPeeked = true) }
+    }
+
+    private fun fileInbox(
+        row: InboxRow,
+        index: Int,
+        categoryId: String,
+        categoryName: String,
+        fromPicker: Boolean,
+    ) {
+        if (writing) return
+        _state.update { it.copy(inboxFiled = it.inboxFiled + InboxFiled(row, index, categoryName)) }
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.setTransactionCategory(id, row.id, categoryId, false) }
+            if (result !is WriteResult.Saved) inboxFiledShown(row.id)
+            if (fromPicker || result is WriteResult.Saved) {
+                publish(result, row.accountId, stayOnRegister = false)
+            } else {
+                when (result) {
+                    is WriteResult.Rejected -> _state.update { it.copy(writeError = result.reason) }
+                    is WriteResult.Confirm -> _state.update { it.copy(confirm = result, writeError = null) }
+                    else -> Unit
+                }
+            }
+        }
+    }
+
     fun openInbox(transactionId: String) {
         push(ShellRoute.PickCategory(transactionId))
         val budgetId = _state.value.settings.openBudgetId ?: return
@@ -1398,6 +1490,7 @@ class ShellViewModel(
 
     fun openNewTransaction() {
         val accountId = openAccountId() ?: return
+        _state.update { it.copy(editFromInbox = false) }
         push(ShellRoute.EditTransaction(accountId, null))
     }
 
@@ -1540,6 +1633,20 @@ class ShellViewModel(
 
     fun submitCategory(categoryId: String?) {
         val target = _state.value.categoryTarget ?: return
+        val inbox =
+            _state.value.shell
+                ?.inbox
+                .orEmpty()
+        val index = inbox.indexOfFirst { it.id == target.transactionId }
+        if (categoryId != null && index >= 0) {
+            val name =
+                target.categories
+                    .firstOrNull { it.id == categoryId }
+                    ?.name
+                    .orEmpty()
+            fileInbox(inbox[index], index, categoryId, name, fromPicker = true)
+            return
+        }
         launchWrite { id ->
             val result =
                 withContext(Dispatchers.IO) {
@@ -1595,8 +1702,16 @@ class ShellViewModel(
 
     fun confirmWrite() {
         val pending = _state.value.confirm ?: return
-        val accountId = openAccountId() ?: _state.value.categoryTarget?.accountId ?: return
-        val stay = _state.value.route !is ShellRoute.PickCategory
+        val inboxAccount =
+            (pending.retry as? ForcedWrite.Category)?.transactionId?.let { id ->
+                _state.value.shell
+                    ?.inbox
+                    ?.firstOrNull { it.id == id }
+                    ?.accountId
+            }
+        val accountId = openAccountId() ?: _state.value.categoryTarget?.accountId ?: inboxAccount ?: return
+        // A write confirmed from the picker or the inbox itself goes back home, not to a register.
+        val stay = _state.value.route !is ShellRoute.PickCategory && _state.value.route !is ShellRoute.Home
         launchWrite { id ->
             val result =
                 withContext(Dispatchers.IO) {
@@ -2081,7 +2196,10 @@ class ShellViewModel(
     ) {
         when (result) {
             is WriteResult.Saved -> {
-                if (stayOnRegister) {
+                // Edits started from the inbox go back to it, not to the account's register.
+                val toRegister = stayOnRegister && !_state.value.editFromInbox
+                _state.update { it.copy(editFromInbox = false) }
+                if (toRegister) {
                     history.clear()
                     history.addLast(ShellRoute.Home)
                     _state.update {

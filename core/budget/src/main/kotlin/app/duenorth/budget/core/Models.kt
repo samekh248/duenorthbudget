@@ -301,6 +301,14 @@ data class InboxRow(
     val id: String,
     val payee: String,
     val amountMinor: Long,
+    /** YYYYMMDD, as the register stores it. */
+    val date: Int = 0,
+    val accountId: String = "",
+    val accountName: String = "",
+    val note: String = "",
+    /** The category this payee last went to, offered as the swipe-right accept. */
+    val suggestionId: String? = null,
+    val suggestionName: String = "",
 )
 
 data class MonthShell(
