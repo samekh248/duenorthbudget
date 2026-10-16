@@ -36,6 +36,7 @@ import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
+import app.duenorth.budget.design.components.MetroComboBox
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Accent
@@ -368,11 +369,7 @@ private fun numberSample(format: String): String =
         else -> "1,000.33"
     }
 
-/**
- * The Windows Phone 8.1 combo box: the current value in a bordered box under its heading, with
- * a chevron. Tapping it unfolds every choice in place, the chosen one in the accent; tapping a
- * choice picks it and folds the box back up.
- */
+/** Settings' combo boxes: every list here is short enough to unfold in place. */
 @Composable
 private fun <T> ListPicker(
     choices: List<T>,
@@ -381,49 +378,5 @@ private fun <T> ListPicker(
     label: (T) -> String,
     onPick: (T) -> Unit,
 ) {
-    var open by remember { mutableStateOf(false) }
-    Column(
-        Modifier
-            .padding(top = 4.dp)
-            .fillMaxWidth()
-            .border(MetroDimens.Stroke, if (open) Metro.accent.fill else Metro.colors.foreground)
-            .testTag(tag),
-    ) {
-        if (!open) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = MetroDimens.TouchTarget)
-                    .metroPress { open = true }
-                    .padding(horizontal = 10.dp)
-                    .testTag("$tag-value"),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                MetroText(
-                    choices.find { it == selected }?.let(label).orEmpty(),
-                    Metro.typography.control,
-                    Modifier.weight(1f),
-                    maxLines = 1,
-                    softWrap = false,
-                )
-                AppGlyphIcon(AppGlyph.ChevronDown)
-            }
-        } else {
-            choices.forEach { choice ->
-                MetroText(
-                    label(choice),
-                    Metro.typography.control,
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = MetroDimens.TouchTarget)
-                        .metroPress {
-                            open = false
-                            if (choice != selected) onPick(choice)
-                        }.padding(horizontal = 10.dp, vertical = MetroDimens.Row)
-                        .testTag("$tag-$choice"),
-                    color = if (choice == selected) Metro.accent.text else Metro.colors.foreground,
-                )
-            }
-        }
-    }
+    MetroComboBox(choices, selected, label, onPick, tag, Modifier.padding(top = 4.dp))
 }

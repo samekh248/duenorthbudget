@@ -16,6 +16,8 @@ object RegisterCopy {
     const val RECONCILE_WARN = "this reconciliation will no longer match"
     const val NO_CATEGORY = "no category"
     const val SPLIT = "split"
+    const val SCHEDULE = "schedule"
+    const val DELETE = "delete"
     const val TRANSFER = "transfer"
     const val OWED = "owed"
     const val RECONCILED = "reconciled"
@@ -66,6 +68,8 @@ data class CategoryChoice(
     val name: String,
     val groupName: String,
     val income: Boolean,
+    /** The category or its group is hidden in the budget (spec 013). */
+    val hidden: Boolean = false,
 )
 
 data class AccountChoice(
@@ -185,14 +189,17 @@ sealed interface EntryResult<out T> {
 }
 
 object MoneyParse {
+    /**
+     * A typed amount read with the Settings [numberFormat]: its group separator is ignored and its decimal
+     * separator ends the whole part. The default reads "1,234.56", as before format settings reached the forms.
+     */
     fun parseMagnitude(
         text: String,
         decimals: Int,
+        numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
     ): Long? {
         val body =
-            text
-                .trim()
-                .replace(",", "")
+            normalize(text.trim(), decimals, numberFormat)
                 .removePrefix("+")
                 .removePrefix("-")
         if (body.isEmpty()) return null
@@ -220,6 +227,50 @@ object MoneyParse {
         val whole = absolute / scale
         val fraction = (absolute % scale).toString().padStart(decimals, '0')
         return "$whole.$fraction"
+    }
+
+    /**
+     * An amount as it starts out in a box: the format's separators, no symbol, no sign. With hide decimals on,
+     * the fraction is left off only when it is zero, so saving never drops cents the person cannot see.
+     */
+    fun editText(
+        minor: Long,
+        decimals: Int,
+        options: FormatOptions = FormatOptions(),
+    ): String {
+        val absolute = if (minor == Long.MIN_VALUE) Long.MAX_VALUE else kotlin.math.abs(minor)
+        val (groupSep, decimalSep) = MoneyFormat.separators(options.numberFormat)
+        val scale = scale(decimals)
+        val whole = MoneyFormat.group(absolute / scale, groupSep)
+        val fraction = absolute % scale
+        if (decimals == 0 || (options.hideFraction && fraction == 0L)) return whole
+        return whole + decimalSep + fraction.toString().padStart(decimals, '0')
+    }
+
+    /** [text] rewritten as plain digits with "." for the decimal point, or left for the checks to reject. */
+    private fun normalize(
+        text: String,
+        decimals: Int,
+        numberFormat: String,
+    ): String =
+        when (numberFormat) {
+            FormatOptions.NUMBER_DOT_COMMA ->
+                if (dotIsDecimal(text, decimals)) text else text.replace(".", "").replace(",", ".")
+            FormatOptions.NUMBER_SPACE_DOT -> text.filterNot { it == ' ' || it == '\u00A0' || it == '\u202F' }
+            else -> text.replace(",", "")
+        }
+
+    /**
+     * In "1.234,56" a lone "." followed by fewer than three digits cannot be a group separator, so it is the
+     * decimal point a keyboard without a comma key typed. "12.50" reads as twelve and a half, not 1250.
+     */
+    private fun dotIsDecimal(
+        text: String,
+        decimals: Int,
+    ): Boolean {
+        if (',' in text || text.count { it == '.' } != 1) return false
+        val after = text.substringAfter('.').length
+        return after in 1..decimals && after < 3
     }
 
     private fun scale(decimals: Int): Long {
@@ -250,6 +301,22 @@ object RegisterEntry {
         return "${Month.of(month).name.lowercase().take(3)} $day"
     }
 
+    /** A transaction whose date was picked, not typed (spec 013), so only payee and amount can be rejected. */
+    fun transaction(
+        id: String,
+        accountId: String,
+        date: Int,
+        payee: String,
+        amountText: String,
+        decimals: Int,
+        expense: Boolean,
+        categoryId: String?,
+        note: String,
+        force: Boolean = false,
+        numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
+    ): EntryResult<TransactionDraft> =
+        transaction(id, accountId, formatIso(date), payee, amountText, decimals, expense, categoryId, note, force, numberFormat)
+
     fun transaction(
         id: String,
         accountId: String,
@@ -261,11 +328,13 @@ object RegisterEntry {
         categoryId: String?,
         note: String,
         force: Boolean = false,
+        numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
     ): EntryResult<TransactionDraft> {
         val date = parseDate(dateText) ?: return EntryResult.Rejected(RegisterCopy.ENTER_DATE)
         if (payee.trim().isEmpty()) return EntryResult.Rejected(RegisterCopy.ENTER_PAYEE)
         val magnitude =
-            MoneyParse.parseMagnitude(amountText, decimals) ?: return EntryResult.Rejected(RegisterCopy.ENTER_AMOUNT)
+            MoneyParse.parseMagnitude(amountText, decimals, numberFormat)
+                ?: return EntryResult.Rejected(RegisterCopy.ENTER_AMOUNT)
         if (magnitude == 0L) return EntryResult.Rejected(RegisterCopy.AMOUNT_ZERO)
         val signed = if (expense) -magnitude else magnitude
         return EntryResult.Ok(
@@ -868,7 +937,8 @@ class RegisterBook(
         session
             .query(
                 """
-                SELECT c.id AS id, c.name AS name, c.is_income AS is_income, COALESCE(g.name, '') AS group_name
+                SELECT c.id AS id, c.name AS name, c.is_income AS is_income, COALESCE(g.name, '') AS group_name,
+                    CASE WHEN IFNULL(c.hidden, 0) = 1 OR IFNULL(g.hidden, 0) = 1 THEN 1 ELSE 0 END AS hidden
                 FROM categories c
                 LEFT JOIN category_groups g ON g.id = c.cat_group
                 WHERE IFNULL(c.tombstone, 0) = 0
@@ -880,6 +950,7 @@ class RegisterBook(
                     name = row.str("name").orEmpty(),
                     groupName = row.str("group_name").orEmpty(),
                     income = row.bool("is_income"),
+                    hidden = row.bool("hidden"),
                 )
             }
 
@@ -1038,8 +1109,7 @@ class RegisterBook(
     private fun nextSort(): Double =
         session.query("SELECT COALESCE(MAX(sort_order), 0) AS sort FROM transactions").first().double("sort") + 1.0
 
-    fun applyRulesForImport(draft: TransactionDraft): TransactionDraft =
-        applyRules(draft, draft.note?.trim()?.ifEmpty { null })
+    fun applyRulesForImport(draft: TransactionDraft): TransactionDraft = applyRules(draft, draft.note?.trim()?.ifEmpty { null })
 
     fun payeeIdForName(name: String): String = payeeFor(name)
 

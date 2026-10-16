@@ -4,9 +4,9 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -134,6 +134,8 @@ fun MetroField(
     modifier: Modifier = Modifier,
     conceal: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    fill: Boolean = true,
+    lines: IntRange? = null,
 ) {
     val colors = Metro.colors
     val field = if (colors.isDark) Color.White else Color(0xFFBFBFBF)
@@ -141,7 +143,7 @@ fun MetroField(
     val hintColor = if (colors.isDark) Color(0xFF909090) else Color(0xFF8F8F8F)
     Box(
         modifier
-            .fillMaxWidth()
+            .then(if (fill) Modifier.fillMaxWidth() else Modifier)
             .background(field)
             .heightIn(min = MetroDimens.TouchTarget)
             .padding(horizontal = 8.dp),
@@ -157,8 +159,10 @@ fun MetroField(
             cursorBrush = SolidColor(Metro.accent.fill),
             visualTransformation = if (conceal) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = keyboardOptions,
-            singleLine = keyboardOptions != KeyboardOptions.Default,
-            modifier = Modifier.fillMaxWidth(),
+            singleLine = lines == null && keyboardOptions != KeyboardOptions.Default,
+            minLines = lines?.first ?: 1,
+            maxLines = lines?.last ?: Int.MAX_VALUE,
+            modifier = Modifier.fillMaxWidth().then(if (lines != null) Modifier.padding(vertical = 10.dp) else Modifier),
         )
     }
 }

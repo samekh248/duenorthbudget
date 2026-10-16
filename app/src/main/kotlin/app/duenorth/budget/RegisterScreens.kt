@@ -1,27 +1,36 @@
 package app.duenorth.budget
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -34,18 +43,29 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CategoryTarget
+import app.duenorth.budget.core.DateColumn
+import app.duenorth.budget.core.DateFormats
+import app.duenorth.budget.core.DatePick
 import app.duenorth.budget.core.EntryResult
+import app.duenorth.budget.core.FormatOptions
+import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MoneyParse
 import app.duenorth.budget.core.RegisterCopy
@@ -56,14 +76,24 @@ import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
+import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
+import app.duenorth.budget.design.components.MetroComboBox
+import app.duenorth.budget.design.components.MetroComboValue
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroPickerColumn
+import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import java.time.LocalDate
+import java.time.Month
+import java.util.Locale
 import java.util.UUID
+import java.time.format.TextStyle as DateTextStyle
 
 @Composable
 fun RegisterScreen(
@@ -306,8 +336,14 @@ private val REGISTER_ROW_AIR = 15.dp
 internal fun registerDetail(row: RegisterRow): String =
     listOfNotNull(
         row.categoryLabel.ifBlank { null },
-        row.note.trim().ifBlank { null },
+        row.note
+            .trim()
+            .replace(LINE_BREAK, " ")
+            .ifBlank { null },
     ).joinToString(" · ")
+
+/** A line break and the spaces around it, read as one space on the register's one-line detail. */
+private val LINE_BREAK = Regex("\\s*\\R\\s*")
 
 @Composable
 fun TransactionForm(
@@ -316,93 +352,499 @@ fun TransactionForm(
     initialDate: String,
     error: String?,
     onSave: (TransactionDraft) -> Unit,
-    onDelete: (String) -> Unit,
-    onSplit: (String) -> Unit,
-    onSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    dateFormat: String = FormatPrefs().dateFormat,
+    numberFormat: String = FormatPrefs().numberFormat,
+    hideFraction: Boolean = FormatPrefs().hideFraction,
 ) {
     val draftId = remember(row?.id, page.account.id) { row?.id ?: UUID.randomUUID().toString() }
-    var date by remember(row?.id) { mutableStateOf(row?.let { RegisterEntry.formatIso(it.date) } ?: initialDate) }
+    var date by remember(row?.id) {
+        mutableIntStateOf(row?.date ?: RegisterEntry.parseDate(initialDate) ?: RegisterEntry.parseDate(RegisterEntry.todayIso())!!)
+    }
     var payee by remember(row?.id) {
         mutableStateOf(if (row == null || row.payee == ShellCopy.NO_PAYEE) "" else row.payee)
     }
     var amount by remember(row?.id) {
-        mutableStateOf(row?.let { MoneyParse.formatMagnitude(it.amountMinor, page.currency.decimals) }.orEmpty())
+        mutableStateOf(
+            row
+                ?.let {
+                    MoneyParse.editText(it.amountMinor, page.currency.decimals, FormatOptions(hideFraction, numberFormat))
+                }.orEmpty(),
+        )
     }
     var expense by remember(row?.id) { mutableStateOf(row?.amountMinor?.let { it <= 0L } ?: true) }
     var note by remember(row?.id) { mutableStateOf(row?.note.orEmpty()) }
     var categoryId by remember(row?.id) { mutableStateOf(row?.categoryId ?: row?.partnerCategoryId) }
-    var localError by remember(row?.id) { mutableStateOf<String?>(null) }
+    var fieldError by remember(row?.id) { mutableStateOf<Pair<TransactionField, String>?>(null) }
+    var overlay by remember(row?.id) { mutableStateOf<FormOverlay>(FormOverlay.None) }
     val mixed =
         row?.transferId != null &&
             row.partnerOffBudget != null &&
             row.partnerOffBudget != page.account.offBudget
     val showCategories = row?.parent != true && (row?.transferId == null || mixed)
-    Column(
-        modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-    ) {
-        MetroText(if (row == null) "transaction" else row.payee, Metro.typography.header, maxLines = 2)
-        MetroField(date, { date = it }, "date", Modifier.padding(top = 12.dp))
-        MetroField(payee, { payee = it }, "payee", Modifier.padding(top = 8.dp))
-        MetroField(amount, { amount = it }, "amount", Modifier.padding(top = 8.dp).testTag("amount-field"))
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            DirectionChoice("expense", expense) { expense = true }
-            DirectionChoice("income", !expense) { expense = false }
+    val options = remember(page.categories, categoryId) { CategoryOptions.of(page.categories, categoryId) }
+    val commit = {
+        when (
+            val parsed =
+                RegisterEntry.transaction(
+                    id = draftId,
+                    accountId = page.account.id,
+                    date = date,
+                    payee = payee,
+                    amountText = amount,
+                    decimals = page.currency.decimals,
+                    expense = expense,
+                    categoryId = if (showCategories) categoryId else null,
+                    note = note,
+                    numberFormat = numberFormat,
+                )
+        ) {
+            is EntryResult.Ok -> {
+                fieldError = null
+                onSave(parsed.value)
+            }
+            is EntryResult.Rejected -> fieldError = TransactionField.of(parsed.reason) to parsed.reason
         }
-        MetroField(note, { note = it }, "note", Modifier.padding(top = 8.dp))
-        val shown = localError ?: error
-        if (shown != null) {
-            MetroText(shown, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
-        }
-        if (showCategories) {
+    }
+    RememberFormSave(commit)
+
+    fun errorFor(field: TransactionField): String? =
+        fieldError?.takeIf { it.first == field }?.second ?: error?.takeIf { field == TransactionField.NOTE && fieldError == null }
+    Box(modifier.background(Metro.colors.background).testTag("transaction-form")) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = MetroDimens.Gutter)
+                .padding(bottom = MetroDimens.Gutter),
+        ) {
             MetroText(
-                "category",
-                Metro.typography.caption,
-                Modifier.padding(top = 12.dp, bottom = 4.dp),
+                page.account.name,
+                Metro.typography.subheader,
+                Modifier.testTag("transaction-account"),
                 color = Metro.colors.secondary,
+                maxLines = 1,
+                softWrap = false,
             )
-            ChoiceLine(RegisterCopy.NO_CATEGORY, categoryId == null) { categoryId = null }
-            page.categories.forEach { category ->
-                ChoiceLine(category.name, category.id == categoryId) { categoryId = category.id }
-            }
-        }
-        val commit = {
-            when (
-                val parsed =
-                    RegisterEntry.transaction(
-                        id = draftId,
-                        accountId = page.account.id,
-                        dateText = date,
-                        payee = payee,
-                        amountText = amount,
-                        decimals = page.currency.decimals,
-                        expense = expense,
-                        categoryId = if (showCategories) categoryId else null,
-                        note = note,
+            MetroText(TransactionFormCopy.TITLE, Metro.typography.header, maxLines = 1)
+            LabeledField(TransactionFormCopy.DATE, errorFor(TransactionField.DATE), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
+                val width = rememberFieldWidth(DateFormats.widestSample(dateFormat), Metro.typography.control, DATE_CHEVRON)
+                Box(
+                    Modifier
+                        .widthIn(max = width)
+                        .fillMaxWidth()
+                        .border(MetroDimens.Stroke, Metro.colors.foreground)
+                        .testTag("transaction-date"),
+                ) {
+                    MetroComboValue(
+                        text = DateFormats.withWeekday(date, dateFormat),
+                        tag = "transaction-date-value",
+                        onClick = { overlay = FormOverlay.DatePicker(date) },
+                        modifier = Modifier.fillMaxWidth(),
                     )
-            ) {
-                is EntryResult.Ok -> {
-                    localError = null
-                    onSave(parsed.value)
                 }
-                is EntryResult.Rejected -> localError = parsed.reason
+            }
+            LabeledField(TransactionFormCopy.PAYEE, errorFor(TransactionField.PAYEE), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
+                MetroField(
+                    payee,
+                    { payee = it },
+                    TransactionFormCopy.PAYEE,
+                    Modifier.testTag("transaction-payee"),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                )
+            }
+            LabeledField(TransactionFormCopy.AMOUNT, errorFor(TransactionField.AMOUNT), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
+                AmountLine(
+                    amount = amount,
+                    onAmount = { amount = it },
+                    expense = expense,
+                    onExpense = { expense = it },
+                    sample = amountSample(page, numberFormat),
+                )
+            }
+            if (showCategories) {
+                LabeledField(
+                    TransactionFormCopy.CATEGORY,
+                    errorFor(TransactionField.CATEGORY),
+                    Modifier.padding(top = MetroDimens.FieldGroupGap),
+                ) {
+                    MetroComboBox(
+                        choices = options.choices,
+                        selected = categoryId,
+                        label = { id -> options.label(id) },
+                        onPick = { categoryId = it },
+                        tag = "transaction-category",
+                        fullScreenThreshold = CategoryOptions.IN_PLACE_LIMIT,
+                        onOpenFull = { overlay = FormOverlay.CategoryList },
+                    )
+                }
+            }
+            LabeledField(TransactionFormCopy.NOTE, errorFor(TransactionField.NOTE), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
+                MetroField(
+                    note,
+                    { note = it },
+                    TransactionFormCopy.NOTE,
+                    Modifier.testTag("transaction-note"),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Default),
+                    lines = NOTE_LINES,
+                )
             }
         }
-        RememberFormSave(commit)
-        MetroButtonGrid(Modifier.padding(top = 8.dp)) {
-            if (!formSaveOnBar()) {
-                MetroButton("save", onClick = commit)
+        when (val open = overlay) {
+            FormOverlay.None -> Unit
+            FormOverlay.CategoryList ->
+                CategoryListPage(
+                    options = options,
+                    onPick = {
+                        categoryId = it
+                        overlay = FormOverlay.None
+                    },
+                    onBack = { overlay = FormOverlay.None },
+                )
+            is FormOverlay.DatePicker ->
+                DatePickerPage(
+                    date = open.draft,
+                    dateFormat = dateFormat,
+                    onChange = { overlay = FormOverlay.DatePicker(it) },
+                    onDone = {
+                        date = open.draft
+                        overlay = FormOverlay.None
+                    },
+                    onCancel = { overlay = FormOverlay.None },
+                )
+        }
+    }
+}
+
+object TransactionFormCopy {
+    const val TITLE = "transaction"
+    const val DATE = "date"
+    const val PAYEE = "payee"
+    const val AMOUNT = "amount"
+    const val CATEGORY = "category"
+    const val NOTE = "note"
+    const val EXPENSE = "expense"
+    const val INCOME = "income"
+    const val CHOOSE_DATE = "choose date"
+    const val DONE = "done"
+    const val CANCEL = "cancel"
+    const val HIDDEN = "(hidden)"
+}
+
+/** Which field a save refusal belongs to, so its message sits under that field (FR-022). */
+enum class TransactionField {
+    DATE,
+    PAYEE,
+    AMOUNT,
+    CATEGORY,
+    NOTE,
+    ;
+
+    companion object {
+        fun of(reason: String): TransactionField =
+            when (reason) {
+                RegisterCopy.ENTER_DATE -> DATE
+                RegisterCopy.ENTER_PAYEE -> PAYEE
+                RegisterCopy.ENTER_AMOUNT, RegisterCopy.AMOUNT_ZERO -> AMOUNT
+                RegisterCopy.CHOOSE_CATEGORY -> CATEGORY
+                else -> NOTE
             }
-            if (row != null) {
-                if (row.transferId == null) {
-                    MetroButton("split") { onSplit(row.id) }
-                    MetroButton("schedule") { onSchedule(row.id) }
+    }
+}
+
+/** A page drawn over the transaction form; the form's edits stay where they are underneath. */
+sealed interface FormOverlay {
+    data object None : FormOverlay
+
+    data object CategoryList : FormOverlay
+
+    data class DatePicker(
+        val draft: Int,
+    ) : FormOverlay
+}
+
+/**
+ * The category choices the transaction form offers: "no category" first, then visible categories
+ * in budget order, plus a hidden category only when it is the current one (spec 013).
+ */
+class CategoryOptions private constructor(
+    val groups: List<Pair<String, List<CategoryChoice>>>,
+    val current: String?,
+) {
+    /** Category ids in list order, `null` standing for "no category". */
+    val choices: List<String?> = listOf<String?>(null) + groups.flatMap { (_, rows) -> rows.map { it.id } }
+
+    private val byId = groups.flatMap { it.second }.associateBy { it.id }
+
+    fun label(id: String?): String {
+        if (id == null) return RegisterCopy.NO_CATEGORY
+        val choice = byId[id] ?: return ""
+        return if (choice.hidden) "${choice.name} ${TransactionFormCopy.HIDDEN}" else choice.name
+    }
+
+    companion object {
+        /** WP8.1 unfolds a combo box in place up to five items; past that it opens a full-screen list. */
+        const val IN_PLACE_LIMIT = 5
+
+        fun of(
+            categories: List<CategoryChoice>,
+            current: String?,
+        ): CategoryOptions {
+            val shown = categories.filter { !it.hidden || it.id == current }
+            val groups =
+                shown
+                    .groupBy { it.groupName }
+                    .map { (name, rows) -> name to rows }
+            return CategoryOptions(groups, current)
+        }
+    }
+}
+
+private val NOTE_LINES = 2..6
+private val DATE_CHEVRON = 42.dp
+private const val AMOUNT_WHOLE = 9_999_999L
+
+/** The widest amount the box is sized for: seven whole digits in the budget's format and decimals. */
+private fun amountSample(
+    page: RegisterPage,
+    numberFormat: String,
+): String {
+    var scale = 1L
+    repeat(page.currency.decimals) { scale *= 10 }
+    val text = MoneyFormat.format(AMOUNT_WHOLE * scale, page.currency, FormatOptions(numberFormat = numberFormat))
+    return text
+        .filter {
+            it.isDigit() || it == '.' || it == ',' || it == ' ' || it == ' '
+        }.map { if (it.isDigit()) '0' else it }
+        .joinToString("")
+}
+
+/** A field's width: [sample] measured in [style], plus the field's padding and [extra] (a chevron). */
+@Composable
+private fun rememberFieldWidth(
+    sample: String,
+    style: TextStyle,
+    extra: Dp = 0.dp,
+): Dp {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    return remember(sample, style, extra, density) {
+        val px = measurer.measure(sample, style, maxLines = 1, softWrap = false).size.width
+        with(density) { px.toDp() } + FIELD_PADDING * 2 + extra + 2.dp
+    }
+}
+
+private val FIELD_PADDING = 10.dp
+
+/** A label over its control, a quarter grid step apart, and the field's error under it (FR-002, FR-020, FR-022). */
+@Composable
+private fun LabeledField(
+    label: String,
+    error: String?,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(modifier.fillMaxWidth()) {
+        MetroText(label, Metro.typography.caption, Modifier.padding(bottom = MetroDimens.FieldLabelGap), color = Metro.colors.secondary)
+        content()
+        if (error != null) {
+            MetroText(
+                error,
+                Metro.typography.body,
+                Modifier
+                    .padding(
+                        top = MetroDimens.FieldLabelGap,
+                    ).testTag("transaction-error-${TransactionField.of(error).name.lowercase()}"),
+                color = Metro.accent.text,
+            )
+        }
+    }
+}
+
+/** The amount box sized to its longest value, with expense/income beside it; the toggle wraps under at large fonts. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AmountLine(
+    amount: String,
+    onAmount: (String) -> Unit,
+    expense: Boolean,
+    onExpense: (Boolean) -> Unit,
+    sample: String,
+) {
+    val width = rememberFieldWidth(sample, Metro.typography.control)
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
+        verticalArrangement = Arrangement.spacedBy(MetroDimens.FieldLabelGap),
+    ) {
+        MetroField(
+            amount,
+            onAmount,
+            TransactionFormCopy.AMOUNT,
+            Modifier.width(width).testTag("amount-field"),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            fill = false,
+        )
+        MetroSegmentedToggle(
+            first = TransactionFormCopy.EXPENSE,
+            second = TransactionFormCopy.INCOME,
+            firstSelected = expense,
+            onSelect = onExpense,
+            tag = "transaction-direction",
+        )
+    }
+}
+
+/** The full-screen category list for budgets with more than five choices (FR-011, FR-012). */
+@Composable
+private fun CategoryListPage(
+    options: CategoryOptions,
+    onPick: (String?) -> Unit,
+    onBack: () -> Unit,
+) {
+    BackHandler(onBack = onBack)
+    RememberBarOverride(emptyList())
+    val rows =
+        remember(options) {
+            buildList<Pair<String, String?>?> {
+                add(null)
+                options.groups.forEach { (name, choices) ->
+                    add(name to null)
+                    choices.forEach { add("" to it.id) }
                 }
-                MetroButton("delete") { onDelete(row.id) }
+            }
+        }
+    val start = remember(options) { rows.indexOfFirst { it?.second != null && it.second == options.current }.coerceAtLeast(0) }
+    val state = rememberLazyListState(initialFirstVisibleItemIndex = start)
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .padding(horizontal = MetroDimens.Gutter)
+            .testTag("transaction-category-list"),
+    ) {
+        MetroText(TransactionFormCopy.CATEGORY, Metro.typography.header, maxLines = 1)
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Gutter), state = state) {
+            items(rows.size) { index ->
+                val entry = rows[index]
+                when {
+                    entry == null ->
+                        CategoryListRow(RegisterCopy.NO_CATEGORY, options.current == null, "transaction-category-none") { onPick(null) }
+                    entry.second == null ->
+                        MetroText(
+                            entry.first.ifBlank { " " },
+                            Metro.typography.caption,
+                            Modifier.padding(top = MetroDimens.Gutter).testTag("transaction-category-group-$index"),
+                            color = Metro.colors.secondary,
+                        )
+                    else -> {
+                        val id = entry.second!!
+                        CategoryListRow(options.label(id), id == options.current, "transaction-category-$id") { onPick(id) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryListRow(
+    label: String,
+    selected: Boolean,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    MetroText(
+        label,
+        Metro.typography.subheader,
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress(onClick)
+            .padding(vertical = MetroDimens.Row)
+            .testTag(tag),
+        color = if (selected) Metro.accent.text else Metro.colors.foreground,
+        maxLines = 2,
+    )
+}
+
+/** The WP8.1 date picker page: looping month, day and year columns in the settings order (FR-005–FR-007). */
+@Composable
+private fun DatePickerPage(
+    date: Int,
+    dateFormat: String,
+    onChange: (Int) -> Unit,
+    onDone: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    BackHandler(onBack = onCancel)
+    val done by rememberUpdatedState(onDone)
+    val cancel by rememberUpdatedState(onCancel)
+    val bar =
+        remember {
+            listOf(
+                ScreenAction("picker-done", AppGlyph.Save, TransactionFormCopy.DONE) { done() },
+                ScreenAction("picker-cancel", AppGlyph.Cancel, TransactionFormCopy.CANCEL) { cancel() },
+            )
+        }
+    RememberBarOverride(bar)
+    val years = DatePick.yearRange(date)
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .padding(horizontal = MetroDimens.Gutter)
+            .testTag("transaction-date-picker"),
+    ) {
+        MetroText(TransactionFormCopy.CHOOSE_DATE, Metro.typography.header, maxLines = 1)
+        Row(
+            Modifier.fillMaxWidth().padding(top = MetroDimens.Grid),
+            horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
+        ) {
+            DatePick.columns(dateFormat).forEach { column ->
+                val cell = Modifier.weight(1f)
+                when (column) {
+                    DateColumn.MONTH ->
+                        MetroPickerColumn(
+                            count = 12,
+                            position = DatePick.month(date) - 1,
+                            label = { at ->
+                                "%02d".format(at + 1) to
+                                    Month.of(at + 1).getDisplayName(DateTextStyle.SHORT, Locale.ENGLISH).lowercase()
+                            },
+                            onPick = { at -> onChange(DatePick.withMonth(date, at + 1)) },
+                            tag = "date-column-month",
+                            modifier = cell,
+                        )
+                    DateColumn.DAY -> {
+                        val days = DatePick.daysIn(DatePick.year(date), DatePick.month(date))
+                        MetroPickerColumn(
+                            count = days,
+                            position = DatePick.day(date) - 1,
+                            label = { at ->
+                                val weekday =
+                                    LocalDate
+                                        .of(DatePick.year(date), DatePick.month(date), at + 1)
+                                        .dayOfWeek
+                                        .getDisplayName(DateTextStyle.FULL, Locale.ENGLISH)
+                                        .lowercase()
+                                "%02d".format(at + 1) to weekday
+                            },
+                            onPick = { at -> onChange(DatePick.withDay(date, at + 1)) },
+                            tag = "date-column-day",
+                            modifier = cell,
+                        )
+                    }
+                    DateColumn.YEAR ->
+                        MetroPickerColumn(
+                            count = years.last - years.first + 1,
+                            position = DatePick.year(date) - years.first,
+                            label = { at -> (years.first + at).toString() to "" },
+                            onPick = { at -> onChange(DatePick.withYear(date, years.first + at)) },
+                            tag = "date-column-year",
+                            modifier = cell,
+                        )
+                }
             }
         }
     }

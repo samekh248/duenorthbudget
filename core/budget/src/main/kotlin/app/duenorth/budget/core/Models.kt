@@ -134,6 +134,87 @@ object DateFormats {
             else -> "$mm/$dd/$yyyy"
         }
     }
+
+    /** The date in [pattern] after its short weekday, as the transaction date box shows it: "Thu 10/01/2026". */
+    fun withWeekday(
+        date: Int,
+        pattern: String,
+    ): String {
+        val year = date / 10000
+        val month = (date / 100) % 100
+        val day = date % 100
+        if (month !in 1..12 || day !in 1..DatePick.daysIn(year, month)) return format(date, pattern)
+        val weekday =
+            java.time.LocalDate
+                .of(year, month, day)
+                .dayOfWeek
+                .getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH)
+        return "$weekday ${format(date, pattern)}"
+    }
+
+    /** The widest value [withWeekday] can produce in [pattern], for sizing the date box. */
+    fun widestSample(pattern: String): String = "Wed " + pattern.map { if (it.isLetter()) '0' else it }.joinToString("")
+}
+
+/** Which part of a date a picker column holds. */
+enum class DateColumn { MONTH, DAY, YEAR }
+
+/**
+ * Date arithmetic for the transaction date picker (spec 013). Dates are Actual's `yyyyMMdd`
+ * integers; every change clamps the day so the result is always a real date.
+ */
+object DatePick {
+    const val FIRST_YEAR = 1900
+    const val LAST_YEAR = 2100
+
+    /** Picker columns in the order [pattern] writes them. */
+    fun columns(pattern: String): List<DateColumn> =
+        listOf(
+            DateColumn.MONTH to pattern.indexOf("MM"),
+            DateColumn.DAY to pattern.indexOf("dd"),
+            DateColumn.YEAR to pattern.indexOf("yyyy"),
+        ).sortedBy { (_, at) -> if (at < 0) Int.MAX_VALUE else at }
+            .map { it.first }
+
+    fun daysIn(
+        year: Int,
+        month: Int,
+    ): Int =
+        when (month) {
+            2 -> if ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0) 29 else 28
+            4, 6, 9, 11 -> 30
+            else -> 31
+        }
+
+    fun year(date: Int): Int = date / 10000
+
+    fun month(date: Int): Int = (date / 100) % 100
+
+    fun day(date: Int): Int = date % 100
+
+    fun of(
+        year: Int,
+        month: Int,
+        day: Int,
+    ): Int = year * 10000 + month * 100 + day.coerceIn(1, daysIn(year, month))
+
+    fun withMonth(
+        date: Int,
+        month: Int,
+    ): Int = of(year(date), month, day(date))
+
+    fun withDay(
+        date: Int,
+        day: Int,
+    ): Int = of(year(date), month(date), day)
+
+    fun withYear(
+        date: Int,
+        year: Int,
+    ): Int = of(year, month(date), day(date))
+
+    /** The picker's years: 1900–2100, widened so [date]'s own year is always offered. */
+    fun yearRange(date: Int): IntRange = minOf(FIRST_YEAR, year(date))..maxOf(LAST_YEAR, year(date))
 }
 
 object MoneyFormat {
@@ -184,7 +265,8 @@ object MoneyFormat {
         return if (negative) -minor else minor
     }
 
-    private fun separators(numberFormat: String): Pair<String, String> =
+    /** The group and decimal separators of a Settings number format, in that order. */
+    internal fun separators(numberFormat: String): Pair<String, String> =
         when (numberFormat) {
             FormatOptions.NUMBER_DOT_COMMA -> "." to ","
             FormatOptions.NUMBER_SPACE_DOT -> " " to "."
@@ -192,7 +274,7 @@ object MoneyFormat {
             else -> "," to "."
         }
 
-    private fun group(
+    internal fun group(
         value: Long,
         separator: String,
     ): String {
