@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,6 +76,7 @@ import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import java.time.YearMonth
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun HomePivot(
@@ -332,12 +334,22 @@ private fun MonthOptions(
     window: MonthWindow,
     onSelect: (YearMonth) -> Unit,
 ) {
+    // Open on the selected month with earlier months above it and later ones below.
+    val selected = window.months.indexOf(month).coerceAtLeast(0)
+    val list = rememberLazyListState(initialFirstVisibleItemIndex = selected)
+    LaunchedEffect(list) {
+        val info = snapshotFlow { list.layoutInfo }.first { it.visibleItemsInfo.isNotEmpty() }
+        val row = info.visibleItemsInfo.firstOrNull { it.index == selected } ?: return@LaunchedEffect
+        val viewport = info.viewportEndOffset - info.viewportStartOffset
+        list.scrollBy((row.offset + row.size / 2 - viewport / 2).toFloat())
+    }
     LazyColumn(
         Modifier
             .fillMaxWidth()
             .padding(top = MetroDimens.Gutter)
             .heightIn(max = 288.dp)
             .testTag("month-list"),
+        state = list,
     ) {
         items(window.months, key = { it.toString() }) { option ->
             MetroText(
