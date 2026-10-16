@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -48,10 +49,16 @@ class InboxContentTest {
     }
 
     @Test
-    fun swipeRightAcceptsSwipeLeftAndTapCategorize() {
+    fun swipeRightAcceptsSwipeLeftCategorizesAndTapOpensDetails() {
         val accepted = mutableListOf<String>()
         val opened = mutableListOf<String>()
-        show(sampleInbox(), onAccept = { accepted += it }, onInbox = { opened += it })
+        val details = mutableListOf<String>()
+        show(
+            sampleInbox(),
+            onAccept = { accepted += it },
+            onInbox = { opened += it },
+            actions = InboxActions(onDetails = { details += it }),
+        )
         compose.onNodeWithTag("inbox-row-coffee").performTouchInput { swipeRight(startX = width * 0.2f, endX = right) }
         compose.waitForIdle()
         assertEquals(listOf("coffee"), accepted)
@@ -59,7 +66,37 @@ class InboxContentTest {
         compose.waitForIdle()
         assertEquals(listOf("shell"), opened)
         compose.onNodeWithTag("inbox-row-atm").performClick()
-        assertEquals(listOf("shell", "atm"), opened)
+        assertEquals(listOf("shell"), opened)
+        assertEquals(listOf("atm"), details)
+    }
+
+    @Test
+    fun longPressOpensAMenuOfEveryAction() {
+        val ran = mutableListOf<String>()
+        show(
+            sampleInbox(),
+            onAccept = { ran += "accept $it" },
+            onInbox = { ran += "categorize $it" },
+            actions =
+                InboxActions(
+                    onDetails = { ran += "edit $it" },
+                    onSplit = { ran += "split $it" },
+                    onSchedule = { ran += "schedule $it" },
+                    onDelete = { ran += "delete $it" },
+                    onOpenAccount = { ran += "account $it" },
+                ),
+        )
+        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { longClick() }
+        compose.onNodeWithTag("inbox-menu").assertIsDisplayed()
+        listOf("accept dining", "categorize", "edit", "split", "schedule", "delete", "go to visa").forEach {
+            compose.onNodeWithText(it).assertIsDisplayed()
+        }
+        compose.onNodeWithText("split").performClick()
+        compose.onNodeWithTag("inbox-menu").assertDoesNotExist()
+        assertEquals(listOf("split coffee"), ran)
+        // No suggestion, no accept.
+        val atm = inboxMenuItems(sampleInbox().last(), {}, {}, InboxActions()).map { it.first }
+        assertEquals(listOf("categorize", "edit", "split", "schedule", "delete", "go to checking"), atm)
     }
 
     @Test
@@ -105,6 +142,7 @@ class InboxContentTest {
         filed: List<InboxFiled> = emptyList(),
         onFiledShown: (String) -> Unit = {},
         onPivotDrag: (Float) -> Unit = {},
+        actions: InboxActions = InboxActions(),
     ) {
         compose.setContent {
             MetroTheme {
@@ -118,6 +156,7 @@ class InboxContentTest {
                         onAccept = onAccept,
                         filed = filed,
                         onFiledShown = onFiledShown,
+                        actions = actions,
                     )
                 }
             }

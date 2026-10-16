@@ -4,9 +4,11 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -31,19 +34,33 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MoneyFormat
@@ -68,7 +85,21 @@ object InboxCopy {
     const val CATEGORIZE = "categorize"
     const val FILED_TO = "filed to"
     const val NO_CATEGORY = "no category"
+    const val EDIT = "edit"
+    const val SPLIT = "split"
+    const val SCHEDULE = "schedule"
+    const val DELETE = "delete"
+    const val GO_TO = "go to"
 }
+
+/** What a row's tap and long-press menu can do, beyond the two swipes. */
+class InboxActions(
+    val onDetails: (String) -> Unit = {},
+    val onSplit: (String) -> Unit = {},
+    val onSchedule: (String) -> Unit = {},
+    val onDelete: (String) -> Unit = {},
+    val onOpenAccount: (String) -> Unit = {},
+)
 
 /**
  * The inbox as a ledger: uncategorized transactions under day headings on faint bands, like the
@@ -89,8 +120,10 @@ fun InboxSection(
     onFiledShown: (String) -> Unit = {},
     peek: Boolean = false,
     onPeeked: () -> Unit = {},
+    actions: InboxActions = InboxActions(),
 ) {
     val entries = inboxEntries(shell.inbox, filed)
+    var menu by remember { mutableStateOf<Pair<InboxRow, Rect>?>(null) }
     if (entries.isEmpty()) {
         Column(modifier.padding(MetroDimens.Gutter), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             MetroText(ShellCopy.NOTHING_TO_CATEGORIZE, Metro.typography.body)
@@ -142,6 +175,8 @@ fun InboxSection(
                         onFiledShown = onFiledShown,
                         peek = peek && entry == entries.first() && entry.filedTo == null,
                         onPeeked = onPeeked,
+                        onDetails = actions.onDetails,
+                        onMenu = { bounds -> menu = entry.row to bounds },
                     )
                 }
             }
@@ -149,6 +184,105 @@ fun InboxSection(
         if (onAdd != null && shell.inbox.isEmpty()) {
             MetroButton("add", Modifier.padding(MetroDimens.Gutter), onClick = onAdd)
         }
+    }
+    menu?.let { (row, anchor) ->
+        InboxMenu(anchor, inboxMenuItems(row, onAccept, onInbox, actions), onDismiss = { menu = null })
+    }
+}
+
+/** Every action a row offers, in the order its long-press menu lists them. */
+internal fun inboxMenuItems(
+    row: InboxRow,
+    onAccept: (String) -> Unit,
+    onCategorize: (String) -> Unit,
+    actions: InboxActions,
+): List<Pair<String, () -> Unit>> =
+    listOfNotNull(
+        row.suggestionName.takeIf { row.suggestionId != null && it.isNotBlank() }?.let { name ->
+            "${InboxCopy.ACCEPT} ${name.lowercase()}" to { onAccept(row.id) }
+        },
+        InboxCopy.CATEGORIZE to { onCategorize(row.id) },
+        InboxCopy.EDIT to { actions.onDetails(row.id) },
+        InboxCopy.SPLIT to { actions.onSplit(row.id) },
+        InboxCopy.SCHEDULE to { actions.onSchedule(row.id) },
+        InboxCopy.DELETE to { actions.onDelete(row.id) },
+        row.accountName.ifBlank { null }?.let { account ->
+            "${InboxCopy.GO_TO} ${account.lowercase()}" to { actions.onOpenAccount(row.accountId) }
+        },
+    )
+
+/**
+ * The Metro context menu: the rest of the screen dims, the pressed row stays bright, and a
+ * full-width panel of lowercase actions opens under it (over it when there is no room below).
+ */
+@Composable
+private fun InboxMenu(
+    anchor: Rect,
+    items: List<Pair<String, () -> Unit>>,
+    onDismiss: () -> Unit,
+) {
+    Popup(
+        popupPositionProvider = WholeWindow,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        InboxMenuPanel(anchor, items, onDismiss)
+    }
+}
+
+private object WholeWindow : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset = IntOffset.Zero
+}
+
+@Composable
+internal fun InboxMenuPanel(
+    anchor: Rect,
+    items: List<Pair<String, () -> Unit>>,
+    onDismiss: () -> Unit,
+) {
+    val scrim = Metro.colors.background.copy(alpha = MENU_SCRIM)
+    Layout(
+        content = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Metro.colors.chrome)
+                    .padding(vertical = MetroDimens.Row)
+                    .testTag("inbox-menu"),
+            ) {
+                items.forEach { (label, run) ->
+                    MetroText(
+                        label,
+                        Metro.typography.subheader,
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = MetroDimens.TouchTarget)
+                            .metroPress {
+                                onDismiss()
+                                run()
+                            }.padding(horizontal = MENU_INSET, vertical = 8.dp),
+                        maxLines = 1,
+                    )
+                }
+            }
+        },
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    drawRect(scrim, Offset.Zero, Size(size.width, anchor.top.coerceAtLeast(0f)))
+                    drawRect(scrim, Offset(0f, anchor.bottom), Size(size.width, (size.height - anchor.bottom).coerceAtLeast(0f)))
+                }.pointerInput(Unit) { detectTapGestures { onDismiss() } },
+    ) { measurables, constraints ->
+        val panel = measurables.single().measure(constraints.copy(minWidth = constraints.maxWidth, minHeight = 0))
+        val below = anchor.bottom.roundToInt()
+        val y = if (below + panel.height <= constraints.maxHeight) below else (anchor.top.roundToInt() - panel.height).coerceAtLeast(0)
+        layout(constraints.maxWidth, constraints.maxHeight) { panel.place(0, y) }
     }
 }
 
@@ -234,8 +368,11 @@ private fun InboxLine(
     onFiledShown: (String) -> Unit,
     peek: Boolean,
     onPeeked: () -> Unit,
+    onDetails: (String) -> Unit,
+    onMenu: (Rect) -> Unit,
 ) {
     val row = entry.row
+    var bounds by remember { mutableStateOf(Rect.Zero) }
     val animations = Metro.animations
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }
@@ -302,6 +439,7 @@ private fun InboxLine(
             .fillMaxWidth()
             .collapse(height.value)
             .onSizeChanged { width = it.width }
+            .onGloballyPositioned { bounds = it.boundsInWindow() }
             .testTag("inbox-row-${row.id}")
             .semantics {
                 customActions =
@@ -368,7 +506,7 @@ private fun InboxLine(
                         }
                         settle()
                     }
-                }.metroPress { categorize(row.id) }
+                }.metroPress(onClick = { onDetails(row.id) }, onLongClick = { onMenu(bounds) })
                 .padding(vertical = INBOX_ROW_AIR),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
@@ -429,6 +567,8 @@ private fun Modifier.collapse(fraction: Float): Modifier =
     }
 
 private val INBOX_ROW_AIR = 15.dp
+private val MENU_INSET = 24.dp
+private const val MENU_SCRIM = 0.7f
 
 /** A swipe past this share of the row's width files it; less springs back. */
 private const val COMMIT = 0.35f

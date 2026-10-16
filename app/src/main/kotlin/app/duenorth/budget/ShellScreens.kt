@@ -109,6 +109,7 @@ fun HomePivot(
     /** Whether the inbox should preview its swipes the next time it is the open section. */
     inboxPeek: Boolean = false,
     onInboxPeeked: () -> Unit = {},
+    inboxActions: InboxActions = InboxActions(),
 ) {
     var section by remember { mutableIntStateOf(initialSection) }
     var pagerGesture by remember { mutableStateOf(false) }
@@ -204,6 +205,7 @@ fun HomePivot(
                             onFiledShown = onInboxFiledShown,
                             peek = inboxPeek && section == HomeSections.headers.indexOf(HomeSections.INBOX),
                             onPeeked = onInboxPeeked,
+                            actions = inboxActions,
                         )
                     }
                 },

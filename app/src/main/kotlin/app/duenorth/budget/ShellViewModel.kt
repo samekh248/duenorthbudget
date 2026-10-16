@@ -336,6 +336,8 @@ data class ShellUiState(
     val inboxFiled: List<InboxFiled> = emptyList(),
     /** Whether the inbox has already shown its swipe preview this run. */
     val inboxPeeked: Boolean = false,
+    /** Set while a transaction form was opened from the inbox, so saving it goes back home. */
+    val editFromInbox: Boolean = false,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
     val settingsPage: SettingsPage = SettingsPage.BUDGET,
     val settingsScroll: Map<SettingsPage, Int> = emptyMap(),
@@ -1251,7 +1253,7 @@ class ShellViewModel(
 
     fun openAccount(accountId: String) {
         push(ShellRoute.Register(accountId))
-        _state.update { it.copy(registerSelection = null) }
+        _state.update { it.copy(registerSelection = null, editFromInbox = false) }
         viewModelScope.launch { apply(load(accountId), accountId) }
     }
 
@@ -1403,6 +1405,39 @@ class ShellViewModel(
         fileInbox(row, index, categoryId, row.suggestionName, fromPicker = false)
     }
 
+    /** A tap on an inbox row opens its transaction, as the register does. */
+    fun openInboxDetails(transactionId: String) {
+        openFromInbox(transactionId) { accountId -> ShellRoute.EditTransaction(accountId, transactionId) }
+    }
+
+    fun openInboxSplit(transactionId: String) {
+        openFromInbox(transactionId) { accountId -> ShellRoute.SplitTransaction(accountId, transactionId) }
+    }
+
+    fun deleteInbox(transactionId: String) {
+        val row =
+            _state.value.shell
+                ?.inbox
+                ?.firstOrNull { it.id == transactionId } ?: return
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.deleteTransaction(id, transactionId, false) }
+            publish(result, row.accountId, stayOnRegister = false)
+        }
+    }
+
+    private fun openFromInbox(
+        transactionId: String,
+        route: (String) -> ShellRoute,
+    ) {
+        val row =
+            _state.value.shell
+                ?.inbox
+                ?.firstOrNull { it.id == transactionId } ?: return
+        push(route(row.accountId))
+        _state.update { it.copy(editFromInbox = true, registerSelection = null) }
+        viewModelScope.launch { apply(load(row.accountId), row.accountId) }
+    }
+
     fun inboxFiledShown(transactionId: String) {
         _state.update { state -> state.copy(inboxFiled = state.inboxFiled.filterNot { it.row.id == transactionId }) }
     }
@@ -1446,6 +1481,7 @@ class ShellViewModel(
 
     fun openNewTransaction() {
         val accountId = openAccountId() ?: return
+        _state.update { it.copy(editFromInbox = false) }
         push(ShellRoute.EditTransaction(accountId, null))
     }
 
@@ -2151,7 +2187,10 @@ class ShellViewModel(
     ) {
         when (result) {
             is WriteResult.Saved -> {
-                if (stayOnRegister) {
+                // Edits started from the inbox go back to it, not to the account's register.
+                val toRegister = stayOnRegister && !_state.value.editFromInbox
+                _state.update { it.copy(editFromInbox = false) }
+                if (toRegister) {
                     history.clear()
                     history.addLast(ShellRoute.Home)
                     _state.update {

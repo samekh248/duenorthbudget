@@ -297,6 +297,16 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onInboxFiledShown = model::inboxFiledShown,
                                 inboxPeek = !state.inboxPeeked,
                                 onInboxPeeked = model::inboxPeeked,
+                                inboxActions =
+                                    remember(model) {
+                                        InboxActions(
+                                            onDetails = model::openInboxDetails,
+                                            onSplit = model::openInboxSplit,
+                                            onSchedule = model::createScheduleFromTransaction,
+                                            onDelete = model::deleteInbox,
+                                            onOpenAccount = model::openAccount,
+                                        )
+                                    },
                                 onReviewCategory = model::openReviewCategory,
                                 onNetWorthIncludeOffBudget = model::setNetWorthIncludeOffBudget,
                                 onPostSchedule = model::postSchedule,
