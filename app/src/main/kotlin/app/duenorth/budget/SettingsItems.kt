@@ -17,7 +17,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -28,6 +32,8 @@ import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.ThemeMode
+import app.duenorth.budget.design.components.AppGlyph
+import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroText
@@ -173,23 +179,23 @@ internal fun FormatItem(
     onHideFraction: (Boolean) -> Unit,
 ) {
     SettingsHeading("date format", tag = "settings-formatting", first = true)
-    DateFormats.choices.forEach { choice ->
-        ChoiceRow(choice, prefs.dateFormat == choice, "settings-date-$choice") { onDateFormat(choice) }
-    }
+    ListPicker(DateFormats.choices, prefs.dateFormat, "settings-date", { it }, onDateFormat)
     SettingsHeading("number format")
-    listOf(
-        FormatOptions.NUMBER_COMMA_DOT,
-        FormatOptions.NUMBER_DOT_COMMA,
-        FormatOptions.NUMBER_SPACE_DOT,
-        FormatOptions.NUMBER_COMMA_DOT_NO_GROUP,
-    ).forEach { choice ->
-        ChoiceRow(choice, prefs.numberFormat == choice, "settings-number-$choice") { onNumberFormat(choice) }
-    }
+    ListPicker(
+        listOf(
+            FormatOptions.NUMBER_COMMA_DOT,
+            FormatOptions.NUMBER_DOT_COMMA,
+            FormatOptions.NUMBER_SPACE_DOT,
+            FormatOptions.NUMBER_COMMA_DOT_NO_GROUP,
+        ),
+        prefs.numberFormat,
+        "settings-number",
+        ::numberSample,
+        onNumberFormat,
+    )
     SettingsHeading("first day of week")
     val days = listOf("sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday")
-    days.forEachIndexed { index, label ->
-        ChoiceRow(label, prefs.firstDayOfWeekIdx == index, "settings-first-day-$index") { onFirstDay(index) }
-    }
+    ListPicker(days.indices.toList(), prefs.firstDayOfWeekIdx, "settings-first-day", { days[it] }, onFirstDay)
     SettingsHeading("decimals")
     ChoiceRow(
         if (prefs.hideFraction) "hide decimals  on" else "hide decimals",
@@ -351,4 +357,73 @@ private fun ChoiceRow(
             .testTag(tag),
         color = if (selected) Metro.accent.text else Metro.colors.foreground,
     )
+}
+
+/** A number format shown as a sample amount, as Actual's own picker does. */
+private fun numberSample(format: String): String =
+    when (format) {
+        FormatOptions.NUMBER_DOT_COMMA -> "1.000,33"
+        FormatOptions.NUMBER_SPACE_DOT -> "1\u00A0000.33"
+        FormatOptions.NUMBER_COMMA_DOT_NO_GROUP -> "1000.33"
+        else -> "1,000.33"
+    }
+
+/**
+ * The Windows Phone 8.1 combo box: the current value in a bordered box under its heading, with
+ * a chevron. Tapping it unfolds every choice in place, the chosen one in the accent; tapping a
+ * choice picks it and folds the box back up.
+ */
+@Composable
+private fun <T> ListPicker(
+    choices: List<T>,
+    selected: T,
+    tag: String,
+    label: (T) -> String,
+    onPick: (T) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Column(
+        Modifier
+            .padding(top = 4.dp)
+            .fillMaxWidth()
+            .border(MetroDimens.Stroke, if (open) Metro.accent.fill else Metro.colors.foreground)
+            .testTag(tag),
+    ) {
+        if (!open) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = MetroDimens.TouchTarget)
+                    .metroPress { open = true }
+                    .padding(horizontal = 10.dp)
+                    .testTag("$tag-value"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MetroText(
+                    choices.find { it == selected }?.let(label).orEmpty(),
+                    Metro.typography.control,
+                    Modifier.weight(1f),
+                    maxLines = 1,
+                    softWrap = false,
+                )
+                AppGlyphIcon(AppGlyph.ChevronDown)
+            }
+        } else {
+            choices.forEach { choice ->
+                MetroText(
+                    label(choice),
+                    Metro.typography.control,
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = MetroDimens.TouchTarget)
+                        .metroPress {
+                            open = false
+                            if (choice != selected) onPick(choice)
+                        }.padding(horizontal = 10.dp, vertical = MetroDimens.Row)
+                        .testTag("$tag-$choice"),
+                    color = if (choice == selected) Metro.accent.text else Metro.colors.foreground,
+                )
+            }
+        }
+    }
 }
