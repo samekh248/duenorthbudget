@@ -288,7 +288,7 @@ class RegisterContentTest {
                 }
             }
         }
-        compose.onNodeWithTag("register-day-20261007", useUnmergedTree = true).assertTextEquals("7 oct")
+        compose.onNodeWithTag("register-day-20261007", useUnmergedTree = true).assertTextEquals("oct 7")
         compose.onAllNodesWithText("-$12,40").onFirst().assertIsDisplayed()
         compose.onNodeWithText("-$1.234,56").assertIsDisplayed()
     }

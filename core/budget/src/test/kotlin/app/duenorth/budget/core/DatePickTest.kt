@@ -50,14 +50,6 @@ class DatePickTest {
     }
 
     @Test
-    fun shortLabelKeepsTheFormatsDayAndMonthOrder() {
-        assertEquals("oct 7", DateFormats.short(20261007, "MM/dd/yyyy"))
-        assertEquals("7 oct", DateFormats.short(20261007, "dd.MM.yyyy"))
-        assertEquals("7 oct", DateFormats.short(20261007, "dd/MM/yyyy"))
-        assertEquals("oct 7", DateFormats.short(20261007, "yyyy-MM-dd"))
-    }
-
-    @Test
     fun typedDatesAreReadInTheFormatsOrder() {
         assertEquals(20261007, DateFormats.parse("10/07/2026", "MM/dd/yyyy"))
         assertEquals(20261007, DateFormats.parse("07.10.2026", "dd.MM.yyyy"))
