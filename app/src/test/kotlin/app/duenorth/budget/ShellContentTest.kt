@@ -53,8 +53,6 @@ class ShellContentTest {
                 Box(Modifier.width(390.dp).height(640.dp)) {
                     HomePivot(
                         shell = shell,
-                        review = null,
-                        upcoming = emptyList(),
                         loading = false,
                         openMonth = shell?.month ?: YearMonth.of(2026, 10),
                         monthWindow = MonthWindow.around(YearMonth.of(2026, 10)),
@@ -81,8 +79,6 @@ class ShellContentTest {
                 Box(Modifier.width(390.dp).height(640.dp)) {
                     HomePivot(
                         shell = shell,
-                        review = null,
-                        upcoming = emptyList(),
                         loading = false,
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),
@@ -118,8 +114,6 @@ class ShellContentTest {
                 Box(Modifier.width(390.dp).height(640.dp)) {
                     HomePivot(
                         shell = shell,
-                        review = null,
-                        upcoming = emptyList(),
                         loading = false,
                         openMonth = openMonth.value,
                         monthWindow = MonthWindow.around(shell.month),

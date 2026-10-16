@@ -35,6 +35,7 @@ import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.ReportsPage
 import app.duenorth.budget.core.ReviewCopy
 import app.duenorth.budget.core.SpendingGroupBy
+import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroPivot
@@ -59,24 +60,20 @@ object ReportItems {
 }
 
 /**
- * Home `•••` → reports: the reporting hub, a top-level view listing every report.
- * Net worth shows today's total on its line and opens the on/off budget totals; the rest
- * open the range pivot at their item.
+ * Home pivot → reports: the reporting hub, listing every report. Net worth shows today's
+ * total on its line and opens the on/off budget totals; month review opens the open month's
+ * spending by category; the rest open the range pivot at their item.
  */
 @Composable
-fun ReportsHubScreen(
+fun ReportsHub(
     netWorth: NetWorthPage?,
+    month: YearMonth,
     onNetWorth: () -> Unit,
+    onMonthReview: () -> Unit,
     onReport: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .testTag("reports-hub"),
-    ) {
-        MetroText(ReportsCopy.TITLE, Metro.typography.header, Modifier.padding(MetroDimens.Gutter))
+    Column(modifier.fillMaxSize().testTag("reports-hub")) {
         LazyColumn(Modifier.fillMaxSize()) {
             item {
                 HubLine(
@@ -85,6 +82,14 @@ fun ReportsHubScreen(
                         ?: ReportsCopy.NET_WORTH_TODAY,
                     "reports-hub-networth",
                     onNetWorth,
+                )
+            }
+            item {
+                HubLine(
+                    ReportsCopy.MONTH_REVIEW,
+                    "${ReportsCopy.MONTH_REVIEW_NOTE} ${monthLabel(month)}",
+                    "reports-hub-review",
+                    onMonthReview,
                 )
             }
             item { HubLine(ReportsCopy.CASH_FLOW, ReportsCopy.CASH_FLOW_NOTE, "reports-hub-cashflow") { onReport(ReportItems.CASH_FLOW) } }

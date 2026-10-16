@@ -6,12 +6,13 @@ It is the second Metro design for Due North. The first mockups were a dark
 pivot with no panorama. On 2026-10-04 the chosen look became design C,
 Light Panorama, and that is Metro 2 here. On 2026-10-13 the home screen
 moved from that panorama to a pivot: a small "DUE NORTH BUDGET" title, a
-header row (budget, accounts, due, review, inbox) with the
+header row (budget, accounts, inbox, reports) with the
 selected header in the foreground and the rest dimmed, and each item at
 full width with no peek. The open month is a dropdown at the top of the
 budget item. The colors, type, app bar, and motion are unchanged. On
-2026-10-16 net worth left the home pivot for reports, a top-level view
-opened from home `•••` that lists every report.
+2026-10-16 reports became the last home pivot item, the hub that lists
+every report (net worth, month review, cash flow, net worth by month,
+spending); due moved to its own view under home `•••`.
 
 Budget screens are drawn in [metro-mockups.svg](metro-mockups.svg): the
 month panorama, accounts, the budgets list, and switching files, in light

@@ -29,16 +29,17 @@ class SectionTitleTest {
         assertNull(title(ShellRoute.Templates))
         assertNull(title(ShellRoute.ManageCategories))
         assertNull(title(ShellRoute.Budgets))
-        assertNull(title(ShellRoute.Reports))
+        assertNull(title(ShellRoute.Due))
     }
 
     @Test
     fun drillInsNameTheirSection() {
         assertEquals("ACCOUNTS", title(ShellRoute.Register("a1")))
-        assertEquals("ACCOUNTS", title(ShellRoute.Reconcile("a1"), homeSection = section(HomeSections.REVIEW)))
+        assertEquals("ACCOUNTS", title(ShellRoute.Reconcile("a1"), homeSection = section(HomeSections.REPORTS)))
         assertEquals("BUDGET", title(ShellRoute.CategoryBudget("c1"), homeSection = section(HomeSections.ACCOUNTS)))
         assertEquals("DUE", title(ShellRoute.ScheduleEditor(null)))
-        assertEquals("REVIEW", title(ShellRoute.ReviewCategory("c1")))
+        assertEquals("REPORTS", title(ShellRoute.ReviewCategory("c1")))
+        assertEquals("REPORTS", title(ShellRoute.MonthReview))
         assertEquals("RULES", title(ShellRoute.RuleEditor(null)))
         assertEquals("REPORTS", title(ShellRoute.NetWorth))
         assertEquals("ACCOUNTS", title(ShellRoute.EditAccount("a1")))

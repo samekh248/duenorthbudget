@@ -11,9 +11,14 @@ import java.time.LocalDate
 
 // Spec 010 US4 (T054): reports, computed on Dispatchers.IO. See contracts/reports.md.
 
-/** Home `•••` → reports: the hub every report opens from. */
-fun ShellViewModel.openReports() {
-    push(ShellRoute.Reports)
+/** Home `•••` → due: what the due pivot item used to list. */
+fun ShellViewModel.openDue() {
+    push(ShellRoute.Due)
+}
+
+/** Reports → month review, what the review pivot item used to show. */
+fun ShellViewModel.openMonthReview() {
+    push(ShellRoute.MonthReview)
 }
 
 /** Reports → net worth, the totals that used to sit on home. */

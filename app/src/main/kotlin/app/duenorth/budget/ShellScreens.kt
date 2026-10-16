@@ -54,10 +54,9 @@ import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MoneyFormat
-import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
+import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ShellCopy
-import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppGlyph
@@ -75,14 +74,12 @@ import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
-import java.time.YearMonth
 import kotlinx.coroutines.flow.first
+import java.time.YearMonth
 
 @Composable
 fun HomePivot(
     shell: MonthShell?,
-    review: MonthReviewPage?,
-    upcoming: List<UpcomingScheduleRow>,
     loading: Boolean,
     openMonth: YearMonth,
     monthWindow: MonthWindow,
@@ -91,11 +88,7 @@ fun HomePivot(
     onSection: (Int) -> Unit = {},
     onAccount: (String) -> Unit = {},
     onInbox: (String) -> Unit = {},
-    onReviewCategory: (String) -> Unit = {},
-    onPostSchedule: (String) -> Unit = {},
-    onSkipSchedule: (String) -> Unit = {},
     modifier: Modifier = Modifier,
-    onOpenSchedule: (String) -> Unit = {},
     onSelectMonth: (YearMonth) -> Unit = {},
     onBudgetCategory: ((String) -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
@@ -109,6 +102,10 @@ fun HomePivot(
     inboxPeek: Boolean = false,
     onInboxPeeked: () -> Unit = {},
     inboxActions: InboxActions = InboxActions(),
+    netWorth: NetWorthPage? = null,
+    onNetWorth: () -> Unit = {},
+    onMonthReview: () -> Unit = {},
+    onReport: (Int) -> Unit = {},
 ) {
     var section by remember { mutableIntStateOf(initialSection) }
     var pagerGesture by remember { mutableStateOf(false) }
@@ -159,29 +156,6 @@ fun HomePivot(
                         )
                     }
                 },
-                PivotItem(HomeSections.DUE) {
-                    if (shell == null) {
-                        if (loading) Placeholder()
-                    } else {
-                        DueSection(
-                            rows = upcoming,
-                            currency = shell.currency,
-                            onListGesture = { listGesture = it },
-                            onPost = onPostSchedule,
-                            onSkip = onSkipSchedule,
-                            formatOptions = formatOptions,
-                            onOpen = onOpenSchedule,
-                        )
-                    }
-                },
-                PivotItem(HomeSections.REVIEW) {
-                    MonthReviewSection(
-                        review = review,
-                        loading = loading,
-                        onListGesture = { listGesture = it },
-                        onCategory = onReviewCategory,
-                    )
-                },
                 PivotItem(HomeSections.INBOX) {
                     if (shell == null) {
                         if (loading) Placeholder()
@@ -200,6 +174,15 @@ fun HomePivot(
                             actions = inboxActions,
                         )
                     }
+                },
+                PivotItem(HomeSections.REPORTS) {
+                    ReportsHub(
+                        netWorth = netWorth,
+                        month = openMonth,
+                        onNetWorth = onNetWorth,
+                        onMonthReview = onMonthReview,
+                        onReport = onReport,
+                    )
                 },
             ),
         modifier = modifier,

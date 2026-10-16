@@ -1,6 +1,6 @@
 # Contract: Reports
 
-Reader: `ReportsReader` (read only). Opened from Home `•••` → `reports`, the reporting hub: a top-level view titled `reports` that lists `net worth` (today's total; opens the on/off budget totals that used to be a home pivot item), `cash flow`, `net worth by month`, and `spending`. Tag `reports-hub`. The last three open `ReportScreens.kt`'s pivot titled `reports`, with items `cash flow`, `net worth`, `spending`, at the one tapped.
+Reader: `ReportsReader` (read only). The reporting hub is the home pivot's `reports` item. It lists `net worth` (today's total; opens the on/off budget totals), `month review` (the open month's income and spending by category, formerly the home `review` item), `cash flow`, `net worth by month`, and `spending`. Tag `reports-hub`. The last three open `ReportScreens.kt`'s pivot titled `reports`, with items `cash flow`, `net worth`, `spending`, at the one tapped.
 
 ## Range
 
