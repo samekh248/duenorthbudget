@@ -1,9 +1,9 @@
 pluginManagement {
     repositories {
         google()
-        // Set by the cloud session hook (.claude/hooks/gradle-dep-cache.sh) when
-        // the network allows it, to stay clear of Maven Central's rate limit.
-        System.getenv("MAVEN_CENTRAL_MIRROR")?.let { maven(it) }
+        // Google's copy of Maven Central, ahead of Central itself: Claude cloud
+        // sessions share IPs that Central often rate-limits (429).
+        maven("https://maven-central.storage-download.googleapis.com/maven2")
         mavenCentral()
         gradlePluginPortal()
     }
@@ -13,7 +13,7 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
-        System.getenv("MAVEN_CENTRAL_MIRROR")?.let { maven(it) }
+        maven("https://maven-central.storage-download.googleapis.com/maven2")
         mavenCentral()
     }
 }

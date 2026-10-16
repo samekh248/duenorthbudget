@@ -56,7 +56,7 @@ android {
         unitTests.all {
             it.systemProperty(
                 "robolectric.dependency.repo.url",
-                System.getenv("MAVEN_CENTRAL_MIRROR") ?: "https://repo.maven.apache.org/maven2",
+                "https://maven-central.storage-download.googleapis.com/maven2",
             )
         }
     }
