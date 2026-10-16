@@ -591,7 +591,7 @@ private const val MENU_SCRIM = 0.7f
 private const val COMMIT = 0.35f
 
 /** The share of the row at each side where a drag belongs to the pivot, not the row. */
-internal const val SWIPE_DEAD_ZONE = 0.1f
+internal const val SWIPE_DEAD_ZONE = 0.2f
 private const val PEEK_REACH = 0.3f
 private const val PEEK_DELAY_MS = 500L
 private const val PEEK_MS = 320

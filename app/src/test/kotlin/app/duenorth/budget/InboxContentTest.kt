@@ -61,10 +61,10 @@ class InboxContentTest {
             onInbox = { opened += it },
             actions = InboxActions(onDetails = { details += it }),
         )
-        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { swipeRight(startX = width * 0.2f, endX = right) }
+        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { swipeRight(startX = width * 0.3f, endX = right) }
         compose.waitForIdle()
         assertEquals(listOf("coffee"), accepted)
-        compose.onNodeWithTag("inbox-row-shell").performTouchInput { swipeLeft(startX = width * 0.8f, endX = left) }
+        compose.onNodeWithTag("inbox-row-shell").performTouchInput { swipeLeft(startX = width * 0.7f, endX = left) }
         compose.waitForIdle()
         assertEquals(listOf("shell"), opened)
         compose.onNodeWithTag("inbox-row-atm").performClick()
@@ -107,8 +107,8 @@ class InboxContentTest {
         val opened = mutableListOf<String>()
         var pivotDragged = 0f
         show(sampleInbox(), onAccept = { accepted += it }, onInbox = { opened += it }, onPivotDrag = { pivotDragged += abs(it) })
-        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { swipeRight(startX = width * 0.05f, endX = right) }
-        compose.onNodeWithTag("inbox-row-shell").performTouchInput { swipeLeft(startX = width * 0.95f, endX = left) }
+        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { swipeRight(startX = width * 0.15f, endX = right) }
+        compose.onNodeWithTag("inbox-row-shell").performTouchInput { swipeLeft(startX = width * 0.85f, endX = left) }
         compose.waitForIdle()
         assertEquals(emptyList<String>(), accepted)
         assertEquals(emptyList<String>(), opened)
