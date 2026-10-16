@@ -4,7 +4,7 @@ The transaction details screen is a UI contract: what it shows, its app bar, the
 
 ## Screen (`TransactionForm`, route `EditTransaction`)
 
-Title area, top to bottom: the section line from `SectionTitle.of` (unchanged rule, research R11); the account name as written (page-title-line size, secondary, tag `transaction-account`); the page title `transaction` (new and existing alike). The first field group starts 24 dp below the title. Root tag `transaction-form`.
+Title area, top to bottom: the section line from `SectionTitle.of` (unchanged rule, research R11); the account name as stored (subheader size, secondary, tag `transaction-account`); the page title `transaction` (new and existing alike). The first field group starts 24 dp below the title. Root tag `transaction-form`.
 
 Body, top to bottom. Each group is `LabeledField`: label (caption, secondary, lowercase) → 6 dp → control → optional error line (body, accent). Groups are 24 dp apart.
 
