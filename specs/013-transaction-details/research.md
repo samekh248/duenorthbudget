@@ -64,9 +64,9 @@ All Technical Context items were known from the code; nothing was left as NEEDS 
 
 ## R11. Page title area
 
-- **Decision**: The small uppercase line follows the app's existing rule in `SectionTitle.of`, which names the home section showing (ACCOUNTS when opened from a register, INBOX when opened from the inbox). The big title is always "transaction". The account's name, as the person wrote it ("Visa"), sits directly under the page title in subheader size and secondary color, `FieldLabelGap` below it; the first field label follows one `FieldGroupGap` later. Tag `transaction-account`. Chosen by the owner on 2026-10-16.
-- **Rationale**: Constitution 1.2.0 (Principle II) defines the small line as the home section, so it stays ACCOUNTS. The owner still wants to see which account the transaction belongs to, which matters when the page is opened from the inbox, so the name goes in its own line under the title instead of replacing the section line. `SectionTitle.of` needs no change; `TransactionForm` draws the name from `page.account.name`.
-- **Alternatives considered**: The account name in the small line ("VISA", the spec's first illustration; contradicts the constitution). Section only, no account name (the owner asked for the name).
+- **Decision**: The small uppercase line follows the app's existing rule in `SectionTitle.of`, which names the home section showing (ACCOUNTS when opened from a register, INBOX when opened from the inbox). Directly under it, and above the page title, is the account's name as the person wrote it ("Visa"), in the same small page-title-line size and the secondary color. The big title is always "transaction". Tag `transaction-account`. Chosen by the owner on 2026-10-16.
+- **Rationale**: Constitution 1.2.0 (Principle II) defines the small line as the home section, so it stays ACCOUNTS. The owner also wants to see which account the transaction belongs to, which matters when the page is opened from the inbox, so the name gets its own line between the section line and the title. `SectionTitled` draws the section line outside the form, and the form's content starts right under it, so `TransactionForm` draws the account line as its first row from `page.account.name`, with the title after it. `SectionTitle.of` needs no change.
+- **Alternatives considered**: The account name in place of ACCOUNTS ("VISA", the spec's first illustration; contradicts the constitution). The name under the page title (the owner placed it above).
 
 ## R12. Commands on the application bar
 
