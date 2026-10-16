@@ -209,6 +209,7 @@ fun AssignScreen(
     onAssign: (String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val prefs = LocalFormatPrefs.current
     var selected by remember(categories) { mutableStateOf(categories.firstOrNull()?.id.orEmpty()) }
     var amount by remember { mutableStateOf("") }
     Column(
@@ -235,9 +236,9 @@ fun AssignScreen(
                 )
             }
         }
-        RememberFormSave { onAssign(selected, amount) }
+        RememberFormSave { onAssign(selected, prefs.readAmount(amount)) }
         if (!formSaveOnBar()) {
-            MetroButton("assign", Modifier.testTag("assign-save")) { onAssign(selected, amount) }
+            MetroButton("assign", Modifier.testTag("assign-save")) { onAssign(selected, prefs.readAmount(amount)) }
         } else {
             Box(Modifier.testTag("assign-save")) {}
         }
@@ -250,6 +251,7 @@ fun AddTransactionScreen(
     onAdd: (String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val prefs = LocalFormatPrefs.current
     var payee by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     Column(
@@ -263,9 +265,9 @@ fun AddTransactionScreen(
         MetroField(payee, { payee = it }, "payee", Modifier.testTag("spend-payee"))
         MetroField(amount, { amount = it }, "amount", Modifier.testTag("spend-amount"))
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        RememberFormSave { onAdd(payee, amount) }
+        RememberFormSave { onAdd(payee, prefs.readAmount(amount)) }
         if (!formSaveOnBar()) {
-            MetroButton("add", Modifier.testTag("spend-save")) { onAdd(payee, amount) }
+            MetroButton("add", Modifier.testTag("spend-save")) { onAdd(payee, prefs.readAmount(amount)) }
         } else {
             Box(Modifier.testTag("spend-save")) {}
         }

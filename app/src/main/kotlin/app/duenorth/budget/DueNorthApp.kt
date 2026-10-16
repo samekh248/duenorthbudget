@@ -284,7 +284,10 @@ fun DueNorthApp(model: ShellViewModel) {
             syncing = state.syncing || state.importFetchPending,
             progress = state.syncProgress,
         ) { modifier ->
-            CompositionLocalProvider(LocalFormSaveHost provides formSaveHost) {
+            CompositionLocalProvider(
+                LocalFormSaveHost provides formSaveHost,
+                LocalFormatPrefs provides state.formatPrefs,
+            ) {
                 SectionTitled(SectionTitle.of(state), modifier) {
                     val fill = Modifier.fillMaxSize()
                     when (val route = state.route) {

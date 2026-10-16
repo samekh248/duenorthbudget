@@ -101,7 +101,7 @@ fun BankLinkScreen(
             MetroText(BankLinkCopy.PICK_ACCOUNT, Metro.typography.caption, color = Metro.colors.secondary)
             if (accounts.isEmpty()) MetroText(BankLinkCopy.NO_ACCOUNTS, Metro.typography.body)
             for (account in accounts) {
-                val balance = account.balanceMinor?.let { "  ${MoneyFormat.format(it, currency)}" }.orEmpty()
+                val balance = account.balanceMinor?.let { "  ${MoneyFormat.format(it, currency, formatOptions())}" }.orEmpty()
                 Pick(
                     "${account.name}$balance",
                     selected = false,

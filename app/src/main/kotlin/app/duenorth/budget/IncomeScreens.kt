@@ -26,7 +26,6 @@ import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.IncomeCategoryRow
 import app.duenorth.budget.core.IncomeGroupRow
 import app.duenorth.budget.core.MoneyFormat
-import app.duenorth.budget.core.MoneyParse
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.monthLabel
@@ -59,7 +58,7 @@ fun IncomeGroupLine(
     group: IncomeGroupRow,
     shell: MonthShell,
     modifier: Modifier = Modifier,
-    formatOptions: FormatOptions = FormatOptions(),
+    formatOptions: FormatOptions = formatOptions(),
 ) {
     Row(
         modifier
@@ -102,7 +101,7 @@ fun IncomeCategoryLine(
     shell: MonthShell,
     onOpen: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
-    formatOptions: FormatOptions = FormatOptions(),
+    formatOptions: FormatOptions = formatOptions(),
     banded: Boolean = false,
 ) {
     val money = shell.currency
@@ -155,7 +154,8 @@ fun IncomeCategoryScreen(
     onAutoHold: (AutoHoldChoice) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var amount by remember(category) { mutableStateOf(MoneyParse.formatMagnitude(category.budgetedMinor, shell.currency.decimals)) }
+    val prefs = LocalFormatPrefs.current
+    var amount by remember(category, prefs) { mutableStateOf(prefs.editAmount(category.budgetedMinor, shell.currency.decimals)) }
     Column(
         modifier
             .fillMaxSize()
@@ -167,16 +167,16 @@ fun IncomeCategoryScreen(
         MetroText(category.name, Metro.typography.header)
         MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
         MetroText(
-            "${IncomeCopy.RECEIVED} ${MoneyFormat.format(category.receivedMinor, shell.currency)}",
+            "${IncomeCopy.RECEIVED} ${MoneyFormat.format(category.receivedMinor, shell.currency, formatOptions())}",
             Metro.typography.subheader,
             Modifier.testTag("income-received"),
         )
         if (shell.mode == BudgetMode.TRACKING) {
             MetroField(amount, { amount = it }, IncomeCopy.BUDGETED, Modifier.testTag("income-budget-amount"))
             if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-            RememberFormSave { onSave(amount) }
+            RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
             if (!formSaveOnBar()) {
-                MetroButton("save") { onSave(amount) }
+                MetroButton("save") { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
             }
         } else {
             MetroText(MonthFillCopy.AUTO_HOLD, Metro.typography.subheader)

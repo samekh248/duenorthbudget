@@ -81,7 +81,8 @@ fun ReportsHubScreen(
             item {
                 HubLine(
                     ReportsCopy.NET_WORTH,
-                    netWorth?.let { "${MoneyFormat.format(it.totalMinor, it.currency)} today" } ?: ReportsCopy.NET_WORTH_TODAY,
+                    netWorth?.let { "${MoneyFormat.format(it.totalMinor, it.currency, formatOptions())} today" }
+                        ?: ReportsCopy.NET_WORTH_TODAY,
                     "reports-hub-networth",
                     onNetWorth,
                 )
@@ -240,13 +241,13 @@ private fun CashFlow(page: ReportsPage) {
             ) {
                 Row(Modifier.fillMaxWidth()) {
                     MetroText(month.month.format(MONTH).lowercase(), Metro.typography.subheader, Modifier.weight(1f))
-                    MetroText(MoneyFormat.format(month.netMinor, page.currency), Metro.typography.subheader)
+                    MetroText(MoneyFormat.format(month.netMinor, page.currency, formatOptions()), Metro.typography.subheader)
                 }
                 Bar(month.incomeMinor, scale, Metro.accent.fill)
                 Bar(abs(month.expenseMinor), scale, Metro.colors.secondary)
                 MetroText(
-                    "${ReportsCopy.INCOME} ${MoneyFormat.format(month.incomeMinor, page.currency)} · " +
-                        "${ReportsCopy.EXPENSES} ${MoneyFormat.format(month.expenseMinor, page.currency)}",
+                    "${ReportsCopy.INCOME} ${MoneyFormat.format(month.incomeMinor, page.currency, formatOptions())} · " +
+                        "${ReportsCopy.EXPENSES} ${MoneyFormat.format(month.expenseMinor, page.currency, formatOptions())}",
                     Metro.typography.caption,
                     color = Metro.colors.secondary,
                 )
@@ -292,7 +293,7 @@ private fun NetWorth(
             ) {
                 Row(Modifier.fillMaxWidth()) {
                     MetroText(month.month.format(MONTH).lowercase(), Metro.typography.subheader, Modifier.weight(1f))
-                    MetroText(MoneyFormat.format(month.total(includeOffBudget), page.currency), Metro.typography.subheader)
+                    MetroText(MoneyFormat.format(month.total(includeOffBudget), page.currency, formatOptions()), Metro.typography.subheader)
                 }
                 Bar(abs(month.total(includeOffBudget)), scale, Metro.accent.fill)
             }
@@ -333,7 +334,7 @@ private fun Spending(
             ) {
                 Row(Modifier.fillMaxWidth()) {
                     MetroText(row.label, Metro.typography.subheader, Modifier.weight(1f), maxLines = 2)
-                    MetroText(MoneyFormat.format(row.amountMinor, page.currency), Metro.typography.subheader)
+                    MetroText(MoneyFormat.format(row.amountMinor, page.currency, formatOptions()), Metro.typography.subheader)
                 }
                 Bar(abs(row.amountMinor), scale, Metro.accent.fill)
             }
@@ -351,7 +352,7 @@ private fun Totals(
         lines.forEach { (label, amount) ->
             Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                 MetroText(label, Metro.typography.body, Modifier.weight(1f), color = Metro.colors.secondary)
-                MetroText(MoneyFormat.format(amount, currency), Metro.typography.subheader)
+                MetroText(MoneyFormat.format(amount, currency, formatOptions()), Metro.typography.subheader)
             }
         }
     }

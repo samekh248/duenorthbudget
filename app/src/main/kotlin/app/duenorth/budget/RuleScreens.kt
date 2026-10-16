@@ -219,7 +219,7 @@ private fun PartLine(
 ) {
     Row(Modifier.fillMaxWidth().testTag(tag), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            MetroText(RuleValues.describe(part, names, decimals), Metro.typography.subheader, maxLines = 3)
+            MetroText(RuleValues.describe(part, names, decimals, LocalFormatPrefs.current), Metro.typography.subheader, maxLines = 3)
             if (part.kept) {
                 MetroText(RuleEditorCopy.KEPT, Metro.typography.caption, Modifier.testTag("$tag-kept"), color = Metro.accent.text)
             }
@@ -247,6 +247,7 @@ private fun PartAdder(
 ) {
     var field by remember { mutableStateOf(ops.keys.first()) }
     var op by remember { mutableStateOf(ops.getValue(ops.keys.first()).first()) }
+    val prefs = LocalFormatPrefs.current
     var text by remember { mutableStateOf("") }
     var problem by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxWidth().testTag(tag), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -265,7 +266,13 @@ private fun PartAdder(
         MetroField(text, { text = it }, RuleScreenCopy.VALUE, Modifier.testTag("$tag-value"))
         if (problem != null) MetroText(problem!!, Metro.typography.caption, color = Metro.accent.text)
         MetroButton(if (action) RuleScreenCopy.ADD_ACTION else RuleScreenCopy.ADD_CONDITION, Modifier.testTag("$tag-button")) {
-            val part = RuleValues.part(field, op, text, names, decimals, action)
+            val typed =
+                when (RuleFields.type(field)) {
+                    "number" -> prefs.readAmount(text, decimals)
+                    "date" -> prefs.readDate(text)
+                    else -> text
+                }
+            val part = RuleValues.part(field, op, typed, names, decimals, action)
             if (part == null) {
                 problem = if (RuleFields.type(field) == "id") RuleScreenCopy.NOT_FOUND else RuleScreenCopy.BAD_VALUE
             } else {

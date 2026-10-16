@@ -73,4 +73,13 @@ class AmountFormatTest {
             )
         assertEquals(-123456L, (result as EntryResult.Ok).value.amountMinor)
     }
+
+    @Test
+    fun canonicalRewritesTypedAmountsForTheBudgetCode() {
+        assertEquals("-1234.5", MoneyParse.canonical("-1.234,5", FormatOptions.NUMBER_DOT_COMMA))
+        assertEquals("1234.56", MoneyParse.canonical("1 234.56", FormatOptions.NUMBER_SPACE_DOT))
+        assertEquals("1234.56", MoneyParse.canonical("1,234.56", FormatOptions.NUMBER_COMMA_DOT))
+        assertEquals("12.50", MoneyParse.canonical("12.50", FormatOptions.NUMBER_DOT_COMMA))
+        assertEquals("abc", MoneyParse.canonical("abc", FormatOptions.NUMBER_DOT_COMMA))
+    }
 }

@@ -33,7 +33,6 @@ import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.ManageCategoryRow
 import app.duenorth.budget.core.ManageGroupRow
 import app.duenorth.budget.core.MoneyFormat
-import app.duenorth.budget.core.MoneyParse
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroButton
@@ -57,7 +56,8 @@ fun CategoryBudgetScreen(
     onSaveNote: (String) -> Unit = {},
 ) {
     val category = shell.groups.flatMap { it.categories }.first { it.id == categoryId }
-    var amount by remember(category) { mutableStateOf(MoneyParse.formatMagnitude(category.budgetedMinor, shell.currency.decimals)) }
+    val prefs = LocalFormatPrefs.current
+    var amount by remember(category, prefs) { mutableStateOf(prefs.editAmount(category.budgetedMinor, shell.currency.decimals)) }
     Column(
         modifier
             .fillMaxSize()
@@ -68,15 +68,15 @@ fun CategoryBudgetScreen(
         MetroText(category.name, Metro.typography.header)
         MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
         MetroText(
-            "available ${MoneyFormat.format(category.availableMinor, shell.currency)}",
+            "available ${MoneyFormat.format(category.availableMinor, shell.currency, formatOptions())}",
             Metro.typography.subheader,
         )
         MetroField(amount, { amount = it }, "budgeted", Modifier.testTag("category-budget-amount"))
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        RememberFormSave { onSave(amount) }
+        RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
         MetroButtonGrid {
             if (!formSaveOnBar()) {
-                MetroButton("save") { onSave(amount) }
+                MetroButton("save") { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
             }
             MetroButton(EnvelopeCopy.MOVE, onClick = onMove)
             MetroButton(
@@ -99,6 +99,7 @@ fun MoveCategoryScreen(
     modifier: Modifier = Modifier,
 ) {
     val from = shell.groups.flatMap { it.categories }.first { it.id == fromCategoryId }
+    val prefs = LocalFormatPrefs.current
     var toId by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     val targets = shell.groups.flatMap { it.categories }.filter { it.id != fromCategoryId }
@@ -125,9 +126,9 @@ fun MoveCategoryScreen(
                 )
             }
         }
-        RememberFormSave { onSave(toId, amount) }
+        RememberFormSave { onSave(toId, prefs.readAmount(amount, shell.currency.decimals)) }
         if (!formSaveOnBar()) {
-            MetroButton("move") { onSave(toId, amount) }
+            MetroButton("move") { onSave(toId, prefs.readAmount(amount, shell.currency.decimals)) }
         }
     }
 }
@@ -140,6 +141,7 @@ fun HoldMonthScreen(
     onRelease: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val prefs = LocalFormatPrefs.current
     var amount by remember { mutableStateOf("") }
     Column(
         modifier
@@ -150,22 +152,22 @@ fun HoldMonthScreen(
     ) {
         MetroText(EnvelopeCopy.HOLD, Metro.typography.header)
         MetroText(
-            "to budget ${MoneyFormat.format(shell.headerMinor, shell.currency)}",
+            "to budget ${MoneyFormat.format(shell.headerMinor, shell.currency, formatOptions())}",
             Metro.typography.subheader,
         )
         if (shell.bufferedMinor != 0L) {
             MetroText(
-                "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency)}",
+                "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency, formatOptions())}",
                 Metro.typography.caption,
                 color = Metro.colors.secondary,
             )
         }
         MetroField(amount, { amount = it }, "amount for next month")
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        RememberFormSave { onSave(amount) }
+        RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
         MetroButtonGrid {
             if (!formSaveOnBar()) {
-                MetroButton(EnvelopeCopy.HOLD) { onSave(amount) }
+                MetroButton(EnvelopeCopy.HOLD) { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
             }
             if (shell.bufferedMinor != 0L) {
                 MetroButton(EnvelopeCopy.RELEASE, onClick = onRelease)
@@ -340,7 +342,7 @@ fun CategoryLine(
     shell: MonthShell,
     onOpen: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
-    formatOptions: FormatOptions = FormatOptions(),
+    formatOptions: FormatOptions = formatOptions(),
     banded: Boolean = false,
 ) {
     val money = shell.currency

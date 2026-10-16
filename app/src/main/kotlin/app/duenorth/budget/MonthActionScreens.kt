@@ -124,7 +124,7 @@ private fun BreakdownLine(
     ) {
         MetroText(label, style, Modifier.weight(1f), color = if (emphasis) Metro.colors.foreground else Metro.colors.secondary)
         MetroText(
-            MoneyFormat.format(amountMinor, currency),
+            MoneyFormat.format(amountMinor, currency, formatOptions()),
             style.copy(textAlign = TextAlign.End),
             Modifier.testTag("$tag-amount"),
             color = if (emphasis) Metro.accent.text else Metro.colors.foreground,
@@ -175,6 +175,7 @@ fun ToBudgetScreen(
     modifier: Modifier = Modifier,
 ) {
     val category = shell.groups.flatMap { it.categories }.firstOrNull { it.id == categoryId }
+    val prefs = LocalFormatPrefs.current
     var amount by remember { mutableStateOf("") }
     Column(
         modifier
@@ -192,22 +193,25 @@ fun ToBudgetScreen(
         )
         if (category != null) {
             MetroText(
-                "available ${MoneyFormat.format(category.availableMinor, shell.currency)}",
+                "available ${MoneyFormat.format(category.availableMinor, shell.currency, formatOptions())}",
                 Metro.typography.subheader,
                 Modifier.testTag("to-budget-available"),
             )
         }
         MetroText(
-            "${MonthActionCopy.TOTAL} ${MoneyFormat.format(shell.headerMinor, shell.currency)}",
+            "${MonthActionCopy.TOTAL} ${MoneyFormat.format(shell.headerMinor, shell.currency, formatOptions())}",
             Metro.typography.body,
             Modifier.testTag("to-budget-header"),
             color = Metro.colors.secondary,
         )
         MetroField(amount, { amount = it }, "amount", Modifier.testTag("to-budget-amount"))
         if (error != null) MetroText(error, Metro.typography.body, Modifier.testTag("to-budget-error"), color = Metro.accent.text)
-        RememberFormSave { onSave(amount) }
+        RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
         if (!formSaveOnBar()) {
-            MetroButton(MonthActionCopy.TRANSFER, Modifier.testTag("to-budget-save")) { onSave(amount) }
+            MetroButton(
+                MonthActionCopy.TRANSFER,
+                Modifier.testTag("to-budget-save"),
+            ) { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
         }
     }
 }

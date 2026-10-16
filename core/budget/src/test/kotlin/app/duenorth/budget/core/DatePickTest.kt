@@ -48,4 +48,23 @@ class DatePickTest {
         assertEquals("Thu 01.10.2026", DateFormats.withWeekday(20261001, "dd.MM.yyyy"))
         assertEquals("Wed 00-00-0000", DateFormats.widestSample("MM-dd-yyyy"))
     }
+
+    @Test
+    fun shortLabelKeepsTheFormatsDayAndMonthOrder() {
+        assertEquals("oct 7", DateFormats.short(20261007, "MM/dd/yyyy"))
+        assertEquals("7 oct", DateFormats.short(20261007, "dd.MM.yyyy"))
+        assertEquals("7 oct", DateFormats.short(20261007, "dd/MM/yyyy"))
+        assertEquals("oct 7", DateFormats.short(20261007, "yyyy-MM-dd"))
+    }
+
+    @Test
+    fun typedDatesAreReadInTheFormatsOrder() {
+        assertEquals(20261007, DateFormats.parse("10/07/2026", "MM/dd/yyyy"))
+        assertEquals(20261007, DateFormats.parse("07.10.2026", "dd.MM.yyyy"))
+        assertEquals(20261007, DateFormats.parse("7/10/2026", "dd/MM/yyyy"))
+        assertEquals(20261007, DateFormats.parse("2026-10-07", "dd.MM.yyyy"))
+        assertEquals(null, DateFormats.parse("31.02.2026", "dd.MM.yyyy"))
+        assertEquals("2026-10-07", DateFormats.toIso("07.10.2026", "dd.MM.yyyy"))
+        assertEquals("soon", DateFormats.toIso("soon", "dd.MM.yyyy"))
+    }
 }

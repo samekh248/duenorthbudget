@@ -78,14 +78,14 @@ private fun PreviewRowLine(
         Column(Modifier.weight(1f)) {
             MetroText(row.payee, Metro.typography.body, maxLines = 2)
             MetroText(
-                RegisterEntry.registerDateLabel(row.date),
+                RegisterEntry.registerDateLabel(row.date, dateFormat()),
                 Metro.typography.caption,
                 color = Metro.colors.secondary,
             )
         }
         Column {
             MetroText(
-                MoneyFormat.format(row.amountMinor, preview.currency),
+                MoneyFormat.format(row.amountMinor, preview.currency, formatOptions()),
                 Metro.typography.body,
                 color = Metro.accent.text,
             )
@@ -147,7 +147,7 @@ private fun ReviewRowEditor(
     ) {
         MetroText(row.payee, Metro.typography.body, maxLines = 2)
         MetroText(
-            MoneyFormat.format(row.amountMinor, page.currency),
+            MoneyFormat.format(row.amountMinor, page.currency, formatOptions()),
             Metro.typography.caption,
             color = Metro.accent.text,
         )

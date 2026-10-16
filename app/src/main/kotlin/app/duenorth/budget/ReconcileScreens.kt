@@ -43,8 +43,9 @@ fun ReconcileStartScreen(
     onStart: (String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val prefs = LocalFormatPrefs.current
     var balance by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf(RegisterEntry.todayIso()) }
+    var date by remember(prefs.dateFormat) { mutableStateOf(prefs.showDate(RegisterEntry.todayIso())) }
     Column(
         modifier
             .fillMaxSize()
@@ -59,7 +60,7 @@ fun ReconcileStartScreen(
         if (error != null) {
             MetroText(error, Metro.typography.body, color = Metro.accent.text)
         }
-        MetroButton("start") { onStart(balance, date) }
+        MetroButton("start") { onStart(prefs.readAmount(balance), prefs.readDate(date)) }
     }
 }
 
@@ -87,7 +88,7 @@ fun ReconcileScreen(
         Column(Modifier.padding(top = MetroDimens.Gutter)) {
             MetroText(ReconcileCopy.STATEMENT, Metro.typography.caption, color = Metro.colors.secondary)
             MetroText(
-                MoneyFormat.format(page.statementMinor, page.currency),
+                MoneyFormat.format(page.statementMinor, page.currency, formatOptions()),
                 Metro.typography.subheader,
                 modifier = Modifier.testTag("statement-amount"),
             )
@@ -99,7 +100,7 @@ fun ReconcileScreen(
                 color = Metro.colors.secondary,
             )
             MetroText(
-                MoneyFormat.format(page.clearedTotalMinor, page.currency),
+                MoneyFormat.format(page.clearedTotalMinor, page.currency, formatOptions()),
                 Metro.typography.subheader,
                 modifier = Modifier.testTag("cleared-total"),
             )
@@ -111,7 +112,7 @@ fun ReconcileScreen(
                 color = Metro.colors.secondary,
             )
             MetroText(
-                MoneyFormat.format(page.differenceMinor, page.currency),
+                MoneyFormat.format(page.differenceMinor, page.currency, formatOptions()),
                 Metro.typography.header,
                 color = Metro.accent.text,
                 modifier = Modifier.testTag("reconcile-difference"),
@@ -153,7 +154,7 @@ private fun ReconcileLine(
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             MetroText(row.payee, Metro.typography.subheader, maxLines = 2)
-            MetroText(RegisterEntry.registerDateLabel(row.date), Metro.typography.caption, color = Metro.colors.secondary)
+            MetroText(RegisterEntry.registerDateLabel(row.date, dateFormat()), Metro.typography.caption, color = Metro.colors.secondary)
         }
         val mark =
             when {
@@ -163,7 +164,7 @@ private fun ReconcileLine(
             }
         MetroText(mark, Metro.typography.subheader, Modifier.widthIn(min = 24.dp))
         MetroText(
-            MoneyFormat.format(row.amountMinor, page.currency),
+            MoneyFormat.format(row.amountMinor, page.currency, formatOptions()),
             Metro.typography.subheader,
             Modifier.widthIn(max = 120.dp),
         )
