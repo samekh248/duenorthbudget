@@ -52,9 +52,10 @@ private val MONTH = DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)
 
 /** The [ReportsScreen] pivot items, in order; [ShellRoute.ReportPivot] opens one. */
 object ReportItems {
-    const val CASH_FLOW = 0
-    const val NET_WORTH = 1
-    const val SPENDING = 2
+    val headers = listOf(ReportsCopy.CASH_FLOW, ReportsCopy.NET_WORTH, ReportsCopy.SPENDING)
+    val CASH_FLOW = headers.indexOf(ReportsCopy.CASH_FLOW)
+    val NET_WORTH = headers.indexOf(ReportsCopy.NET_WORTH)
+    val SPENDING = headers.indexOf(ReportsCopy.SPENDING)
 }
 
 /**

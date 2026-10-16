@@ -51,7 +51,7 @@ class ReportContentTest {
                     {},
                     {},
                     {},
-                    initialItem = 2,
+                    initialItem = ReportItems.SPENDING,
                 )
             }
         }
@@ -74,7 +74,7 @@ class ReportContentTest {
                     {},
                     { groupBy.value = it },
                     {},
-                    initialItem = 2,
+                    initialItem = ReportItems.SPENDING,
                 )
             }
         }

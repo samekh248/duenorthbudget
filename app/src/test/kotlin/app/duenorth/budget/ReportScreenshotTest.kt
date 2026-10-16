@@ -25,22 +25,22 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [33], qualifiers = "w411dp-h891dp-xxhdpi")
 class ReportScreenshotTest {
     @Test
-    fun cashFlowLight() = snap("report_cashflow_light", dark = false, item = 0)
+    fun cashFlowLight() = snap("report_cashflow_light", dark = false, item = ReportItems.CASH_FLOW)
 
     @Test
-    fun cashFlowDark() = snap("report_cashflow_dark", dark = true, item = 0)
+    fun cashFlowDark() = snap("report_cashflow_dark", dark = true, item = ReportItems.CASH_FLOW)
 
     @Test
-    fun netWorthLight() = snap("report_networth_light", dark = false, item = 1)
+    fun netWorthLight() = snap("report_networth_light", dark = false, item = ReportItems.NET_WORTH)
 
     @Test
-    fun netWorthDark() = snap("report_networth_dark", dark = true, item = 1)
+    fun netWorthDark() = snap("report_networth_dark", dark = true, item = ReportItems.NET_WORTH)
 
     @Test
-    fun spendingLight() = snap("report_spending_light", dark = false, item = 2)
+    fun spendingLight() = snap("report_spending_light", dark = false, item = ReportItems.SPENDING)
 
     @Test
-    fun spendingDark() = snap("report_spending_dark", dark = true, item = 2)
+    fun spendingDark() = snap("report_spending_dark", dark = true, item = ReportItems.SPENDING)
 
     @Test
     fun hubLight() = capture("reports_hub_light", dark = false) { Hub() }

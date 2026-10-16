@@ -28,8 +28,8 @@ data class SettingsBar(
 
 object ScreenBar {
     /** Home pivot item indexes the bar changes for. */
-    const val HOME_BUDGET = 0
-    const val HOME_ACCOUNTS = 1
+    val HOME_BUDGET = HomeSections.headers.indexOf(HomeSections.BUDGET)
+    val HOME_ACCOUNTS = HomeSections.headers.indexOf(HomeSections.ACCOUNTS)
 
     fun specsFor(
         route: ShellRoute,
