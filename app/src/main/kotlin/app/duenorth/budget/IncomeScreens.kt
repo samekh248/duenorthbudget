@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -102,12 +103,14 @@ fun IncomeCategoryLine(
     onOpen: ((String) -> Unit)?,
     modifier: Modifier = Modifier,
     formatOptions: FormatOptions = FormatOptions(),
+    banded: Boolean = false,
 ) {
     val money = shell.currency
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
+            .ledgerFill(if (banded) ledgerBand else Color.Transparent)
             .then(if (onOpen != null) Modifier.metroPress { onOpen(category.id) } else Modifier)
             .testTag("income-category-${category.id}"),
         verticalAlignment = Alignment.CenterVertically,
