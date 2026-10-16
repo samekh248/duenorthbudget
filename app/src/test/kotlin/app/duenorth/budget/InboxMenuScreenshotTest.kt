@@ -59,7 +59,6 @@ class InboxMenuScreenshotTest {
                     HomePivot(
                         shell = shell,
                         review = null,
-                        netWorth = null,
                         upcoming = emptyList(),
                         loading = false,
                         openMonth = shell.month,

@@ -71,17 +71,17 @@ class ShellScreenshotTest {
     fun accountsDark() = snap("accounts_dark", dark = true, shell = sample().copy(accounts = manyAccounts()), section = 1)
 
     @Test
-    fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = 5)
+    fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX))
 
     @Test
-    fun inboxLight() = snap("inbox_light", dark = false, shell = sample(), section = 5)
+    fun inboxLight() = snap("inbox_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX))
 
     // Corner Coffee just filed: the confirmation sits in the row's own slot before it collapses.
     @Test
-    fun inboxFiledLight() = snap("inbox_filed_light", dark = false, shell = sample(), section = 5, filed = true)
+    fun inboxFiledLight() = snap("inbox_filed_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX), filed = true)
 
     @Test
-    fun inboxFiledDark() = snap("inbox_filed_dark", dark = true, shell = sample(), section = 5, filed = true)
+    fun inboxFiledDark() = snap("inbox_filed_dark", dark = true, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX), filed = true)
 
     // Edge to edge with a 32dp status bar (gray strip): the pivot title starts below it.
     @Test
