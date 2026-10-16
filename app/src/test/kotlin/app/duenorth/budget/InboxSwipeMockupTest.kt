@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -267,24 +268,6 @@ private fun SwipeRow(
 ) {
     val fill = if (banded) ledgerBand else Color.Transparent
     Box(Modifier.fillMaxWidth().collapse(collapse)) {
-        if (done != null) {
-            // Confirmation: the row's slot turns accent with a check and the category it went to.
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 84.dp)
-                    .ledgerFill(Metro.accent.fill)
-                    .padding(vertical = 15.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppGlyphIcon(AppGlyph.Save, Metro.accent.onFill)
-                Column(Modifier.padding(start = MetroDimens.Gutter)) {
-                    MetroText("filed to ${done.lowercase()}", Metro.typography.body, color = Metro.accent.onFill)
-                    MetroText(item.payee, Metro.typography.caption, color = Metro.accent.onFill.copy(alpha = 0.75f))
-                }
-            }
-            return@Box
-        }
         // What the swipe uncovers: accept on the left (row moving right), categorize on the right.
         if (offset != 0f) {
             val accept = offset > 0
@@ -309,6 +292,7 @@ private fun SwipeRow(
             Modifier
                 .fillMaxWidth()
                 .slide(offset)
+                .alpha(if (done != null) 0f else 1f)
                 .heightIn(min = MetroDimens.TouchTarget)
                 .ledgerFill(if (offset != 0f) Metro.colors.background else fill)
                 .ledgerFill(if (offset != 0f) fill else Color.Transparent)
@@ -332,6 +316,21 @@ private fun SwipeRow(
                     maxLines = 1,
                     softWrap = false,
                 )
+            }
+        }
+        if (done != null) {
+            // Confirmation: the row's own slot, same size, turns accent with a check and the category it went to.
+            Row(
+                Modifier
+                    .matchParentSize()
+                    .ledgerFill(Metro.accent.fill),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppGlyphIcon(AppGlyph.Save, Metro.accent.onFill)
+                Column(Modifier.padding(start = MetroDimens.Gutter)) {
+                    MetroText("filed to ${done.lowercase()}", Metro.typography.body, color = Metro.accent.onFill)
+                    MetroText(item.payee, Metro.typography.caption, color = Metro.accent.onFill.copy(alpha = 0.75f))
+                }
             }
         }
     }
