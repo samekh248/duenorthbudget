@@ -120,7 +120,7 @@ fun RegisterScreen(
         MetroText(page.account.name, Metro.typography.header, maxLines = 2)
         BudgetTotal(
             label = if (owed) "${ShellCopy.BALANCE} ${RegisterCopy.OWED}" else ShellCopy.BALANCE,
-            amount = MoneyFormat.format(page.balanceMinor, page.currency),
+            amount = MoneyFormat.format(page.balanceMinor, page.currency, formatOptions()),
             amountColor = Metro.accent.text,
             amountTag = "register-balance",
             modifier = Modifier.padding(top = MetroDimens.Gutter),
@@ -170,7 +170,7 @@ private fun RegisterList(
         days.forEach { day ->
             item(key = "day-${day.first().id}") {
                 MetroText(
-                    RegisterEntry.registerDateLabel(day.first().date),
+                    DateFormats.short(day.first().date, dateFormat()),
                     Metro.typography.caption,
                     Modifier.padding(top = 16.dp, bottom = 4.dp).testTag("register-day-${day.first().date}"),
                     color = Metro.accent.text,
@@ -261,7 +261,7 @@ private fun RegisterLine(
                 )
             }
             MetroText(
-                MoneyFormat.format(row.amountMinor, page.currency),
+                MoneyFormat.format(row.amountMinor, page.currency, formatOptions()),
                 Metro.typography.body.copy(textAlign = TextAlign.End),
                 Modifier.weight(LEDGER_FIGURE * 2).testTag("register-amount-${row.id}"),
                 color = accent,
@@ -284,7 +284,7 @@ private fun RegisterLine(
                     maxLines = 2,
                 )
                 MetroText(
-                    MoneyFormat.format(part.amountMinor, page.currency),
+                    MoneyFormat.format(part.amountMinor, page.currency, formatOptions()),
                     Metro.typography.caption.copy(textAlign = TextAlign.End),
                     Modifier.weight(LEDGER_FIGURE * 2),
                     color = Metro.colors.foreground,
@@ -859,11 +859,12 @@ fun SplitForm(
     onUnsplit: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val prefs = LocalFormatPrefs.current
     val seed =
         if (row.parts.size >= 2) {
-            row.parts.map { it.categoryId to MoneyParse.formatMagnitude(it.amountMinor, page.currency.decimals) }
+            row.parts.map { it.categoryId to prefs.editAmount(it.amountMinor, page.currency.decimals) }
         } else {
-            listOf((row.categoryId ?: "") to MoneyParse.formatMagnitude(row.amountMinor, page.currency.decimals), "" to "")
+            listOf((row.categoryId ?: "") to prefs.editAmount(row.amountMinor, page.currency.decimals), "" to "")
         }
     var lines by remember(row.id) { mutableStateOf(seed) }
     var localError by remember(row.id) { mutableStateOf<String?>(null) }
@@ -875,7 +876,7 @@ fun SplitForm(
     ) {
         MetroText("split", Metro.typography.header)
         MetroText(
-            MoneyFormat.format(row.amountMinor, page.currency),
+            MoneyFormat.format(row.amountMinor, page.currency, formatOptions()),
             Metro.typography.subheader,
             color = Metro.accent.text,
         )
@@ -900,7 +901,8 @@ fun SplitForm(
             }
         }
         val commitSplit = {
-            when (val parsed = RegisterEntry.split(row.amountMinor, page.currency.decimals, lines)) {
+            val typed = lines.map { (category, text) -> category to prefs.readAmount(text, page.currency.decimals) }
+            when (val parsed = RegisterEntry.split(row.amountMinor, page.currency.decimals, typed)) {
                 is EntryResult.Ok -> {
                     localError = null
                     onSave(row.id, parsed.value)
@@ -952,7 +954,8 @@ fun TransferForm(
     val draftId = remember(page.account.id) { UUID.randomUUID().toString() }
     val others = page.accounts.filter { it.id != page.account.id }
     var toId by remember(page.account.id) { mutableStateOf(others.firstOrNull()?.id.orEmpty()) }
-    var date by remember { mutableStateOf(initialDate) }
+    val prefs = LocalFormatPrefs.current
+    var date by remember(prefs.dateFormat) { mutableStateOf(prefs.showDate(initialDate)) }
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var categoryId by remember(toId) { mutableStateOf<String?>(null) }
@@ -998,8 +1001,8 @@ fun TransferForm(
                         id = draftId,
                         fromAccountId = page.account.id,
                         toAccountId = toId,
-                        dateText = date,
-                        amountText = amount,
+                        dateText = prefs.readDate(date),
+                        amountText = prefs.readAmount(amount, page.currency.decimals),
                         decimals = page.currency.decimals,
                         categoryId = if (needsCategory) categoryId else null,
                         note = note,
@@ -1034,7 +1037,7 @@ fun CategoryPickerScreen(
     ) {
         MetroText(target.payee, Metro.typography.header, maxLines = 2)
         MetroText(
-            MoneyFormat.format(target.amountMinor, target.currency),
+            MoneyFormat.format(target.amountMinor, target.currency, formatOptions()),
             Metro.typography.subheader,
             color = Metro.accent.text,
         )

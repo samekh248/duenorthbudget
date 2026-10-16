@@ -97,7 +97,7 @@ fun HomePivot(
     onSelectMonth: (YearMonth) -> Unit = {},
     onBudgetCategory: ((String) -> Unit)? = null,
     onAddTransaction: (() -> Unit)? = null,
-    formatOptions: FormatOptions = FormatOptions(),
+    formatOptions: FormatOptions = formatOptions(),
     onToBudget: (() -> Unit)? = null,
     notice: String? = null,
     onAcceptInbox: (String) -> Unit = onInbox,
@@ -386,7 +386,7 @@ fun BudgetSection(
     onListGesture: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onCategory: ((String) -> Unit)? = null,
-    formatOptions: FormatOptions = FormatOptions(),
+    formatOptions: FormatOptions = formatOptions(),
     onToBudget: (() -> Unit)? = null,
     notice: String? = null,
 ) {
@@ -522,7 +522,7 @@ private fun GroupLine(
     group: GroupRow,
     shell: MonthShell,
     modifier: Modifier = Modifier,
-    formatOptions: FormatOptions = FormatOptions(),
+    formatOptions: FormatOptions = formatOptions(),
 ) {
     GroupHeading(
         name = group.name,
@@ -582,7 +582,7 @@ fun AccountsSection(
     onListGesture: (Boolean) -> Unit,
     onAccount: (String) -> Unit = {},
     modifier: Modifier = Modifier,
-    formatOptions: FormatOptions = FormatOptions(),
+    formatOptions: FormatOptions = formatOptions(),
 ) {
     if (accounts.isEmpty()) {
         MetroText(

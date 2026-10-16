@@ -431,14 +431,17 @@ object RuleValues {
         }
     }
 
-    /** "payee is Cafe"; a kept part shows its stored field. */
+    /** "payee is Cafe"; a kept part shows its stored field. With [format], amounts and dates follow Settings. */
     fun describe(
         part: RulePart,
         names: RuleNames,
         decimals: Int,
+        format: FormatPrefs? = null,
     ): String {
         val field = if (part.kept) part.raw["field"]?.let { (it as? JsonPrimitive)?.contentOrNull }.orEmpty() else part.field
-        return listOf(field, part.op, shown(part.field, part.value, names, decimals)).filter { it.isNotEmpty() }.joinToString(" ")
+        return listOf(field, part.op, shown(part.field, part.value, names, decimals, format))
+            .filter { it.isNotEmpty() }
+            .joinToString(" ")
     }
 
     private fun shown(
@@ -446,23 +449,43 @@ object RuleValues {
         value: JsonElement?,
         names: RuleNames,
         decimals: Int,
+        format: FormatPrefs?,
     ): String =
         when (value) {
             null, JsonNull -> ""
-            is JsonArray -> value.joinToString(", ") { shown(field, it, names, decimals) }
+            is JsonArray -> value.joinToString(", ") { shown(field, it, names, decimals, format) }
             is JsonObject ->
                 value["num1"]?.let { low ->
-                    "${shown(field, low, names, decimals)} and ${shown(field, value["num2"], names, decimals)}"
-                } ?: value["start"]?.let { (it as? JsonPrimitive)?.contentOrNull }.orEmpty()
+                    "${shown(field, low, names, decimals, format)} and ${shown(field, value["num2"], names, decimals, format)}"
+                } ?: value["start"]?.let { (it as? JsonPrimitive)?.contentOrNull }?.let { date(it, format) }.orEmpty()
             is JsonPrimitive -> {
                 val content = value.contentOrNull.orEmpty()
                 when {
-                    field == "amount" && !value.isString -> content.toLongOrNull()?.let { amountText(it, decimals) } ?: content
+                    field == "amount" && !value.isString -> content.toLongOrNull()?.let { amount(it, decimals, format) } ?: content
                     RuleFields.type(field) == "id" -> names.name(field, content)
+                    RuleFields.type(field) == "date" -> date(content, format)
                     else -> content
                 }
             }
         }
+
+    private fun amount(
+        minor: Long,
+        decimals: Int,
+        format: FormatPrefs?,
+    ): String {
+        if (format == null) return amountText(minor, decimals)
+        val sign = if (minor < 0) "-" else ""
+        return sign + MoneyParse.editText(minor, decimals, FormatOptions(numberFormat = format.numberFormat))
+    }
+
+    private fun date(
+        iso: String,
+        format: FormatPrefs?,
+    ): String {
+        if (format == null || !DATE.matches(iso)) return iso
+        return RegisterEntry.parseDate(iso)?.let { DateFormats.format(it, format.dateFormat) } ?: iso
+    }
 
     fun amountText(
         minor: Long,

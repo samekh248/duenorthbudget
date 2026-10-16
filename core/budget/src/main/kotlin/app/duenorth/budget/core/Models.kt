@@ -152,6 +152,52 @@ object DateFormats {
         return "$weekday ${format(date, pattern)}"
     }
 
+    /**
+     * A short day label that keeps [pattern]'s order of day and month: "oct 7" for month-first and
+     * year-first patterns, "7 oct" for day-first ones. Register and list headings use it.
+     */
+    fun short(
+        date: Int,
+        pattern: String,
+    ): String {
+        val month = (date / 100) % 100
+        val day = date % 100
+        if (month !in 1..12) return date.toString()
+        val name =
+            java.time.Month
+                .of(month)
+                .name
+                .lowercase()
+                .take(3)
+        return if (DatePick.columns(pattern).first() == DateColumn.DAY) "$day $name" else "$name $day"
+    }
+
+    /**
+     * A typed date read in [pattern]'s order, with any separators, or as `yyyy-MM-dd`. Null when it is not a
+     * real date.
+     */
+    fun parse(
+        text: String,
+        pattern: String,
+    ): Int? {
+        val parts = text.trim().split(Regex("\\D+")).filter { it.isNotEmpty() }
+        if (parts.size != 3) return RegisterEntry.parseDate(text)
+        val iso = parts[0].length == 4
+        val order = if (iso) listOf(DateColumn.YEAR, DateColumn.MONTH, DateColumn.DAY) else DatePick.columns(pattern)
+        val values = order.zip(parts.map { it.toIntOrNull() ?: return null }).toMap()
+        val year = values.getValue(DateColumn.YEAR)
+        val month = values.getValue(DateColumn.MONTH)
+        val day = values.getValue(DateColumn.DAY)
+        if (year !in 1..9999 || month !in 1..12 || day !in 1..DatePick.daysIn(year, month)) return null
+        return year * 10000 + month * 100 + day
+    }
+
+    /** [text] as `yyyy-MM-dd` when it reads as a date in [pattern], otherwise unchanged so the form rejects it. */
+    fun toIso(
+        text: String,
+        pattern: String,
+    ): String = parse(text, pattern)?.let(RegisterEntry::formatIso) ?: text
+
     /** The widest value [withWeekday] can produce in [pattern], for sizing the date box. */
     fun widestSample(pattern: String): String = "Wed " + pattern.map { if (it.isLetter()) '0' else it }.joinToString("")
 }

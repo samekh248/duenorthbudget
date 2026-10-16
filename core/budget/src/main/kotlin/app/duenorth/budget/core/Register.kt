@@ -247,6 +247,17 @@ object MoneyParse {
         return whole + decimalSep + fraction.toString().padStart(decimals, '0')
     }
 
+    /**
+     * A typed amount in [numberFormat] rewritten with no group separators and "." for the decimal point
+     * ("-1.234,5" becomes "-1234.5"), the form the budget and sync code reads. The caller still checks it.
+     * [decimals] only decides whether a lone "." in the dot-comma format is a decimal point.
+     */
+    fun canonical(
+        text: String,
+        numberFormat: String,
+        decimals: Int = 2,
+    ): String = normalize(text.trim(), decimals, numberFormat)
+
     /** [text] rewritten as plain digits with "." for the decimal point, or left for the checks to reject. */
     private fun normalize(
         text: String,

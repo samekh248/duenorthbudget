@@ -59,7 +59,7 @@ fun MonthReviewSection(
         ) {
             MetroText(ReviewCopy.INCOME, Metro.typography.subheader, Modifier.weight(1f))
             MetroText(
-                MoneyFormat.format(review.incomeMinor, review.currency),
+                MoneyFormat.format(review.incomeMinor, review.currency, formatOptions()),
                 Metro.typography.subheader,
                 modifier = Modifier.testTag("review-income"),
             )
@@ -93,7 +93,7 @@ private fun ReviewCategoryLine(
     ) {
         MetroText(row.name, Metro.typography.subheader, Modifier.weight(1f).padding(end = 12.dp), maxLines = 3)
         MetroText(
-            MoneyFormat.format(-abs(row.spentMinor), review.currency),
+            MoneyFormat.format(-abs(row.spentMinor), review.currency, formatOptions()),
             Metro.typography.subheader,
             Modifier.widthIn(max = 148.dp),
         )
@@ -121,7 +121,7 @@ fun NetWorthSection(
         val empty = page.onBudgetMinor == 0L && page.offBudgetMinor == 0L
         if (empty) {
             MetroText(ReviewCopy.NO_ACCOUNTS, Metro.typography.body, Modifier.padding(top = MetroDimens.Grid))
-            MetroText(MoneyFormat.format(0, page.currency), Metro.typography.header, Modifier.testTag("net-worth-total"))
+            MetroText(MoneyFormat.format(0, page.currency, formatOptions()), Metro.typography.header, Modifier.testTag("net-worth-total"))
             return
         }
         NetWorthLine(ReviewCopy.ON_BUDGET, page.onBudgetMinor, page)
@@ -144,7 +144,7 @@ fun NetWorthSection(
             color = Metro.colors.secondary,
         )
         MetroText(
-            MoneyFormat.format(page.totalMinor, page.currency),
+            MoneyFormat.format(page.totalMinor, page.currency, formatOptions()),
             Metro.typography.header,
             color = Metro.accent.text,
             modifier = Modifier.testTag("net-worth-total"),
@@ -160,7 +160,7 @@ private fun NetWorthLine(
 ) {
     Row(Modifier.fillMaxWidth().padding(vertical = MetroDimens.Row), verticalAlignment = Alignment.CenterVertically) {
         MetroText(label, Metro.typography.subheader, Modifier.weight(1f))
-        MetroText(MoneyFormat.format(amountMinor, page.currency), Metro.typography.subheader)
+        MetroText(MoneyFormat.format(amountMinor, page.currency, formatOptions()), Metro.typography.subheader)
     }
 }
 
@@ -184,7 +184,7 @@ fun CategoryReviewScreen(
         Column(Modifier.padding(top = MetroDimens.Gutter)) {
             MetroText(monthLabel(page.month), Metro.typography.caption, color = Metro.colors.secondary)
             MetroText(
-                MoneyFormat.format(-abs(page.totalMinor), page.currency),
+                MoneyFormat.format(-abs(page.totalMinor), page.currency, formatOptions()),
                 Metro.typography.subheader,
                 Modifier.testTag("category-review-total"),
             )
@@ -209,10 +209,10 @@ private fun CategoryReviewLine(
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             MetroText(row.payee, Metro.typography.subheader, maxLines = 2)
-            MetroText(RegisterEntry.registerDateLabel(row.date), Metro.typography.caption, color = Metro.colors.secondary)
+            MetroText(RegisterEntry.registerDateLabel(row.date, dateFormat()), Metro.typography.caption, color = Metro.colors.secondary)
         }
         MetroText(
-            MoneyFormat.format(row.amountMinor, page.currency),
+            MoneyFormat.format(row.amountMinor, page.currency, formatOptions()),
             Metro.typography.subheader,
             Modifier.widthIn(max = 120.dp),
         )

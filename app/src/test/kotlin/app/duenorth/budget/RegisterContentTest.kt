@@ -19,6 +19,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -29,11 +30,13 @@ import app.duenorth.budget.core.AccountChoice
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatOptions
+import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.RegisterAccount
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterRow
 import app.duenorth.budget.core.TransactionDraft
+import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -263,6 +266,54 @@ class RegisterContentTest {
         val toggle = compose.onNodeWithTag("transaction-direction").fetchSemanticsNode().boundsInRoot
         assertEquals(amount.top, toggle.top, 1f)
         assertTrue(amount.width < 390 * compose.density.density / 2)
+    }
+
+    @Test
+    fun registerFollowsTheFormatSettings() {
+        compose.setContent {
+            MetroTheme {
+                CompositionLocalProvider(
+                    LocalFormatPrefs provides FormatPrefs(dateFormat = "dd.MM.yyyy", numberFormat = FormatOptions.NUMBER_DOT_COMMA),
+                ) {
+                    Box(Modifier.width(390.dp).height(640.dp)) {
+                        RegisterScreen(
+                            page = sample(balance = -123_456),
+                            onGesture = {},
+                            onOpen = {},
+                            onAdd = {},
+                            onTransfer = {},
+                            onReconcile = {},
+                        )
+                    }
+                }
+            }
+        }
+        compose.onNodeWithTag("register-day-20261007", useUnmergedTree = true).assertTextEquals("7 oct")
+        compose.onAllNodesWithText("-$12,40").onFirst().assertIsDisplayed()
+        compose.onNodeWithText("-$1.234,56").assertIsDisplayed()
+    }
+
+    @Test
+    fun transferReadsTheDateAndAmountInTheChosenFormat() {
+        var saved: TransferDraft? = null
+        val host = FormSaveHost()
+        compose.setContent {
+            MetroTheme {
+                CompositionLocalProvider(
+                    LocalFormSaveHost provides host,
+                    LocalFormatPrefs provides FormatPrefs(dateFormat = "dd.MM.yyyy", numberFormat = FormatOptions.NUMBER_DOT_COMMA),
+                ) {
+                    Box(Modifier.width(390.dp).height(780.dp)) {
+                        TransferForm(page = sample(), initialDate = "2026-10-07", error = null, onSave = { saved = it })
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("07.10.2026").assertIsDisplayed()
+        compose.onAllNodes(hasSetTextAction())[1].performTextReplacement("1.234,56")
+        compose.runOnIdle { host.save() }
+        assertEquals(123_456L, saved?.amountMinor)
+        assertEquals(20261007, saved?.date)
     }
 
     @Test

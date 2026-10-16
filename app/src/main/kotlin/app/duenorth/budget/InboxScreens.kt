@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import app.duenorth.budget.core.DateFormats
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MoneyFormat
@@ -118,7 +119,7 @@ fun InboxSection(
     onInbox: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onAdd: (() -> Unit)? = null,
-    formatOptions: FormatOptions = FormatOptions(),
+    formatOptions: FormatOptions = formatOptions(),
     onAccept: (String) -> Unit = onInbox,
     filed: List<InboxFiled> = emptyList(),
     onFiledShown: (String) -> Unit = {},
@@ -367,7 +368,7 @@ private fun InboxDayHeading(
         }
     }
     MetroText(
-        RegisterEntry.registerDateLabel(date),
+        DateFormats.short(date, dateFormat()),
         Metro.typography.caption,
         Modifier.collapse(height.value).padding(top = 16.dp, bottom = 4.dp).testTag("inbox-day-$date"),
         color = Metro.accent.text,

@@ -176,7 +176,7 @@ private fun ManagedAccountLine(
             maxLines = 2,
         )
         MetroText(
-            MoneyFormat.format(account.balanceMinor, currency),
+            MoneyFormat.format(account.balanceMinor, currency, formatOptions()),
             Metro.typography.subheader,
             Modifier.widthIn(max = 148.dp),
             color = if (dim) Metro.colors.secondary else Metro.colors.foreground,
@@ -193,6 +193,7 @@ fun AddAccountScreen(
     modifier: Modifier = Modifier,
 ) {
     var name by remember { mutableStateOf("") }
+    val prefs = LocalFormatPrefs.current
     var balance by remember { mutableStateOf("") }
     var offBudget by remember { mutableStateOf(false) }
     Column(
@@ -211,9 +212,9 @@ fun AddAccountScreen(
             Choice(AccountScreenCopy.OFF_BUDGET, offBudget, "account-add-off") { offBudget = true }
         }
         if (error != null) MetroText(error, Metro.typography.body, Modifier.testTag("account-error"), color = Metro.accent.text)
-        RememberFormSave { onSave(name, offBudget, balance) }
+        RememberFormSave { onSave(name, offBudget, prefs.readAmount(balance)) }
         if (!formSaveOnBar()) {
-            MetroButton("save", Modifier.testTag("account-add-save")) { onSave(name, offBudget, balance) }
+            MetroButton("save", Modifier.testTag("account-add-save")) { onSave(name, offBudget, prefs.readAmount(balance)) }
         }
     }
 }
@@ -278,7 +279,7 @@ fun CloseAccountScreen(
         MetroText(AccountScreenCopy.CLOSE, Metro.typography.header)
         MetroText(account.name, Metro.typography.caption, color = Metro.colors.secondary)
         MetroText(
-            "${AccountScreenCopy.BALANCE_LEFT} ${MoneyFormat.format(account.balanceMinor, currency)}",
+            "${AccountScreenCopy.BALANCE_LEFT} ${MoneyFormat.format(account.balanceMinor, currency, formatOptions())}",
             Metro.typography.subheader,
             Modifier.padding(top = MetroDimens.Gutter).testTag("account-close-balance"),
         )

@@ -30,6 +30,7 @@ import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.FormatOptions
+import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RuleValues
@@ -53,7 +54,7 @@ fun DueSection(
     onPost: (String) -> Unit,
     onSkip: (String) -> Unit,
     modifier: Modifier = Modifier,
-    formatOptions: FormatOptions = FormatOptions(),
+    formatOptions: FormatOptions = formatOptions(),
     onOpen: (String) -> Unit = {},
 ) {
     if (rows.isEmpty()) {
@@ -81,7 +82,7 @@ private fun DueLine(
     currency: CurrencySpec,
     onPost: (String) -> Unit,
     onSkip: (String) -> Unit,
-    formatOptions: FormatOptions = FormatOptions(),
+    formatOptions: FormatOptions = formatOptions(),
     onOpen: (String) -> Unit = {},
 ) {
     Column(
@@ -100,7 +101,7 @@ private fun DueLine(
             ) {
                 MetroText(row.payee, Metro.typography.subheader, maxLines = 2)
                 MetroText(
-                    "${row.accountName} · ${RegisterEntry.registerDateLabel(row.nextDate)}",
+                    "${row.accountName} · ${RegisterEntry.registerDateLabel(row.nextDate, dateFormat())}",
                     Metro.typography.body,
                     color = Metro.colors.secondary,
                     maxLines = 2,
@@ -198,6 +199,18 @@ data class ScheduleForm(
     val endDate: String,
     val postsTransaction: Boolean,
 ) {
+    /** The typed amounts and dates rewritten from the person's format into the form [toDraft] reads. */
+    fun read(
+        prefs: FormatPrefs,
+        decimals: Int,
+    ): ScheduleForm =
+        copy(
+            amount = prefs.readAmount(amount, decimals),
+            amount2 = prefs.readAmount(amount2, decimals),
+            start = prefs.readDate(start),
+            endDate = prefs.readDate(endDate),
+        )
+
     fun toDraft(
         base: ScheduleDraft,
         decimals: Int,
@@ -223,24 +236,32 @@ data class ScheduleForm(
     }
 
     companion object {
+        /** Without [prefs] the amount stays as "-25.00", the form tests and older callers type. */
+        private fun amountText(
+            minor: Long,
+            decimals: Int,
+            prefs: FormatPrefs?,
+        ): String = prefs?.editSignedAmount(minor, decimals) ?: RuleValues.amountText(minor, decimals)
+
         fun from(
             draft: ScheduleDraft,
             decimals: Int,
+            prefs: FormatPrefs? = null,
         ): ScheduleForm =
             ScheduleForm(
                 name = draft.name,
                 accountId = draft.accountId,
                 payee = draft.payeeName,
-                amount = if (draft.id == null && draft.amountMinor == 0L) "" else RuleValues.amountText(draft.amountMinor, decimals),
+                amount = if (draft.id == null && draft.amountMinor == 0L) "" else amountText(draft.amountMinor, decimals, prefs),
                 amountOp = draft.amountOp,
-                amount2 = if (draft.amountOp == "isbetween") RuleValues.amountText(draft.amount2Minor, decimals) else "",
+                amount2 = if (draft.amountOp == "isbetween") amountText(draft.amount2Minor, decimals, prefs) else "",
                 categoryId = draft.categoryId,
                 repeat = draft.repeat,
                 interval = draft.interval.toString(),
-                start = draft.startIso,
+                start = prefs?.showDate(draft.startIso) ?: draft.startIso,
                 end = draft.end,
                 endCount = draft.endOccurrences.toString(),
-                endDate = draft.endDateIso,
+                endDate = prefs?.showDate(draft.endDateIso) ?: draft.endDateIso,
                 postsTransaction = draft.postsTransaction,
             )
     }
@@ -260,7 +281,8 @@ fun ScheduleEditorScreen(
     onSave: (ScheduleForm) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var form by remember(draft.id) { mutableStateOf(ScheduleForm.from(draft, decimals)) }
+    val prefs = LocalFormatPrefs.current
+    var form by remember(draft.id, prefs) { mutableStateOf(ScheduleForm.from(draft, decimals, prefs)) }
     Column(
         modifier
             .fillMaxSize()
@@ -349,9 +371,9 @@ fun ScheduleEditorScreen(
             "schedule-posts",
         ) { form = form.copy(postsTransaction = !form.postsTransaction) }
         if (error != null) MetroText(error, Metro.typography.body, Modifier.testTag("schedule-error"), color = Metro.accent.text)
-        RememberFormSave { onSave(form) }
+        RememberFormSave { onSave(form.read(prefs, decimals)) }
         if (!formSaveOnBar()) {
-            MetroButton("save", Modifier.testTag("schedule-save")) { onSave(form) }
+            MetroButton("save", Modifier.testTag("schedule-save")) { onSave(form.read(prefs, decimals)) }
         }
     }
 }
