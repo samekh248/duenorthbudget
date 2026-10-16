@@ -151,8 +151,17 @@ class ShellContentTest {
         compose.onNodeWithTag("to-budget").assertIsDisplayed()
         compose.onNodeWithTag("month-label").performClick()
         compose.onNodeWithTag("month-list").assertIsDisplayed()
-        compose.onNodeWithTag("month-option-2024-10").performClick()
-        compose.onNodeWithText("october 2024").assertIsDisplayed()
+        // The list opens on the open month, with earlier months above and later months below.
+        val list = compose.onNodeWithTag("month-list").fetchSemanticsNode().boundsInRoot
+        val currentNode = compose.onNodeWithTag("month-option-2026-10")
+        currentNode.assertIsDisplayed()
+        val current = currentNode.fetchSemanticsNode().boundsInRoot
+        assertTrue("open month is centered: $current in $list", abs(current.center.y - list.center.y) <= current.height)
+        compose.onNodeWithTag("month-option-2026-09").assertIsDisplayed()
+        compose.onNodeWithTag("month-option-2026-11").assertIsDisplayed()
+        compose.onNodeWithTag("month-option-2024-10").assertDoesNotExist()
+        compose.onNodeWithTag("month-option-2026-08").performClick()
+        compose.onNodeWithText("august 2026").assertIsDisplayed()
         compose.onNodeWithTag("month-list").assertDoesNotExist()
     }
 
