@@ -23,10 +23,8 @@ class ScreenBarTest {
     fun budgetEditModeBar() {
         val specs =
             ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, undoLabel = "assign", budgetEditing = true)
-        assertEquals(listOf("end-budget-edit", "undo"), specs.filter { it.primary }.map { it.id })
-        assertEquals(listOf("copy-last", "average", "zero"), specs.filter { !it.primary }.map { it.id })
-        val nothingToUndo = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, budgetEditing = true)
-        assertEquals(listOf("end-budget-edit"), nothingToUndo.filter { it.primary }.map { it.id })
+        // A sandbox: done and cancel only, since undo and the fills would write straight away.
+        assertEquals(listOf("end-budget-edit", "cancel-budget-edit"), specs.map { it.id })
     }
 
     @Test

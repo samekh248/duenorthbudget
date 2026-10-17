@@ -760,6 +760,8 @@ fun MetroPivot(
     items: List<PivotItem>,
     modifier: Modifier = Modifier,
     initialItem: Int = 0,
+    /** Holds the pivot on its item: no swiping, and the headers do not switch. */
+    locked: Boolean = false,
     onGesture: (Boolean) -> Unit = {},
     /** Called with the item index once a swipe or header tap settles. */
     onSelected: (Int) -> Unit = {},
@@ -785,6 +787,7 @@ fun MetroPivot(
     }
 
     fun goTo(index: Int) {
+        if (locked) return
         scope.launch {
             val target = pager.currentPage + PivotMotion.delta(itemOf(pager.currentPage), index, count)
             if (animations) {
@@ -872,7 +875,7 @@ fun MetroPivot(
             state = pager,
             modifier = Modifier.weight(1f),
             beyondViewportPageCount = 1,
-            userScrollEnabled = count > 1,
+            userScrollEnabled = count > 1 && !locked,
         ) { page ->
             Box(Modifier.fillMaxSize()) {
                 items[itemOf(page)].content()

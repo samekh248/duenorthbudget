@@ -596,6 +596,8 @@ class ShellViewModel(
     }
 
     fun selectOpenMonth(month: YearMonth) {
+        // Edit mode's changes belong to the month it opened on.
+        if (_state.value.budgetEdit != null) return
         val gesture = shellGate.gestureActive
         val pinned = _state.value.pinnedMonth
         val hit = months.select(month, gesture)
@@ -628,8 +630,8 @@ class ShellViewModel(
     }
 
     fun selectHomeSection(index: Int) {
-        // Edit mode belongs to the budget item; swiping away from it finishes editing.
-        if (index != ScreenBar.HOME_BUDGET && _state.value.budgetEdit != null) endBudgetEdit()
+        // Edit mode belongs to the budget item and holds the pivot still; leaving it anyway drops the changes.
+        if (index != ScreenBar.HOME_BUDGET && _state.value.budgetEdit != null) cancelBudgetEdit()
         _state.update { it.copy(homeSection = index) }
     }
 
@@ -1076,6 +1078,17 @@ class ShellViewModel(
         }
     }
 
+    /** Edit mode's done: saves each changed budgeted amount for [month] as one undo step. */
+    fun saveBudgets(
+        month: YearMonth,
+        amounts: Map<String, Long>,
+    ) {
+        val shell = _state.value.shell ?: return
+        applyEnvelopeEdit(optimistic = { amounts.entries.fold(it) { s, (id, minor) -> s.withBudgetedAssignment(id, minor) } }) {
+            sync.assignBudgets(shell.budgetId, month, amounts)
+        }
+    }
+
     fun toggleCategoryCarryover(enabled: Boolean) {
         val shell = _state.value.shell ?: return
         val categoryId = (_state.value.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
@@ -1090,6 +1103,10 @@ class ShellViewModel(
     ) {
         val shell = _state.value.shell ?: return
         val from = (_state.value.route as? ShellRoute.MoveCategory)?.fromCategoryId ?: return
+        if (_state.value.budgetEdit != null) {
+            moveInBudgetEdit(from, toCategoryId, amountText)
+            return
+        }
         if (toCategoryId == MOVE_TO_BUDGET) {
             transferToBudget(from, amountText)
             return
@@ -1219,9 +1236,9 @@ class ShellViewModel(
             endInboxSelecting()
             return true
         }
-        // Back closes the keypad without saving what was typed, then leaves edit mode.
+        // Back is edit mode's cancel: it leaves without saving anything changed there.
         if (current.budgetEdit != null && current.route == ShellRoute.Home && current.confirm == null) {
-            if (current.budgetEdit.categoryId != null) closeBudgetKeypad() else endBudgetEdit()
+            cancelBudgetEdit()
             return true
         }
         if (current.confirm != null) {

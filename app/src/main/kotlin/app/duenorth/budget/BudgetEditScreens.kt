@@ -44,6 +44,7 @@ object BudgetEditCopy {
     const val EDIT = "edit budget"
     const val EDITING = "editing"
     const val DONE = "done"
+    const val CANCEL = "cancel"
     const val COVER = "cover"
     const val ALL = "all"
     const val AVAILABLE = "available"

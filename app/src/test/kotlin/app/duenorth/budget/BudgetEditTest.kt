@@ -5,14 +5,17 @@ import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.CreateResult
+import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.MemorySecretStore
 import app.duenorth.budget.core.MockBudgets
+import app.duenorth.budget.core.MoneyParse
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -21,34 +24,30 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.io.File
 
-/** The budget's edit mode: boxes typed into on the keypad, sums worked out, each box saved as it closes. */
+/** The budget's edit mode: boxes typed into on the keypad, sums worked out, nothing saved until done. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class BudgetEditTest {
     @Test
-    fun plusTypedOnTheKeypadAddsToTheOldAmountAndComesOutOfToBudget() {
+    fun plusTypedOnTheKeypadAddsToTheOldAmountButSavesNothingUntilDone() {
         val model = household("plus")
         val before = model.state.value.shell!!
         model.startBudgetEdit()
         model.focusBudgetBox("c-food")
         listOf("+", "2", "5").forEach(model::typeBudgetKey)
-        assertEquals(
-            "+25",
-            model.state.value.budgetEdit!!
-                .text,
-        )
+        assertEquals("+25", model.edit().text)
         model.doneBudgetBox()
-        assertEquals(BudgetEdit(), model.state.value.budgetEdit)
+        assertNull(model.edit().categoryId)
         val food = before.category("c-food")!!.budgetedMinor + 2_500
-        await {
-            model.state.value.shell
-                ?.category("c-food")
-                ?.budgetedMinor == food
-        }
-        await {
-            model.state.value.shell
-                ?.headerMinor == before.headerMinor - 2_500
-        }
+        // Edit mode shows the new amount and to budget less it; the saved month is untouched.
+        assertEquals(food, model.editing().category("c-food")!!.budgetedMinor)
+        assertEquals(before.headerMinor - 2_500, model.editing().headerMinor)
+        assertEquals(before.category("c-food")!!.budgetedMinor, model.saved().category("c-food")!!.budgetedMinor)
+
+        model.endBudgetEdit()
+        assertNull(model.state.value.budgetEdit)
+        await { model.saved().category("c-food")?.budgetedMinor == food }
+        await { model.saved().headerMinor == before.headerMinor - 2_500 }
     }
 
     @Test
@@ -57,11 +56,7 @@ class BudgetEditTest {
         model.startBudgetEdit()
         model.focusBudgetBox("c-food")
         listOf("3", "0", "0", "÷", "2", BudgetKeys.EQUALS).forEach(model::typeBudgetKey)
-        assertEquals(
-            "150.00",
-            model.state.value.budgetEdit!!
-                .text,
-        )
+        assertEquals("150.00", model.edit().text)
     }
 
     @Test
@@ -73,41 +68,53 @@ class BudgetEditTest {
         listOf("5", "÷", "0").forEach(model::typeBudgetKey)
         model.doneBudgetBox()
         assertEquals(SyncCopy.ENTER_AMOUNT, model.state.value.editError)
-        assertEquals(
-            "c-food",
-            model.state.value.budgetEdit!!
-                .categoryId,
-        )
-        assertEquals(
-            before.category("c-food")!!.budgetedMinor,
-            model.state.value.shell!!
-                .category("c-food")!!
-                .budgetedMinor,
-        )
+        assertEquals("c-food", model.edit().categoryId)
+        assertEquals(before.category("c-food")!!.budgetedMinor, model.editing().category("c-food")!!.budgetedMinor)
     }
 
     @Test
-    fun backClosesTheKeypadWithoutSavingThenLeavesEditMode() {
+    fun backLeavesEditModeAndDropsEverythingChanged() {
         val model = household("back")
         val before = model.state.value.shell!!
         model.startBudgetEdit()
         model.focusBudgetBox("c-food")
         listOf("9", "9").forEach(model::typeBudgetKey)
-        model.back()
-        assertEquals(BudgetEdit(), model.state.value.budgetEdit)
-        assertEquals(
-            before.category("c-food")!!.budgetedMinor,
-            model.state.value.shell!!
-                .category("c-food")!!
-                .budgetedMinor,
-        )
-        model.back()
+        model.focusBudgetBox("c-rent")
+        listOf("+", "5").forEach(model::typeBudgetKey)
+        assertTrue(model.back())
         assertNull(model.state.value.budgetEdit)
         assertEquals(ShellRoute.Home, model.state.value.route)
+        settle(model)
+        assertEquals(before.groups, model.saved().groups)
+        assertEquals(before.headerMinor, model.saved().headerMinor)
     }
 
     @Test
-    fun movingToAnotherBoxSavesTheFirst() {
+    fun cancelDropsEverythingChanged() {
+        val model = household("cancel")
+        val before = model.state.value.shell!!
+        val undo = model.state.value.undoLabel
+        val (from, to) =
+            before.groups
+                .flatMap { it.categories }
+                .filter { it.availableMinor > 1_000 }
+                .take(2)
+        model.startBudgetEdit()
+        model.focusBudgetBox("c-food")
+        listOf("1", "2").forEach(model::typeBudgetKey)
+        model.doneBudgetBox()
+        model.openMoveFrom(from.id)
+        model.submitMoveCategory(to.id, "10")
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        model.cancelBudgetEdit()
+        assertNull(model.state.value.budgetEdit)
+        settle(model)
+        assertEquals(before.groups, model.saved().groups)
+        assertEquals(undo, model.state.value.undoLabel)
+    }
+
+    @Test
+    fun movingToAnotherBoxKeepsTheFirstInEditMode() {
         val model = household("move")
         val before = model.state.value.shell!!
         val (first, second) = before.groups.flatMap { it.categories }.take(2)
@@ -115,16 +122,14 @@ class BudgetEditTest {
         model.focusBudgetBox(first.id)
         listOf("-", "1", "0").forEach(model::typeBudgetKey)
         model.focusBudgetBox(second.id)
-        assertEquals(BudgetEdit(second.id), model.state.value.budgetEdit)
-        await {
-            model.state.value.shell
-                ?.category(first.id)
-                ?.budgetedMinor == first.budgetedMinor - 1_000
-        }
+        assertEquals(second.id, model.edit().categoryId)
+        assertEquals("", model.edit().text)
+        assertEquals(first.budgetedMinor - 1_000, model.editing().category(first.id)!!.budgetedMinor)
+        assertEquals(first.budgetedMinor, model.saved().category(first.id)!!.budgetedMinor)
     }
 
     @Test
-    fun tappingAvailableMovesMoneyToAnotherCategoryAndBackToEditMode() {
+    fun tappingAvailableMovesMoneyInEditModeAndDoneSavesItAsOneUndo() {
         val model = household("move-money")
         val before = model.state.value.shell!!
         val (from, to) =
@@ -141,32 +146,38 @@ class BudgetEditTest {
             model.state.value.formatPrefs
                 .readAmount("4+6"),
         )
-        await { model.state.value.route == ShellRoute.Home }
-        assertEquals(BudgetEdit(), model.state.value.budgetEdit)
-        await {
-            model.state.value.shell
-                ?.category(to.id)
-                ?.availableMinor == to.availableMinor + 1_000
-        }
+        assertEquals(ShellRoute.Home, model.state.value.route)
         // Budgeted moves with available: the source gives up what it moved, the destination gains it.
-        assertEquals(
-            to.budgetedMinor + 1_000,
-            model.state.value.shell!!
-                .category(to.id)!!
-                .budgetedMinor,
-        )
-        assertEquals(
-            from.budgetedMinor - 1_000,
-            model.state.value.shell!!
-                .category(from.id)!!
-                .budgetedMinor,
-        )
-        assertEquals(
-            from.availableMinor - 1_000,
-            model.state.value.shell!!
-                .category(from.id)!!
-                .availableMinor,
-        )
+        assertEquals(to.budgetedMinor + 1_000, model.editing().category(to.id)!!.budgetedMinor)
+        assertEquals(to.availableMinor + 1_000, model.editing().category(to.id)!!.availableMinor)
+        assertEquals(from.budgetedMinor - 1_000, model.editing().category(from.id)!!.budgetedMinor)
+        assertEquals(from.availableMinor - 1_000, model.editing().category(from.id)!!.availableMinor)
+        assertEquals(from.budgetedMinor, model.saved().category(from.id)!!.budgetedMinor)
+
+        val other = before.groups.flatMap { it.categories }.first { it.id != from.id && it.id != to.id }
+        model.focusBudgetBox(other.id)
+        listOf("+", "5").forEach(model::typeBudgetKey)
+        model.endBudgetEdit()
+        await { model.saved().category(to.id)?.budgetedMinor == to.budgetedMinor + 1_000 }
+        await { model.saved().category(other.id)?.budgetedMinor == other.budgetedMinor + 500 }
+        assertEquals(from.budgetedMinor - 1_000, model.saved().category(from.id)!!.budgetedMinor)
+        await { model.state.value.undoLabel != null }
+
+        // One undo takes the whole edit back.
+        model.undo()
+        await { model.saved().groups == before.groups }
+    }
+
+    @Test
+    fun movingMoreThanIsAvailableIsRefused() {
+        val model = household("too-much")
+        val before = model.state.value.shell!!
+        val (from, to) = before.groups.flatMap { it.categories }.filter { it.availableMinor > 0 }.take(2)
+        model.startBudgetEdit()
+        model.openMoveFrom(from.id)
+        model.submitMoveCategory(to.id, MoneyParse.formatMagnitude(from.availableMinor + 100, 2))
+        assertEquals(EnvelopeCopy.NOT_ENOUGH, model.state.value.editError)
+        assertEquals(ShellRoute.MoveCategory(from.id), model.state.value.route)
     }
 
     @Test
@@ -177,19 +188,23 @@ class BudgetEditTest {
         model.startBudgetEdit()
         model.openMoveFrom(from.id)
         model.submitMoveCategory(MOVE_TO_BUDGET, "10")
-        await { model.state.value.route == ShellRoute.Home }
-        await {
-            model.state.value.shell
-                ?.headerMinor == before.headerMinor + 1_000
-        }
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        assertEquals(before.headerMinor + 1_000, model.editing().headerMinor)
+        model.endBudgetEdit()
+        await { model.saved().headerMinor == before.headerMinor + 1_000 }
     }
 
     @Test
-    fun leavingTheBudgetItemEndsEditMode() {
+    fun leavingTheBudgetItemDropsEditMode() {
         val model = household("swipe")
+        val before = model.state.value.shell!!
         model.startBudgetEdit()
+        model.focusBudgetBox("c-food")
+        listOf("1").forEach(model::typeBudgetKey)
         model.selectHomeSection(ScreenBar.HOME_ACCOUNTS)
         assertNull(model.state.value.budgetEdit)
+        settle(model)
+        assertEquals(before.groups, model.saved().groups)
     }
 
     private fun household(name: String): ShellViewModel {
@@ -205,6 +220,20 @@ class BudgetEditTest {
         val model = ShellViewModel(library, sync)
         await { !model.state.value.loading && model.state.value.shell != null }
         return model
+    }
+
+    private fun ShellViewModel.edit(): BudgetEdit = state.value.budgetEdit!!
+
+    private fun ShellViewModel.editing(): MonthShell = state.value.editingShell()!!
+
+    private fun ShellViewModel.saved(): MonthShell = state.value.shell!!
+
+    // Gives any write a chance to land, so a test that expects none would see it.
+    private fun settle(model: ShellViewModel) {
+        repeat(20) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
     }
 
     private fun MonthShell.category(id: String): CategoryRow? = groups.flatMap { it.categories }.firstOrNull { it.id == id }

@@ -203,6 +203,8 @@ fun HomePivot(
             ),
         modifier = modifier,
         initialItem = initialSection,
+        // Edit mode holds the pivot on the budget, so a stray swipe cannot leave it.
+        locked = budgetEdit != null,
         onGesture = { pagerGesture = it },
         onSelected = onSection,
     )

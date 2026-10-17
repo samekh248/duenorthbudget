@@ -37,7 +37,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
-import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.HttpActualTransport
@@ -284,6 +283,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::deleteTransaction) },
                     onEditBudget = model::startBudgetEdit,
                     onEndBudgetEdit = model::endBudgetEdit,
+                    onCancelBudgetEdit = model::cancelBudgetEdit,
                 )
             }
         val actions = formSaveHost.bar ?: ScreenBar.forState(state, handlers)
@@ -305,7 +305,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     when (val route = state.route) {
                         ShellRoute.Home ->
                             HomePivot(
-                                shell = state.shell,
+                                shell = state.editingShell(),
                                 loading = state.loading,
                                 openMonth = state.openMonth,
                                 monthWindow = model.monthWindow(),
@@ -341,7 +341,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onToBudget = if (state.shell == null) null else model::startBudgetEdit,
                                 budgetEdit = state.budgetEdit,
                                 budgetEditActions =
-                                    remember(model, state.shell?.mode) {
+                                    remember(model) {
                                         BudgetEditActions(
                                             onFocus = model::focusBudgetBox,
                                             onKey = model::typeBudgetKey,
@@ -351,14 +351,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                             onAvailable = { id ->
                                                 if (model.doneBudgetBox()) model.openMoveFrom(id)
                                             },
-                                            onToBudget =
-                                                if (state.shell?.mode == BudgetMode.ENVELOPE) {
-                                                    {
-                                                        if (model.doneBudgetBox()) model.openBreakdown()
-                                                    }
-                                                } else {
-                                                    null
-                                                },
+                                            // The breakdown reads the saved month, not edit mode's changes.
+                                            onToBudget = null,
                                         )
                                     },
                                 editError = state.editError,
@@ -785,9 +779,18 @@ fun DueNorthApp(model: ShellViewModel) {
                             }
                         }
                         is ShellRoute.MoveCategory -> {
-                            val shell = state.shell
+                            val shell = state.editingShell()
                             if (shell == null) {
                                 Placeholder()
+                            } else if (state.budgetEdit != null) {
+                                // From edit mode the move lands in its sandbox, on the month being edited.
+                                MoveCategoryScreen(
+                                    shell = shell,
+                                    fromCategoryId = route.fromCategoryId,
+                                    error = state.editError,
+                                    onSave = model::submitMoveCategory,
+                                    modifier = fill,
+                                )
                             } else {
                                 EditorWithMonth(
                                     openMonth = state.openMonth,

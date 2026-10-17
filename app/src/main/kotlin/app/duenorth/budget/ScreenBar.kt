@@ -88,11 +88,13 @@ object ScreenBar {
             ShellRoute.Home ->
                 when {
                     !hasBudget -> settings()
-                    // Edit mode: done leaves it, undo steps back one box, and the month fills stay in the menu.
+                    // Edit mode is a sandbox: done saves what changed, cancel drops it. Undo and the month
+                    // fills would write straight away, so they wait until it is over.
                     homeSection == HOME_BUDGET && budgetEditing ->
-                        listOf(spec("end-budget-edit", AppGlyph.Save, BudgetEditCopy.DONE)) +
-                            (if (undoLabel == null) emptyList() else listOf(spec("undo", AppGlyph.Undo, MonthActionCopy.UNDO))) +
-                            fills()
+                        listOf(
+                            spec("end-budget-edit", AppGlyph.Save, BudgetEditCopy.DONE),
+                            spec("cancel-budget-edit", AppGlyph.Cancel, BudgetEditCopy.CANCEL),
+                        )
                     // The accounts pivot item carries account management, so the month menu does not.
                     // Select mode swaps the inbox's bar for what can be done to the checked rows.
                     homeSection == HOME_INBOX && inboxSelecting ->
@@ -362,6 +364,7 @@ class ScreenBarHandlers(
     val onDeleteTransaction: () -> Unit = {},
     val onEditBudget: () -> Unit = {},
     val onEndBudgetEdit: () -> Unit = {},
+    val onCancelBudgetEdit: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -425,6 +428,7 @@ class ScreenBarHandlers(
             "delete-transaction" -> onDeleteTransaction
             "edit-budget" -> onEditBudget
             "end-budget-edit" -> onEndBudgetEdit
+            "cancel-budget-edit" -> onCancelBudgetEdit
             else -> ({})
         }
 }
