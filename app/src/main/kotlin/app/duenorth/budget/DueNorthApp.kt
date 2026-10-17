@@ -46,6 +46,7 @@ import app.duenorth.budget.core.ServerAddress
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.MotionPolicy
+import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -294,6 +295,8 @@ fun DueNorthApp(model: ShellViewModel) {
         ) { modifier ->
             CompositionLocalProvider(
                 LocalFormSaveHost provides formSaveHost,
+                // Enter in a one-line box saves the page, unless a picker drawn over the form owns the bar.
+                LocalFieldSubmit provides { if (formSaveHost.bar == null) formSaveHost.save() },
                 LocalFormatPrefs provides state.formatPrefs,
             ) {
                 // Each new page turns in; a route that only updates in place keeps its class and stays put.
