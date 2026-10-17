@@ -73,10 +73,10 @@ fun CategoryBudgetScreen(
         )
         MetroField(amount, { amount = it }, "budgeted", Modifier.testTag("category-budget-amount"))
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
+        RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals, base = category.budgetedMinor)) }
         MetroButtonGrid {
             if (!formSaveOnBar()) {
-                MetroButton("save") { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
+                MetroButton("save") { onSave(prefs.readAmount(amount, shell.currency.decimals, base = category.budgetedMinor)) }
             }
             MetroButton(EnvelopeCopy.MOVE, onClick = onMove)
             MetroButton(

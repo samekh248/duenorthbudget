@@ -55,6 +55,7 @@ object ScreenBar {
         inboxSelecting: Boolean = false,
         bankLinked: Boolean = false,
         transaction: TransactionMenu = TransactionMenu.NEW,
+        budgetEditing: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -87,6 +88,11 @@ object ScreenBar {
             ShellRoute.Home ->
                 when {
                     !hasBudget -> settings()
+                    // Edit mode: done leaves it, undo steps back one box, and the month fills stay in the menu.
+                    homeSection == HOME_BUDGET && budgetEditing ->
+                        listOf(spec("end-budget-edit", AppGlyph.Save, BudgetEditCopy.DONE)) +
+                            (if (undoLabel == null) emptyList() else listOf(spec("undo", AppGlyph.Undo, MonthActionCopy.UNDO))) +
+                            fills()
                     // The accounts pivot item carries account management, so the month menu does not.
                     // Select mode swaps the inbox's bar for what can be done to the checked rows.
                     homeSection == HOME_INBOX && inboxSelecting ->
@@ -109,13 +115,15 @@ object ScreenBar {
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
-                        ) + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel) + settings()
+                        ) + editBudget() + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel) +
+                            settings()
                     else ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("hold", AppGlyph.Hold, "hold"),
                             spec("categories", AppGlyph.Categories, "categories"),
-                        ) + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel) + settings()
+                        ) + editBudget() + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel) +
+                            settings()
                 }
             // Select mode swaps the register's bar for what can be done to the picked transactions.
             is ShellRoute.Register ->
@@ -232,6 +240,7 @@ object ScreenBar {
             state.inboxSelection != null,
             state.registerBankLinked,
             transactionMenu(state),
+            state.budgetEdit != null,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -255,6 +264,9 @@ object ScreenBar {
             spec("save", AppGlyph.Save, "save"),
             spec("cancel", AppGlyph.Cancel, "cancel"),
         )
+
+    /** Home `•••` → edit budget heads the budget's menu. */
+    private fun editBudget() = listOf(menu("edit-budget", AppGlyph.Categories, BudgetEditCopy.EDIT))
 
     /** Home `•••` → bring hidden groups and categories back into the month, or leave them out again. */
     private fun hidden(shown: Boolean) =
@@ -348,6 +360,8 @@ class ScreenBarHandlers(
     val onSplitTransaction: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
+    val onEditBudget: () -> Unit = {},
+    val onEndBudgetEdit: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -409,6 +423,8 @@ class ScreenBarHandlers(
             "split-transaction" -> onSplitTransaction
             "schedule-transaction" -> onScheduleTransaction
             "delete-transaction" -> onDeleteTransaction
+            "edit-budget" -> onEditBudget
+            "end-budget-edit" -> onEndBudgetEdit
             else -> ({})
         }
 }

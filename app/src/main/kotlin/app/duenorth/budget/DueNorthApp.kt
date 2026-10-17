@@ -281,6 +281,8 @@ fun DueNorthApp(model: ShellViewModel) {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
                     },
                     onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::deleteTransaction) },
+                    onEditBudget = model::startBudgetEdit,
+                    onEndBudgetEdit = model::endBudgetEdit,
                 )
             }
         val actions = formSaveHost.bar ?: ScreenBar.forState(state, handlers)
@@ -288,6 +290,7 @@ fun DueNorthApp(model: ShellViewModel) {
             actions,
             syncing = state.syncing || state.importFetchPending,
             progress = state.syncProgress,
+            bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
         ) { modifier ->
             CompositionLocalProvider(
                 LocalFormSaveHost provides formSaveHost,
@@ -331,8 +334,29 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSelectMonth = model::selectOpenMonth,
                                 onBudgetCategory = if (state.shell == null) null else model::openCategoryBudget,
                                 onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
-                                onToBudget =
-                                    if (state.shell?.mode == BudgetMode.ENVELOPE) model::openBreakdown else null,
+                                // Tapping to budget opens edit mode; in edit mode it opens the breakdown.
+                                onToBudget = if (state.shell == null) null else model::startBudgetEdit,
+                                budgetEdit = state.budgetEdit,
+                                budgetEditActions =
+                                    remember(model, state.shell?.mode) {
+                                        BudgetEditActions(
+                                            onFocus = model::focusBudgetBox,
+                                            onKey = model::typeBudgetKey,
+                                            onCover = model::coverBudgetBox,
+                                            onAll = model::allToBudgetBox,
+                                            onDone = model::doneBudgetBox,
+                                            onToBudget =
+                                                if (state.shell?.mode == BudgetMode.ENVELOPE) {
+                                                    {
+                                                        model.doneBudgetBox()
+                                                        model.openBreakdown()
+                                                    }
+                                                } else {
+                                                    null
+                                                },
+                                        )
+                                    },
+                                editError = state.editError,
                                 notice = state.monthNotice,
                                 formatOptions =
                                     FormatOptions(

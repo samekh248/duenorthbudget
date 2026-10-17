@@ -13,9 +13,20 @@ class ScreenBarTest {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
         assertEquals(listOf("add", "hold", "categories"), specs.filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("show-hidden", "copy-last", "average", "zero", "due", "add-schedule", "rules", "settings"),
+            listOf("edit-budget", "show-hidden", "copy-last", "average", "zero", "due", "add-schedule", "rules", "settings"),
             specs.filter { !it.primary }.map { it.id },
         )
+    }
+
+    // Edit mode: done and undo on the bar, the month fills in the menu, and no settings to wander off to.
+    @Test
+    fun budgetEditModeBar() {
+        val specs =
+            ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, undoLabel = "assign", budgetEditing = true)
+        assertEquals(listOf("end-budget-edit", "undo"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("copy-last", "average", "zero"), specs.filter { !it.primary }.map { it.id })
+        val nothingToUndo = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, budgetEditing = true)
+        assertEquals(listOf("end-budget-edit"), nothingToUndo.filter { it.primary }.map { it.id })
     }
 
     @Test

@@ -352,6 +352,8 @@ data class ShellUiState(
     val inboxFiled: List<InboxFiled> = emptyList(),
     /** Inbox rows checked in the inbox's select mode; null when not selecting. */
     val inboxSelection: Set<String>? = null,
+    /** The budget's edit mode, with the box being typed into; null when not editing. */
+    val budgetEdit: BudgetEdit? = null,
     /** Set while a transaction form was opened from the inbox, so saving it goes back home. */
     val editFromInbox: Boolean = false,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
@@ -626,6 +628,8 @@ class ShellViewModel(
     }
 
     fun selectHomeSection(index: Int) {
+        // Edit mode belongs to the budget item; swiping away from it finishes editing.
+        if (index != ScreenBar.HOME_BUDGET && _state.value.budgetEdit != null) endBudgetEdit()
         _state.update { it.copy(homeSection = index) }
     }
 
@@ -1046,8 +1050,16 @@ class ShellViewModel(
     }
 
     fun saveCategoryBudget(amountText: String) {
-        val shell = _state.value.shell ?: return
         val categoryId = (_state.value.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
+        assignBudget(categoryId, amountText)
+    }
+
+    /** Sets [categoryId]'s budgeted amount for the month being edited; [amountText] reads like "1234.56". */
+    fun assignBudget(
+        categoryId: String,
+        amountText: String,
+    ) {
+        val shell = _state.value.shell ?: return
         val budgeted = MoneyFormat.parse(amountText, shell.currency.decimals)
         if (budgeted == null) {
             _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
@@ -1195,6 +1207,11 @@ class ShellViewModel(
         }
         if (current.inboxSelection != null && current.route == ShellRoute.Home && current.confirm == null) {
             endInboxSelecting()
+            return true
+        }
+        // Back closes the keypad without saving what was typed, then leaves edit mode.
+        if (current.budgetEdit != null && current.route == ShellRoute.Home && current.confirm == null) {
+            if (current.budgetEdit.categoryId != null) closeBudgetKeypad() else endBudgetEdit()
             return true
         }
         if (current.confirm != null) {

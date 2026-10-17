@@ -107,6 +107,10 @@ fun HomePivot(
     onNetWorth: () -> Unit = {},
     onMonthReview: () -> Unit = {},
     onReport: (Int) -> Unit = {},
+    /** The budget's edit mode; null when not editing. */
+    budgetEdit: BudgetEdit? = null,
+    budgetEditActions: BudgetEditActions = BudgetEditActions(),
+    editError: String? = null,
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
@@ -118,6 +122,15 @@ fun HomePivot(
                 PivotItem(HomeSections.BUDGET) {
                     if (shell == null) {
                         if (loading) Placeholder()
+                    } else if (budgetEdit != null) {
+                        BudgetEditSection(
+                            shell,
+                            budgetEdit,
+                            budgetEditActions,
+                            onListGesture = { listGesture = it },
+                            error = editError,
+                            formatOptions = formatOptions,
+                        )
                     } else {
                         Column(Modifier.fillMaxSize()) {
                             BudgetMonthTitle(
@@ -884,6 +897,8 @@ fun ShellChrome(
     syncing: Boolean = false,
     progress: Float? = null,
     statusBar: WindowInsets = WindowInsets.statusBars,
+    /** False while a page puts its own panel where the bar goes, as the budget's keypad does. */
+    bar: Boolean = true,
     content: @Composable (Modifier) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -901,7 +916,7 @@ fun ShellChrome(
         ) {
             if (syncing) SyncProgressBar(progress)
             content(Modifier.weight(1f))
-            MetroAppBar(actions, expanded, { expanded = it })
+            if (bar) MetroAppBar(actions, expanded, { expanded = it })
         }
     }
 }
