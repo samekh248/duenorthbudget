@@ -50,6 +50,7 @@ import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroTheme
+import app.duenorth.budget.design.turnstileIn
 import java.io.File
 import java.time.YearMonth
 import java.util.Locale
@@ -292,7 +293,8 @@ fun DueNorthApp(model: ShellViewModel) {
                 LocalFormSaveHost provides formSaveHost,
                 LocalFormatPrefs provides state.formatPrefs,
             ) {
-                SectionTitled(SectionTitle.of(state), modifier) {
+                // Each new page turns in; a route that only updates in place keeps its class and stays put.
+                SectionTitled(SectionTitle.of(state), modifier.turnstileIn(state.route::class)) {
                     val fill = Modifier.fillMaxSize()
                     when (val route = state.route) {
                         ShellRoute.Home ->

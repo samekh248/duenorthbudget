@@ -1,7 +1,8 @@
 package app.duenorth.budget.design.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -39,6 +40,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -71,6 +73,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.PivotMotion
 import app.duenorth.budget.design.metroTilt
 import app.duenorth.budget.design.theme.Metro
@@ -312,11 +315,6 @@ data class AppBarButton(
     val id: String = label,
 )
 
-private const val EXPAND_MS = 200
-
-/** Metro's ease out, used for the bar opening and closing. */
-private val AppBarEasing = CubicBezierEasing(0.1f, 0.9f, 0.2f, 1f)
-
 /**
  * The WP8.1 Application Bar, as in due north tasks: round outlined buttons centered along the
  * bottom and an ellipsis near the top right that expands the bar to show their labels and the
@@ -355,7 +353,7 @@ fun MetroAppBar(
                 },
             ).background(colors.chrome)
             .windowInsetsPadding(windowInsets)
-            .animateContentSize(tween(EXPAND_MS, easing = AppBarEasing)),
+            .animateContentSize(tween(MetroMotion.SHORT_MS, easing = MetroMotion.EaseOut)),
     ) {
         Box(Modifier.fillMaxWidth().heightIn(min = MetroDimens.AppBar)) {
             Row(
@@ -757,7 +755,7 @@ fun MetroPivot(
         scope.launch {
             val target = pager.currentPage + PivotMotion.delta(itemOf(pager.currentPage), index, count)
             if (animations) {
-                pager.animateScrollToPage(target)
+                pager.animateScrollToPage(target, animationSpec = tween(MetroMotion.PAGE_MS, easing = MetroMotion.EaseOut))
             } else {
                 pager.scrollToPage(target)
             }
@@ -789,21 +787,30 @@ fun MetroPivot(
         Layout(
             content = {
                 PivotMotion.order(itemOf(base), count).forEach { index ->
-                    val isSelected = index == selected
-                    MetroText(
-                        items[index].header,
-                        type.sectionHeader,
-                        Modifier
-                            .heightIn(min = MetroDimens.TouchTarget)
-                            .semantics {
-                                role = Role.Tab
-                                this.selected = isSelected
-                            }.metroPress { goTo(index) }
-                            .testTag("pivot-header-$index"),
-                        color = if (isSelected) colors.foreground else colors.secondary,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
+                    // Keyed, so each header keeps its own colour as the row rotates.
+                    key(index) {
+                        val isSelected = index == selected
+                        // Brightens and dims rather than switching at the swipe's midpoint.
+                        val color by animateColorAsState(
+                            if (isSelected) colors.foreground else colors.secondary,
+                            if (animations) tween(MetroMotion.QUICK_MS) else snap(),
+                            label = "pivot-header",
+                        )
+                        MetroText(
+                            items[index].header,
+                            type.sectionHeader,
+                            Modifier
+                                .heightIn(min = MetroDimens.TouchTarget)
+                                .semantics {
+                                    role = Role.Tab
+                                    this.selected = isSelected
+                                }.metroPress { goTo(index) }
+                                .testTag("pivot-header-$index"),
+                            color = color,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
                 }
             },
             modifier =

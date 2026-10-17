@@ -58,6 +58,7 @@ import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.monthLabel
+import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
@@ -931,7 +932,7 @@ private fun arrivalModifier(
     val alpha = remember(id) { Animatable(if (arrivals.isNew(id) && animations) 0f else 1f) }
     LaunchedEffect(id) {
         if (alpha.value < 1f && animations) {
-            alpha.animateTo(1f, tween(160))
+            alpha.animateTo(1f, tween(MetroMotion.QUICK_MS, easing = MetroMotion.EaseOut))
         } else {
             alpha.snapTo(1f)
         }

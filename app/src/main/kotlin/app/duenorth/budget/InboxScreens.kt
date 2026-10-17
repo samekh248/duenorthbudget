@@ -1,8 +1,15 @@
 package app.duenorth.budget
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -20,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -27,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -40,6 +49,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
@@ -65,6 +75,7 @@ import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.ShellCopy
+import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
@@ -74,7 +85,9 @@ import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroWeights
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 object InboxCopy {
@@ -137,11 +150,13 @@ fun InboxSection(
         return
     }
     val list = rememberLazyListState()
-    LaunchedEffect(list) {
-        snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
+    val selectList = rememberLazyListState()
+    LaunchedEffect(list, selectList) {
+        snapshotFlow { list.isScrollInProgress || selectList.isScrollInProgress }.collect { onListGesture(it) }
     }
     val waiting = shell.inbox.filter { row -> filed.none { it.row.id == row.id } }
     val money = { minor: Long -> MoneyFormat.format(minor, shell.currency, formatOptions) }
+    val animations = Metro.animations
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
             BudgetTotal(
@@ -151,80 +166,67 @@ fun InboxSection(
                 "inbox-count",
                 modifier = Modifier.weight(1f),
             )
-            if (selection != null) {
-                BudgetTotal(
-                    InboxCopy.SELECTED,
-                    "${selection.size}",
-                    Metro.colors.foreground,
-                    "inbox-selected",
-                    alignEnd = true,
-                    modifier = Modifier.weight(1f),
-                )
-            } else {
-                BudgetTotal(
-                    InboxCopy.SPENDING,
-                    money(waiting.filter { it.amountMinor < 0 }.sumOf { it.amountMinor }),
-                    Metro.colors.foreground,
-                    "inbox-spending",
-                    alignEnd = true,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-        if (selection != null) {
-            LazyColumn(Modifier.weight(1f), state = list) {
-                // Rows just filed stay in the list until their confirmation has played.
-                inboxDayItems(entries) { i, entry ->
-                    InboxLine(
-                        entry = entry,
-                        amount = money(entry.row.amountMinor),
-                        banded = ledgerBanded(i),
-                        onFiledShown = onFiledShown,
-                        onTap = { onToggle(entry.row.id) },
-                        onMenu = null,
-                        checked = entry.row.id in selection,
+            // Keyed on whether select mode is on, so a new count updates in place and only the mode change fades.
+            AnimatedContent(
+                selection,
+                Modifier.weight(1f),
+                transitionSpec = { modeFade(animations) },
+                contentAlignment = Alignment.TopEnd,
+                label = "inbox-total",
+                contentKey = { it != null },
+            ) { picked ->
+                if (picked != null) {
+                    BudgetTotal(
+                        InboxCopy.SELECTED,
+                        "${picked.size}",
+                        Metro.colors.foreground,
+                        "inbox-selected",
+                        alignEnd = true,
+                    )
+                } else {
+                    BudgetTotal(
+                        InboxCopy.SPENDING,
+                        money(waiting.filter { it.amountMinor < 0 }.sumOf { it.amountMinor }),
+                        Metro.colors.foreground,
+                        "inbox-spending",
+                        alignEnd = true,
                     )
                 }
             }
-            return@Column
         }
-        // The top entry is featured. When it has just been filed, the next waiting one rises into the panel.
-        val head = entries.first()
-        val next = if (head.filedTo != null) entries.drop(1).firstOrNull { it.filedTo == null } else null
-        val rise = remember(head.row.id, head.filedTo) { Animatable(if (head.filedTo == null) 1f else 0f) }
-        val animations = Metro.animations
-        val shown by rememberUpdatedState(onFiledShown)
-        LaunchedEffect(head.row.id, head.filedTo) {
-            if (head.filedTo == null) return@LaunchedEffect
-            delay(FILED_HOLD_MS)
-            if (animations && next != null) rise.animateTo(1f, tween(RISE_MS, easing = FastOutSlowInEasing)) else rise.snapTo(1f)
-            shown(head.row.id)
-        }
-        val featured = if (head.filedTo == null) head.row else next?.row
-        FeaturedPanel(
-            row = featured,
-            amount = featured?.let { money(it.amountMinor) }.orEmpty(),
-            filed = head.takeIf { it.filedTo != null },
-            rise = rise.value,
-            onAccept = onAccept,
-            onCategorize = onInbox,
-            onDetails = actions.onDetails,
-            onMenu = { row, bounds -> menu = row to bounds },
-            modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
-        )
-        LazyColumn(Modifier.weight(1f), state = list) {
-            inboxDayItems(entries.drop(1), leaving = next?.let { it to rise.value }) { i, entry ->
-                InboxLine(
-                    entry = entry,
-                    amount = money(entry.row.amountMinor),
-                    banded = ledgerBanded(i),
-                    onFiledShown = onFiledShown,
-                    onTap = { actions.onDetails(entry.row.id) },
-                    onMenu = { bounds -> menu = entry.row to bounds },
+        // Select mode fades through: the panel and queue fade out, then the checked list fades in.
+        AnimatedContent(
+            selection,
+            Modifier.weight(1f),
+            transitionSpec = { modeFade(animations) },
+            label = "inbox-mode",
+            contentKey = { it != null },
+        ) { picked ->
+            if (picked != null) {
+                LazyColumn(Modifier.fillMaxSize(), state = selectList) {
+                    // Rows just filed stay in the list until their confirmation has played.
+                    inboxDayItems(entries) { i, entry ->
+                        InboxLine(
+                            entry = entry,
+                            amount = money(entry.row.amountMinor),
+                            banded = ledgerBanded(i),
+                            onFiledShown = onFiledShown,
+                            onTap = { onToggle(entry.row.id) },
+                            onMenu = null,
+                            checked = entry.row.id in picked,
+                        )
+                    }
+                }
+            } else {
+                InboxQueue(
+                    entries = entries,
+                    list = list,
+                    money = money,
                     onAccept = onAccept,
-                    onCategorize = onInbox,
-                    // The row rising into the panel leaves the queue as it goes.
-                    leaving = if (entry == next) rise.value else 0f,
+                    onInbox = onInbox,
+                    onFiledShown = onFiledShown,
+                    actions = actions,
+                    onMenu = { row, bounds -> menu = row to bounds },
                 )
             }
         }
@@ -233,6 +235,78 @@ fun InboxSection(
         InboxMenu(anchor, inboxMenuItems(row, onAccept, onInbox, actions), onDismiss = { menu = null })
     }
 }
+
+/** The featured panel over the waiting queue: what the inbox shows outside select mode. */
+@Composable
+private fun InboxQueue(
+    entries: List<InboxEntry>,
+    list: LazyListState,
+    money: (Long) -> String,
+    onAccept: (String) -> Unit,
+    onInbox: (String) -> Unit,
+    onFiledShown: (String) -> Unit,
+    actions: InboxActions,
+    onMenu: (InboxRow, Rect) -> Unit,
+) {
+    if (entries.isEmpty()) return
+    // The top entry is featured. When it has just been filed, the next waiting one rises into the panel.
+    val head = entries.first()
+    val next = if (head.filedTo != null) entries.drop(1).firstOrNull { it.filedTo == null } else null
+    val rise = remember(head.row.id, head.filedTo) { Animatable(if (head.filedTo == null) 1f else 0f) }
+    val animations = Metro.animations
+    val shown by rememberUpdatedState(onFiledShown)
+    LaunchedEffect(head.row.id, head.filedTo) {
+        if (head.filedTo == null) return@LaunchedEffect
+        delay(FILED_HOLD_MS)
+        if (animations && next != null) {
+            rise.animateTo(1f, tween(MetroMotion.PAGE_MS, easing = MetroMotion.EaseOut))
+        } else {
+            rise.snapTo(1f)
+        }
+        shown(head.row.id)
+    }
+    // Read only in layout and drawing, so the rise never recomposes the panel or the list.
+    val risen = { rise.value }
+    val featured = if (head.filedTo == null) head.row else next?.row
+    Column(Modifier.fillMaxSize()) {
+        FeaturedPanel(
+            row = featured,
+            amount = featured?.let { money(it.amountMinor) }.orEmpty(),
+            filed = head.takeIf { it.filedTo != null },
+            rise = risen,
+            onAccept = onAccept,
+            onCategorize = onInbox,
+            onDetails = actions.onDetails,
+            onMenu = onMenu,
+            modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
+        )
+        LazyColumn(Modifier.weight(1f), state = list) {
+            inboxDayItems(entries.drop(1), leaving = next?.let { it to risen }) { i, entry ->
+                InboxLine(
+                    entry = entry,
+                    amount = money(entry.row.amountMinor),
+                    banded = ledgerBanded(i),
+                    onFiledShown = onFiledShown,
+                    onTap = { actions.onDetails(entry.row.id) },
+                    onMenu = { bounds -> onMenu(entry.row, bounds) },
+                    onAccept = onAccept,
+                    onCategorize = onInbox,
+                    // The row rising into the panel leaves the queue as it goes.
+                    leaving = if (entry == next) risen else NOT_LEAVING,
+                )
+            }
+        }
+    }
+}
+
+/** The select-mode change: the old view fades out, then the new one fades in, so the two never overlap. */
+private fun modeFade(animations: Boolean): ContentTransform =
+    if (animations) {
+        fadeIn(tween(MODE_IN_MS, delayMillis = MODE_OUT_MS, easing = MetroMotion.EaseOut)) togetherWith
+            fadeOut(tween(MODE_OUT_MS))
+    } else {
+        EnterTransition.None togetherWith ExitTransition.None
+    }
 
 /** Every action a row offers, in the order its long-press menu lists them. */
 internal fun inboxMenuItems(
@@ -376,7 +450,7 @@ private fun FeaturedPanel(
     row: InboxRow?,
     amount: String,
     filed: InboxEntry?,
-    rise: Float,
+    rise: () -> Float,
     onAccept: (String) -> Unit,
     onCategorize: (String) -> Unit,
     onDetails: (String) -> Unit,
@@ -387,7 +461,10 @@ private fun FeaturedPanel(
     Box(
         modifier
             .fillMaxWidth()
+            .clipBelow()
             .ledgerFill(Metro.colors.chrome)
+            // The next transaction can be taller or shorter: the panel eases to its size instead of jumping.
+            .easedHeight()
             .onGloballyPositioned { bounds = it.boundsInWindow() }
             .testTag("inbox-featured"),
     ) {
@@ -396,7 +473,7 @@ private fun FeaturedPanel(
                 Modifier
                     .fillMaxWidth()
                     .clipBelow()
-                    .then(if (filed != null) Modifier.alpha(window(rise, RISE_FADE_FROM, 1f)).rising(1f - rise) else Modifier)
+                    .then(if (filed != null) Modifier.rising(rise) else Modifier)
                     .metroPress(onClick = { onDetails(row.id) }, onLongClick = { onMenu(row, bounds) })
                     .padding(vertical = FEATURED_PAD)
                     .testTag("inbox-featured-${row.id}"),
@@ -439,7 +516,7 @@ private fun FeaturedPanel(
             Row(
                 Modifier
                     .then(if (row != null) Modifier.matchParentSize() else Modifier.heightIn(min = FEATURED_EMPTY))
-                    .alpha(1f - window(rise, 0f, RISE_FADE_TO))
+                    .graphicsLayer { alpha = 1f - window(rise(), 0f, RISE_FADE_TO) }
                     .testTag("inbox-filed-${filed.row.id}"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -478,12 +555,36 @@ private fun window(
     to: Float,
 ) = ((t - from) / (to - from)).coerceIn(0f, 1f)
 
-/** Pushes content down by [fraction] of its own height, so it rises into its slot from below. */
-private fun Modifier.rising(fraction: Float): Modifier =
-    layout { measurable, constraints ->
-        val p = measurable.measure(constraints)
-        layout(p.width, p.height) { p.place(0, (p.height * fraction).roundToInt()) }
+/** Rises content into its slot from below as [rise] goes from 0 to 1, fading it in on the way. */
+private fun Modifier.rising(rise: () -> Float): Modifier =
+    graphicsLayer {
+        val t = rise()
+        translationY = size.height * (1f - t)
+        alpha = window(t, RISE_FADE_FROM, 1f)
     }
+
+/** Eases the slot's height to its content's whenever the content changes size, without clipping its sides. */
+@Composable
+private fun Modifier.easedHeight(): Modifier {
+    if (!Metro.animations) return this
+    val scope = rememberCoroutineScope()
+    val height = remember { EasedHeight() }
+    return layout { measurable, constraints ->
+        val p = measurable.measure(constraints)
+        val target = p.height.toFloat()
+        val anim = height.anim ?: Animatable(target).also { height.anim = it }
+        if (anim.targetValue != target) {
+            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                anim.animateTo(target, tween(MetroMotion.SHORT_MS, easing = MetroMotion.Standard))
+            }
+        }
+        layout(p.width, anim.value.roundToInt()) { p.place(0, 0) }
+    }
+}
+
+private class EasedHeight {
+    var anim: Animatable<Float, AnimationVector1D>? = null
+}
 
 /** Clips only what falls below the slot, so the panel's colour still runs past the gutter. */
 private fun Modifier.clipBelow(): Modifier =
@@ -512,7 +613,7 @@ internal fun inboxDays(entries: List<InboxEntry>): List<List<InboxEntry>> =
  */
 private fun LazyListScope.inboxDayItems(
     entries: List<InboxEntry>,
-    leaving: Pair<InboxEntry, Float>? = null,
+    leaving: Pair<InboxEntry, () -> Float>? = null,
     line: @Composable (Int, InboxEntry) -> Unit,
 ) {
     var start = 0
@@ -523,7 +624,7 @@ private fun LazyListScope.inboxDayItems(
             InboxDayHeading(
                 first.row.date,
                 filed = waiting.isEmpty(),
-                leaving = leaving?.takeIf { (entry, _) -> waiting == listOf(entry) }?.second ?: 0f,
+                leaving = leaving?.takeIf { (entry, _) -> waiting == listOf(entry) }?.second ?: NOT_LEAVING,
             )
         }
         val offset = start
@@ -537,14 +638,14 @@ private fun LazyListScope.inboxDayItems(
 private fun InboxDayHeading(
     date: Int,
     filed: Boolean,
-    leaving: Float,
+    leaving: () -> Float,
 ) {
     val height = remember { Animatable(1f) }
     val animations = Metro.animations
     LaunchedEffect(filed) {
         if (filed) {
             delay(FILED_HOLD_MS)
-            if (animations) height.animateTo(0f, tween(COLLAPSE_MS)) else height.snapTo(0f)
+            if (animations) height.animateTo(0f, collapseSpec) else height.snapTo(0f)
         } else {
             height.snapTo(1f)
         }
@@ -553,8 +654,8 @@ private fun InboxDayHeading(
         RegisterEntry.registerDateLabel(date),
         Metro.typography.caption,
         Modifier
-            .collapse(height.value * (1f - leaving))
-            .alpha(1f - leaving)
+            .collapse { height.value * (1f - leaving()) }
+            .graphicsLayer { alpha = 1f - leaving() }
             .padding(top = DAY_AIR_ABOVE, bottom = 4.dp)
             .testTag("inbox-day-$date"),
         color = Metro.accent.text,
@@ -585,7 +686,7 @@ private fun InboxLine(
     onAccept: (String) -> Unit = {},
     onCategorize: (String) -> Unit = {},
     checked: Boolean? = null,
-    leaving: Float = 0f,
+    leaving: () -> Float = NOT_LEAVING,
 ) {
     val row = entry.row
     var bounds by remember { mutableStateOf(Rect.Zero) }
@@ -602,15 +703,15 @@ private fun InboxLine(
             return@LaunchedEffect
         }
         delay(FILED_HOLD_MS)
-        if (animations) height.animateTo(0f, tween(COLLAPSE_MS)) else height.snapTo(0f)
+        if (animations) height.animateTo(0f, collapseSpec) else height.snapTo(0f)
         shown(row.id)
     }
     val acceptsHere = row.suggestionId != null
     Box(
         Modifier
             .fillMaxWidth()
-            .collapse(height.value * (1f - leaving))
-            .alpha(1f - leaving)
+            .collapse { height.value * (1f - leaving()) }
+            .graphicsLayer { alpha = 1f - leaving() }
             .onGloballyPositioned { bounds = it.boundsInWindow() }
             .testTag("inbox-row-${row.id}")
             .semantics {
@@ -702,17 +803,25 @@ private fun InboxCheck(
     }
 }
 
-/** Shrinks a slot to [fraction] of its height, clipping only the bottom so bands still run past the gutter. */
-private fun Modifier.collapse(fraction: Float): Modifier =
-    if (fraction >= 1f) {
-        this
-    } else {
-        drawWithContent { clipRect(-size.width, 0f, size.width * 2, size.height) { this@drawWithContent.drawContent() } }
-            .layout { measurable, constraints ->
-                val p = measurable.measure(constraints)
-                layout(p.width, (p.height * fraction.coerceAtLeast(0f)).roundToInt()) { p.place(0, 0) }
-            }
+/**
+ * Shrinks a slot to [fraction] of its height, clipping only the bottom so bands still run past the
+ * gutter. [fraction] is read in layout and drawing, so a collapse never recomposes the row.
+ */
+private fun Modifier.collapse(fraction: () -> Float): Modifier =
+    drawWithContent {
+        if (fraction() >= 1f) {
+            drawContent()
+        } else {
+            clipRect(-size.width, 0f, size.width * 2, size.height) { this@drawWithContent.drawContent() }
+        }
+    }.layout { measurable, constraints ->
+        val p = measurable.measure(constraints)
+        layout(p.width, (p.height * fraction().coerceIn(0f, 1f)).roundToInt()) { p.place(0, 0) }
     }
+
+private val NOT_LEAVING = { 0f }
+
+private val collapseSpec = tween<Float>(MetroMotion.SHORT_MS, easing = MetroMotion.Standard)
 
 private val INBOX_ROW_AIR = 15.dp
 private val FEATURED_AIR_ABOVE = 24.dp
@@ -723,9 +832,9 @@ private val CHECK_SIZE = 26.dp
 private val MENU_INSET = 24.dp
 private const val MENU_SCRIM = 0.7f
 internal const val FILED_HOLD_MS = 900L
-private const val COLLAPSE_MS = 240
 private val DAY_AIR_ABOVE = 12.dp
-private const val RISE_MS = 420
+private const val MODE_OUT_MS = 90
+private const val MODE_IN_MS = 180
 
 /** The confirmation is gone by this share of the rise; the next transaction starts showing at the other. */
 private const val RISE_FADE_TO = 0.4f
