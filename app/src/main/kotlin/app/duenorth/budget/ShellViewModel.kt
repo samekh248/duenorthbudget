@@ -219,8 +219,13 @@ sealed interface ShellRoute {
     ) : ShellRoute,
         StackRoute
 
-    // Spec 010 US4. Reports is the reporting hub; each report opens from it.
-    data object Reports : ShellRoute, StackRoute
+    /** Home `•••` → due: upcoming scheduled transactions to post or skip. */
+    data object Due : ShellRoute, StackRoute
+
+    // Spec 010 US4. The home pivot's reports item is the reporting hub; each report opens from it.
+
+    /** Reports → month review: the open month's income and spending by category. */
+    data object MonthReview : ShellRoute, StackRoute
 
     /** Reports → net worth: today's on and off budget totals. */
     data object NetWorth : ShellRoute, StackRoute

@@ -223,8 +223,6 @@ class MonthActionContentTest {
                 Box(Modifier.width(390.dp).height(640.dp)) {
                     HomePivot(
                         shell = shell,
-                        review = null,
-                        upcoming = emptyList(),
                         loading = false,
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),
@@ -305,7 +303,7 @@ class MonthActionContentTest {
     fun trackingHidesBreakdownToBudgetAndAutoHold() {
         val home = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.TRACKING).map { it.id }
         assertEquals(
-            listOf("add", "categories", "show-hidden", "copy-last", "average", "zero", "add-schedule", "rules", "reports", "settings"),
+            listOf("add", "categories", "show-hidden", "copy-last", "average", "zero", "due", "add-schedule", "rules", "settings"),
             home,
         )
         val category = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), hasBudget = true, mode = BudgetMode.TRACKING).map { it.id }
@@ -321,8 +319,6 @@ class MonthActionContentTest {
                 Box(Modifier.width(390.dp).height(640.dp)) {
                     HomePivot(
                         shell = shell.copy(mode = mode.value),
-                        review = null,
-                        upcoming = emptyList(),
                         loading = false,
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),

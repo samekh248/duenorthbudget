@@ -13,7 +13,7 @@ class ScreenBarTest {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
         assertEquals(listOf("add", "hold", "categories"), specs.filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("show-hidden", "copy-last", "average", "zero", "add-schedule", "rules", "reports", "settings"),
+            listOf("show-hidden", "copy-last", "average", "zero", "due", "add-schedule", "rules", "settings"),
             specs.filter { !it.primary }.map { it.id },
         )
     }

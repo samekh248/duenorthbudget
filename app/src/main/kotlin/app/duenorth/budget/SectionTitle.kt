@@ -17,11 +17,10 @@ import app.duenorth.budget.design.theme.MetroDimens
 object HomeSections {
     const val BUDGET = "budget"
     const val ACCOUNTS = "accounts"
-    const val DUE = "due"
-    const val REVIEW = "review"
     const val INBOX = "inbox"
+    const val REPORTS = ReportsCopy.TITLE
 
-    val headers = listOf(BUDGET, ACCOUNTS, DUE, REVIEW, INBOX)
+    val headers = listOf(BUDGET, ACCOUNTS, INBOX, REPORTS)
 }
 
 object SectionTitleCopy {
@@ -60,10 +59,12 @@ object SectionTitle {
                 ShellRoute.Assign,
                 -> HomeSections.BUDGET
                 is ShellRoute.RuleEditor -> return SectionTitleCopy.RULES
-                is ShellRoute.ScheduleEditor -> HomeSections.DUE
-                is ShellRoute.ReviewCategory -> HomeSections.REVIEW
-                // Reports is a top-level view, and its pages sit under it.
-                ShellRoute.NetWorth -> ReportsCopy.TITLE
+                is ShellRoute.ScheduleEditor -> ScheduleScreenCopy.DUE
+                // Reports is a home pivot item, and the pages it opens sit under it.
+                ShellRoute.NetWorth,
+                ShellRoute.MonthReview,
+                is ShellRoute.ReviewCategory,
+                -> HomeSections.REPORTS
                 is ShellRoute.ReportPivot -> return null
                 ShellRoute.Create,
                 ShellRoute.SampleBudgets,
@@ -98,7 +99,7 @@ object SectionTitle {
             ShellRoute.Templates,
             ShellRoute.ManageCategories,
             ShellRoute.Budgets,
-            ShellRoute.Reports,
+            ShellRoute.Due,
         )
 }
 

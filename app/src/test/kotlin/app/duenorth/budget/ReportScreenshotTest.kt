@@ -11,6 +11,7 @@ import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.SpendingGroupBy
+import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -19,7 +20,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Spec 010 T055: the reports hub and each report in light and dark. */
+/** Spec 010 T055: each report in light and dark. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [33], qualifiers = "w411dp-h891dp-xxhdpi")
@@ -43,16 +44,29 @@ class ReportScreenshotTest {
     fun spendingDark() = snap("report_spending_dark", dark = true, item = ReportItems.SPENDING)
 
     @Test
-    fun hubLight() = capture("reports_hub_light", dark = false) { Hub() }
-
-    @Test
-    fun hubDark() = capture("reports_hub_dark", dark = true) { Hub() }
-
-    @Test
     fun netWorthTodayLight() = capture("reports_networth_today_light", dark = false) { NetWorthToday() }
 
     @Test
     fun netWorthTodayDark() = capture("reports_networth_today_dark", dark = true) { NetWorthToday() }
+
+    // Home `•••` → due: what the due pivot item used to list, now its own view.
+    @Test
+    fun dueLight() = capture("due_light", dark = false) { Due() }
+
+    @Test
+    fun dueDark() = capture("due_dark", dark = true) { Due() }
+
+    @Composable
+    private fun Due() {
+        val usd = Currencies.byCode("USD")!!
+        val rows =
+            listOf(
+                UpcomingScheduleRow("s1", "rent", "a1", "Checking", "Landlord", -145_000, "c1", "Rent", 20261101, false, "upcoming"),
+                UpcomingScheduleRow("s2", "phone", "a2", "Credit card", "Phone Co", -6_500, "c2", "Phone", 20261016, true, "due"),
+                UpcomingScheduleRow("s3", "pay", "a1", "Checking", "Employer", 310_000, null, "Income", 20261030, false, "upcoming"),
+            )
+        DueScreen(rows, usd, {}, {}, {}, {})
+    }
 
     private val today =
         NetWorthPage(
@@ -61,11 +75,6 @@ class ReportScreenshotTest {
             offBudgetMinor = 21_830_000,
             includeOffBudget = true,
         )
-
-    @Composable
-    private fun Hub() {
-        ReportsHubScreen(today, {}, {})
-    }
 
     @Composable
     private fun NetWorthToday() {

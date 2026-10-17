@@ -46,6 +46,28 @@ import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 
+/** Home `•••` → due: a top-level view of the upcoming scheduled transactions to post or skip. */
+@Composable
+fun DueScreen(
+    rows: List<UpcomingScheduleRow>,
+    currency: CurrencySpec,
+    onPost: (String) -> Unit,
+    onSkip: (String) -> Unit,
+    onOpen: (String) -> Unit,
+    onGesture: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .testTag("due-screen"),
+    ) {
+        MetroText(ScheduleScreenCopy.DUE, Metro.typography.header, Modifier.padding(MetroDimens.Gutter))
+        DueSection(rows, currency, onGesture, onPost, onSkip, onOpen = onOpen)
+    }
+}
+
 @Composable
 fun DueSection(
     rows: List<UpcomingScheduleRow>,
@@ -147,6 +169,7 @@ fun ScheduleDuplicateScreen(
 
 /** Words for the schedule editor (`contracts/schedules-rules.md`). */
 object ScheduleScreenCopy {
+    const val DUE = "due"
     const val ADD = "new schedule"
     const val EDIT = "schedule"
     const val DELETE = "delete schedule"

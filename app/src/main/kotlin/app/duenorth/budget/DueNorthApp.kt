@@ -262,7 +262,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onAddRule = model::openNewRule,
                     onDeleteSchedule = model::deleteOpenSchedule,
                     onDeleteRule = model::deleteOpenRule,
-                    onReports = model::openReports,
+                    onDue = model::openDue,
                     onTemplates = model::openTemplates,
                     onBankLink = model::openBankLink,
                     onNext = model::onboardingCheck,
@@ -298,8 +298,6 @@ fun DueNorthApp(model: ShellViewModel) {
                         ShellRoute.Home ->
                             HomePivot(
                                 shell = state.shell,
-                                review = state.monthReview,
-                                upcoming = state.upcoming,
                                 loading = state.loading,
                                 openMonth = state.openMonth,
                                 monthWindow = model.monthWindow(),
@@ -323,11 +321,11 @@ fun DueNorthApp(model: ShellViewModel) {
                                             onOpenAccount = model::openAccount,
                                         )
                                     },
-                                onReviewCategory = model::openReviewCategory,
-                                onPostSchedule = model::postSchedule,
-                                onSkipSchedule = model::skipSchedule,
+                                netWorth = state.netWorth,
+                                onNetWorth = model::openNetWorth,
+                                onMonthReview = model::openMonthReview,
+                                onReport = model::openReport,
                                 modifier = fill,
-                                onOpenSchedule = model::openSchedule,
                                 onSelectMonth = model::selectOpenMonth,
                                 onBudgetCategory = if (state.shell == null) null else model::openCategoryBudget,
                                 onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
@@ -878,12 +876,29 @@ fun DueNorthApp(model: ShellViewModel) {
                             }
                         }
                         ShellRoute.Rules -> RulesScreen(state.rulesList, model::openRule, fill)
-                        ShellRoute.Reports ->
-                            ReportsHubScreen(
-                                netWorth = state.netWorth,
-                                onNetWorth = model::openNetWorth,
-                                onReport = model::openReport,
-                                modifier = fill,
+                        ShellRoute.Due -> {
+                            val shell = state.shell
+                            if (shell == null) {
+                                Placeholder()
+                            } else {
+                                DueScreen(
+                                    rows = state.upcoming,
+                                    currency = shell.currency,
+                                    onPost = model::postSchedule,
+                                    onSkip = model::skipSchedule,
+                                    onOpen = model::openSchedule,
+                                    onGesture = model::setGesture,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        ShellRoute.MonthReview ->
+                            MonthReviewSection(
+                                review = state.monthReview,
+                                loading = state.loading,
+                                onListGesture = model::setGesture,
+                                onCategory = model::openReviewCategory,
+                                modifier = fill.background(Metro.colors.background),
                             )
                         ShellRoute.NetWorth ->
                             NetWorthSection(

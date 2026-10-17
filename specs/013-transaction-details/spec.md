@@ -140,8 +140,8 @@ row under that day.
 
 ### User Story 3 - A titled, labelled, right-sized form (Priority: P2)
 
-The screen reads as a Windows Phone 8.1 page: a small uppercase line naming
-the account over the oversized lowercase title "transaction". Each field
+The screen reads as a Windows Phone 8.1 page: the small uppercase section
+line over the account's name as the oversized page title. Each field
 has a small label above it. Fields whose values have a known length (date,
 amount) are only as wide as that length needs. Free-text fields (payee,
 note) keep the full width. Spacing follows the Metro 2 grid so a label sits
@@ -158,9 +158,9 @@ existing transaction against the acceptance scenarios below.
 
 1. **Given** a transaction in the "Visa" account, **When** the details
    screen opens, **Then** the top of the page reads "ACCOUNTS" in the small
-   uppercase title line, then "Visa" (the account name as stored) in the
-   subheader size and secondary color on its own line, then "transaction" in
-   the page-title size. The payee is no longer used as the page title.
+   uppercase title line, then "Visa" (the account name as stored) as the
+   page title. The word "transaction" does not appear, and the payee is no
+   longer used as the page title.
 2. **Given** any field with a value, **When** the screen is shown, **Then**
    the field's name ("date", "payee", "amount", "category", "note") is shown
    above it in lowercase secondary text, and stays shown after a value is
@@ -258,9 +258,8 @@ there and no command buttons remain in the page body.
 **Page**
 
 - **FR-001**: The transaction details screen MUST show the Windows Phone 8.1
-  title area in three rows: "ACCOUNTS" in the small uppercase title line,
-  then the account's name as stored in the subheader size and secondary
-  color, then the lowercase page title "transaction". The first field label
+  title area in two rows: "ACCOUNTS" in the small uppercase title line, then
+  the account's name as stored as the page title. The first field label
   sits one 24 dp grid step below the page title. This holds for new and
   existing transactions.
 - **FR-002**: Every field MUST have a persistent lowercase label above it in
@@ -392,10 +391,10 @@ there and no command buttons remain in the page body.
   for five or fewer items, opens a full-screen picker above that), and page
   commands on the application bar. The five-item threshold is the
   platform's own rule.
-- The small title line names the home section (ACCOUNTS), and the account
-  the register is open on gets its own line between it and the page title
-  (decided 2026-10-16).
-- The page title is "transaction" for both new and existing transactions.
+- The small title line names the home section (ACCOUNTS), and the page title
+  is the name of the account the register is open on, for both new and
+  existing transactions (decided 2026-10-16; this replaced an earlier layout
+  with the account name on its own line over the title "transaction").
   The payee shows in its own field.
 - "Make the field only as long as it needs to be" applies to fields whose
   length is known (date, amount). Payee and note hold free text of any
