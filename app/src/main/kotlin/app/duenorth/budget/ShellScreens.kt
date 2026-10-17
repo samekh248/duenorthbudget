@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -115,6 +116,8 @@ fun HomePivot(
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
     LaunchedEffect(pagerGesture, listGesture) { onGesture(pagerGesture || listGesture) }
+    // Leaving Home mid-scroll (say, to move money from edit mode) must not leave the shell's repaints held back.
+    DisposableEffect(Unit) { onDispose { onGesture(false) } }
     MetroPivot(
         title = SectionTitleCopy.APP,
         items =

@@ -148,6 +148,19 @@ class BudgetEditTest {
                 ?.category(to.id)
                 ?.availableMinor == to.availableMinor + 1_000
         }
+        // Budgeted moves with available: the source gives up what it moved, the destination gains it.
+        assertEquals(
+            to.budgetedMinor + 1_000,
+            model.state.value.shell!!
+                .category(to.id)!!
+                .budgetedMinor,
+        )
+        assertEquals(
+            from.budgetedMinor - 1_000,
+            model.state.value.shell!!
+                .category(from.id)!!
+                .budgetedMinor,
+        )
         assertEquals(
             from.availableMinor - 1_000,
             model.state.value.shell!!
