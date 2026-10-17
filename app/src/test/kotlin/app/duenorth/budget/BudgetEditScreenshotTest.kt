@@ -43,6 +43,45 @@ class BudgetEditScreenshotTest {
     @Test
     fun fullyBudgetedLight() = snap("budget_edit_zero_light", dark = false, edit = BudgetEdit(), toBudget = 0, held = 0)
 
+    // Tapping Gas's available: 20 moving to Groceries, with both figures showing the result.
+    @Test
+    fun moveLight() = moveSnap("budget_edit_move_light", dark = false)
+
+    @Test
+    fun moveDark() = moveSnap("budget_edit_move_dark", dark = true)
+
+    private fun moveSnap(
+        name: String,
+        dark: Boolean,
+    ) {
+        val shell = sample()
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Box(Modifier.width(390.dp).height(780.dp)) {
+                    ShellChrome(
+                        actions =
+                            ScreenBar.specsFor(ShellRoute.MoveCategory("c-gas"), true, BudgetMode.ENVELOPE).map {
+                                ScreenAction(it.id, it.glyph, it.label, it.primary) {}
+                            },
+                        statusBar =
+                            androidx.compose.foundation.layout
+                                .WindowInsets(0),
+                    ) { modifier ->
+                        MoveCategoryScreen(
+                            shell = shell,
+                            fromCategoryId = "c-gas",
+                            error = null,
+                            onSave = { _, _ -> },
+                            modifier = modifier,
+                            initialTo = "c-groceries",
+                            initialAmount = "20",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     private fun snap(
         name: String,
         dark: Boolean,

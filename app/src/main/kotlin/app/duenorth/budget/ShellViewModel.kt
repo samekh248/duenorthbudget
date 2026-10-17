@@ -1034,6 +1034,12 @@ class ShellViewModel(
         _state.update { it.copy(editError = null) }
     }
 
+    /** Opens the move screen for [categoryId] from wherever the person is, as edit mode's available figures do. */
+    fun openMoveFrom(categoryId: String) {
+        push(ShellRoute.MoveCategory(categoryId))
+        _state.update { it.copy(editError = null) }
+    }
+
     fun showHoldMonth() {
         push(ShellRoute.HoldMonth)
         _state.update { it.copy(editError = null) }
@@ -1084,6 +1090,10 @@ class ShellViewModel(
     ) {
         val shell = _state.value.shell ?: return
         val from = (_state.value.route as? ShellRoute.MoveCategory)?.fromCategoryId ?: return
+        if (toCategoryId == MOVE_TO_BUDGET) {
+            transferToBudget(from, amountText)
+            return
+        }
         if (toCategoryId.isBlank()) {
             _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
             return

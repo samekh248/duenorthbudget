@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryManagePage
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.EnvelopeCopy
@@ -33,6 +34,7 @@ import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.ManageCategoryRow
 import app.duenorth.budget.core.ManageGroupRow
 import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.core.MoneyMath
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroButton
@@ -90,6 +92,14 @@ fun CategoryBudgetScreen(
     }
 }
 
+/** The to-budget pick on the move screen, which moves money back out of the category. */
+const val MOVE_TO_BUDGET = "to-budget"
+
+/**
+ * Moves money from one category: the amount (sums work, and all takes everything available), then where it
+ * goes, picked from to budget and every other category with what each has available. Once an amount reads,
+ * the source and the picked destination show what they will have after the move.
+ */
 @Composable
 fun MoveCategoryScreen(
     shell: MonthShell,
@@ -97,39 +107,145 @@ fun MoveCategoryScreen(
     error: String?,
     onSave: (String, String) -> Unit,
     modifier: Modifier = Modifier,
+    initialTo: String = "",
+    initialAmount: String = "",
 ) {
     val from = shell.groups.flatMap { it.categories }.first { it.id == fromCategoryId }
     val prefs = LocalFormatPrefs.current
-    var toId by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    val targets = shell.groups.flatMap { it.categories }.filter { it.id != fromCategoryId }
+    val options = formatOptions()
+    val money = shell.currency
+    var toId by remember { mutableStateOf(initialTo) }
+    var amount by remember { mutableStateOf(initialAmount) }
+    val moved = MoneyMath.evaluate(amount, prefs.numberFormat, money.decimals)?.takeIf { it > 0 } ?: 0L
+    val envelope = shell.mode == BudgetMode.ENVELOPE
     Column(
         modifier
             .fillMaxSize()
             .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
+            .padding(MetroDimens.Gutter)
+            .testTag("move-screen"),
     ) {
-        MetroText("${EnvelopeCopy.MOVE} from ${from.name}", Metro.typography.header)
-        MetroField(amount, { amount = it }, "amount", Modifier.padding(vertical = MetroDimens.Gutter))
-        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        LazyColumn(Modifier.weight(1f)) {
-            items(targets, key = { it.id }) { target ->
-                MetroText(
-                    target.name,
-                    Metro.typography.subheader,
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = MetroDimens.TouchTarget)
-                        .metroPress { toId = target.id }
-                        .padding(vertical = MetroDimens.Row),
-                    color = if (toId == target.id) Metro.accent.text else Metro.colors.foreground,
-                )
+        MetroText("${EnvelopeCopy.MOVE} from ${from.name}", Metro.typography.subheader, maxLines = 2)
+        MetroText(
+            "available ${MoneyFormat.format(from.availableMinor - moved, money, options)}",
+            Metro.typography.caption,
+            Modifier.padding(top = 4.dp).testTag("move-from-available"),
+            color = Metro.colors.secondary,
+        )
+        MetroField(amount, { amount = it }, "amount", Modifier.padding(top = MetroDimens.Gutter).testTag("move-amount"))
+        // Quick picks: everything the category has, or what the picked category is overspent by.
+        val target = shell.groups.flatMap { it.categories }.firstOrNull { it.id == toId }
+        val cover =
+            target
+                ?.availableMinor
+                ?.takeIf { it < 0 }
+                ?.let { minOf(-it, from.availableMinor) }
+                ?.takeIf { it > 0 }
+        Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Grid)) {
+            if (from.availableMinor > 0) {
+                QuickAmount("all ${MoneyFormat.format(from.availableMinor, money, options)}", "move-all") {
+                    amount = prefs.editAmount(from.availableMinor, money.decimals)
+                }
+            }
+            if (cover != null) {
+                QuickAmount("cover ${MoneyFormat.format(cover, money, options)}", "move-cover") {
+                    amount = prefs.editAmount(cover, money.decimals)
+                }
             }
         }
-        RememberFormSave { onSave(toId, prefs.readAmount(amount, shell.currency.decimals)) }
-        if (!formSaveOnBar()) {
-            MetroButton("move") { onSave(toId, prefs.readAmount(amount, shell.currency.decimals)) }
+        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+        MetroText("to", Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
+        LazyColumn(Modifier.weight(1f)) {
+            if (envelope) {
+                item(key = MOVE_TO_BUDGET) {
+                    MoveTarget(
+                        name = shell.headerLabel,
+                        available = MoneyFormat.format(shell.headerMinor + if (toId == MOVE_TO_BUDGET) moved else 0L, money, options),
+                        picked = toId == MOVE_TO_BUDGET,
+                        banded = false,
+                        tag = "move-to-$MOVE_TO_BUDGET",
+                    ) { toId = MOVE_TO_BUDGET }
+                }
+            }
+            var band = 0
+            shell.groups.forEach { group ->
+                val targets = group.categories.filter { it.id != fromCategoryId }
+                if (targets.isEmpty()) return@forEach
+                item(key = "group-${group.id}") {
+                    MetroText(
+                        group.name,
+                        Metro.typography.groupHeader,
+                        Modifier.padding(top = MetroDimens.Row, bottom = 4.dp),
+                        color = Metro.colors.secondary,
+                    )
+                }
+                targets.forEach { target ->
+                    val banded = ledgerBanded(band++)
+                    item(key = target.id) {
+                        MoveTarget(
+                            name = target.name,
+                            available = MoneyFormat.format(target.availableMinor + if (toId == target.id) moved else 0L, money, options),
+                            picked = toId == target.id,
+                            banded = banded,
+                            tag = "move-to-${target.id}",
+                        ) { toId = target.id }
+                    }
+                }
+            }
         }
+        RememberFormSave { onSave(toId, prefs.readAmount(amount, money.decimals)) }
+        if (!formSaveOnBar()) {
+            MetroButton("move") { onSave(toId, prefs.readAmount(amount, money.decimals)) }
+        }
+    }
+}
+
+@Composable
+private fun QuickAmount(
+    label: String,
+    tag: String,
+    onPick: () -> Unit,
+) {
+    MetroText(
+        label,
+        Metro.typography.body,
+        Modifier
+            .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress(onClick = onPick)
+            .padding(vertical = MetroDimens.Row)
+            .testTag(tag),
+        color = Metro.accent.text,
+    )
+}
+
+@Composable
+private fun MoveTarget(
+    name: String,
+    available: String,
+    picked: Boolean,
+    banded: Boolean,
+    tag: String,
+    onPick: () -> Unit,
+) {
+    val ink = if (picked) Metro.accent.onFill else Metro.colors.foreground
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .ledgerFill(
+                if (picked) {
+                    Metro.accent.fill
+                } else if (banded) {
+                    ledgerBand
+                } else {
+                    Color.Transparent
+                },
+            ).metroPress(onClick = onPick)
+            .testTag(tag),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MetroText(name, Metro.typography.body, Modifier.weight(1f).padding(end = MetroDimens.Gutter), color = ink, maxLines = 2)
+        MetroText(available, Metro.typography.body, color = if (picked) ink else Metro.accent.text, maxLines = 1, softWrap = false)
     }
 }
 

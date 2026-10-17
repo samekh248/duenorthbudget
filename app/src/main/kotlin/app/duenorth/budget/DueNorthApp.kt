@@ -345,11 +345,13 @@ fun DueNorthApp(model: ShellViewModel) {
                                             onCover = model::coverBudgetBox,
                                             onAll = model::allToBudgetBox,
                                             onDone = model::doneBudgetBox,
+                                            onAvailable = { id ->
+                                                if (model.doneBudgetBox()) model.openMoveFrom(id)
+                                            },
                                             onToBudget =
                                                 if (state.shell?.mode == BudgetMode.ENVELOPE) {
                                                     {
-                                                        model.doneBudgetBox()
-                                                        model.openBreakdown()
+                                                        if (model.doneBudgetBox()) model.openBreakdown()
                                                     }
                                                 } else {
                                                     null

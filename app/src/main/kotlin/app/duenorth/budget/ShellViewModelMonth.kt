@@ -77,8 +77,16 @@ fun ShellViewModel.openToBudget() {
 
 /** Paints the lower budget and higher to-budget first, and rolls back on a refusal. */
 fun ShellViewModel.submitToBudget(amountText: String) {
-    val shell = state.value.shell ?: return
     val categoryId = (state.value.route as? ShellRoute.ToBudget)?.categoryId ?: return
+    transferToBudget(categoryId, amountText)
+}
+
+/** Moves [amountText] of [categoryId]'s budget back to to budget, then goes back a page. Envelope only. */
+fun ShellViewModel.transferToBudget(
+    categoryId: String,
+    amountText: String,
+) {
+    val shell = state.value.shell ?: return
     val category = shell.groups.flatMap { it.categories }.firstOrNull { it.id == categoryId } ?: return
     val amount = MoneyFormat.parse(amountText, shell.currency.decimals)
     if (amount == null || amount <= 0L) {

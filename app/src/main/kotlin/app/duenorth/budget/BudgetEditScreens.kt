@@ -56,6 +56,8 @@ class BudgetEditActions(
     val onCover: () -> Unit = {},
     val onAll: () -> Unit = {},
     val onDone: () -> Unit = {},
+    /** A tap on a category's available figure: move money from it. */
+    val onAvailable: (String) -> Unit = {},
     /** A tap on the pinned to budget figure; null when it does nothing. */
     val onToBudget: (() -> Unit)? = null,
 )
@@ -192,6 +194,7 @@ fun BudgetEditSection(
                         open = open,
                         banded = ledgerBanded(position.getValue(category.id)),
                         onFocus = { actions.onFocus(category.id) },
+                        onAvailable = { actions.onAvailable(category.id) },
                     )
                 }
                 item(key = "edit-gap-${group.id}") { Spacer(Modifier.height(MetroDimens.Row)) }
@@ -249,6 +252,7 @@ private fun EditLine(
     open: Boolean,
     banded: Boolean,
     onFocus: () -> Unit,
+    onAvailable: () -> Unit,
 ) {
     Row(
         Modifier
@@ -294,14 +298,23 @@ private fun EditLine(
                 softWrap = false,
             )
         }
-        MetroText(
-            available,
-            Metro.typography.body.copy(textAlign = TextAlign.End),
-            Modifier.weight(LEDGER_FIGURE).testTag("edit-available-${category.id}"),
-            color = Metro.accent.text,
-            maxLines = 1,
-            softWrap = false,
-        )
+        // The available figure moves money from the category to another one or back to to budget.
+        Box(
+            Modifier
+                .weight(LEDGER_FIGURE)
+                .heightIn(min = MetroDimens.TouchTarget)
+                .metroPress(onClick = onAvailable)
+                .testTag("edit-available-${category.id}"),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            MetroText(
+                available,
+                Metro.typography.body.copy(textAlign = TextAlign.End),
+                color = Metro.accent.text,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
     }
 }
 

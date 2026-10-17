@@ -83,9 +83,11 @@ fun ShellViewModel.closeBudgetKeypad() {
     mutate { it.copy(budgetEdit = it.budgetEdit?.copy(categoryId = null, text = ""), editError = null) }
 }
 
-/** done on the keypad: saves the box and closes the keypad. */
-fun ShellViewModel.doneBudgetBox() {
-    if (commitBudgetBox()) closeBudgetKeypad()
+/** done on the keypad: saves the box and closes the keypad. False when what was typed does not read. */
+fun ShellViewModel.doneBudgetBox(): Boolean {
+    if (!commitBudgetBox()) return false
+    closeBudgetKeypad()
+    return true
 }
 
 private fun ShellViewModel.budgetEditCategory(): CategoryRow? {

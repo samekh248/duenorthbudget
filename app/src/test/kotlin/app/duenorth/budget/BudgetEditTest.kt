@@ -124,6 +124,54 @@ class BudgetEditTest {
     }
 
     @Test
+    fun tappingAvailableMovesMoneyToAnotherCategoryAndBackToEditMode() {
+        val model = household("move-money")
+        val before = model.state.value.shell!!
+        val (from, to) =
+            before.groups
+                .flatMap { it.categories }
+                .filter { it.availableMinor > 1_000 }
+                .take(2)
+        model.startBudgetEdit()
+        model.openMoveFrom(from.id)
+        assertEquals(ShellRoute.MoveCategory(from.id), model.state.value.route)
+        // The screen reads the box as the person typed it, sums included.
+        model.submitMoveCategory(
+            to.id,
+            model.state.value.formatPrefs
+                .readAmount("4+6"),
+        )
+        await { model.state.value.route == ShellRoute.Home }
+        assertEquals(BudgetEdit(), model.state.value.budgetEdit)
+        await {
+            model.state.value.shell
+                ?.category(to.id)
+                ?.availableMinor == to.availableMinor + 1_000
+        }
+        assertEquals(
+            from.availableMinor - 1_000,
+            model.state.value.shell!!
+                .category(from.id)!!
+                .availableMinor,
+        )
+    }
+
+    @Test
+    fun movingToToBudgetRaisesIt() {
+        val model = household("move-to-budget")
+        val before = model.state.value.shell!!
+        val from = before.groups.flatMap { it.categories }.first { it.availableMinor > 1_000 }
+        model.startBudgetEdit()
+        model.openMoveFrom(from.id)
+        model.submitMoveCategory(MOVE_TO_BUDGET, "10")
+        await { model.state.value.route == ShellRoute.Home }
+        await {
+            model.state.value.shell
+                ?.headerMinor == before.headerMinor + 1_000
+        }
+    }
+
+    @Test
     fun leavingTheBudgetItemEndsEditMode() {
         val model = household("swipe")
         model.startBudgetEdit()
