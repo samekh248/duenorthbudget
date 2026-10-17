@@ -186,10 +186,10 @@ fun BudgetEditSection(
                         category = category,
                         boxText =
                             when {
-                                !open -> prefs.editAmount(category.budgetedMinor, money.decimals)
+                                !open -> prefs.editSignedAmount(category.budgetedMinor, money.decimals)
                                 else -> edit.text
                             },
-                        hint = if (open && edit.text.isEmpty()) prefs.editAmount(category.budgetedMinor, money.decimals) else null,
+                        hint = if (open && edit.text.isEmpty()) prefs.editSignedAmount(category.budgetedMinor, money.decimals) else null,
                         available = MoneyFormat.format(category.availableMinor + if (open) delta else 0L, money, formatOptions),
                         open = open,
                         banded = ledgerBanded(position.getValue(category.id)),

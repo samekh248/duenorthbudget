@@ -59,7 +59,12 @@ fun CategoryBudgetScreen(
 ) {
     val category = shell.groups.flatMap { it.categories }.first { it.id == categoryId }
     val prefs = LocalFormatPrefs.current
-    var amount by remember(category, prefs) { mutableStateOf(prefs.editAmount(category.budgetedMinor, shell.currency.decimals)) }
+    // Signed, so a negative budget (money moved out) reads as one.
+    val initial = prefs.editSignedAmount(category.budgetedMinor, shell.currency.decimals)
+    var amount by remember(category, prefs) { mutableStateOf(initial) }
+    // "+500" typed over the amount adds to it. This box starts filled in, so a leading minus is a negative
+    // amount ("-150"), not "take 150 off".
+    val base = if (amount.trimStart().startsWith("-")) null else category.budgetedMinor
     Column(
         modifier
             .fillMaxSize()
@@ -75,10 +80,10 @@ fun CategoryBudgetScreen(
         )
         MetroField(amount, { amount = it }, "budgeted", Modifier.testTag("category-budget-amount"))
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals, base = category.budgetedMinor)) }
+        RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals, base = base)) }
         MetroButtonGrid {
             if (!formSaveOnBar()) {
-                MetroButton("save") { onSave(prefs.readAmount(amount, shell.currency.decimals, base = category.budgetedMinor)) }
+                MetroButton("save") { onSave(prefs.readAmount(amount, shell.currency.decimals, base = base)) }
             }
             MetroButton(EnvelopeCopy.MOVE, onClick = onMove)
             MetroButton(
