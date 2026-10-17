@@ -419,15 +419,14 @@ fun TransactionForm(
                 .padding(horizontal = MetroDimens.Gutter)
                 .padding(bottom = MetroDimens.Gutter),
         ) {
+            // The page is titled with the account the register is open on, under the ACCOUNTS line.
             MetroText(
                 page.account.name,
-                Metro.typography.subheader,
+                Metro.typography.header,
                 Modifier.testTag("transaction-account"),
-                color = Metro.colors.secondary,
                 maxLines = 1,
                 softWrap = false,
             )
-            MetroText(TransactionFormCopy.TITLE, Metro.typography.header, maxLines = 1)
             LabeledField(TransactionFormCopy.DATE, errorFor(TransactionField.DATE), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
                 val width = rememberFieldWidth(DateFormats.widestSample(dateFormat), Metro.typography.control, DATE_CHEVRON)
                 Box(
@@ -518,7 +517,6 @@ fun TransactionForm(
 }
 
 object TransactionFormCopy {
-    const val TITLE = "transaction"
     const val DATE = "date"
     const val PAYEE = "payee"
     const val AMOUNT = "amount"

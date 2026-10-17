@@ -58,8 +58,6 @@ class InboxMenuScreenshotTest {
                 Column(Modifier.fillMaxSize()) {
                     HomePivot(
                         shell = shell,
-                        review = null,
-                        upcoming = emptyList(),
                         loading = false,
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),

@@ -18,6 +18,7 @@ import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MonthShell
+import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppBarButton
@@ -97,6 +98,17 @@ class ShellScreenshotTest {
     fun inboxFiledDark() =
         snap("inbox_filed_dark", dark = true, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX), filed = true)
 
+    // Reports on the home pivot: the reporting hub, with today's net worth on its line.
+    @Test
+    fun reportsHubLight() = snap("reports_hub_light", dark = false, shell = sample(), section = reportsSection, netWorth = netWorth())
+
+    @Test
+    fun reportsHubDark() = snap("reports_hub_dark", dark = true, shell = sample(), section = reportsSection, netWorth = netWorth())
+
+    private val reportsSection = HomeSections.headers.indexOf(HomeSections.REPORTS)
+
+    private fun netWorth() = NetWorthPage(Currencies.byCode("USD")!!, 1_284_250, 21_830_000, includeOffBudget = true)
+
     // Edge to edge with a 32dp status bar (gray strip): the pivot title starts below it.
     @Test
     fun homeUnderStatusBarDark() = statusBarSnap("home_status_bar_dark", dark = true, inset = 32.dp)
@@ -113,6 +125,7 @@ class ShellScreenshotTest {
         shell: MonthShell,
         section: Int = 0,
         filed: Boolean = false,
+        netWorth: NetWorthPage? = null,
     ) {
         val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
         val justFiled = if (filed) listOf(InboxFiled(shell.inbox.first(), 0, "Dining")) else emptyList()
@@ -121,8 +134,6 @@ class ShellScreenshotTest {
                 Column(Modifier.width(390.dp).height(780.dp)) {
                     HomePivot(
                         shell = shown,
-                        review = null,
-                        upcoming = emptyList(),
                         loading = false,
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),
@@ -130,6 +141,7 @@ class ShellScreenshotTest {
                         onGesture = {},
                         modifier = Modifier.weight(1f),
                         inboxFiled = justFiled,
+                        netWorth = netWorth,
                     )
                     MetroAppBar(
                         actions =
@@ -158,8 +170,6 @@ class ShellScreenshotTest {
                     ShellChrome(actions = emptyList(), statusBar = WindowInsets(top = inset)) { modifier ->
                         HomePivot(
                             shell = shell,
-                            review = null,
-                            upcoming = emptyList(),
                             loading = false,
                             openMonth = shell.month,
                             monthWindow = MonthWindow.around(shell.month),

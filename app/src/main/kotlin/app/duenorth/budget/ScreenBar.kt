@@ -5,7 +5,6 @@ import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.RegisterCopy
-import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SignInMethod
 import app.duenorth.budget.core.TemplateCopy
@@ -254,12 +253,12 @@ object ScreenBar {
             menu("zero", AppGlyph.Zero, MonthFillCopy.ZERO),
         )
 
-    /** Home `•••` → new schedule and rules (spec 010 US3). */
+    /** Home `•••` → what is due, new schedule, and rules (spec 010 US3). */
     private fun schedules() =
         listOf(
+            menu("due", AppGlyph.Calendar, ScheduleScreenCopy.DUE),
             menu("add-schedule", AppGlyph.Add, ScheduleScreenCopy.ADD),
             menu("rules", AppGlyph.Categories, RuleScreenCopy.TITLE),
-            menu("reports", AppGlyph.Breakdown, ReportsCopy.TITLE),
         )
 
     /** Home `•••` → templates, only while experimental features and budget templates are both on (spec 010 US5). */
@@ -311,7 +310,7 @@ class ScreenBarHandlers(
     val onAddRule: () -> Unit = {},
     val onDeleteSchedule: () -> Unit = {},
     val onDeleteRule: () -> Unit = {},
-    val onReports: () -> Unit = {},
+    val onDue: () -> Unit = {},
     val onTemplates: () -> Unit = {},
     val onBankLink: () -> Unit = {},
     val onNext: () -> Unit = {},
@@ -367,7 +366,7 @@ class ScreenBarHandlers(
             "add-rule" -> onAddRule
             "delete-schedule" -> onDeleteSchedule
             "delete-rule" -> onDeleteRule
-            "reports" -> onReports
+            "due" -> onDue
             "templates" -> onTemplates
             "bank-link" -> onBankLink
             "next" -> onNext

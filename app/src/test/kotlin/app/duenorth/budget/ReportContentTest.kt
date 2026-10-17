@@ -32,9 +32,13 @@ class ReportContentTest {
     val compose = createHostComposeRule()
 
     @Test
-    fun homeMenuOpensReports() {
-        assertTrue("reports" in ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE).map { it.id })
-        assertTrue("reports" in ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.TRACKING).map { it.id })
+    fun reportsIsAHomePivotItemNotAMenuLink() {
+        assertEquals(listOf("budget", "accounts", "inbox", "reports"), HomeSections.headers)
+        for (mode in listOf(BudgetMode.ENVELOPE, BudgetMode.TRACKING)) {
+            val ids = ScreenBar.specsFor(ShellRoute.Home, true, mode).map { it.id }
+            assertTrue("reports" !in ids)
+            assertTrue("due" in ids)
+        }
     }
 
     @Test
@@ -97,8 +101,6 @@ class ReportContentTest {
     @Test
     fun reportsThroughTheModel() {
         val (model, _) = household("reports")
-        model.openReports()
-        assertEquals(ShellRoute.Reports, model.state.value.route)
         model.openReport(ReportItems.CASH_FLOW)
         assertEquals(ShellRoute.ReportPivot(ReportItems.CASH_FLOW), model.state.value.route)
         await { model.state.value.reports != null && !model.state.value.reportsLoading }
@@ -126,8 +128,6 @@ class ReportContentTest {
         assertEquals(0L, empty.cashFlow.incomeMinor)
         assertTrue(empty.spending.rows.isEmpty())
         model.back()
-        assertEquals(ShellRoute.Reports, model.state.value.route)
-        model.back()
         assertEquals(ShellRoute.Home, model.state.value.route)
     }
 
@@ -135,6 +135,7 @@ class ReportContentTest {
     fun hubListsEveryReportAndOpensIt() {
         val opened = mutableStateOf<Int?>(null)
         val netWorth = mutableStateOf(false)
+        val review = mutableStateOf(false)
         val page =
             NetWorthPage(
                 currency = Currencies.byCode("USD")!!,
@@ -144,9 +145,11 @@ class ReportContentTest {
             )
         compose.setContent {
             MetroTheme {
-                ReportsHubScreen(
+                ReportsHub(
                     netWorth = page,
+                    month = YearMonth.of(2026, 10),
                     onNetWorth = { netWorth.value = true },
+                    onMonthReview = { review.value = true },
                     onReport = { opened.value = it },
                 )
             }
@@ -154,6 +157,8 @@ class ReportContentTest {
         compose.onNodeWithText("${MoneyFormat.format(125_000, page.currency)} today").assertExists()
         compose.onNodeWithTag("reports-hub-networth").performClick()
         assertTrue(netWorth.value)
+        compose.onNodeWithTag("reports-hub-review").performClick()
+        assertTrue(review.value)
         compose.onNodeWithTag("reports-hub-cashflow").performClick()
         assertEquals(ReportItems.CASH_FLOW, opened.value)
         compose.onNodeWithTag("reports-hub-networth-months").performClick()
@@ -163,13 +168,19 @@ class ReportContentTest {
     }
 
     @Test
-    fun netWorthOpensFromReportsNotHome() {
-        assertTrue(ReportsCopy.NET_WORTH !in HomeSections.headers)
+    fun reportPagesGoBackToHome() {
         val (model, _) = household("networth")
-        model.openReports()
         model.openNetWorth()
         assertEquals(ShellRoute.NetWorth, model.state.value.route)
         model.back()
-        assertEquals(ShellRoute.Reports, model.state.value.route)
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        model.openMonthReview()
+        assertEquals(ShellRoute.MonthReview, model.state.value.route)
+        model.back()
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        model.openDue()
+        assertEquals(ShellRoute.Due, model.state.value.route)
+        model.back()
+        assertEquals(ShellRoute.Home, model.state.value.route)
     }
 }
