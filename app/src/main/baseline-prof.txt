@@ -1,0 +1,4 @@
+# Compile all of Due North's own code ahead of time, so the first visit to each screen does not
+# run interpreted while Compose builds it. Compose and the other libraries bring their own profiles.
+HSPLapp/duenorth/budget/**;->**(**)**
+Lapp/duenorth/budget/**;
