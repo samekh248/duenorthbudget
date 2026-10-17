@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -80,7 +81,6 @@ object InboxCopy {
     const val TO_CATEGORIZE = "to categorize"
     const val SPENDING = "spending"
     const val SELECTED = "selected"
-    const val UP_NEXT = "up next"
     const val SUGGESTED = "suggested"
     const val NO_SUGGESTION = "no suggestion"
     const val ACCEPT = "accept"
@@ -174,7 +174,7 @@ fun InboxSection(
         if (selection != null) {
             LazyColumn(Modifier.weight(1f), state = list) {
                 // Rows just filed stay in the list until their confirmation has played.
-                itemsIndexed(entries, key = { _, it -> it.row.id }) { i, entry ->
+                inboxDayItems(entries) { i, entry ->
                     InboxLine(
                         entry = entry,
                         amount = money(entry.row.amountMinor),
@@ -212,12 +212,8 @@ fun InboxSection(
             onMenu = { row, bounds -> menu = row to bounds },
             modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
         )
-        val queue = entries.drop(1)
-        if (queue.any { it.filedTo == null }) {
-            MetroText(InboxCopy.UP_NEXT, Metro.typography.caption, Modifier.padding(bottom = 4.dp), color = Metro.colors.secondary)
-        }
         LazyColumn(Modifier.weight(1f), state = list) {
-            itemsIndexed(queue, key = { _, it -> it.row.id }) { i, entry ->
+            inboxDayItems(entries.drop(1), leaving = next?.let { it to rise.value }) { i, entry ->
                 InboxLine(
                     entry = entry,
                     amount = money(entry.row.amountMinor),
@@ -493,11 +489,82 @@ private fun Modifier.rising(fraction: Float): Modifier =
 private fun Modifier.clipBelow(): Modifier =
     drawWithContent { clipRect(-size.width, 0f, size.width * 2, size.height) { this@drawWithContent.drawContent() } }
 
-/** The quieter line under a payee: the suggested category, the date, the account, then the note. */
+/** Runs of entries that share a date, in inbox order. */
+internal fun inboxDays(entries: List<InboxEntry>): List<List<InboxEntry>> =
+    entries.fold(mutableListOf<MutableList<InboxEntry>>()) { days, entry ->
+        if (days
+                .lastOrNull()
+                ?.first()
+                ?.row
+                ?.date == entry.row.date
+        ) {
+            days.last() += entry
+        } else {
+            days += mutableListOf(entry)
+        }
+        days
+    }
+
+/**
+ * [entries] grouped under date headings, each row drawn by [line] with its index across the whole
+ * list for banding. [leaving] is a row on its way out and how far it has gone; a heading goes with
+ * it when nothing else in its day is still waiting.
+ */
+private fun LazyListScope.inboxDayItems(
+    entries: List<InboxEntry>,
+    leaving: Pair<InboxEntry, Float>? = null,
+    line: @Composable (Int, InboxEntry) -> Unit,
+) {
+    var start = 0
+    inboxDays(entries).forEach { day ->
+        val waiting = day.filter { it.filedTo == null }
+        val first = day.first()
+        item(key = "day-${first.row.date}-${first.row.id}") {
+            InboxDayHeading(
+                first.row.date,
+                filed = waiting.isEmpty(),
+                leaving = leaving?.takeIf { (entry, _) -> waiting == listOf(entry) }?.second ?: 0f,
+            )
+        }
+        val offset = start
+        itemsIndexed(day, key = { _, it -> it.row.id }) { i, entry -> line(offset + i, entry) }
+        start += day.size
+    }
+}
+
+/** A day's date over its rows. It collapses once every row under it has been filed, or with [leaving]. */
+@Composable
+private fun InboxDayHeading(
+    date: Int,
+    filed: Boolean,
+    leaving: Float,
+) {
+    val height = remember { Animatable(1f) }
+    val animations = Metro.animations
+    LaunchedEffect(filed) {
+        if (filed) {
+            delay(FILED_HOLD_MS)
+            if (animations) height.animateTo(0f, tween(COLLAPSE_MS)) else height.snapTo(0f)
+        } else {
+            height.snapTo(1f)
+        }
+    }
+    MetroText(
+        RegisterEntry.registerDateLabel(date),
+        Metro.typography.caption,
+        Modifier
+            .collapse(height.value * (1f - leaving))
+            .alpha(1f - leaving)
+            .padding(top = DAY_AIR_ABOVE, bottom = 4.dp)
+            .testTag("inbox-day-$date"),
+        color = Metro.accent.text,
+    )
+}
+
+/** The quieter line under a payee: the suggested category, the account, then the note. The date is the row's heading. */
 internal fun inboxDetail(row: InboxRow): String =
     listOfNotNull(
         row.suggestionName.ifBlank { InboxCopy.NO_CATEGORY },
-        row.date.takeIf { it > 0 }?.let(RegisterEntry::registerDateLabel),
         row.accountName.ifBlank { null },
         row.note.ifBlank { null },
     ).joinToString(" · ")
@@ -657,6 +724,7 @@ private val MENU_INSET = 24.dp
 private const val MENU_SCRIM = 0.7f
 internal const val FILED_HOLD_MS = 900L
 private const val COLLAPSE_MS = 240
+private val DAY_AIR_ABOVE = 12.dp
 private const val RISE_MS = 420
 
 /** The confirmation is gone by this share of the rise; the next transaction starts showing at the other. */

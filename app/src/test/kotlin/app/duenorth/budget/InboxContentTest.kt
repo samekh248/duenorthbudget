@@ -47,13 +47,43 @@ class InboxContentTest {
         compose.onNodeWithTag("inbox-featured-amount", useUnmergedTree = true).assertTextEquals("-$5.75")
         compose.onNodeWithText("Dining", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("inbox-row-coffee").assertDoesNotExist()
-        compose.onNodeWithTag("inbox-detail-shell", useUnmergedTree = true).assertTextEquals("Gas · oct 15 · Checking")
+        compose.onNodeWithTag("inbox-detail-shell", useUnmergedTree = true).assertTextEquals("Gas · Checking")
         compose
             .onNodeWithTag(
                 "inbox-detail-atm",
                 useUnmergedTree = true,
-            ).assertTextEquals("no category · oct 11 · Checking · ATM withdrawal")
+            ).assertTextEquals("no category · Checking · ATM withdrawal")
         compose.onNodeWithTag("inbox-amount-atm", useUnmergedTree = true).assertTextEquals("-$20.00")
+    }
+
+    @Test
+    fun theQueueIsGroupedUnderDateHeadings() {
+        show(sampleInbox())
+        compose.onNodeWithTag("inbox-day-20261015", useUnmergedTree = true).assertTextEquals("oct 15")
+        compose.onNodeWithTag("inbox-day-20261011", useUnmergedTree = true).assertTextEquals("oct 11")
+        val shellTop =
+            compose
+                .onNodeWithTag("inbox-row-shell")
+                .fetchSemanticsNode()
+                .boundsInRoot.top
+        val atmTop =
+            compose
+                .onNodeWithTag("inbox-row-atm")
+                .fetchSemanticsNode()
+                .boundsInRoot.top
+        val oct11 = compose.onNodeWithTag("inbox-day-20261011", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("oct 11 heads the atm row, below shell", oct11.top > shellTop && oct11.bottom <= atmTop)
+        assertEquals(
+            listOf(listOf("coffee", "shell"), listOf("atm")),
+            inboxDays(inboxEntries(sampleInbox(), emptyList())).map { day -> day.map { it.row.id } },
+        )
+    }
+
+    @Test
+    fun selectModeGroupsEveryRowUnderDateHeadings() {
+        show(sampleInbox(), selection = emptySet())
+        compose.onNodeWithTag("inbox-day-20261015", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("inbox-day-20261011", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test
