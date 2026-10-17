@@ -146,6 +146,10 @@ sealed interface ForcedWrite {
         val categoryId: String?,
     ) : ForcedWrite
 
+    data class Categories(
+        val assignments: Map<String, String?>,
+    ) : ForcedWrite
+
     data class Split(
         val transactionId: String,
         val parts: List<SplitPart>,
@@ -658,35 +662,40 @@ class RegisterBook(
         transactionId: String,
         categoryId: String?,
         force: Boolean,
+    ): WriteResult = setCategories(mapOf(transactionId to categoryId), force, ForcedWrite.Category(transactionId, categoryId))
+
+    /** Files several transactions at once, as one write: all of them, or none when one is refused. */
+    fun setCategories(
+        assignments: Map<String, String?>,
+        force: Boolean,
+        retry: ForcedWrite = ForcedWrite.Categories(assignments),
     ): WriteResult {
-        if (categoryId != null && !categoryAlive(categoryId)) return WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
+        if (assignments.values.any { it != null && !categoryAlive(it) }) return WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
         return write {
-            val txn = find(transactionId) ?: return@write WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
-            if (txn.tombstone) return@write WriteResult.Saved
-            if (txn.parent) return@write WriteResult.Rejected(RegisterCopy.SPLIT_MUST_ADD)
-            val partner = txn.transferId?.let { find(it) }?.takeIf { !it.tombstone }
-            guard(
-                listOfNotNull(txn, partner),
-                force,
-                ForcedWrite.Category(transactionId, categoryId),
-            )?.let { return@write it }
-            if (partner != null) {
-                val side = account(txn.accountId) ?: return@write WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
-                val other = account(partner.accountId) ?: return@write WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
-                val placed = placeCategory(side, other, categoryId) ?: return@write WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
-                updateFields(txn.id, txn.accountId, placed.first, txn.amount, txn.payeeId, txn.note, txn.date)
-                updateFields(
-                    partner.id,
-                    partner.accountId,
-                    placed.second,
-                    partner.amount,
-                    partner.payeeId,
-                    partner.note,
-                    partner.date,
-                )
-                return@write WriteResult.Saved
+            val found = assignments.keys.map { find(it) ?: return@write WriteResult.Rejected(ShellCopy.NO_ACCOUNTS) }
+            val live = found.filter { !it.tombstone }
+            if (live.any { it.parent }) return@write WriteResult.Rejected(RegisterCopy.SPLIT_MUST_ADD)
+            val partners = live.associate { txn -> txn.id to txn.transferId?.let { find(it) }?.takeIf { !it.tombstone } }
+            guard(live + partners.values.filterNotNull(), force, retry)?.let { return@write it }
+            // Place every transfer before writing anything, so a refusal leaves the whole batch untouched.
+            val placements =
+                live.associate { txn ->
+                    val partner = partners[txn.id] ?: return@associate txn.id to null
+                    val side = account(txn.accountId) ?: return@write WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+                    val other = account(partner.accountId) ?: return@write WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+                    txn.id to
+                        (placeCategory(side, other, assignments[txn.id]) ?: return@write WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY))
+                }
+            live.forEach { txn ->
+                val partner = partners[txn.id]
+                val placed = placements[txn.id]
+                if (partner != null && placed != null) {
+                    updateFields(txn.id, txn.accountId, placed.first, txn.amount, txn.payeeId, txn.note, txn.date)
+                    updateFields(partner.id, partner.accountId, placed.second, partner.amount, partner.payeeId, partner.note, partner.date)
+                } else {
+                    updateFields(txn.id, txn.accountId, assignments[txn.id], txn.amount, txn.payeeId, txn.note, txn.date)
+                }
             }
-            updateFields(txn.id, txn.accountId, categoryId, txn.amount, txn.payeeId, txn.note, txn.date)
             WriteResult.Saved
         }
     }

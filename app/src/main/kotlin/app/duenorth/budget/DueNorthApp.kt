@@ -236,6 +236,10 @@ fun DueNorthApp(model: ShellViewModel) {
                     onClearSelected = { model.setSelectedCleared(true) },
                     onUnclearSelected = { model.setSelectedCleared(false) },
                     onEndSelecting = model::endSelecting,
+                    onSelectInbox = model::startInboxSelecting,
+                    onAcceptSelected = model::acceptSelectedInbox,
+                    onCategorizeSelected = model::categorizeSelectedInbox,
+                    onEndInboxSelecting = model::endInboxSelecting,
                     onCancel = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.cancelImport()
@@ -305,8 +309,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onAcceptInbox = model::acceptInbox,
                                 inboxFiled = state.inboxFiled,
                                 onInboxFiledShown = model::inboxFiledShown,
-                                inboxPeek = !state.settings.inboxSwipeShown,
-                                onInboxPeeked = model::inboxPeeked,
+                                inboxSelection = state.inboxSelection,
+                                onInboxToggle = model::toggleInboxSelected,
                                 inboxActions =
                                     remember(model) {
                                         InboxActions(

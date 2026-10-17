@@ -36,6 +36,7 @@ object ScreenBar {
     /** Home pivot item indexes the bar changes for. */
     val HOME_BUDGET = HomeSections.headers.indexOf(HomeSections.BUDGET)
     val HOME_ACCOUNTS = HomeSections.headers.indexOf(HomeSections.ACCOUNTS)
+    val HOME_INBOX = HomeSections.headers.indexOf(HomeSections.INBOX)
 
     fun specsFor(
         route: ShellRoute,
@@ -51,6 +52,7 @@ object ScreenBar {
         homeSection: Int = HOME_BUDGET,
         showHidden: Boolean = false,
         selecting: Boolean = false,
+        inboxSelecting: Boolean = false,
         bankLinked: Boolean = false,
         transaction: TransactionMenu = TransactionMenu.NEW,
     ): List<ScreenBarSpec> =
@@ -86,6 +88,18 @@ object ScreenBar {
                 when {
                     !hasBudget -> settings()
                     // The accounts pivot item carries account management, so the month menu does not.
+                    // Select mode swaps the inbox's bar for what can be done to the checked rows.
+                    homeSection == HOME_INBOX && inboxSelecting ->
+                        listOf(
+                            spec("accept-selected", AppGlyph.Save, InboxCopy.ACCEPT),
+                            spec("categorize-selected", AppGlyph.Categories, InboxCopy.CATEGORIZE),
+                            spec("end-inbox-selecting", AppGlyph.Cancel, InboxCopy.CANCEL),
+                        )
+                    homeSection == HOME_INBOX ->
+                        listOf(
+                            spec("add", AppGlyph.Add, "add"),
+                            spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT),
+                        ) + undo(undoLabel) + settings()
                     homeSection == HOME_ACCOUNTS ->
                         listOf(
                             spec("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
@@ -215,6 +229,7 @@ object ScreenBar {
             state.homeSection,
             state.settings.showHiddenCategories,
             state.registerSelection != null,
+            state.inboxSelection != null,
             state.registerBankLinked,
             transactionMenu(state),
         ).map { spec ->
@@ -326,6 +341,10 @@ class ScreenBarHandlers(
     val onClearSelected: () -> Unit = {},
     val onUnclearSelected: () -> Unit = {},
     val onEndSelecting: () -> Unit = {},
+    val onSelectInbox: () -> Unit = {},
+    val onAcceptSelected: () -> Unit = {},
+    val onCategorizeSelected: () -> Unit = {},
+    val onEndInboxSelecting: () -> Unit = {},
     val onSplitTransaction: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
@@ -383,6 +402,10 @@ class ScreenBarHandlers(
             "clear-selected" -> onClearSelected
             "unclear-selected" -> onUnclearSelected
             "end-selecting" -> onEndSelecting
+            "select-inbox" -> onSelectInbox
+            "accept-selected" -> onAcceptSelected
+            "categorize-selected" -> onCategorizeSelected
+            "end-inbox-selecting" -> onEndInboxSelecting
             "split-transaction" -> onSplitTransaction
             "schedule-transaction" -> onScheduleTransaction
             "delete-transaction" -> onDeleteTransaction

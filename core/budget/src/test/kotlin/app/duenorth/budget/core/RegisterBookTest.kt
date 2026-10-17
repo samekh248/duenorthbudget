@@ -190,6 +190,27 @@ class RegisterBookTest {
     }
 
     @Test
+    fun setCategoriesFilesSeveralAtOnceOrNoneWhenOneIsReconciled() {
+        db { session, book ->
+            book.save(draft("a", category = null, payee = "Market"))
+            book.save(draft("b", category = null, payee = "Kiosk"))
+            book.save(draft("c", category = null, payee = "Stand"))
+            assertTrue(book.setCategories(mapOf("a" to "c-food", "b" to "c-house"), false) is WriteResult.Saved)
+            assertEquals(listOf("c"), shell(session).inbox.map { it.id })
+            assertEquals(-1_000L, spent(session, "c-food"))
+            assertEquals(-1_000L, spent(session, "c-house"))
+            // One reconciled row asks first, and nothing is filed until the whole batch is confirmed.
+            book.save(draft("d", category = null, payee = "Fair"))
+            session.exec("UPDATE transactions SET reconciled = 1 WHERE id = 'd'")
+            val asked = book.setCategories(mapOf("c" to "c-food", "d" to "c-food"), false)
+            assertEquals(ForcedWrite.Categories(mapOf("c" to "c-food", "d" to "c-food")), (asked as WriteResult.Confirm).retry)
+            assertEquals(listOf("d", "c"), shell(session).inbox.map { it.id }.sortedDescending())
+            assertTrue(book.setCategories(mapOf("c" to "c-food", "d" to "c-food"), true) is WriteResult.Saved)
+            assertTrue(shell(session).inbox.isEmpty())
+        }
+    }
+
+    @Test
     fun splitRefusesABadSumAndUnsplitRestoresOneCategory() {
         db { session, book ->
             book.save(draft("market", amount = -3_000, payee = "Market"))

@@ -89,7 +89,18 @@ class ShellScreenshotTest {
     @Test
     fun inboxLight() = snap("inbox_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX))
 
-    // Corner Coffee just filed: the confirmation sits in the row's own slot before it collapses.
+    // Select mode: a check box on every row, and the bar acts on the checked ones.
+    @Test
+    fun inboxSelectLight() =
+        snap(
+            "inbox_select_light",
+            dark = false,
+            shell = sample(),
+            section = HomeSections.headers.indexOf(HomeSections.INBOX),
+            selection = setOf(sample().inbox.first().id),
+        )
+
+    // Corner Coffee just filed: the confirmation fills the featured panel before the next one rises in.
     @Test
     fun inboxFiledLight() =
         snap("inbox_filed_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX), filed = true)
@@ -125,8 +136,10 @@ class ShellScreenshotTest {
         shell: MonthShell,
         section: Int = 0,
         filed: Boolean = false,
+        selection: Set<String>? = null,
         netWorth: NetWorthPage? = null,
     ) {
+        val inbox = section == HomeSections.headers.indexOf(HomeSections.INBOX)
         val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
         val justFiled = if (filed) listOf(InboxFiled(shell.inbox.first(), 0, "Dining")) else emptyList()
         captureRoboImage("src/test/snapshots/$name.png") {
@@ -141,15 +154,30 @@ class ShellScreenshotTest {
                         onGesture = {},
                         modifier = Modifier.weight(1f),
                         inboxFiled = justFiled,
+                        inboxSelection = selection,
                         netWorth = netWorth,
                     )
                     MetroAppBar(
                         actions =
-                            listOf(
-                                AppBarButton(AppGlyph.Budgets, "budgets", onClick = {}),
-                                AppBarButton(AppGlyph.Sync, "sync", onClick = {}),
-                                AppBarButton(AppGlyph.Appearance, "appearance", onClick = {}),
-                            ).asScreenActions(),
+                            when {
+                                inbox && selection != null ->
+                                    listOf(
+                                        AppBarButton(AppGlyph.Save, InboxCopy.ACCEPT, onClick = {}),
+                                        AppBarButton(AppGlyph.Categories, InboxCopy.CATEGORIZE, onClick = {}),
+                                        AppBarButton(AppGlyph.Cancel, InboxCopy.CANCEL, onClick = {}),
+                                    )
+                                inbox ->
+                                    listOf(
+                                        AppBarButton(AppGlyph.Add, "add", onClick = {}),
+                                        AppBarButton(AppGlyph.Select, InboxCopy.SELECT, onClick = {}),
+                                    )
+                                else ->
+                                    listOf(
+                                        AppBarButton(AppGlyph.Budgets, "budgets", onClick = {}),
+                                        AppBarButton(AppGlyph.Sync, "sync", onClick = {}),
+                                        AppBarButton(AppGlyph.Appearance, "appearance", onClick = {}),
+                                    )
+                            }.asScreenActions(),
                         expanded = false,
                         onExpandedChange = {},
                     )
