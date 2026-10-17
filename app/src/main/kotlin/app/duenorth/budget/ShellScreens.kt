@@ -75,8 +75,8 @@ import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
-import java.time.YearMonth
 import kotlinx.coroutines.flow.first
+import java.time.YearMonth
 
 @Composable
 fun HomePivot(
@@ -105,12 +105,11 @@ fun HomePivot(
     onAcceptInbox: (String) -> Unit = onInbox,
     inboxFiled: List<InboxFiled> = emptyList(),
     onInboxFiledShown: (String) -> Unit = {},
-    /** Whether the inbox should preview its swipes the next time it is the open section. */
-    inboxPeek: Boolean = false,
-    onInboxPeeked: () -> Unit = {},
     inboxActions: InboxActions = InboxActions(),
+    /** Rows checked in the inbox's select mode; null when not selecting. */
+    inboxSelection: Set<String>? = null,
+    onInboxToggle: (String) -> Unit = {},
 ) {
-    var section by remember { mutableIntStateOf(initialSection) }
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
     LaunchedEffect(pagerGesture, listGesture) { onGesture(pagerGesture || listGesture) }
@@ -195,9 +194,9 @@ fun HomePivot(
                             onAccept = onAcceptInbox,
                             filed = inboxFiled,
                             onFiledShown = onInboxFiledShown,
-                            peek = inboxPeek && section == HomeSections.headers.indexOf(HomeSections.INBOX),
-                            onPeeked = onInboxPeeked,
                             actions = inboxActions,
+                            selection = inboxSelection,
+                            onToggle = onInboxToggle,
                         )
                     }
                 },
@@ -205,10 +204,7 @@ fun HomePivot(
         modifier = modifier,
         initialItem = initialSection,
         onGesture = { pagerGesture = it },
-        onSelected = {
-            section = it
-            onSection(it)
-        },
+        onSelected = onSection,
     )
 }
 

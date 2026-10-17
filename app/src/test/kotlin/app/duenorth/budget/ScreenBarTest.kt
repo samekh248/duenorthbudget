@@ -43,6 +43,22 @@ class ScreenBarTest {
     }
 
     @Test
+    fun homeInboxSectionOffersSelectAndSelectModeActsOnTheCheckedRows() {
+        val inbox = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX)
+        assertEquals(listOf("add", "select-inbox"), inbox.filter { it.primary }.map { it.id })
+        assertEquals(listOf("settings"), inbox.filter { !it.primary }.map { it.id })
+        val selecting =
+            ScreenBar.specsFor(
+                ShellRoute.Home,
+                hasBudget = true,
+                mode = BudgetMode.ENVELOPE,
+                homeSection = ScreenBar.HOME_INBOX,
+                inboxSelecting = true,
+            )
+        assertEquals(listOf("accept-selected", "categorize-selected", "end-inbox-selecting"), selecting.map { it.id })
+    }
+
+    @Test
     fun homeTrackingOmitsHold() {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.TRACKING)
         val ids = specs.map { it.id }
@@ -60,7 +76,7 @@ class ScreenBarTest {
     @Test
     fun settingsIsTheLastMenuItemOnHome() {
         listOf(BudgetMode.ENVELOPE, BudgetMode.TRACKING).forEach { mode ->
-            listOf(ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS).forEach { section ->
+            listOf(ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS, ScreenBar.HOME_INBOX).forEach { section ->
                 val specs = ScreenBar.specsFor(ShellRoute.Home, true, mode, undoLabel = "assign", homeSection = section)
                 assertEquals("settings", specs.last().id)
                 assertFalse(specs.last().primary)

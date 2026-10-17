@@ -519,6 +519,21 @@ class BudgetLibrary(
             }
         } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    /** Files several transactions at once as one undo step, learning each payee's category. */
+    fun setTransactionsCategory(
+        budgetId: String,
+        assignments: Map<String, String?>,
+        force: Boolean,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.CATEGORIZE) { session ->
+            RegisterBook(session).setCategories(assignments, force).also {
+                if (it is WriteResult.Saved) {
+                    val learning = CategoryLearning(session, ids)
+                    assignments.keys.forEach(learning::learnFrom)
+                }
+            }
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     fun deleteTransaction(
         budgetId: String,
         transactionId: String,

@@ -126,8 +126,10 @@ sealed interface ShellRoute {
         val accountId: String,
     ) : ShellRoute
 
+    /** The category picker for [transactionId], plus [others] when several inbox rows are filed together. */
     data class PickCategory(
         val transactionId: String,
+        val others: List<String> = emptyList(),
     ) : ShellRoute
 
     data class ImportPreviewRoute(
@@ -343,6 +345,8 @@ data class ShellUiState(
     val homeSection: Int = 0,
     /** Inbox rows just filed, kept on screen while their confirmation plays. */
     val inboxFiled: List<InboxFiled> = emptyList(),
+    /** Inbox rows checked in the inbox's select mode; null when not selecting. */
+    val inboxSelection: Set<String>? = null,
     /** Set while a transaction form was opened from the inbox, so saving it goes back home. */
     val editFromInbox: Boolean = false,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
@@ -1184,6 +1188,10 @@ class ShellViewModel(
             endSelecting()
             return true
         }
+        if (current.inboxSelection != null && current.route == ShellRoute.Home && current.confirm == null) {
+            endInboxSelecting()
+            return true
+        }
         if (current.confirm != null) {
             _state.update { it.copy(confirm = null) }
             return true
@@ -1399,7 +1407,7 @@ class ShellViewModel(
         _state.update { it.copy(importReview = review, importError = null) }
     }
 
-    /** Swipe right: files the row under the category its payee last went to, or opens the picker when there is none. */
+    /** Accept: files the row under the category its payee last went to, or opens the picker when there is none. */
     fun acceptInbox(transactionId: String) {
         val inbox = _state.value.shell?.inbox ?: return
         val index = inbox.indexOfFirst { it.id == transactionId }
@@ -1449,13 +1457,57 @@ class ShellViewModel(
         _state.update { state -> state.copy(inboxFiled = state.inboxFiled.filterNot { it.row.id == transactionId }) }
     }
 
-    /** The swipe preview plays on the first inbox visit ever, so this is remembered across launches. */
-    fun inboxPeeked() {
-        if (_state.value.settings.inboxSwipeShown) return
-        _state.update { it.copy(settings = it.settings.copy(inboxSwipeShown = true)) }
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) { library.updateSettings { it.copy(inboxSwipeShown = true) } }
+    /** The inbox bar's select: every row gets a check box, and the bar acts on the checked ones. */
+    fun startInboxSelecting() {
+        _state.update { it.copy(inboxSelection = emptySet()) }
+    }
+
+    fun toggleInboxSelected(transactionId: String) {
+        _state.update {
+            val picked = it.inboxSelection ?: return@update it
+            it.copy(inboxSelection = if (transactionId in picked) picked - transactionId else picked + transactionId)
         }
+    }
+
+    fun endInboxSelecting() {
+        _state.update { it.copy(inboxSelection = null) }
+    }
+
+    /**
+     * Files every checked row that has a suggestion under it, as one undo step. Rows without a
+     * suggestion stay checked, so categorize can file them next.
+     */
+    fun acceptSelectedInbox() {
+        val picked = _state.value.inboxSelection ?: return
+        val rows =
+            _state.value.shell
+                ?.inbox
+                .orEmpty()
+                .withIndex()
+                .filter { it.value.id in picked && it.value.suggestionId != null }
+        if (rows.isEmpty() || writing) return
+        val left = picked - rows.map { it.value.id }.toSet()
+        _state.update { it.copy(inboxSelection = left.ifEmpty { null }) }
+        fileInboxRows(
+            rows.associate {
+                it.value.id to it.value.suggestionId
+            },
+            rows.map { InboxFiled(it.value, it.index, it.value.suggestionName) },
+            fromPicker = false,
+        )
+    }
+
+    /** Opens the picker for every checked row; the category picked files them all. */
+    fun categorizeSelectedInbox() {
+        val picked = _state.value.inboxSelection ?: return
+        val ids =
+            _state.value.shell
+                ?.inbox
+                .orEmpty()
+                .filter { it.id in picked }
+                .map { it.id }
+        if (ids.isEmpty()) return
+        openInbox(ids.first(), ids.drop(1))
     }
 
     private fun fileInbox(
@@ -1464,14 +1516,37 @@ class ShellViewModel(
         categoryId: String,
         categoryName: String,
         fromPicker: Boolean,
+    ) = fileInboxRows(mapOf(row.id to categoryId), listOf(InboxFiled(row, index, categoryName)), fromPicker)
+
+    /** Writes [assignments] as one undo step while [filed] play their confirmations. */
+    private fun fileInboxRows(
+        assignments: Map<String, String?>,
+        filed: List<InboxFiled>,
+        fromPicker: Boolean,
     ) {
-        if (writing) return
-        _state.update { it.copy(inboxFiled = it.inboxFiled + InboxFiled(row, index, categoryName)) }
+        if (writing || filed.isEmpty()) return
+        _state.update { it.copy(inboxFiled = it.inboxFiled + filed) }
+        val accountId = filed.first().row.accountId
         launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.setTransactionCategory(id, row.id, categoryId, false) }
-            if (result !is WriteResult.Saved) inboxFiledShown(row.id)
+            val result =
+                withContext(Dispatchers.IO) {
+                    if (assignments.size == 1) {
+                        val (txn, category) = assignments.entries.single()
+                        library.setTransactionCategory(id, txn, category, false)
+                    } else {
+                        library.setTransactionsCategory(id, assignments, false)
+                    }
+                }
+            if (result !is WriteResult.Saved) filed.forEach { inboxFiledShown(it.row.id) }
+            if (result is WriteResult.Saved) {
+                _state.update {
+                    it.copy(
+                        inboxSelection = it.inboxSelection?.minus(assignments.keys)?.ifEmpty { null },
+                    )
+                }
+            }
             if (fromPicker || result is WriteResult.Saved) {
-                publish(result, row.accountId, stayOnRegister = false)
+                publish(result, accountId, stayOnRegister = false)
             } else {
                 when (result) {
                     is WriteResult.Rejected -> _state.update { it.copy(writeError = result.reason) }
@@ -1482,12 +1557,29 @@ class ShellViewModel(
         }
     }
 
-    fun openInbox(transactionId: String) {
-        push(ShellRoute.PickCategory(transactionId))
+    fun openInbox(transactionId: String) = openInbox(transactionId, emptyList())
+
+    /** The picker for one inbox row, or for it and [others] together, headed by their count and total. */
+    private fun openInbox(
+        transactionId: String,
+        others: List<String>,
+    ) {
+        push(ShellRoute.PickCategory(transactionId, others))
         val budgetId = _state.value.settings.openBudgetId ?: return
+        val together =
+            _state.value.shell
+                ?.inbox
+                .orEmpty()
+                .filter { it.id == transactionId || it.id in others }
         viewModelScope.launch {
             val target = withContext(Dispatchers.IO) { library.readCategoryTarget(budgetId, transactionId) }
-            _state.update { it.copy(categoryTarget = target, loading = false) }
+            val shown =
+                if (others.isEmpty()) {
+                    target
+                } else {
+                    target?.copy(payee = "${together.size} ${InboxCopy.TRANSACTIONS}", amountMinor = together.sumOf { it.amountMinor })
+                }
+            _state.update { it.copy(categoryTarget = shown, loading = false) }
         }
     }
 
@@ -1641,6 +1733,22 @@ class ShellViewModel(
                 ?.inbox
                 .orEmpty()
         val index = inbox.indexOfFirst { it.id == target.transactionId }
+        val others = (_state.value.route as? ShellRoute.PickCategory)?.others.orEmpty()
+        if (categoryId != null && others.isNotEmpty()) {
+            val name =
+                target.categories
+                    .firstOrNull { it.id == categoryId }
+                    ?.name
+                    .orEmpty()
+            val ids = setOf(target.transactionId) + others
+            val rows = inbox.withIndex().filter { it.value.id in ids }
+            fileInboxRows(
+                rows.associate { it.value.id to categoryId },
+                rows.map { InboxFiled(it.value, it.index, name) },
+                fromPicker = true,
+            )
+            return
+        }
         if (categoryId != null && index >= 0) {
             val name =
                 target.categories
@@ -1706,7 +1814,11 @@ class ShellViewModel(
     fun confirmWrite() {
         val pending = _state.value.confirm ?: return
         val inboxAccount =
-            (pending.retry as? ForcedWrite.Category)?.transactionId?.let { id ->
+            when (val retry = pending.retry) {
+                is ForcedWrite.Category -> retry.transactionId
+                is ForcedWrite.Categories -> retry.assignments.keys.firstOrNull()
+                else -> null
+            }?.let { id ->
                 _state.value.shell
                     ?.inbox
                     ?.firstOrNull { it.id == id }
@@ -1723,6 +1835,7 @@ class ShellViewModel(
                         is ForcedWrite.Delete -> library.deleteTransaction(id, retry.transactionId, true)
                         is ForcedWrite.Category ->
                             library.setTransactionCategory(id, retry.transactionId, retry.categoryId, true)
+                        is ForcedWrite.Categories -> library.setTransactionsCategory(id, retry.assignments, true)
                         is ForcedWrite.Split -> library.splitTransaction(id, retry.transactionId, retry.parts, true)
                         is ForcedWrite.Unsplit -> library.unsplitTransaction(id, retry.transactionId, true)
                         is ForcedWrite.Transfer -> library.transfer(id, retry.draft)

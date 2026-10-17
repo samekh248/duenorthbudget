@@ -1,8 +1,5 @@
 package app.duenorth.budget
 
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -11,6 +8,9 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -32,26 +32,32 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.YearMonth
-import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [33])
+@Config(sdk = [33], qualifiers = "w411dp-h891dp")
 class InboxContentTest {
     @get:Rule
     val compose = createHostComposeRule()
 
     @Test
-    fun rowsShowDayCountSuggestionAccountAndNote() {
+    fun theTopRowIsFeaturedAndTheRestWaitWithTheirDetails() {
         show(sampleInbox())
         compose.onNodeWithTag("inbox-count").assertTextEquals("3")
-        compose.onNodeWithTag("inbox-day-20261015").assertTextEquals("oct 15")
-        compose.onNodeWithTag("inbox-detail-coffee", useUnmergedTree = true).assertTextEquals("Dining · Visa")
-        compose.onNodeWithTag("inbox-detail-atm", useUnmergedTree = true).assertTextEquals("no category · Checking · ATM withdrawal")
-        compose.onNodeWithTag("inbox-amount-coffee", useUnmergedTree = true).assertTextEquals("-$5.75")
+        compose.onNodeWithTag("inbox-featured-coffee").assertIsDisplayed()
+        compose.onNodeWithTag("inbox-featured-amount", useUnmergedTree = true).assertTextEquals("-$5.75")
+        compose.onNodeWithText("Dining", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("inbox-row-coffee").assertDoesNotExist()
+        compose.onNodeWithTag("inbox-detail-shell", useUnmergedTree = true).assertTextEquals("Gas · oct 15 · Checking")
+        compose
+            .onNodeWithTag(
+                "inbox-detail-atm",
+                useUnmergedTree = true,
+            ).assertTextEquals("no category · oct 11 · Checking · ATM withdrawal")
+        compose.onNodeWithTag("inbox-amount-atm", useUnmergedTree = true).assertTextEquals("-$20.00")
     }
 
     @Test
-    fun swipeRightAcceptsSwipeLeftCategorizesAndTapOpensDetails() {
+    fun theFeaturedButtonsAcceptAndCategorizeAndTapsOpenDetails() {
         val accepted = mutableListOf<String>()
         val opened = mutableListOf<String>()
         val details = mutableListOf<String>()
@@ -61,15 +67,33 @@ class InboxContentTest {
             onInbox = { opened += it },
             actions = InboxActions(onDetails = { details += it }),
         )
-        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { swipeRight(startX = width * 0.3f, endX = right) }
-        compose.waitForIdle()
-        assertEquals(listOf("coffee"), accepted)
-        compose.onNodeWithTag("inbox-row-shell").performTouchInput { swipeLeft(startX = width * 0.7f, endX = left) }
-        compose.waitForIdle()
-        assertEquals(listOf("shell"), opened)
+        compose.onNodeWithTag("inbox-featured-accept").performClick()
+        compose.onNodeWithTag("inbox-featured-categorize").performClick()
         compose.onNodeWithTag("inbox-row-atm").performClick()
-        assertEquals(listOf("shell"), opened)
+        assertEquals(listOf("coffee"), accepted)
+        assertEquals(listOf("coffee"), opened)
         assertEquals(listOf("atm"), details)
+    }
+
+    @Test
+    fun aFeaturedRowWithoutASuggestionOnlyOffersCategorize() {
+        show(sampleInbox().takeLast(1))
+        compose.onNodeWithTag("inbox-featured-atm").assertIsDisplayed()
+        compose.onNodeWithTag("inbox-featured-accept").assertDoesNotExist()
+        compose.onNodeWithTag("inbox-featured-categorize").assertIsDisplayed()
+        compose.onNodeWithText(InboxCopy.NO_SUGGESTION, useUnmergedTree = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun aRowCanNoLongerBeSwiped() {
+        val accepted = mutableListOf<String>()
+        val opened = mutableListOf<String>()
+        show(sampleInbox(), onAccept = { accepted += it }, onInbox = { opened += it })
+        compose.onNodeWithTag("inbox-row-shell").performTouchInput { swipeRight(startX = width * 0.3f, endX = right) }
+        compose.onNodeWithTag("inbox-row-atm").performTouchInput { swipeLeft(startX = width * 0.7f, endX = left) }
+        compose.waitForIdle()
+        assertEquals(emptyList<String>(), accepted)
+        assertEquals(emptyList<String>(), opened)
     }
 
     @Test
@@ -88,31 +112,66 @@ class InboxContentTest {
                     onOpenAccount = { ran += "account $it" },
                 ),
         )
-        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { longClick() }
+        compose.onNodeWithTag("inbox-row-shell").performTouchInput { longClick() }
         compose.onNodeWithTag("inbox-menu").assertIsDisplayed()
-        listOf("accept", "categorize", "edit", "split", "schedule", "delete", "go to visa").forEach {
-            compose.onNodeWithText(it).assertIsDisplayed()
+        listOf("accept", "categorize", "edit", "split", "schedule", "delete", "go to checking").forEach {
+            compose.onNode(hasText(it) and hasAnyAncestor(hasTestTag("inbox-menu"))).assertIsDisplayed()
         }
         compose.onNodeWithText("split").performClick()
         compose.onNodeWithTag("inbox-menu").assertDoesNotExist()
-        assertEquals(listOf("split coffee"), ran)
+        assertEquals(listOf("split shell"), ran)
+        // The featured row has the same menu.
+        compose.onNodeWithTag("inbox-featured-coffee").performTouchInput { longClick(center.copy(y = 10f)) }
+        compose.onNodeWithText("go to visa").performClick()
+        assertEquals(listOf("split shell", "account visa"), ran)
         // No suggestion, no accept.
         val atm = inboxMenuItems(sampleInbox().last(), {}, {}, InboxActions()).map { it.first }
         assertEquals(listOf("categorize", "edit", "split", "schedule", "delete", "go to checking"), atm)
     }
 
     @Test
-    fun dragsFromTheEdgesAreLeftToThePivot() {
-        val accepted = mutableListOf<String>()
-        val opened = mutableListOf<String>()
-        var pivotDragged = 0f
-        show(sampleInbox(), onAccept = { accepted += it }, onInbox = { opened += it }, onPivotDrag = { pivotDragged += abs(it) })
-        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { swipeRight(startX = width * 0.15f, endX = right) }
-        compose.onNodeWithTag("inbox-row-shell").performTouchInput { swipeLeft(startX = width * 0.85f, endX = left) }
-        compose.waitForIdle()
-        assertEquals(emptyList<String>(), accepted)
-        assertEquals(emptyList<String>(), opened)
-        assertTrue(pivotDragged > 0f)
+    fun selectModeChecksRowsInsteadOfOpeningThem() {
+        val toggled = mutableListOf<String>()
+        val details = mutableListOf<String>()
+        show(sampleInbox(), selection = setOf("shell"), onToggle = { toggled += it }, actions = InboxActions(onDetails = { details += it }))
+        compose.onNodeWithTag("inbox-featured").assertDoesNotExist()
+        compose.onNodeWithTag("inbox-selected").assertTextEquals("1")
+        compose.onNodeWithTag("inbox-checked-shell", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("inbox-unchecked-coffee", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("inbox-row-atm").performClick()
+        // A long press checks the row too; there is no menu in select mode.
+        compose.onNodeWithTag("inbox-row-coffee").performTouchInput { longClick() }
+        compose.onNodeWithTag("inbox-menu").assertDoesNotExist()
+        assertEquals(listOf("atm", "coffee"), toggled)
+        assertEquals(emptyList<String>(), details)
+    }
+
+    @Test
+    fun aFiledTopRowConfirmsInThePanelThenTheNextRisesIntoIt() {
+        val rows = sampleInbox()
+        val shown = mutableListOf<String>()
+        compose.mainClock.autoAdvance = false
+        show(rows.drop(1), filed = listOf(InboxFiled(rows.first(), 0, "Dining")), onFiledShown = { shown += it })
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("filed to dining", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("inbox-count").assertTextEquals("2")
+        // The next row waits in the queue until it rises.
+        compose.onNodeWithTag("inbox-row-shell").assertExists()
+        compose.mainClock.advanceTimeBy(FILED_HOLD_MS + 1_000)
+        assertEquals(listOf("coffee"), shown)
+    }
+
+    @Test
+    fun aRowFiledFromTheQueueConfirmsInItsOwnSlot() {
+        val rows = sampleInbox()
+        val shown = mutableListOf<String>()
+        compose.mainClock.autoAdvance = false
+        show(rows - rows[1], filed = listOf(InboxFiled(rows[1], 1, "Gas")), onFiledShown = { shown += it })
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("inbox-featured-coffee").assertExists()
+        compose.onNodeWithTag("inbox-filed-shell").assertExists()
+        compose.mainClock.advanceTimeBy(FILED_HOLD_MS + 1_000)
+        assertEquals(listOf("shell"), shown)
     }
 
     @Test
@@ -133,25 +192,11 @@ class InboxContentTest {
     }
 
     @Test
-    fun aFiledRowShowsItsConfirmationWhereItWas() {
-        val rows = sampleInbox()
-        val shown = mutableListOf<String>()
-        compose.mainClock.autoAdvance = false
-        show(rows.drop(1), filed = listOf(InboxFiled(rows.first(), 0, "Dining")), onFiledShown = { shown += it })
-        compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("filed to dining").assertIsDisplayed()
-        compose.onNodeWithTag("inbox-count").assertTextEquals("2")
-        compose.mainClock.advanceTimeBy(FILED_HOLD_MS + 1_000)
-        assertEquals(listOf("coffee"), shown)
-    }
-
-    @Test
     fun filedRowsGoBackToTheirPlace() {
         val rows = sampleInbox()
         val entries = inboxEntries(rows.drop(1), listOf(InboxFiled(rows.first(), 0, "Dining")))
         assertEquals(listOf("coffee", "shell", "atm"), entries.map { it.row.id })
         assertEquals(listOf("Dining", null, null), entries.map { it.filedTo })
-        assertEquals(listOf(2, 1), inboxDays(entries).map { it.size })
     }
 
     private fun show(
@@ -160,14 +205,13 @@ class InboxContentTest {
         onInbox: (String) -> Unit = {},
         filed: List<InboxFiled> = emptyList(),
         onFiledShown: (String) -> Unit = {},
-        onPivotDrag: (Float) -> Unit = {},
         actions: InboxActions = InboxActions(),
+        selection: Set<String>? = null,
+        onToggle: (String) -> Unit = {},
     ) {
         compose.setContent {
             MetroTheme {
-                // Stands in for the pivot, which takes horizontal drags the rows leave alone.
-                val pivot = rememberDraggableState(onPivotDrag)
-                Box(Modifier.width(390.dp).height(780.dp).draggable(pivot, Orientation.Horizontal)) {
+                Box(Modifier.width(390.dp).height(780.dp)) {
                     InboxSection(
                         shell = shell(inbox),
                         onListGesture = {},
@@ -176,6 +220,8 @@ class InboxContentTest {
                         filed = filed,
                         onFiledShown = onFiledShown,
                         actions = actions,
+                        selection = selection,
+                        onToggle = onToggle,
                     )
                 }
             }

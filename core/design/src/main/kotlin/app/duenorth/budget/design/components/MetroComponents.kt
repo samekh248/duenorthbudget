@@ -292,6 +292,7 @@ enum class AppGlyph {
     Average,
     Zero,
     Undo,
+    Select,
 }
 
 @Immutable
@@ -490,6 +491,7 @@ object AppGlyphInk {
             AppGlyph.Average -> 3
             AppGlyph.Zero -> 1
             AppGlyph.Undo -> 3
+            AppGlyph.Select -> 4
         }
 
     fun DrawScope.draw(
@@ -622,6 +624,25 @@ object AppGlyphInk {
                 )
                 drawLine(color, Offset(4.dp.toPx(), 10.dp.toPx()), Offset(18.dp.toPx(), 10.dp.toPx()), strokeWidth = 1.6.dp.toPx())
                 drawLine(color, Offset(8.dp.toPx(), 4.dp.toPx()), Offset(8.dp.toPx(), 8.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+            }
+            AppGlyph.Select -> {
+                // A list with a box before each line: the WP "select" glyph.
+                listOf(5f, 13f).forEach { top ->
+                    drawRect(
+                        color,
+                        topLeft = Offset(4.dp.toPx(), top.dp.toPx()),
+                        size =
+                            androidx.compose.ui.geometry
+                                .Size(5.dp.toPx(), 5.dp.toPx()),
+                        style = stroke,
+                    )
+                    drawLine(
+                        color,
+                        Offset(12.dp.toPx(), (top + 2.5f).dp.toPx()),
+                        Offset(18.dp.toPx(), (top + 2.5f).dp.toPx()),
+                        strokeWidth = 1.6.dp.toPx(),
+                    )
+                }
             }
             AppGlyph.Breakdown -> {
                 drawLine(color, Offset(4.dp.toPx(), 5.dp.toPx()), Offset(18.dp.toPx(), 5.dp.toPx()), strokeWidth = 1.6.dp.toPx())

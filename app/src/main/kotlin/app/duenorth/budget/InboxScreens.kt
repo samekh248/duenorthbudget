@@ -2,14 +2,10 @@ package app.duenorth.budget
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,17 +16,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -45,12 +40,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -74,19 +67,27 @@ import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.MetroWeights
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 object InboxCopy {
     const val TO_CATEGORIZE = "to categorize"
     const val SPENDING = "spending"
+    const val SELECTED = "selected"
+    const val UP_NEXT = "up next"
+    const val SUGGESTED = "suggested"
+    const val NO_SUGGESTION = "no suggestion"
     const val ACCEPT = "accept"
     const val CATEGORIZE = "categorize"
+    const val SELECT = "select"
+    const val CANCEL = "cancel"
+    const val TRANSACTIONS = "transactions"
     const val FILED_TO = "filed to"
     const val NO_CATEGORY = "no category"
     const val EDIT = "edit"
@@ -96,7 +97,7 @@ object InboxCopy {
     const val GO_TO = "go to"
 }
 
-/** What a row's tap and long-press menu can do, beyond the two swipes. */
+/** What a row's tap and long-press menu can do, beyond accept and categorize. */
 class InboxActions(
     val onDetails: (String) -> Unit = {},
     val onSplit: (String) -> Unit = {},
@@ -106,10 +107,10 @@ class InboxActions(
 )
 
 /**
- * The inbox as a ledger: uncategorized transactions under day headings on faint bands, like the
- * account register. Swipe a row right to accept the category its payee last went to, or left to
- * pick one; a filed row turns accent in place, then collapses. The first time the inbox is shown
- * ([peek]), the top row slides each way to show both swipes.
+ * The inbox: the top transaction stands apart in a panel with accept and categorize buttons, and
+ * the rest wait below it as a ledger. Once the top one is filed, its confirmation fills the panel
+ * and the next one rises into its place. Every row's long press opens a menu of all its actions,
+ * and the bar's select ([selection] not null) gives every row a check box instead.
  */
 @Composable
 fun InboxSection(
@@ -122,9 +123,9 @@ fun InboxSection(
     onAccept: (String) -> Unit = onInbox,
     filed: List<InboxFiled> = emptyList(),
     onFiledShown: (String) -> Unit = {},
-    peek: Boolean = false,
-    onPeeked: () -> Unit = {},
     actions: InboxActions = InboxActions(),
+    selection: Set<String>? = null,
+    onToggle: (String) -> Unit = {},
 ) {
     val entries = inboxEntries(shell.inbox, filed)
     var menu by remember { mutableStateOf<Pair<InboxRow, Rect>?>(null) }
@@ -140,6 +141,7 @@ fun InboxSection(
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
     val waiting = shell.inbox.filter { row -> filed.none { it.row.id == row.id } }
+    val money = { minor: Long -> MoneyFormat.format(minor, shell.currency, formatOptions) }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
             BudgetTotal(
@@ -149,44 +151,86 @@ fun InboxSection(
                 "inbox-count",
                 modifier = Modifier.weight(1f),
             )
-            BudgetTotal(
-                InboxCopy.SPENDING,
-                MoneyFormat.format(waiting.filter { it.amountMinor < 0 }.sumOf { it.amountMinor }, shell.currency, formatOptions),
-                Metro.colors.foreground,
-                "inbox-spending",
-                alignEnd = true,
-                modifier = Modifier.weight(1f),
-            )
+            if (selection != null) {
+                BudgetTotal(
+                    InboxCopy.SELECTED,
+                    "${selection.size}",
+                    Metro.colors.foreground,
+                    "inbox-selected",
+                    alignEnd = true,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                BudgetTotal(
+                    InboxCopy.SPENDING,
+                    money(waiting.filter { it.amountMinor < 0 }.sumOf { it.amountMinor }),
+                    Metro.colors.foreground,
+                    "inbox-spending",
+                    alignEnd = true,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
-        LazyColumn(Modifier.weight(1f), state = list) {
-            var index = 0
-            inboxDays(entries).forEach { day ->
-                val first = day.first()
-                val headingLeaves = day.all { it.filedTo != null }
-                item(key = "day-${first.row.date}-${first.row.id}") {
-                    InboxDayHeading(first.row.date, leaving = headingLeaves)
-                }
-                val start = index
-                index += day.size
-                items(day, key = { it.row.id }) { entry ->
+        if (selection != null) {
+            LazyColumn(Modifier.weight(1f), state = list) {
+                // Rows just filed stay in the list until their confirmation has played.
+                itemsIndexed(entries, key = { _, it -> it.row.id }) { i, entry ->
                     InboxLine(
                         entry = entry,
-                        shell = shell,
-                        formatOptions = formatOptions,
-                        banded = ledgerBanded(start + day.indexOf(entry)),
-                        onAccept = onAccept,
-                        onCategorize = onInbox,
+                        amount = money(entry.row.amountMinor),
+                        banded = ledgerBanded(i),
                         onFiledShown = onFiledShown,
-                        peek = peek && entry == entries.first() && entry.filedTo == null,
-                        onPeeked = onPeeked,
-                        onDetails = actions.onDetails,
-                        onMenu = { bounds -> menu = entry.row to bounds },
+                        onTap = { onToggle(entry.row.id) },
+                        onMenu = null,
+                        checked = entry.row.id in selection,
                     )
                 }
             }
+            return@Column
         }
-        if (onAdd != null && shell.inbox.isEmpty()) {
-            MetroButton("add", Modifier.padding(MetroDimens.Gutter), onClick = onAdd)
+        // The top entry is featured. When it has just been filed, the next waiting one rises into the panel.
+        val head = entries.first()
+        val next = if (head.filedTo != null) entries.drop(1).firstOrNull { it.filedTo == null } else null
+        val rise = remember(head.row.id, head.filedTo) { Animatable(if (head.filedTo == null) 1f else 0f) }
+        val animations = Metro.animations
+        val shown by rememberUpdatedState(onFiledShown)
+        LaunchedEffect(head.row.id, head.filedTo) {
+            if (head.filedTo == null) return@LaunchedEffect
+            delay(FILED_HOLD_MS)
+            if (animations && next != null) rise.animateTo(1f, tween(RISE_MS, easing = FastOutSlowInEasing)) else rise.snapTo(1f)
+            shown(head.row.id)
+        }
+        val featured = if (head.filedTo == null) head.row else next?.row
+        FeaturedPanel(
+            row = featured,
+            amount = featured?.let { money(it.amountMinor) }.orEmpty(),
+            filed = head.takeIf { it.filedTo != null },
+            rise = rise.value,
+            onAccept = onAccept,
+            onCategorize = onInbox,
+            onDetails = actions.onDetails,
+            onMenu = { row, bounds -> menu = row to bounds },
+            modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
+        )
+        val queue = entries.drop(1)
+        if (queue.any { it.filedTo == null }) {
+            MetroText(InboxCopy.UP_NEXT, Metro.typography.caption, Modifier.padding(bottom = 4.dp), color = Metro.colors.secondary)
+        }
+        LazyColumn(Modifier.weight(1f), state = list) {
+            itemsIndexed(queue, key = { _, it -> it.row.id }) { i, entry ->
+                InboxLine(
+                    entry = entry,
+                    amount = money(entry.row.amountMinor),
+                    banded = ledgerBanded(i),
+                    onFiledShown = onFiledShown,
+                    onTap = { actions.onDetails(entry.row.id) },
+                    onMenu = { bounds -> menu = entry.row to bounds },
+                    onAccept = onAccept,
+                    onCategorize = onInbox,
+                    // The row rising into the panel leaves the queue as it goes.
+                    leaving = if (entry == next) rise.value else 0f,
+                )
+            }
         }
     }
     menu?.let { (row, anchor) ->
@@ -326,136 +370,180 @@ internal fun inboxEntries(
     return out
 }
 
-/** Runs of entries that share a date, in inbox order. */
-internal fun inboxDays(entries: List<InboxEntry>): List<List<InboxEntry>> =
-    entries.fold(mutableListOf<MutableList<InboxEntry>>()) { days, entry ->
-        if (days
-                .lastOrNull()
-                ?.first()
-                ?.row
-                ?.date == entry.row.date
-        ) {
-            days.last() += entry
-        } else {
-            days += mutableListOf(entry)
+/**
+ * The featured transaction: a full-width panel with the date, payee, amount, the suggested
+ * category, and the two buttons. [filed] lays its confirmation over the panel while [row], the
+ * next transaction, rises in by [rise]; the panel keeps the size of the transaction it shows.
+ */
+@Composable
+private fun FeaturedPanel(
+    row: InboxRow?,
+    amount: String,
+    filed: InboxEntry?,
+    rise: Float,
+    onAccept: (String) -> Unit,
+    onCategorize: (String) -> Unit,
+    onDetails: (String) -> Unit,
+    onMenu: (InboxRow, Rect) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    Box(
+        modifier
+            .fillMaxWidth()
+            .ledgerFill(Metro.colors.chrome)
+            .onGloballyPositioned { bounds = it.boundsInWindow() }
+            .testTag("inbox-featured"),
+    ) {
+        if (row != null) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clipBelow()
+                    .then(if (filed != null) Modifier.alpha(window(rise, RISE_FADE_FROM, 1f)).rising(1f - rise) else Modifier)
+                    .metroPress(onClick = { onDetails(row.id) }, onLongClick = { onMenu(row, bounds) })
+                    .padding(vertical = FEATURED_PAD)
+                    .testTag("inbox-featured-${row.id}"),
+            ) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(Modifier.weight(1f).padding(end = MetroDimens.Gutter)) {
+                        MetroText(RegisterEntry.registerDateLabel(row.date), Metro.typography.caption, color = Metro.accent.text)
+                        MetroText(row.payee, Metro.typography.groupHeader, maxLines = 2)
+                        MetroText(
+                            listOfNotNull(row.accountName.ifBlank { null }, row.note.ifBlank { null }).joinToString(" · "),
+                            Metro.typography.caption,
+                            color = Metro.colors.secondary,
+                            maxLines = 2,
+                        )
+                    }
+                    MetroText(
+                        amount,
+                        Metro.typography.groupHeader.copy(textAlign = TextAlign.End),
+                        Modifier.testTag("inbox-featured-amount"),
+                        color = Metro.accent.text,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                }
+                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (row.suggestionId != null) {
+                        MetroText("${InboxCopy.SUGGESTED} ", Metro.typography.caption, color = Metro.colors.secondary)
+                        MetroText(row.suggestionName, Metro.typography.body.copy(fontWeight = MetroWeights.Semibold))
+                    } else {
+                        MetroText(InboxCopy.NO_SUGGESTION, Metro.typography.caption, color = Metro.colors.secondary)
+                    }
+                }
+                MetroButtonGrid(Modifier.padding(top = 12.dp)) {
+                    if (row.suggestionId != null) AcceptButton { onAccept(row.id) }
+                    MetroButton(InboxCopy.CATEGORIZE, Modifier.testTag("inbox-featured-categorize")) { onCategorize(row.id) }
+                }
+            }
         }
-        days
+        if (filed != null) {
+            Row(
+                Modifier
+                    .then(if (row != null) Modifier.matchParentSize() else Modifier.heightIn(min = FEATURED_EMPTY))
+                    .alpha(1f - window(rise, 0f, RISE_FADE_TO))
+                    .testTag("inbox-filed-${filed.row.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppGlyphIcon(AppGlyph.Save, Metro.accent.text)
+                Column(Modifier.padding(start = MetroDimens.Gutter)) {
+                    MetroText("${InboxCopy.FILED_TO} ${filed.filedTo.orEmpty().lowercase()}", Metro.typography.groupHeader, maxLines = 1)
+                    MetroText(filed.row.payee, Metro.typography.caption, color = Metro.colors.secondary, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+/** The featured accept: the one filled button on the page, in the accent colour. */
+@Composable
+private fun AcceptButton(onClick: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.ButtonMin)
+            .border(MetroDimens.Stroke, Metro.accent.fill)
+            .background(Metro.accent.fill)
+            .metroPress(onClick)
+            .padding(horizontal = 9.5.dp, vertical = 3.5.dp)
+            .testTag("inbox-featured-accept"),
+        contentAlignment = Alignment.Center,
+    ) {
+        MetroText(InboxCopy.ACCEPT, Metro.typography.body.copy(fontWeight = MetroWeights.Semibold), color = Metro.accent.onFill)
+    }
+}
+
+/** Where [t] sits between [from] and [to], clamped to 0..1. */
+private fun window(
+    t: Float,
+    from: Float,
+    to: Float,
+) = ((t - from) / (to - from)).coerceIn(0f, 1f)
+
+/** Pushes content down by [fraction] of its own height, so it rises into its slot from below. */
+private fun Modifier.rising(fraction: Float): Modifier =
+    layout { measurable, constraints ->
+        val p = measurable.measure(constraints)
+        layout(p.width, p.height) { p.place(0, (p.height * fraction).roundToInt()) }
     }
 
-/** The quieter line under a payee: the suggested category, the account, then the note. */
+/** Clips only what falls below the slot, so the panel's colour still runs past the gutter. */
+private fun Modifier.clipBelow(): Modifier =
+    drawWithContent { clipRect(-size.width, 0f, size.width * 2, size.height) { this@drawWithContent.drawContent() } }
+
+/** The quieter line under a payee: the suggested category, the date, the account, then the note. */
 internal fun inboxDetail(row: InboxRow): String =
     listOfNotNull(
         row.suggestionName.ifBlank { InboxCopy.NO_CATEGORY },
+        row.date.takeIf { it > 0 }?.let(RegisterEntry::registerDateLabel),
         row.accountName.ifBlank { null },
         row.note.ifBlank { null },
     ).joinToString(" · ")
 
-@Composable
-private fun InboxDayHeading(
-    date: Int,
-    leaving: Boolean,
-) {
-    // A day whose last row is being filed collapses with it.
-    val height = remember { Animatable(1f) }
-    val animations = Metro.animations
-    LaunchedEffect(leaving) {
-        if (leaving) {
-            delay(FILED_HOLD_MS)
-            if (animations) height.animateTo(0f, tween(COLLAPSE_MS)) else height.snapTo(0f)
-        } else {
-            height.snapTo(1f)
-        }
-    }
-    MetroText(
-        RegisterEntry.registerDateLabel(date),
-        Metro.typography.caption,
-        Modifier.collapse(height.value).padding(top = 16.dp, bottom = 4.dp).testTag("inbox-day-$date"),
-        color = Metro.accent.text,
-    )
-}
-
+/**
+ * One waiting row. A tap opens it ([onTap]; in select mode it checks the row instead) and a long
+ * press opens its menu. A row filed from its menu turns accent in place, then collapses; [leaving]
+ * collapses the row that is rising into the featured panel.
+ */
 @Composable
 private fun InboxLine(
     entry: InboxEntry,
-    shell: MonthShell,
-    formatOptions: FormatOptions,
+    amount: String,
     banded: Boolean,
-    onAccept: (String) -> Unit,
-    onCategorize: (String) -> Unit,
     onFiledShown: (String) -> Unit,
-    peek: Boolean,
-    onPeeked: () -> Unit,
-    onDetails: (String) -> Unit,
-    onMenu: (Rect) -> Unit,
+    onTap: () -> Unit,
+    onMenu: ((Rect) -> Unit)?,
+    onAccept: (String) -> Unit = {},
+    onCategorize: (String) -> Unit = {},
+    checked: Boolean? = null,
+    leaving: Float = 0f,
 ) {
     val row = entry.row
     var bounds by remember { mutableStateOf(Rect.Zero) }
     val animations = Metro.animations
-    val scope = rememberCoroutineScope()
-    val offset = remember { Animatable(0f) }
     val height = remember { Animatable(1f) }
-    var width by remember { mutableIntStateOf(0) }
     val accept by rememberUpdatedState(onAccept)
     val categorize by rememberUpdatedState(onCategorize)
     val shown by rememberUpdatedState(onFiledShown)
-    val peeked by rememberUpdatedState(onPeeked)
     val filedTo = entry.filedTo
-
-    // First visit: slide part way right, then part way left, to show what each swipe does.
-    LaunchedEffect(peek, width) {
-        if (!peek || width == 0) return@LaunchedEffect
-        if (animations) {
-            delay(PEEK_DELAY_MS)
-            val reach = width * PEEK_REACH
-            offset.animateTo(reach, tween(PEEK_MS, easing = FastOutSlowInEasing))
-            delay(PEEK_HOLD_MS)
-            offset.animateTo(0f, tween(PEEK_MS, easing = FastOutSlowInEasing))
-            delay(PEEK_GAP_MS)
-            offset.animateTo(-reach, tween(PEEK_MS, easing = FastOutSlowInEasing))
-            delay(PEEK_HOLD_MS)
-            offset.animateTo(0f, tween(PEEK_MS, easing = FastOutSlowInEasing))
-        }
-        peeked()
-    }
     // Filed: hold the confirmation in the row's own slot, then collapse it away.
     LaunchedEffect(filedTo) {
         if (filedTo == null) {
             height.snapTo(1f)
             return@LaunchedEffect
         }
-        offset.snapTo(0f)
         delay(FILED_HOLD_MS)
         if (animations) height.animateTo(0f, tween(COLLAPSE_MS)) else height.snapTo(0f)
         shown(row.id)
     }
-
-    fun settle() {
-        scope.launch {
-            val w = width.toFloat()
-            when {
-                w > 0 && offset.value > w * COMMIT -> {
-                    offset.animateTo(w, tween(EXIT_MS, easing = LinearOutSlowInEasing))
-                    accept(row.id)
-                }
-                w > 0 && offset.value < -w * COMMIT -> {
-                    offset.animateTo(-w, tween(EXIT_MS, easing = LinearOutSlowInEasing))
-                    categorize(row.id)
-                    // Back in place for when the picker is dismissed without a choice.
-                    delay(RETURN_DELAY_MS)
-                    offset.snapTo(0f)
-                }
-                else -> offset.animateTo(0f, tween(EXIT_MS))
-            }
-        }
-    }
-
-    val fill = if (banded) ledgerBand else Color.Transparent
     val acceptsHere = row.suggestionId != null
     Box(
         Modifier
             .fillMaxWidth()
-            .collapse(height.value)
-            .onSizeChanged { width = it.width }
+            .collapse(height.value * (1f - leaving))
+            .alpha(1f - leaving)
             .onGloballyPositioned { bounds = it.boundsInWindow() }
             .testTag("inbox-row-${row.id}")
             .semantics {
@@ -472,80 +560,38 @@ private fun InboxLine(
                     )
             },
     ) {
-        // What a swipe uncovers: accept on the left as the row moves right, categorize on the right.
-        if (offset.value != 0f && filedTo == null) {
-            val right = offset.value > 0
-            val accepting = right && acceptsHere
-            val ink = if (accepting) Metro.accent.onFill else Color.White
-            Row(
-                Modifier
-                    .matchParentSize()
-                    .ledgerFill(if (accepting) Metro.accent.fill else Metro.colors.secondary),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = if (right) Arrangement.Start else Arrangement.End,
-            ) {
-                val label = if (accepting) InboxCopy.ACCEPT else InboxCopy.CATEGORIZE
-                val glyph = if (accepting) AppGlyph.Save else AppGlyph.Categories
-                if (right) {
-                    AppGlyphIcon(glyph, ink)
-                    MetroText(label, Metro.typography.caption, Modifier.padding(start = 8.dp), color = ink)
-                } else {
-                    MetroText(label, Metro.typography.caption, Modifier.padding(end = 8.dp), color = ink)
-                    AppGlyphIcon(glyph, ink)
-                }
-            }
-        }
-        Box(
+        Row(
             Modifier
                 .fillMaxWidth()
-                .layout { measurable, constraints ->
-                    val p = measurable.measure(constraints)
-                    layout(p.width, p.height) { p.place(offset.value.roundToInt(), 0) }
-                }.alpha(if (filedTo != null) 0f else 1f)
+                .alpha(if (filedTo != null) 0f else 1f)
                 .heightIn(min = MetroDimens.TouchTarget)
-                .ledgerFill(if (offset.value != 0f) Metro.colors.background else fill)
-                .ledgerFill(if (offset.value != 0f) fill else Color.Transparent)
-                .pointerInput(row.id) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
-                        // Drags that start near either edge are left to the pivot, so its swipe still works over the list.
-                        val edge = size.width * SWIPE_DEAD_ZONE
-                        if (down.position.x < edge || down.position.x > size.width - edge) return@awaitEachGesture
-                        val drag =
-                            awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
-                                change.consume()
-                                scope.launch { offset.snapTo(offset.value + over) }
-                            } ?: return@awaitEachGesture
-                        horizontalDrag(drag.id) { change ->
-                            val dx = change.positionChange().x
-                            change.consume()
-                            scope.launch { offset.snapTo(offset.value + dx) }
-                        }
-                        settle()
-                    }
-                }.metroPress(onClick = { onDetails(row.id) }, onLongClick = { onMenu(bounds) })
+                .ledgerFill(if (banded) ledgerBand else Color.Transparent)
+                .metroPress(onClick = onTap, onLongClick = onMenu?.let { open -> { open(bounds) } })
                 .padding(vertical = INBOX_ROW_AIR),
+            verticalAlignment = if (checked != null) Alignment.CenterVertically else Alignment.Top,
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter)) {
-                    MetroText(row.payee, Metro.typography.body, maxLines = 2)
-                    MetroText(
-                        inboxDetail(row),
-                        Metro.typography.caption,
-                        Modifier.testTag("inbox-detail-${row.id}"),
-                        color = Metro.colors.secondary,
-                        maxLines = 2,
-                    )
-                }
+            if (checked != null) InboxCheck(checked, row.id)
+            Column(
+                Modifier
+                    .weight(LEDGER_NAME + LEDGER_FIGURE)
+                    .padding(start = if (checked != null) MetroDimens.Gutter else 0.dp, end = MetroDimens.Gutter),
+            ) {
+                MetroText(row.payee, Metro.typography.body, maxLines = 2)
                 MetroText(
-                    MoneyFormat.format(row.amountMinor, shell.currency, formatOptions),
-                    Metro.typography.body.copy(textAlign = TextAlign.End),
-                    Modifier.weight(LEDGER_FIGURE * 2).testTag("inbox-amount-${row.id}"),
-                    color = Metro.accent.text,
-                    maxLines = 1,
-                    softWrap = false,
+                    inboxDetail(row),
+                    Metro.typography.caption,
+                    Modifier.testTag("inbox-detail-${row.id}"),
+                    color = Metro.colors.secondary,
+                    maxLines = 2,
                 )
             }
+            MetroText(
+                amount,
+                Metro.typography.body.copy(textAlign = TextAlign.End),
+                Modifier.weight(LEDGER_FIGURE * 2).testTag("inbox-amount-${row.id}"),
+                maxLines = 1,
+                softWrap = false,
+            )
         }
         if (filedTo != null) {
             // The confirmation takes the row's own slot, the same size as the row.
@@ -571,6 +617,24 @@ private fun InboxLine(
     }
 }
 
+/** The select-mode check box: an outlined square, filled with the accent and a tick when checked. */
+@Composable
+private fun InboxCheck(
+    checked: Boolean,
+    id: String,
+) {
+    Box(
+        Modifier
+            .size(CHECK_SIZE)
+            .border(MetroDimens.Stroke, Metro.colors.foreground)
+            .background(if (checked) Metro.accent.fill else Color.Transparent)
+            .testTag(if (checked) "inbox-checked-$id" else "inbox-unchecked-$id"),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (checked) AppGlyphIcon(AppGlyph.Save, Metro.accent.onFill)
+    }
+}
+
 /** Shrinks a slot to [fraction] of its height, clipping only the bottom so bands still run past the gutter. */
 private fun Modifier.collapse(fraction: Float): Modifier =
     if (fraction >= 1f) {
@@ -584,20 +648,17 @@ private fun Modifier.collapse(fraction: Float): Modifier =
     }
 
 private val INBOX_ROW_AIR = 15.dp
+private val FEATURED_AIR_ABOVE = 24.dp
+private val FEATURED_AIR_BELOW = 28.dp
+private val FEATURED_PAD = 20.dp
+private val FEATURED_EMPTY = 96.dp
+private val CHECK_SIZE = 26.dp
 private val MENU_INSET = 24.dp
 private const val MENU_SCRIM = 0.7f
-
-/** A swipe past this share of the row's width files it; less springs back. */
-private const val COMMIT = 0.35f
-
-/** The share of the row at each side where a drag belongs to the pivot, not the row. */
-internal const val SWIPE_DEAD_ZONE = 0.2f
-private const val PEEK_REACH = 0.3f
-private const val PEEK_DELAY_MS = 500L
-private const val PEEK_MS = 320
-private const val PEEK_HOLD_MS = 350L
-private const val PEEK_GAP_MS = 200L
-private const val EXIT_MS = 200
-private const val RETURN_DELAY_MS = 600L
 internal const val FILED_HOLD_MS = 900L
 private const val COLLAPSE_MS = 240
+private const val RISE_MS = 420
+
+/** The confirmation is gone by this share of the rise; the next transaction starts showing at the other. */
+private const val RISE_FADE_TO = 0.4f
+private const val RISE_FADE_FROM = 0.3f
