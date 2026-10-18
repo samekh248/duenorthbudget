@@ -230,7 +230,7 @@ class RegisterScreenshotTest {
                     RegisterRow(
                         id = "payment",
                         date = 20261005,
-                        payee = "Payment from Checking",
+                        payee = "transfer from Checking",
                         categoryId = null,
                         categoryLabel = "transfer",
                         amountMinor = 20_000,
@@ -242,6 +242,7 @@ class RegisterScreenshotTest {
                         parent = false,
                         cleared = true,
                         parts = emptyList(),
+                        transferAccountId = "checking",
                     ),
                     RegisterRow(
                         id = "rent",

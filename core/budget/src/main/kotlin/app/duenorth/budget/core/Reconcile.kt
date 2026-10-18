@@ -91,10 +91,11 @@ class ReconcileBook(
     ): ReconcileStartResult {
         val account = account(accountId) ?: return ReconcileStartResult.Rejected(ShellCopy.NO_ACCOUNTS)
         val currency = currency()
-        val minor = MoneyParse.parseMagnitude(balanceText, currency.decimals)
-            ?: return ReconcileStartResult.Rejected(
-                if (balanceText.isBlank()) ReconcileCopy.ENTER_BALANCE else ReconcileCopy.TOO_MANY_DECIMALS,
-            )
+        val minor =
+            MoneyParse.parseMagnitude(balanceText, currency.decimals)
+                ?: return ReconcileStartResult.Rejected(
+                    if (balanceText.isBlank()) ReconcileCopy.ENTER_BALANCE else ReconcileCopy.TOO_MANY_DECIMALS,
+                )
         val date =
             RegisterEntry.parseDate(dateText)
                 ?: return ReconcileStartResult.Rejected(
@@ -200,10 +201,13 @@ class ReconcileBook(
                         t.amount AS amount,
                         t.cleared AS cleared,
                         t.reconciled AS reconciled,
-                        COALESCE(p.name, '') AS payee
+                        COALESCE(p.name, '') AS payee,
+                        target.name AS transfer_name
                     FROM transactions t
                     LEFT JOIN payees p
                         ON p.id = t.description AND IFNULL(p.tombstone, 0) = 0
+                    LEFT JOIN accounts target
+                        ON target.id = p.transfer_acct
                     WHERE t.acct = ?
                         AND IFNULL(t.tombstone, 0) = 0
                         AND IFNULL(t.isChild, 0) = 0
@@ -214,7 +218,9 @@ class ReconcileBook(
                     ReconcileRow(
                         id = row.str("id").orEmpty(),
                         date = row.long("date").toInt(),
-                        payee = row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE },
+                        payee =
+                            row.str("transfer_name")?.let { RegisterEntry.transferLabel(row.long("amount"), it) }
+                                ?: row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE },
                         amountMinor = row.long("amount"),
                         cleared = row.bool("cleared"),
                         reconciled = row.bool("reconciled"),
