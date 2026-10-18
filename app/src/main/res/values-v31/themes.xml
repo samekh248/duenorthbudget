@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12+ always draws a launch window before the first frame. Leave it
+      without an icon and the same colour as the first screen, so the app
+      appears to open straight onto it instead of showing a splash.
+    -->
+    <style name="Theme.DueNorth" parent="Base.Theme.DueNorth">
+        <item name="android:windowSplashScreenBackground">@color/launch_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
+    </style>
+</resources>
