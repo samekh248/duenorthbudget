@@ -43,7 +43,8 @@ class RuleContentTest {
     @Test
     fun barEntries() {
         val home = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE).map { it.id }
-        assertTrue("add-schedule" in home && "rules" in home)
+        assertTrue("add-schedule" !in home && "rules" in home)
+        assertTrue("add-schedule" in ScreenBar.specsFor(ShellRoute.Schedules, true, BudgetMode.ENVELOPE).map { it.id })
         assertEquals(listOf("add-rule"), ScreenBar.specsFor(ShellRoute.Rules, true, BudgetMode.ENVELOPE).map { it.id })
         assertEquals(listOf("save", "cancel"), ScreenBar.specsFor(ShellRoute.RuleEditor(null), true, BudgetMode.ENVELOPE).map { it.id })
         assertTrue("delete-rule" in ScreenBar.specsFor(ShellRoute.RuleEditor("r1"), true, BudgetMode.ENVELOPE).map { it.id })
@@ -132,13 +133,23 @@ class RuleContentTest {
         model.submitSchedule(ScheduleForm.from(base, 2).copy(name = "Gym", payee = "Gym", amount = "-25", repeat = ScheduleRepeat.MONTHLY))
         await {
             model.state.value.route == ShellRoute.Home &&
-                model.state.value.upcoming
+                model.state.value.schedules
                     .any { it.payee == "Gym" }
         }
         val gym =
-            model.state.value.upcoming
+            model.state.value.schedules
                 .first { it.payee == "Gym" }
-        model.openSchedule(gym.id)
+        model.openSchedules()
+        assertEquals(ShellRoute.Schedules, model.state.value.route)
+        model.toggleSchedulesCalendar()
+        assertTrue(model.state.value.schedulesCalendar)
+        model.openScheduleDetails(gym.id)
+        await {
+            model.state.value.scheduleDetails
+                ?.summary
+                ?.id == gym.id
+        }
+        model.editOpenSchedule()
         await {
             model.state.value.scheduleDraft
                 ?.id == gym.id
@@ -148,6 +159,20 @@ class RuleContentTest {
             model.state.value.scheduleDraft!!
                 .amountMinor,
         )
+        model.back()
+        assertEquals(ShellRoute.ScheduleDetails(gym.id), model.state.value.route)
+        // Deleting from the editor leaves the schedule's page too, back to the list.
+        model.editOpenSchedule()
+        await {
+            model.state.value.scheduleDraft
+                ?.id == gym.id
+        }
+        model.deleteOpenSchedule()
+        await {
+            model.state.value.route == ShellRoute.Schedules &&
+                model.state.value.schedules
+                    .none { it.id == gym.id }
+        }
         model.back()
 
         model.openRules()

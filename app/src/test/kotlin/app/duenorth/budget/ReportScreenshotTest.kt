@@ -11,7 +11,6 @@ import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.SpendingGroupBy
-import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -48,25 +47,6 @@ class ReportScreenshotTest {
 
     @Test
     fun netWorthTodayDark() = capture("reports_networth_today_dark", dark = true) { NetWorthToday() }
-
-    // Home `•••` → due: what the due pivot item used to list, now its own view.
-    @Test
-    fun dueLight() = capture("due_light", dark = false) { Due() }
-
-    @Test
-    fun dueDark() = capture("due_dark", dark = true) { Due() }
-
-    @Composable
-    private fun Due() {
-        val usd = Currencies.byCode("USD")!!
-        val rows =
-            listOf(
-                UpcomingScheduleRow("s1", "rent", "a1", "Checking", "Landlord", -145_000, "c1", "Rent", 20261101, false, "upcoming"),
-                UpcomingScheduleRow("s2", "phone", "a2", "Credit card", "Phone Co", -6_500, "c2", "Phone", 20261016, true, "due"),
-                UpcomingScheduleRow("s3", "pay", "a1", "Checking", "Employer", 310_000, null, "Income", 20261030, false, "upcoming"),
-            )
-        DueScreen(rows, usd, {}, {}, {}, {})
-    }
 
     private val today =
         NetWorthPage(

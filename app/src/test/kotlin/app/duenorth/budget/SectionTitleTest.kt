@@ -29,7 +29,7 @@ class SectionTitleTest {
         assertNull(title(ShellRoute.Templates))
         assertNull(title(ShellRoute.ManageCategories))
         assertNull(title(ShellRoute.Budgets))
-        assertNull(title(ShellRoute.Due))
+        assertNull(title(ShellRoute.Schedules))
     }
 
     @Test
@@ -37,7 +37,8 @@ class SectionTitleTest {
         assertEquals("ACCOUNTS", title(ShellRoute.Register("a1")))
         assertEquals("ACCOUNTS", title(ShellRoute.Reconcile("a1"), homeSection = section(HomeSections.REPORTS)))
         assertEquals("BUDGET", title(ShellRoute.CategoryBudget("c1"), homeSection = section(HomeSections.ACCOUNTS)))
-        assertEquals("DUE", title(ShellRoute.ScheduleEditor(null)))
+        assertEquals("SCHEDULES", title(ShellRoute.ScheduleEditor(null)))
+        assertEquals("SCHEDULES", title(ShellRoute.ScheduleDetails("s1")))
         assertEquals("REPORTS", title(ShellRoute.ReviewCategory("c1")))
         assertEquals("REPORTS", title(ShellRoute.MonthReview))
         assertEquals("RULES", title(ShellRoute.RuleEditor(null)))

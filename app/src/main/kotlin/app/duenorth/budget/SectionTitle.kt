@@ -27,6 +27,7 @@ object SectionTitleCopy {
     const val APP = "DUE NORTH BUDGET"
     const val SETTINGS = "SETTINGS"
     const val RULES = "RULES"
+    const val SCHEDULES = "SCHEDULES"
 }
 
 /**
@@ -59,7 +60,9 @@ object SectionTitle {
                 ShellRoute.Assign,
                 -> HomeSections.BUDGET
                 is ShellRoute.RuleEditor -> return SectionTitleCopy.RULES
-                is ShellRoute.ScheduleEditor -> ScheduleScreenCopy.DUE
+                is ShellRoute.ScheduleEditor,
+                is ShellRoute.ScheduleDetails,
+                -> return SectionTitleCopy.SCHEDULES
                 // Reports is a home pivot item, and the pages it opens sit under it.
                 ShellRoute.NetWorth,
                 ShellRoute.MonthReview,
@@ -99,7 +102,7 @@ object SectionTitle {
             ShellRoute.Templates,
             ShellRoute.ManageCategories,
             ShellRoute.Budgets,
-            ShellRoute.Due,
+            ShellRoute.Schedules,
         )
 }
 

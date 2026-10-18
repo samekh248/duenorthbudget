@@ -29,6 +29,26 @@ class ScheduleRulesBookTest {
     }
 
     @Test
+    fun listAllCarriesRepeatDatesAndPostedHistory() {
+        db { session, _ ->
+            val schedules = SchedulesBook(session, clock)
+            val scheduleId = seedMonthlyRent(session, amount = -90_000, next = "2026-10-09")
+            val before = schedules.listAll().single { it.id == scheduleId }
+            assertEquals(ScheduleRepeat.MONTHLY, before.repeat)
+            assertEquals(1, before.interval)
+            assertEquals("Checking", before.accountName)
+            assertEquals(listOf(20261009, 20261109, 20261209), before.dates.take(3))
+            assertEquals(20271009, before.dates.last())
+            assertTrue(schedules.details(scheduleId)!!.posted.isEmpty())
+            assertTrue(schedules.post(scheduleId) is ScheduleWriteResult.Posted)
+            val details = schedules.details(scheduleId)!!
+            assertEquals(20261109, details.summary.nextDate)
+            assertEquals(listOf(20261009), details.posted.map { it.date })
+            assertEquals(-90_000L, details.posted.single().amountMinor)
+        }
+    }
+
+    @Test
     fun skipDoesNotCreateTransaction() {
         db { session, book ->
             val schedules = SchedulesBook(session, clock)
@@ -130,7 +150,14 @@ class ScheduleRulesBookTest {
                     note = null,
                 ),
             )
-            assertEquals(RegisterCopy.NO_CATEGORY, book.read("checking")!!.rows.single().categoryLabel)
+            assertEquals(
+                RegisterCopy.NO_CATEGORY,
+                book
+                    .read("checking")!!
+                    .rows
+                    .single()
+                    .categoryLabel,
+            )
         }
     }
 
