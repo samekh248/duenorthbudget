@@ -71,6 +71,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -153,48 +154,16 @@ fun MetroField(
     fill: Boolean = true,
     lines: IntRange? = null,
 ) {
-    val colors = Metro.colors
     val submit = LocalFieldSubmit.current
-    val field = if (colors.isDark) Color.White else Color(0xFFBFBFBF)
-    val ink = Color.Black
-    val hintColor = if (colors.isDark) Color(0xFF909090) else Color(0xFF8F8F8F)
-    Box(
-        modifier
-            .then(if (fill) Modifier.fillMaxWidth() else Modifier)
-            .background(field)
-            .heightIn(min = MetroDimens.TouchTarget)
-            .padding(horizontal = 8.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        if (value.isEmpty()) {
-            MetroText(hint, Metro.typography.control, color = hintColor)
-        }
+    MetroFieldFrame(value.isEmpty(), hint, modifier, fill) { style, cursor ->
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
-            textStyle = Metro.typography.control.copy(color = ink),
-            cursorBrush = SolidColor(Metro.accent.fill),
+            textStyle = style,
+            cursorBrush = cursor,
             visualTransformation = if (conceal) PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions =
-                if (lines == null && keyboardOptions.imeAction in setOf(ImeAction.Default, ImeAction.Unspecified)) {
-                    keyboardOptions.copy(imeAction = ImeAction.Done)
-                } else {
-                    keyboardOptions
-                },
-            keyboardActions =
-                if (lines == null) {
-                    KeyboardActions(
-                        onDone = {
-                            defaultKeyboardAction(ImeAction.Done)
-                            submit?.invoke()
-                        },
-                        onGo = { submit?.invoke() },
-                        onSend = { submit?.invoke() },
-                        onSearch = { submit?.invoke() },
-                    )
-                } else {
-                    KeyboardActions.Default
-                },
+            keyboardOptions = fieldKeyboard(keyboardOptions, lines),
+            keyboardActions = fieldActions(lines, submit),
             singleLine = lines == null,
             minLines = lines?.first ?: 1,
             maxLines = lines?.last ?: Int.MAX_VALUE,
@@ -202,6 +171,88 @@ fun MetroField(
         )
     }
 }
+
+/**
+ * The same one-line box over a [TextFieldValue], for a box that sets its own selection, such as one that
+ * opens with its text selected so typing replaces it. Enter submits through [LocalFieldSubmit].
+ */
+@Composable
+fun MetroField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    hint: String,
+    modifier: Modifier = Modifier,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    fill: Boolean = true,
+) {
+    val submit = LocalFieldSubmit.current
+    MetroFieldFrame(value.text.isEmpty(), hint, modifier, fill) { style, cursor ->
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = style,
+            cursorBrush = cursor,
+            keyboardOptions = fieldKeyboard(keyboardOptions, null),
+            keyboardActions = fieldActions(null, submit),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun MetroFieldFrame(
+    empty: Boolean,
+    hint: String,
+    modifier: Modifier,
+    fill: Boolean,
+    field: @Composable (TextStyle, SolidColor) -> Unit,
+) {
+    val colors = Metro.colors
+    val background = if (colors.isDark) Color.White else Color(0xFFBFBFBF)
+    val hintColor = if (colors.isDark) Color(0xFF909090) else Color(0xFF8F8F8F)
+    Box(
+        modifier
+            .then(if (fill) Modifier.fillMaxWidth() else Modifier)
+            .background(background)
+            .heightIn(min = MetroDimens.TouchTarget)
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        if (empty) {
+            MetroText(hint, Metro.typography.control, color = hintColor)
+        }
+        field(Metro.typography.control.copy(color = Color.Black), SolidColor(Metro.accent.fill))
+    }
+}
+
+private fun fieldKeyboard(
+    options: KeyboardOptions,
+    lines: IntRange?,
+): KeyboardOptions =
+    if (lines == null && options.imeAction in setOf(ImeAction.Default, ImeAction.Unspecified)) {
+        options.copy(imeAction = ImeAction.Done)
+    } else {
+        options
+    }
+
+private fun fieldActions(
+    lines: IntRange?,
+    submit: (() -> Unit)?,
+): KeyboardActions =
+    if (lines == null) {
+        KeyboardActions(
+            onDone = {
+                defaultKeyboardAction(ImeAction.Done)
+                submit?.invoke()
+            },
+            onGo = { submit?.invoke() },
+            onSend = { submit?.invoke() },
+            onSearch = { submit?.invoke() },
+        )
+    } else {
+        KeyboardActions.Default
+    }
 
 /**
  * A body button, laid out the Windows Phone way: every button is one cell of a two-column

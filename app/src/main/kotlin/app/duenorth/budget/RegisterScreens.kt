@@ -670,6 +670,9 @@ class CategoryOptions private constructor(
         return if (choice.hidden) "${choice.name} ${TransactionFormCopy.HIDDEN}" else choice.name
     }
 
+    /** The category's own name, without the hidden mark. */
+    fun name(id: String): String = byId[id]?.name.orEmpty()
+
     companion object {
         /** WP8.1 unfolds a combo box in place up to five items; past that it opens a full-screen list. */
         const val IN_PLACE_LIMIT = 5
@@ -782,7 +785,10 @@ private fun AmountLine(
     }
 }
 
-/** The full-screen category list for budgets with more than five choices (FR-011, FR-012). */
+/**
+ * The full-screen category list for budgets with more than five choices (FR-011, FR-012), under a focused
+ * filter box that holds the current category's name, selected, so typing replaces it and narrows the list.
+ */
 @Composable
 private fun CategoryListPage(
     options: CategoryOptions,
@@ -791,18 +797,33 @@ private fun CategoryListPage(
 ) {
     BackHandler(onBack = onBack)
     RememberBarOverride(emptyList())
+    val filter = rememberCategoryFilter(options.current?.let(options::name).orEmpty())
+    val query = filter.query
     val rows =
-        remember(options) {
+        remember(options, query) {
             buildList<Pair<String, String?>?> {
-                add(null)
+                if (query.isBlank()) add(null)
                 options.groups.forEach { (name, choices) ->
-                    add(name to null)
-                    choices.forEach { add("" to it.id) }
+                    val shown = CategoryFilter.choices(choices, query)
+                    if (shown.isNotEmpty()) {
+                        add(name to null)
+                        shown.forEach { add("" to it.id) }
+                    }
                 }
+                if (query.isNotBlank() && CategoryFilter.showsNone(query)) add(null)
             }
         }
     val start = remember(options) { rows.indexOfFirst { it?.second != null && it.second == options.current }.coerceAtLeast(0) }
     val state = rememberLazyListState(initialFirstVisibleItemIndex = start)
+    LaunchedEffect(query) { if (filter.typed) state.scrollToItem(0) }
+    val enter = {
+        if (!filter.typed) {
+            onPick(options.current)
+        } else {
+            val top = rows.indexOfFirst { it == null || it.second != null }
+            if (top >= 0) onPick(rows[top]?.second)
+        }
+    }
     Column(
         Modifier
             .fillMaxSize()
@@ -811,6 +832,7 @@ private fun CategoryListPage(
             .testTag("transaction-category-list"),
     ) {
         MetroText(TransactionFormCopy.CATEGORY, Metro.typography.header, maxLines = 1)
+        CategoryFilterField(filter, enter, Modifier.padding(top = MetroDimens.Gutter))
         LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Gutter), state = state) {
             items(rows.size) { index ->
                 val entry = rows[index]
@@ -1116,6 +1138,19 @@ fun CategoryPickerScreen(
     onPick: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val current = target.categoryId?.let { id -> target.categories.firstOrNull { it.id == id } }
+    val filter = rememberCategoryFilter(current?.name.orEmpty())
+    val query = filter.query
+    val shown = remember(target.categories, query) { CategoryFilter.choices(target.categories, query) }
+    val none = CategoryFilter.showsNone(query)
+    val enter = {
+        when {
+            !filter.typed -> onPick(current?.id)
+            query.isBlank() && none -> onPick(null)
+            shown.isNotEmpty() -> onPick(shown.first().id)
+            none -> onPick(null)
+        }
+    }
     Column(
         modifier
             .fillMaxSize()
@@ -1131,10 +1166,18 @@ fun CategoryPickerScreen(
         if (error != null) {
             MetroText(error, Metro.typography.body, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)
         }
-        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
-            item { ChoiceLine(RegisterCopy.NO_CATEGORY, false) { onPick(null) } }
-            items(target.categories, key = { it.id }) { category ->
-                ChoiceLine(category.name, false) { onPick(category.id) }
+        CategoryFilterField(filter, enter, Modifier.padding(top = MetroDimens.Grid))
+        val list = rememberLazyListState()
+        LaunchedEffect(query) { if (filter.typed) list.scrollToItem(0) }
+        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Gutter), state = list) {
+            if (query.isBlank()) {
+                item { ChoiceLine(RegisterCopy.NO_CATEGORY, current == null) { onPick(null) } }
+            }
+            items(shown, key = { it.id }) { category ->
+                ChoiceLine(category.name, category.id == current?.id) { onPick(category.id) }
+            }
+            if (query.isNotBlank() && none) {
+                item { ChoiceLine(RegisterCopy.NO_CATEGORY, current == null) { onPick(null) } }
             }
         }
     }
