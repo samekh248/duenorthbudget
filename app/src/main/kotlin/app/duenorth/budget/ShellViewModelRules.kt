@@ -12,7 +12,65 @@ import kotlinx.coroutines.withContext
 
 // Spec 010 US3 (T049): schedule editor and rules, as extensions of ShellViewModel. See contracts/schedules-rules.md.
 
-/** Home `•••` → new schedule; starts today in the first open on-budget account. */
+/** Accounts → schedules: the pivot of upcoming and all schedules. */
+fun ShellViewModel.openSchedules() {
+    push(ShellRoute.Schedules)
+    mutate { it.copy(schedulesSection = SchedulesSection.UPCOMING) }
+    refresh()
+}
+
+fun ShellViewModel.setSchedulesSection(index: Int) {
+    mutate { it.copy(schedulesSection = index) }
+}
+
+/** Schedules → calendar or list: how upcoming shows what is coming. */
+fun ShellViewModel.toggleSchedulesCalendar() {
+    mutate { it.copy(schedulesCalendar = !it.schedulesCalendar) }
+}
+
+/** Schedules → tap a schedule: its own page. */
+fun ShellViewModel.openScheduleDetails(scheduleId: String) {
+    val budgetId = state.value.settings.openBudgetId ?: return
+    push(ShellRoute.ScheduleDetails(scheduleId))
+    mutate { it.copy(scheduleDetails = null) }
+    viewModelScope.launch {
+        val details = withContext(Dispatchers.IO) { library.readScheduleDetails(budgetId, scheduleId) }
+        mutate { current ->
+            if ((current.route as? ShellRoute.ScheduleDetails)?.scheduleId ==
+                scheduleId
+            ) {
+                current.copy(scheduleDetails = details)
+            } else {
+                current
+            }
+        }
+    }
+}
+
+/** The schedule a details page or the editor has open. */
+private fun ShellViewModel.openScheduleId(): String? =
+    when (val route = state.value.route) {
+        is ShellRoute.ScheduleDetails -> route.scheduleId
+        is ShellRoute.ScheduleEditor -> route.scheduleId
+        else -> null
+    }
+
+/** A schedule's page → edit. */
+fun ShellViewModel.editOpenSchedule() {
+    openScheduleId()?.let(::openSchedule)
+}
+
+/** A schedule's page → post: adds its next transaction now, early when it is not yet due. */
+fun ShellViewModel.postOpenSchedule() {
+    openScheduleId()?.let(::postSchedule)
+}
+
+/** A schedule's page → skip: moves it to its next date without a transaction. */
+fun ShellViewModel.skipOpenSchedule() {
+    openScheduleId()?.let(::skipSchedule)
+}
+
+/** Schedules `+` → new schedule; starts today in the first open on-budget account. */
 fun ShellViewModel.openNewSchedule() {
     val accounts =
         state.value.shell
@@ -25,7 +83,7 @@ fun ShellViewModel.openNewSchedule() {
     loadRuleCategories()
 }
 
-/** Due → tap a schedule. */
+/** A schedule's page → edit: the schedule editor. */
 fun ShellViewModel.openSchedule(scheduleId: String) {
     val budgetId = state.value.settings.openBudgetId ?: return
     push(ShellRoute.ScheduleEditor(scheduleId))
@@ -59,10 +117,12 @@ fun ShellViewModel.submitSchedule(form: ScheduleForm) {
 
 fun ShellViewModel.deleteOpenSchedule() {
     val budgetId = state.value.settings.openBudgetId ?: return
-    val scheduleId = (state.value.route as? ShellRoute.ScheduleEditor)?.scheduleId ?: return
+    val scheduleId = openScheduleId() ?: return
     viewModelScope.launch {
         withContext(Dispatchers.IO) { library.deleteSchedule(budgetId, scheduleId) }
         afterRuleWrite(budgetId, leave = true)
+        // Deleted from the editor: the schedule's page under it is gone too.
+        if ((state.value.route as? ShellRoute.ScheduleDetails)?.scheduleId == scheduleId) back()
     }
 }
 

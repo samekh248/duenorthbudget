@@ -50,7 +50,9 @@ import app.duenorth.budget.core.ReportsPage
 import app.duenorth.budget.core.RuleDraft
 import app.duenorth.budget.core.RuleSummary
 import app.duenorth.budget.core.SavedInstance
+import app.duenorth.budget.core.ScheduleDetails
 import app.duenorth.budget.core.ScheduleDraft
+import app.duenorth.budget.core.ScheduleSummary
 import app.duenorth.budget.core.ScheduleWriteResult
 import app.duenorth.budget.core.ServerAddress
 import app.duenorth.budget.core.ServerCheck
@@ -63,7 +65,6 @@ import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.core.UnlockResult
-import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.core.UploadResult
 import app.duenorth.budget.core.WriteResult
 import app.duenorth.budget.core.activeInstance
@@ -220,8 +221,14 @@ sealed interface ShellRoute {
     ) : ShellRoute,
         StackRoute
 
-    /** Home `•••` → due: upcoming scheduled transactions to post or skip. */
-    data object Due : ShellRoute, StackRoute
+    /** Accounts → schedules: a pivot of what is coming up (a list or a calendar) and every schedule. */
+    data object Schedules : ShellRoute, StackRoute
+
+    /** Schedules → one schedule: its details, next dates and what it has posted. */
+    data class ScheduleDetails(
+        val scheduleId: String,
+    ) : ShellRoute,
+        StackRoute
 
     // Spec 010 US4. The home pivot's reports item is the reporting hub; each report opens from it.
 
@@ -282,7 +289,14 @@ data class ShellUiState(
     val categoryMonth: CategoryMonthPage? = null,
     val reconcile: ReconcilePage? = null,
     val reconcileError: String? = null,
-    val upcoming: List<UpcomingScheduleRow> = emptyList(),
+    /** Every schedule, ended ones included, by next date. */
+    val schedules: List<ScheduleSummary> = emptyList(),
+    /** The schedule [ShellRoute.ScheduleDetails] shows; null while it loads. */
+    val scheduleDetails: ScheduleDetails? = null,
+    /** The schedules pivot item showing: [SchedulesSection.UPCOMING] or [SchedulesSection.ALL]. */
+    val schedulesSection: Int = 0,
+    /** Upcoming shows a month calendar instead of the list. */
+    val schedulesCalendar: Boolean = false,
     val payees: List<PayeeRow> = emptyList(),
     val payeeMergeTarget: String? = null,
     val scheduleDuplicateId: String? = null,
@@ -2445,11 +2459,15 @@ class ShellViewModel(
             val locked = budgetId != null && sync.needsPassword(budgetId)
             val viewMonth = editorMonth()
             val shell = if (budgetId == null || locked) null else library.readShell(budgetId, viewMonth)
-            val upcoming =
+            val schedules =
                 if (budgetId == null || locked) {
                     emptyList()
                 } else {
-                    library.readUpcomingSchedules(budgetId)
+                    library.readSchedules(budgetId)
+                }
+            val scheduleDetails =
+                (_state.value.route as? ShellRoute.ScheduleDetails)?.let { route ->
+                    if (budgetId == null || locked) null else library.readScheduleDetails(budgetId, route.scheduleId)
                 }
             val register =
                 if (budgetId != null && accountId != null && !locked) {
@@ -2498,7 +2516,8 @@ class ShellViewModel(
                 budgets,
                 shell,
                 register,
-                upcoming,
+                schedules,
+                scheduleDetails,
                 monthReview,
                 netWorth,
                 locked,
@@ -2557,7 +2576,11 @@ class ShellViewModel(
                 budgets = loaded.budgets,
                 shell = visibleShell,
                 register = register,
-                upcoming = loaded.upcoming,
+                schedules = loaded.schedules,
+                scheduleDetails =
+                    (route as? ShellRoute.ScheduleDetails)?.let { open ->
+                        (loaded.scheduleDetails ?: current.scheduleDetails)?.takeIf { it.summary.id == open.scheduleId }
+                    },
                 route = route,
                 settingsReturn = current.settingsReturn && route != ShellRoute.Home,
                 openMonth = reviewMonth,
@@ -2803,7 +2826,8 @@ class ShellViewModel(
         val budgets: List<BudgetSummary>,
         val shell: MonthShell?,
         val register: RegisterPage?,
-        val upcoming: List<UpcomingScheduleRow>,
+        val schedules: List<ScheduleSummary>,
+        val scheduleDetails: ScheduleDetails?,
         val monthReview: MonthReviewPage?,
         val netWorth: NetWorthPage?,
         val locked: Boolean,

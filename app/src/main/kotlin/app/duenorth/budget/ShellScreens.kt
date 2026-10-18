@@ -376,7 +376,7 @@ private fun TextStyle.at(scale: Float): TextStyle {
 }
 
 @Composable
-private fun MonthIconButton(
+internal fun MonthIconButton(
     glyph: AppGlyph,
     tag: String,
     onClick: () -> Unit,
@@ -504,7 +504,7 @@ fun BudgetSection(
 
 /** Air after a group's last category, so each group reads as its own block. */
 @Composable
-private fun GroupGap() {
+internal fun GroupGap() {
     Spacer(Modifier.height(MetroDimens.Grid))
 }
 
@@ -553,7 +553,7 @@ private fun GroupLine(
 
 /** A group's name in the group-header type, with its total (or a control) at the end. */
 @Composable
-private fun GroupHeading(
+internal fun GroupHeading(
     name: String,
     tag: String,
     id: String,

@@ -25,6 +25,14 @@ enum class TransactionMenu {
     TRANSFER,
 }
 
+/** What the schedules pivot and a schedule's page need beyond the route. */
+data class SchedulesBar(
+    val section: Int = SchedulesSection.UPCOMING,
+    val calendar: Boolean = false,
+    /** False for an ended schedule: nothing left to post or skip. */
+    val open: Boolean = true,
+)
+
 /** What the settings bar needs beyond the route (spec 012). */
 data class SettingsBar(
     val page: SettingsPage = SettingsPage.BUDGET,
@@ -56,6 +64,7 @@ object ScreenBar {
         bankLinked: Boolean = false,
         transaction: TransactionMenu = TransactionMenu.NEW,
         budgetEditing: Boolean = false,
+        schedules: SchedulesBar = SchedulesBar(),
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -112,18 +121,19 @@ object ScreenBar {
                         listOf(
                             spec("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
                             spec("accounts", AppGlyph.Budgets, AccountScreenCopy.MANAGE),
+                            spec("schedules", AppGlyph.Calendar, ScheduleScreenCopy.SCHEDULES),
                         ) + undo(undoLabel) + settings()
                     mode == BudgetMode.TRACKING ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
-                        ) + editBudget() + hidden(showHidden) + schedules() + undo(undoLabel) + settings()
+                        ) + editBudget() + hidden(showHidden) + rules() + undo(undoLabel) + settings()
                     else ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("hold", AppGlyph.Hold, "hold"),
                             spec("categories", AppGlyph.Categories, "categories"),
-                        ) + editBudget() + hidden(showHidden) + schedules() + undo(undoLabel) + settings()
+                        ) + editBudget() + hidden(showHidden) + rules() + undo(undoLabel) + settings()
                 }
             // Select mode swaps the register's bar for what can be done to the picked transactions.
             is ShellRoute.Register ->
@@ -159,6 +169,29 @@ object ScreenBar {
             is ShellRoute.EditAccount,
             -> saveCancel()
             ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, RuleScreenCopy.ADD)) + undo(undoLabel)
+            // Upcoming switches between its list and its calendar; all has nothing to switch.
+            ShellRoute.Schedules ->
+                listOf(spec("add-schedule", AppGlyph.Add, ScheduleScreenCopy.NEW)) +
+                    if (schedules.section == SchedulesSection.UPCOMING) {
+                        listOf(
+                            if (schedules.calendar) {
+                                spec("schedules-view", AppGlyph.Categories, ScheduleScreenCopy.LIST)
+                            } else {
+                                spec("schedules-view", AppGlyph.Calendar, ScheduleScreenCopy.CALENDAR)
+                            },
+                        )
+                    } else {
+                        emptyList()
+                    } + undo(undoLabel)
+            is ShellRoute.ScheduleDetails ->
+                buildList {
+                    if (schedules.open) {
+                        add(spec("post-schedule", AppGlyph.Save, ScheduleScreenCopy.POST))
+                        add(spec("skip-schedule", AppGlyph.ChevronRight, ScheduleScreenCopy.SKIP))
+                    }
+                    add(spec("edit-schedule", AppGlyph.Settings, ScheduleScreenCopy.EDIT_ACTION))
+                    add(menu("delete-schedule", AppGlyph.Cancel, ScheduleScreenCopy.DELETE))
+                } + undo(undoLabel)
             is ShellRoute.ScheduleEditor ->
                 saveCancel() +
                     if (route.scheduleId ==
@@ -241,6 +274,11 @@ object ScreenBar {
             state.registerBankLinked,
             transactionMenu(state),
             state.budgetEdit != null,
+            SchedulesBar(
+                section = state.schedulesSection,
+                calendar = state.schedulesCalendar,
+                open = state.scheduleDetails?.summary?.completed != true,
+            ),
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -280,13 +318,8 @@ object ScreenBar {
             menu("zero", AppGlyph.Zero, MonthFillCopy.ZERO),
         )
 
-    /** Home `•••` → what is due, new schedule, and rules (spec 010 US3). */
-    private fun schedules() =
-        listOf(
-            menu("due", AppGlyph.Calendar, ScheduleScreenCopy.DUE),
-            menu("add-schedule", AppGlyph.Add, ScheduleScreenCopy.ADD),
-            menu("rules", AppGlyph.Categories, RuleScreenCopy.TITLE),
-        )
+    /** Home `•••` → rules (spec 010 US3); schedules live on the accounts pivot item. */
+    private fun rules() = listOf(menu("rules", AppGlyph.Categories, RuleScreenCopy.TITLE))
 
     /** Home `•••` → templates, only while experimental features and budget templates are both on (spec 010 US5). */
     private fun templates(on: Boolean) = if (on) listOf(menu("templates", AppGlyph.Average, TemplateCopy.TITLE)) else emptyList()
@@ -337,7 +370,11 @@ class ScreenBarHandlers(
     val onAddRule: () -> Unit = {},
     val onDeleteSchedule: () -> Unit = {},
     val onDeleteRule: () -> Unit = {},
-    val onDue: () -> Unit = {},
+    val onSchedules: () -> Unit = {},
+    val onSchedulesView: () -> Unit = {},
+    val onPostSchedule: () -> Unit = {},
+    val onSkipSchedule: () -> Unit = {},
+    val onEditSchedule: () -> Unit = {},
     val onTemplates: () -> Unit = {},
     val onBankLink: () -> Unit = {},
     val onNext: () -> Unit = {},
@@ -400,7 +437,11 @@ class ScreenBarHandlers(
             "add-rule" -> onAddRule
             "delete-schedule" -> onDeleteSchedule
             "delete-rule" -> onDeleteRule
-            "due" -> onDue
+            "schedules" -> onSchedules
+            "schedules-view" -> onSchedulesView
+            "post-schedule" -> onPostSchedule
+            "skip-schedule" -> onSkipSchedule
+            "edit-schedule" -> onEditSchedule
             "templates" -> onTemplates
             "bank-link" -> onBankLink
             "next" -> onNext

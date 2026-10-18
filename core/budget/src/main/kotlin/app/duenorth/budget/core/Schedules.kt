@@ -31,6 +31,45 @@ data class UpcomingScheduleRow(
     val status: String,
 )
 
+/**
+ * One schedule as the schedules view lists it: what it is, how it repeats, and the dates it falls
+ * on from its next date for about a year ([dates]; empty once it has ended).
+ */
+data class ScheduleSummary(
+    val id: String,
+    val name: String,
+    val accountId: String,
+    val accountName: String,
+    val payee: String,
+    val amountMinor: Long,
+    /** `is`, `isapprox`, or `isbetween`. */
+    val amountOp: String,
+    val categoryLabel: String,
+    val nextDate: Int,
+    val completed: Boolean,
+    val postsTransaction: Boolean,
+    val repeat: ScheduleRepeat,
+    val interval: Int,
+    val dates: List<Int>,
+) {
+    /** The schedule's own name, or its payee's when it has none. */
+    val title: String get() = name.ifBlank { payee }
+}
+
+/** A transaction a schedule posted. */
+data class SchedulePosted(
+    val id: String,
+    val date: Int,
+    val amountMinor: Long,
+    val categoryLabel: String,
+)
+
+/** A schedule's own page: the summary and the transactions it has posted, newest first. */
+data class ScheduleDetails(
+    val summary: ScheduleSummary,
+    val posted: List<SchedulePosted>,
+)
+
 /** How a schedule repeats in the editor; `ONCE` stores a plain date. */
 enum class ScheduleRepeat(
     val frequency: String?,
@@ -132,6 +171,94 @@ class SchedulesBook(
                     status = if (schedule.nextIso == todayIso) "due" else "upcoming",
                 )
             }
+    }
+
+    /** Every schedule, ended ones included, by next date. */
+    fun listAll(): List<ScheduleSummary> {
+        val accounts = HashMap<String, String>()
+        return loadSchedules()
+            .sortedWith(compareBy({ it.nextIso }, { it.name }))
+            .map { schedule ->
+                val name = accounts.getOrPut(schedule.accountId) { account(schedule.accountId)?.name.orEmpty() }
+                summary(schedule, name)
+            }
+    }
+
+    /** One schedule with what it has posted; null when it is gone. */
+    fun details(
+        scheduleId: String,
+        postedLimit: Int = 12,
+    ): ScheduleDetails? {
+        val schedule = loadSchedules().firstOrNull { it.id == scheduleId } ?: return null
+        val posted =
+            session
+                .query(
+                    """
+                    SELECT t.id AS id, t.date AS date, t.amount AS amount, c.name AS category
+                    FROM transactions t
+                    LEFT JOIN categories c ON c.id = t.category
+                    WHERE IFNULL(t.tombstone, 0) = 0
+                      AND IFNULL(t.isChild, 0) = 0
+                      AND t.schedule = ?
+                    ORDER BY t.date DESC, t.sort_order DESC
+                    LIMIT ?
+                    """.trimIndent(),
+                    listOf(scheduleId, postedLimit),
+                ).map { row ->
+                    SchedulePosted(
+                        id = row.str("id").orEmpty(),
+                        date = row.long("date").toInt(),
+                        amountMinor = row.long("amount"),
+                        categoryLabel = row.str("category").orEmpty().ifBlank { RegisterCopy.NO_CATEGORY },
+                    )
+                }
+        return ScheduleDetails(summary(schedule, account(schedule.accountId)?.name.orEmpty()), posted)
+    }
+
+    private fun summary(
+        schedule: LoadedSchedule,
+        accountName: String,
+    ): ScheduleSummary {
+        val config = schedule.dateCondition["value"] as? JsonObject
+        val frequency = config?.get("frequency")?.jsonPrimitive?.contentOrNull
+        val next = ScheduleDates.parseIso(schedule.nextIso)
+        val dates =
+            when {
+                schedule.completed || next == null -> emptyList()
+                config == null -> listOf(next)
+                else -> {
+                    val horizon = next.plusYears(1)
+                    ScheduleRecurrence.occurrences(config, next, limit = DATES_LIMIT).filter { it <= horizon }
+                }
+            }.map { it.toActualDate() }
+        val amountOp =
+            schedule.conditionsJson
+                .firstOrNull { it.jsonObject["field"]?.jsonPrimitive?.contentOrNull == "amount" }
+                ?.jsonObject
+                ?.get("op")
+                ?.jsonPrimitive
+                ?.contentOrNull ?: "is"
+        return ScheduleSummary(
+            id = schedule.id,
+            name = schedule.name,
+            accountId = schedule.accountId,
+            accountName = accountName,
+            payee = schedule.payeeName,
+            amountMinor = schedule.amountMinor,
+            amountOp = amountOp,
+            categoryLabel = schedule.categoryLabel,
+            nextDate = ScheduleDates.fromIso(schedule.nextIso) ?: 0,
+            completed = schedule.completed,
+            postsTransaction = schedule.postsTransaction,
+            repeat = ScheduleRepeat.entries.firstOrNull { it.frequency == frequency } ?: ScheduleRepeat.ONCE,
+            interval =
+                config
+                    ?.get("interval")
+                    ?.jsonPrimitive
+                    ?.intOrNull
+                    ?.coerceAtLeast(1) ?: 1,
+            dates = dates,
+        )
     }
 
     fun post(
@@ -555,6 +682,7 @@ class SchedulesBook(
         val nextIso: String,
         val conditionsJson: JsonArray,
         val dateCondition: JsonObject,
+        val postsTransaction: Boolean = false,
     )
 
     private fun loadSchedules(): List<LoadedSchedule> {
@@ -566,6 +694,7 @@ class SchedulesBook(
                     s.name AS name,
                     s.rule AS rule,
                     s.completed AS completed,
+                    s.posts_transaction AS posts_transaction,
                     r.conditions AS conditions,
                     nd.local_next_date AS next_date
                 FROM schedules s
@@ -623,6 +752,7 @@ class SchedulesBook(
                 nextIso = nextIso,
                 conditionsJson = conditions,
                 dateCondition = dateCond,
+                postsTransaction = row.long("posts_transaction") == 1L,
             )
         }
     }
@@ -746,6 +876,9 @@ class SchedulesBook(
         )
     }
 }
+
+/** Enough dates for a weekly schedule's year; a daily one shows its next few months. */
+private const val DATES_LIMIT = 120
 
 private val EDITED_DATE_KEYS = setOf("start", "frequency", "interval", "endMode", "endOccurrences", "endDate")
 

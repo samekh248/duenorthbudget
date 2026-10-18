@@ -13,9 +13,57 @@ class ScreenBarTest {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
         assertEquals(listOf("add", "hold", "categories"), specs.filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("edit-budget", "show-hidden", "due", "add-schedule", "rules", "settings"),
+            listOf("edit-budget", "show-hidden", "rules", "settings"),
             specs.filter { !it.primary }.map { it.id },
         )
+    }
+
+    // Schedules live on the accounts pivot item: its bar opens them, and the budget's menu no longer adds or lists them.
+    @Test
+    fun accountsBarOpensSchedules() {
+        val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_ACCOUNTS)
+        assertEquals(listOf("add-account", "accounts", "schedules"), specs.filter { it.primary }.map { it.id })
+        assertEquals("schedules", specs.single { it.id == "schedules" }.label)
+    }
+
+    // Upcoming switches between its list and calendar; all has nothing to switch.
+    @Test
+    fun schedulesBarSwitchesUpcomingView() {
+        val list = ScreenBar.specsFor(ShellRoute.Schedules, hasBudget = true, mode = BudgetMode.ENVELOPE)
+        assertEquals(listOf("add-schedule", "schedules-view"), list.map { it.id })
+        assertEquals("calendar", list.last().label)
+        val calendar =
+            ScreenBar.specsFor(
+                ShellRoute.Schedules,
+                hasBudget = true,
+                mode = BudgetMode.ENVELOPE,
+                schedules = SchedulesBar(calendar = true),
+            )
+        assertEquals("list", calendar.last().label)
+        val all =
+            ScreenBar.specsFor(
+                ShellRoute.Schedules,
+                hasBudget = true,
+                mode = BudgetMode.ENVELOPE,
+                schedules = SchedulesBar(section = SchedulesSection.ALL),
+            )
+        assertEquals(listOf("add-schedule"), all.map { it.id })
+    }
+
+    // A schedule's page: post, skip and edit on the bar, delete in the menu; an ended one only edits.
+    @Test
+    fun scheduleDetailsBar() {
+        val open = ScreenBar.specsFor(ShellRoute.ScheduleDetails("s1"), hasBudget = true, mode = BudgetMode.ENVELOPE)
+        assertEquals(listOf("post-schedule", "skip-schedule", "edit-schedule"), open.filter { it.primary }.map { it.id })
+        assertEquals(listOf("delete-schedule"), open.filter { !it.primary }.map { it.id })
+        val ended =
+            ScreenBar.specsFor(
+                ShellRoute.ScheduleDetails("s1"),
+                hasBudget = true,
+                mode = BudgetMode.ENVELOPE,
+                schedules = SchedulesBar(open = false),
+            )
+        assertEquals(listOf("edit-schedule"), ended.filter { it.primary }.map { it.id })
     }
 
     // Edit mode: done and undo on the bar, the month fills in the menu, and no settings to wander off to.
@@ -58,7 +106,7 @@ class ScreenBarTest {
                 mode = BudgetMode.ENVELOPE,
                 homeSection = ScreenBar.HOME_ACCOUNTS,
             )
-        assertEquals(listOf("add-account", "accounts"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add-account", "accounts", "schedules"), specs.filter { it.primary }.map { it.id })
         assertEquals(listOf("settings"), specs.filter { !it.primary }.map { it.id })
     }
 

@@ -645,6 +645,13 @@ class BudgetLibrary(
     fun readUpcomingSchedules(budgetId: String): List<UpcomingScheduleRow> =
         open(budgetId) { SchedulesBook(it, clock).listUpcoming() } ?: emptyList()
 
+    fun readSchedules(budgetId: String): List<ScheduleSummary> = open(budgetId) { SchedulesBook(it, clock).listAll() } ?: emptyList()
+
+    fun readScheduleDetails(
+        budgetId: String,
+        scheduleId: String,
+    ): ScheduleDetails? = open(budgetId) { SchedulesBook(it, clock).details(scheduleId) }
+
     fun postSchedule(
         budgetId: String,
         scheduleId: String,

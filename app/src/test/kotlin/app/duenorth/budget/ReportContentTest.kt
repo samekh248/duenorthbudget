@@ -37,7 +37,7 @@ class ReportContentTest {
         for (mode in listOf(BudgetMode.ENVELOPE, BudgetMode.TRACKING)) {
             val ids = ScreenBar.specsFor(ShellRoute.Home, true, mode).map { it.id }
             assertTrue("reports" !in ids)
-            assertTrue("due" in ids)
+            assertTrue("due" !in ids)
         }
     }
 
@@ -176,10 +176,6 @@ class ReportContentTest {
         assertEquals(ShellRoute.Home, model.state.value.route)
         model.openMonthReview()
         assertEquals(ShellRoute.MonthReview, model.state.value.route)
-        model.back()
-        assertEquals(ShellRoute.Home, model.state.value.route)
-        model.openDue()
-        assertEquals(ShellRoute.Due, model.state.value.route)
         model.back()
         assertEquals(ShellRoute.Home, model.state.value.route)
     }

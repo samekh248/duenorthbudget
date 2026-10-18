@@ -46,102 +46,6 @@ import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 
-/** Home `•••` → due: a top-level view of the upcoming scheduled transactions to post or skip. */
-@Composable
-fun DueScreen(
-    rows: List<UpcomingScheduleRow>,
-    currency: CurrencySpec,
-    onPost: (String) -> Unit,
-    onSkip: (String) -> Unit,
-    onOpen: (String) -> Unit,
-    onGesture: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .testTag("due-screen"),
-    ) {
-        MetroText(ScheduleScreenCopy.DUE, Metro.typography.header, Modifier.padding(MetroDimens.Gutter))
-        DueSection(rows, currency, onGesture, onPost, onSkip, onOpen = onOpen)
-    }
-}
-
-@Composable
-fun DueSection(
-    rows: List<UpcomingScheduleRow>,
-    currency: CurrencySpec,
-    onListGesture: (Boolean) -> Unit,
-    onPost: (String) -> Unit,
-    onSkip: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    formatOptions: FormatOptions = formatOptions(),
-    onOpen: (String) -> Unit = {},
-) {
-    if (rows.isEmpty()) {
-        MetroText(
-            "nothing due",
-            Metro.typography.body,
-            modifier.padding(MetroDimens.Gutter),
-        )
-        return
-    }
-    val list = rememberLazyListState()
-    LaunchedEffect(list) {
-        snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
-    }
-    LazyColumn(modifier.fillMaxSize(), state = list) {
-        items(rows, key = { it.id }) { row ->
-            DueLine(row, currency, onPost, onSkip, formatOptions, onOpen)
-        }
-    }
-}
-
-@Composable
-private fun DueLine(
-    row: UpcomingScheduleRow,
-    currency: CurrencySpec,
-    onPost: (String) -> Unit,
-    onSkip: (String) -> Unit,
-    formatOptions: FormatOptions = formatOptions(),
-    onOpen: (String) -> Unit = {},
-) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
-            .testTag("due-${row.id}"),
-    ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            Column(
-                Modifier
-                    .weight(1f)
-                    .metroPress { onOpen(row.id) }
-                    .padding(end = 12.dp)
-                    .testTag("due-open-${row.id}"),
-            ) {
-                MetroText(row.payee, Metro.typography.subheader, maxLines = 2)
-                MetroText(
-                    "${row.accountName} · ${RegisterEntry.registerDateLabel(row.nextDate, dateFormat())}",
-                    Metro.typography.body,
-                    color = Metro.colors.secondary,
-                    maxLines = 2,
-                )
-            }
-            MetroText(
-                MoneyFormat.format(row.amountMinor, currency, formatOptions),
-                Metro.typography.subheader,
-                Modifier.widthIn(max = 148.dp),
-            )
-        }
-        MetroButtonGrid(Modifier.padding(top = MetroDimens.Gutter)) {
-            MetroButton(if (row.dueToday) "post" else "post early") { onPost(row.id) }
-            MetroButton("skip") { onSkip(row.id) }
-        }
-    }
-}
-
 @Composable
 fun ScheduleDuplicateScreen(
     onPostAnyway: () -> Unit,
@@ -169,7 +73,34 @@ fun ScheduleDuplicateScreen(
 
 /** Words for the schedule editor (`contracts/schedules-rules.md`). */
 object ScheduleScreenCopy {
-    const val DUE = "due"
+    const val SCHEDULES = "schedules"
+    const val UPCOMING = "upcoming"
+    const val ALL = "all"
+    const val NEW = "new"
+    const val LIST = "list"
+    const val CALENDAR = "calendar"
+    const val POST = "post"
+    const val POST_EARLY = "post early"
+    const val SKIP = "skip"
+    const val EDIT_ACTION = "edit"
+    const val NEXT_30_DAYS = "next 30 days"
+    const val COMING_IN = "coming in"
+    const val DUE_TODAY = "due today"
+    const val DUE_ON = "due"
+    const val NOTHING_COMING = "nothing coming up in the next 30 days"
+    const val NOTHING_ON_DAY = "nothing scheduled"
+    const val NO_SCHEDULES = "no schedules yet"
+    const val ENDED = "Ended"
+    const val ENDED_LINE = "ended"
+    const val NEXT = "next"
+    const val REPEATS = "repeats"
+    const val COMING_UP = "coming up"
+    const val POSTED = "posted"
+    const val NOTHING_POSTED = "nothing posted yet"
+    const val ADDS = "adds the transaction"
+    const val ADDS_YES = "yes, on its date"
+    const val ADDS_NO = "no, waits for post"
+    const val ADDS_ITSELF = "adds itself"
     const val ADD = "new schedule"
     const val EDIT = "schedule"
     const val DELETE = "delete schedule"
@@ -194,6 +125,30 @@ object ScheduleScreenCopy {
     const val AUTO_POST = "add the transaction automatically"
     const val KEPT = "kept from the file: day pattern and weekend move"
     const val ENTER_AMOUNT = "enter an amount"
+
+    /** "every month", "every 2 weeks", or "once". */
+    fun every(
+        repeat: ScheduleRepeat,
+        interval: Int,
+    ): String {
+        val unit =
+            when (repeat) {
+                ScheduleRepeat.ONCE -> return "once"
+                ScheduleRepeat.DAILY -> "day"
+                ScheduleRepeat.WEEKLY -> "week"
+                ScheduleRepeat.MONTHLY -> "month"
+                ScheduleRepeat.YEARLY -> "year"
+            }
+        return if (interval <= 1) "every $unit" else "every $interval ${unit}s"
+    }
+
+    /** How the amount is matched: exactly, about, or between. */
+    fun amountKind(op: String): String =
+        when (op) {
+            "isapprox" -> ABOUT
+            "isbetween" -> BETWEEN
+            else -> EXACTLY
+        }
 
     fun repeat(value: ScheduleRepeat): String =
         when (value) {

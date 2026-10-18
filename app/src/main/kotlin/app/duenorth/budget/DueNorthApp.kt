@@ -41,6 +41,7 @@ import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.OnboardingOrigin
+import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.ServerAddress
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.ThemeMode
@@ -263,7 +264,11 @@ fun DueNorthApp(model: ShellViewModel) {
                     onAddRule = model::openNewRule,
                     onDeleteSchedule = model::deleteOpenSchedule,
                     onDeleteRule = model::deleteOpenRule,
-                    onDue = model::openDue,
+                    onSchedules = model::openSchedules,
+                    onSchedulesView = model::toggleSchedulesCalendar,
+                    onPostSchedule = model::postOpenSchedule,
+                    onSkipSchedule = model::skipOpenSchedule,
+                    onEditSchedule = model::editOpenSchedule,
                     onTemplates = model::openTemplates,
                     onBankLink = model::openBankLink,
                     onNext = model::onboardingCheck,
@@ -915,20 +920,33 @@ fun DueNorthApp(model: ShellViewModel) {
                             }
                         }
                         ShellRoute.Rules -> RulesScreen(state.rulesList, model::openRule, fill)
-                        ShellRoute.Due -> {
+                        ShellRoute.Schedules -> {
                             val shell = state.shell
                             if (shell == null) {
                                 Placeholder()
                             } else {
-                                DueScreen(
-                                    rows = state.upcoming,
+                                SchedulesScreen(
+                                    schedules = state.schedules,
                                     currency = shell.currency,
+                                    today = RegisterEntry.parseDate(state.today) ?: 0,
+                                    section = state.schedulesSection,
+                                    calendar = state.schedulesCalendar,
+                                    onSection = model::setSchedulesSection,
+                                    onOpen = model::openScheduleDetails,
                                     onPost = model::postSchedule,
                                     onSkip = model::skipSchedule,
-                                    onOpen = model::openSchedule,
                                     onGesture = model::setGesture,
                                     modifier = fill,
                                 )
+                            }
+                        }
+                        is ShellRoute.ScheduleDetails -> {
+                            val details = state.scheduleDetails
+                            val shell = state.shell
+                            if (details == null || shell == null || details.summary.id != route.scheduleId) {
+                                Placeholder()
+                            } else {
+                                ScheduleDetailsScreen(details, shell.currency, fill)
                             }
                         }
                         ShellRoute.MonthReview ->
