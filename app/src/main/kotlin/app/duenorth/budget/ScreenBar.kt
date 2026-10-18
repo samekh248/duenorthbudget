@@ -88,13 +88,13 @@ object ScreenBar {
             ShellRoute.Home ->
                 when {
                     !hasBudget -> settings()
-                    // Edit mode is a sandbox: done saves what changed, cancel drops it. Undo and the month
-                    // fills would write straight away, so they wait until it is over.
+                    // Edit mode is a sandbox: done saves what changed, cancel drops it. The month fills and
+                    // templates live here and fill its boxes; undo would write straight away, so it waits.
                     homeSection == HOME_BUDGET && budgetEditing ->
                         listOf(
                             spec("end-budget-edit", AppGlyph.Save, BudgetEditCopy.DONE),
                             spec("cancel-budget-edit", AppGlyph.Cancel, BudgetEditCopy.CANCEL),
-                        )
+                        ) + fills() + templates(templates)
                     // The accounts pivot item carries account management, so the month menu does not.
                     // Select mode swaps the inbox's bar for what can be done to the checked rows.
                     homeSection == HOME_INBOX && inboxSelecting ->
@@ -117,15 +117,13 @@ object ScreenBar {
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
-                        ) + editBudget() + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel) +
-                            settings()
+                        ) + editBudget() + hidden(showHidden) + schedules() + undo(undoLabel) + settings()
                     else ->
                         listOf(
                             spec("add", AppGlyph.Add, "add"),
                             spec("hold", AppGlyph.Hold, "hold"),
                             spec("categories", AppGlyph.Categories, "categories"),
-                        ) + editBudget() + hidden(showHidden) + fills() + schedules() + templates(templates) + undo(undoLabel) +
-                            settings()
+                        ) + editBudget() + hidden(showHidden) + schedules() + undo(undoLabel) + settings()
                 }
             // Select mode swaps the register's bar for what can be done to the picked transactions.
             is ShellRoute.Register ->

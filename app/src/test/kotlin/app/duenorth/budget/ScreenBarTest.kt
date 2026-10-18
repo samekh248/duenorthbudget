@@ -13,7 +13,7 @@ class ScreenBarTest {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
         assertEquals(listOf("add", "hold", "categories"), specs.filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("edit-budget", "show-hidden", "copy-last", "average", "zero", "due", "add-schedule", "rules", "settings"),
+            listOf("edit-budget", "show-hidden", "due", "add-schedule", "rules", "settings"),
             specs.filter { !it.primary }.map { it.id },
         )
     }
@@ -22,9 +22,20 @@ class ScreenBarTest {
     @Test
     fun budgetEditModeBar() {
         val specs =
-            ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, undoLabel = "assign", budgetEditing = true)
-        // A sandbox: done and cancel only, since undo and the fills would write straight away.
-        assertEquals(listOf("end-budget-edit", "cancel-budget-edit"), specs.map { it.id })
+            ScreenBar.specsFor(
+                ShellRoute.Home,
+                hasBudget = true,
+                mode = BudgetMode.ENVELOPE,
+                undoLabel = "assign",
+                budgetEditing = true,
+                templates = true,
+            )
+        // A sandbox: done and cancel, with the fills and templates in its menu; undo would write straight away.
+        assertEquals(listOf("end-budget-edit", "cancel-budget-edit"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("copy-last", "average", "zero", "templates"), specs.filter { !it.primary }.map { it.id })
+        // The budget's own menu no longer carries them.
+        val home = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, templates = true).map { it.id }
+        assertTrue(home.none { it in setOf("copy-last", "average", "zero", "templates") })
     }
 
     @Test

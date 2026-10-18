@@ -62,12 +62,7 @@ class MonthFillBook(
         month: YearMonth,
         confirmed: Boolean,
     ): MonthFillResult {
-        val amounts =
-            when (kind) {
-                MonthFillKind.COPY_LAST -> copyTargets(month)
-                MonthFillKind.AVERAGE -> averageTargets(month)
-                MonthFillKind.ZERO -> zeroTargets()
-            }
+        val amounts = targets(kind, month)
         if (amounts.isEmpty()) return MonthFillResult.NothingToCopy
         if (!confirmed) {
             if (kind == MonthFillKind.ZERO) return MonthFillResult.NeedsConfirm(MonthFillCopy.ZERO_CONFIRM)
@@ -78,6 +73,17 @@ class MonthFillBook(
         }
         return MonthFillResult.Filled
     }
+
+    /** What [fill] would budget each category for [month]; writes nothing. Empty when there is nothing to copy. */
+    fun targets(
+        kind: MonthFillKind,
+        month: YearMonth,
+    ): Map<String, Long> =
+        when (kind) {
+            MonthFillKind.COPY_LAST -> copyTargets(month)
+            MonthFillKind.AVERAGE -> averageTargets(month)
+            MonthFillKind.ZERO -> zeroTargets()
+        }
 
     /** Envelope only: moves [amountMinor] of the category's budget back to to-budget. */
     fun transferToBudget(

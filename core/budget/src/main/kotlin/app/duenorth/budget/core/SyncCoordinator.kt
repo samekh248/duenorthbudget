@@ -458,14 +458,20 @@ class SyncCoordinator(
         return EditResult.Saved
     }
 
-    /** Edit mode's done: every changed budgeted amount for [month], written as one step so one undo takes it all back. */
+    /**
+     * Edit mode's done: every changed budgeted amount for [month], written as one step so one undo takes it all
+     * back. When edit mode ran the templates ([templates] is whether it overwrote), they run first so their goals
+     * are saved too, and the amounts then land over theirs.
+     */
     fun assignBudgets(
         budgetId: String,
         month: YearMonth,
         amounts: Map<String, Long>,
+        templates: Boolean? = null,
     ): EditResult {
-        if (amounts.isEmpty()) return EditResult.Saved
+        if (amounts.isEmpty() && templates == null) return EditResult.Saved
         journaled(budgetId, UndoCopy.BUDGET_EDIT) { session ->
+            if (templates != null) TemplateEngine(session, dates.today()).run(month, overwrite = templates, confirmed = true)
             amounts.forEach { (categoryId, amount) ->
                 BudgetEdits.assign(session, syncClock, month.toActualMonth(), categoryId, amount)
             }
@@ -539,6 +545,16 @@ class SyncCoordinator(
             }
         } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
     }
+
+    /** What a month fill would budget each category for [month], for edit mode to show before anything is saved. */
+    fun fillTargets(
+        budgetId: String,
+        month: YearMonth,
+        kind: MonthFillKind,
+    ): Map<String, Long>? =
+        library.serial {
+            library.useDatabase(budgetId) { session -> MonthFillBook(session, dates.today()).targets(kind, month) }
+        }
 
     /** Copy last month, three-month average or zero (spec 010 US1); one undo step. */
     fun fillMonth(

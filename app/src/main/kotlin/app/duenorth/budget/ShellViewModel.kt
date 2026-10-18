@@ -1085,10 +1085,11 @@ class ShellViewModel(
     fun saveBudgets(
         month: YearMonth,
         amounts: Map<String, Long>,
+        templates: Boolean? = null,
     ) {
         val shell = _state.value.shell ?: return
         applyEnvelopeEdit(optimistic = { amounts.entries.fold(it) { s, (id, minor) -> s.withBudgetedAssignment(id, minor) } }) {
-            sync.assignBudgets(shell.budgetId, month, amounts)
+            sync.assignBudgets(shell.budgetId, month, amounts, templates)
         }
     }
 

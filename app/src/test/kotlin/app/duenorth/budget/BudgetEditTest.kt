@@ -10,9 +10,12 @@ import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.MemorySecretStore
 import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.MoneyParse
+import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.core.TemplateResult
+import app.duenorth.budget.core.UndoCopy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -172,7 +175,11 @@ class BudgetEditTest {
     fun movingMoreThanIsAvailableIsRefused() {
         val model = household("too-much")
         val before = model.state.value.shell!!
-        val (from, to) = before.groups.flatMap { it.categories }.filter { it.availableMinor > 0 }.take(2)
+        val (from, to) =
+            before.groups
+                .flatMap { it.categories }
+                .filter { it.availableMinor > 0 }
+                .take(2)
         model.startBudgetEdit()
         model.openMoveFrom(from.id)
         model.submitMoveCategory(to.id, MoneyParse.formatMagnitude(from.availableMinor + 100, 2))
@@ -192,6 +199,68 @@ class BudgetEditTest {
         assertEquals(before.headerMinor + 1_000, model.editing().headerMinor)
         model.endBudgetEdit()
         await { model.saved().headerMinor == before.headerMinor + 1_000 }
+    }
+
+    @Test
+    fun aMonthFillInEditModeFillsTheBoxesAndSavesOnDone() {
+        val model = household("fill")
+        val before = model.state.value.shell!!
+        model.startBudgetEdit()
+        model.fillMonth(MonthFillKind.ZERO)
+        await {
+            model.state.value.budgetEdit
+                ?.budgeted
+                ?.isNotEmpty() == true
+        }
+        // Nothing to confirm in the sandbox, and nothing saved yet.
+        assertNull(model.state.value.fillConfirm)
+        assertTrue(
+            model
+                .editing()
+                .groups
+                .flatMap { it.categories }
+                .all { it.budgetedMinor == 0L },
+        )
+        assertEquals(before.groups, model.saved().groups)
+
+        model.endBudgetEdit()
+        await {
+            model
+                .saved()
+                .groups
+                .flatMap { it.categories }
+                .all { it.budgetedMinor == 0L }
+        }
+    }
+
+    @Test
+    fun templatesInEditModeFillTheBoxesWithoutSaving() {
+        val model = household("templates")
+        model.setExperimental(true)
+        model.setGoalTemplates(true)
+        await { model.state.value.formatPrefs.templatesOn }
+        model.openCategoryBudget("c-gas")
+        await { model.state.value.categoryNote != null }
+        model.saveCategoryNote("#template 123")
+        await { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }
+        model.back()
+        val before = model.state.value.shell!!
+        model.startBudgetEdit()
+        model.openTemplates()
+        assertEquals(ShellRoute.Templates, model.state.value.route)
+        model.applyTemplates(overwrite = true)
+        await { model.state.value.templateResult is TemplateResult.Applied }
+        assertNull(model.state.value.templateConfirm)
+        assertEquals(12_300L, model.edit().budgeted["c-gas"])
+        settle(model)
+        assertEquals(before.category("c-gas")!!.budgetedMinor, model.saved().category("c-gas")!!.budgetedMinor)
+        assertEquals(UndoCopy.CATEGORY_NOTE, model.state.value.undoLabel)
+
+        model.back()
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        model.endBudgetEdit()
+        await { model.saved().category("c-gas")?.budgetedMinor == 12_300L }
+        await { model.state.value.undoLabel == UndoCopy.BUDGET_EDIT }
     }
 
     @Test

@@ -30,6 +30,11 @@ fun ShellViewModel.applyTemplates(
     overwrite: Boolean,
     confirmed: Boolean = false,
 ) {
+    // Opened from edit mode, templates fill its boxes and save with done; overwriting needs no asking there.
+    if (state.value.budgetEdit != null) {
+        applyTemplatesInBudgetEdit(overwrite)
+        return
+    }
     val budgetId = state.value.settings.openBudgetId ?: return
     val month = editorMonth()
     mutate { it.copy(templateBusy = true, templateConfirm = null) }
