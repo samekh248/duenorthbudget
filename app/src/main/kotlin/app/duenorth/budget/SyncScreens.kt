@@ -250,6 +250,7 @@ fun AddTransactionScreen(
     error: String?,
     onAdd: (String, String) -> Unit,
     modifier: Modifier = Modifier,
+    payees: List<String> = emptyList(),
 ) {
     val prefs = LocalFormatPrefs.current
     var payee by remember { mutableStateOf("") }
@@ -262,7 +263,7 @@ fun AddTransactionScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         MetroText("spend", Metro.typography.header)
-        MetroField(payee, { payee = it }, "payee", Modifier.testTag("spend-payee"))
+        PayeeField(payee, { payee = it }, payees, "payee", "spend-payee")
         MetroField(amount, { amount = it }, "amount", Modifier.testTag("spend-amount"))
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
         RememberFormSave { onAdd(payee, prefs.readAmount(amount)) }

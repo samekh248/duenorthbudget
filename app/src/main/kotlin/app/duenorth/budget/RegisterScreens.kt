@@ -445,6 +445,7 @@ fun TransactionForm(
     dateFormat: String = FormatPrefs().dateFormat,
     numberFormat: String = FormatPrefs().numberFormat,
     hideFraction: Boolean = FormatPrefs().hideFraction,
+    payees: List<String> = emptyList(),
 ) {
     val draftId = remember(row?.id, page.account.id) { row?.id ?: UUID.randomUUID().toString() }
     var date by remember(row?.id) {
@@ -534,13 +535,7 @@ fun TransactionForm(
                 }
             }
             LabeledField(TransactionFormCopy.PAYEE, errorFor(TransactionField.PAYEE), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
-                MetroField(
-                    payee,
-                    { payee = it },
-                    TransactionFormCopy.PAYEE,
-                    Modifier.testTag("transaction-payee"),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-                )
+                PayeeField(payee, { payee = it }, payees, TransactionFormCopy.PAYEE, "transaction-payee")
             }
             LabeledField(TransactionFormCopy.AMOUNT, errorFor(TransactionField.AMOUNT), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
                 AmountLine(
