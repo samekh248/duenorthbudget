@@ -534,6 +534,26 @@ class BudgetLibrary(
             }
         } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    /** Matches a bank transaction with one entered by hand: one transaction stays, as one undo step. */
+    fun matchTransactions(
+        budgetId: String,
+        bankId: String,
+        enteredId: String,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.MATCH) { session ->
+            MatchBook(session, clock.today()).match(bankId, enteredId).also {
+                if (it is WriteResult.Saved) CategoryLearning(session, ids).learnFrom(bankId)
+            }
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun notAMatch(
+        budgetId: String,
+        bankId: String,
+        enteredId: String,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.NOT_A_MATCH) { MatchBook(it, clock.today()).notAMatch(bankId, enteredId) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     fun deleteTransaction(
         budgetId: String,
         transactionId: String,

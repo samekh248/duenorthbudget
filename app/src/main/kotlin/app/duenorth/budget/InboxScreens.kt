@@ -71,6 +71,8 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.InboxRow
+import app.duenorth.budget.core.MatchCopy
+import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.RegisterEntry
@@ -117,6 +119,8 @@ class InboxActions(
     val onSchedule: (String) -> Unit = {},
     val onDelete: (String) -> Unit = {},
     val onOpenAccount: (String) -> Unit = {},
+    val onMatch: (MatchPair) -> Unit = {},
+    val onNotAMatch: (MatchPair) -> Unit = {},
 )
 
 /**
@@ -139,10 +143,15 @@ fun InboxSection(
     actions: InboxActions = InboxActions(),
     selection: Set<String>? = null,
     onToggle: (String) -> Unit = {},
+    lead: String? = null,
 ) {
-    val entries = inboxEntries(shell.inbox, filed)
+    // Both sides of a possible match wait in the pair panel, not in the queue.
+    val paired = shell.matches.flatMapTo(mutableSetOf()) { it.ids }
+    val pair = shell.matches.firstOrNull()?.takeIf { selection == null }
+    val inbox = shell.inbox.filter { it.id !in paired }.sortedBy { if (it.id == lead) 0 else 1 }
+    val entries = inboxEntries(inbox, filed)
     var menu by remember { mutableStateOf<Pair<InboxRow, Rect>?>(null) }
-    if (entries.isEmpty()) {
+    if (entries.isEmpty() && pair == null) {
         Column(modifier.padding(MetroDimens.Gutter), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             MetroText(ShellCopy.NOTHING_TO_CATEGORIZE, Metro.typography.body)
             if (onAdd != null) MetroButton("add", onClick = onAdd)
@@ -154,7 +163,7 @@ fun InboxSection(
     LaunchedEffect(list, selectList) {
         snapshotFlow { list.isScrollInProgress || selectList.isScrollInProgress }.collect { onListGesture(it) }
     }
-    val waiting = shell.inbox.filter { row -> filed.none { it.row.id == row.id } }
+    val waiting = inbox.filter { row -> filed.none { it.row.id == row.id } }
     val money = { minor: Long -> MoneyFormat.format(minor, shell.currency, formatOptions) }
     val animations = Metro.animations
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
@@ -181,6 +190,14 @@ fun InboxSection(
                         "${picked.size}",
                         Metro.colors.foreground,
                         "inbox-selected",
+                        alignEnd = true,
+                    )
+                } else if (shell.matches.isNotEmpty()) {
+                    BudgetTotal(
+                        MatchCopy.TO_MATCH,
+                        "${shell.matches.size}",
+                        Metro.colors.foreground,
+                        "inbox-to-match",
                         alignEnd = true,
                     )
                 } else {
@@ -219,6 +236,7 @@ fun InboxSection(
                 }
             } else {
                 InboxQueue(
+                    pair = pair,
                     entries = entries,
                     list = list,
                     money = money,
@@ -239,6 +257,7 @@ fun InboxSection(
 /** The featured panel over the waiting queue: what the inbox shows outside select mode. */
 @Composable
 private fun InboxQueue(
+    pair: MatchPair?,
     entries: List<InboxEntry>,
     list: LazyListState,
     money: (Long) -> String,
@@ -248,6 +267,33 @@ private fun InboxQueue(
     actions: InboxActions,
     onMenu: (InboxRow, Rect) -> Unit,
 ) {
+    // A possible match leads the inbox: it takes the panel and every waiting row stays in the queue.
+    if (pair != null) {
+        Column(Modifier.fillMaxSize()) {
+            MatchPanel(
+                pair = pair,
+                money = money,
+                onMatch = { actions.onMatch(pair) },
+                onNotAMatch = { actions.onNotAMatch(pair) },
+                modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
+            )
+            LazyColumn(Modifier.weight(1f), state = list) {
+                inboxDayItems(entries) { i, entry ->
+                    InboxLine(
+                        entry = entry,
+                        amount = money(entry.row.amountMinor),
+                        banded = ledgerBanded(i),
+                        onFiledShown = onFiledShown,
+                        onTap = { actions.onDetails(entry.row.id) },
+                        onMenu = { bounds -> onMenu(entry.row, bounds) },
+                        onAccept = onAccept,
+                        onCategorize = onInbox,
+                    )
+                }
+            }
+        }
+        return
+    }
     if (entries.isEmpty()) return
     // The top entry is featured. When it has just been filed, the next waiting one rises into the panel.
     val head = entries.first()
@@ -532,19 +578,26 @@ private fun FeaturedPanel(
 
 /** The featured accept: the one filled button on the page, in the accent colour. */
 @Composable
-private fun AcceptButton(onClick: () -> Unit) {
+private fun AcceptButton(onClick: () -> Unit) = AccentButton(InboxCopy.ACCEPT, Modifier.testTag("inbox-featured-accept"), onClick)
+
+/** A filled button in the accent colour, for the one action a panel leads with. */
+@Composable
+internal fun AccentButton(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.ButtonMin)
             .border(MetroDimens.Stroke, Metro.accent.fill)
             .background(Metro.accent.fill)
             .metroPress(onClick)
-            .padding(horizontal = 9.5.dp, vertical = 3.5.dp)
-            .testTag("inbox-featured-accept"),
+            .padding(horizontal = 9.5.dp, vertical = 3.5.dp),
         contentAlignment = Alignment.Center,
     ) {
-        MetroText(InboxCopy.ACCEPT, Metro.typography.body.copy(fontWeight = MetroWeights.Semibold), color = Metro.accent.onFill)
+        MetroText(label, Metro.typography.body.copy(fontWeight = MetroWeights.Semibold), color = Metro.accent.onFill)
     }
 }
 
@@ -826,7 +879,7 @@ private val collapseSpec = tween<Float>(MetroMotion.SHORT_MS, easing = MetroMoti
 private val INBOX_ROW_AIR = 15.dp
 private val FEATURED_AIR_ABOVE = 24.dp
 private val FEATURED_AIR_BELOW = 28.dp
-private val FEATURED_PAD = 20.dp
+internal val FEATURED_PAD = 20.dp
 private val FEATURED_EMPTY = 96.dp
 private val CHECK_SIZE = 26.dp
 private val MENU_INSET = 24.dp

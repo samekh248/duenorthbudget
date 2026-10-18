@@ -319,6 +319,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onInboxFiledShown = model::inboxFiledShown,
                                 inboxSelection = state.inboxSelection,
                                 onInboxToggle = model::toggleInboxSelected,
+                                inboxLead = state.inboxLead,
                                 inboxActions =
                                     remember(model) {
                                         InboxActions(
@@ -327,6 +328,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                             onSchedule = model::createScheduleFromTransaction,
                                             onDelete = model::deleteInbox,
                                             onOpenAccount = model::openAccount,
+                                            onMatch = { model.matchTransactions(it, stayOnRegister = false) },
+                                            onNotAMatch = { model.notAMatch(it, stayOnRegister = false) },
                                         )
                                     },
                                 netWorth = state.netWorth,
@@ -615,6 +618,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                         importLauncher.launch("*/*")
                                     },
                                     modifier = fill,
+                                    onMatch = { model.matchTransactions(it, stayOnRegister = true) },
+                                    onNotAMatch = { model.notAMatch(it, stayOnRegister = true) },
                                 )
                             }
                         }

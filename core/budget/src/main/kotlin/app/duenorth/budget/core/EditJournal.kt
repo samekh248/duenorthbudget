@@ -28,6 +28,8 @@ object UndoCopy {
     const val BANK_LINK = "bank link"
     const val CLEAR = "clear"
     const val UNCLEAR = "unclear"
+    const val MATCH = "match"
+    const val NOT_A_MATCH = "not a match"
 }
 
 /** One person-level action, as the cells it wrote. */
