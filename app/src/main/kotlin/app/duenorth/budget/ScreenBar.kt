@@ -230,7 +230,6 @@ object ScreenBar {
                     }
             ShellRoute.AddTransaction,
             is ShellRoute.SplitTransaction,
-            is ShellRoute.TransferMoney,
             ShellRoute.HoldMonth,
             is ShellRoute.ToBudget,
             is ShellRoute.MoveCategory,
@@ -349,7 +348,6 @@ class ScreenBarHandlers(
     val onHold: () -> Unit,
     val onCategories: () -> Unit,
     val onSettings: () -> Unit,
-    val onTransfer: () -> Unit,
     val onReconcile: () -> Unit,
     val onImport: () -> Unit,
     val onBankSync: () -> Unit = {},
@@ -414,7 +412,6 @@ class ScreenBarHandlers(
             "hold" -> onHold
             "categories" -> onCategories
             "settings" -> onSettings
-            "transfer" -> onTransfer
             "reconcile" -> onReconcile
             "import" -> onImport
             "sync" -> onBankSync

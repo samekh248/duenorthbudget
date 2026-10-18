@@ -69,16 +69,16 @@ class ReconcileReviewTest {
             session.exec(
                 "INSERT INTO accounts (id, name, offbudget, type, sort_order) VALUES ('other', 'Other', 0, 'checking', 3)",
             )
-            register.transfer(
-                TransferDraft(
+            register.save(
+                TransactionDraft(
                     id = "xfer",
-                    fromAccountId = "checking",
-                    toAccountId = "other",
+                    accountId = "checking",
                     date = 20261007,
-                    amountMinor = 500,
+                    payee = "",
+                    amountMinor = -500,
                     categoryId = null,
                     note = null,
-                    force = false,
+                    transferAccountId = "other",
                 ),
             )
             val month = YearMonth.of(2026, 10)
@@ -171,5 +171,4 @@ class ReconcileReviewTest {
         date: Int = 20261007,
         payee: String = "Cafe",
     ) = TransactionDraft(id, account, date, payee, amount, category, null, false)
-
 }

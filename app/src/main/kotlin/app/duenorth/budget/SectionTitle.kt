@@ -46,7 +46,6 @@ object SectionTitle {
                 is ShellRoute.Reconcile,
                 is ShellRoute.ImportPreviewRoute,
                 is ShellRoute.ImportReviewRoute,
-                is ShellRoute.TransferMoney,
                 is ShellRoute.BankLink,
                 is ShellRoute.EditAccount,
                 is ShellRoute.CloseAccount,

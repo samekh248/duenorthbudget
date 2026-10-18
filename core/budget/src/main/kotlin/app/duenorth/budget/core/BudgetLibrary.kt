@@ -589,11 +589,6 @@ class BudgetLibrary(
         edit(budgetId, UndoCopy.UNSPLIT) { RegisterBook(it).unsplit(transactionId, force) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
-    fun transfer(
-        budgetId: String,
-        draft: TransferDraft,
-    ): WriteResult = edit(budgetId, UndoCopy.TRANSFER) { RegisterBook(it).transfer(draft) } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
-
     fun readMonthReview(
         budgetId: String,
         month: YearMonth,

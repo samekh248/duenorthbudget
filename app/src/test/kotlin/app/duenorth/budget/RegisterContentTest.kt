@@ -45,7 +45,6 @@ import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterRow
 import app.duenorth.budget.core.TransactionDraft
-import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -71,7 +70,6 @@ class RegisterContentTest {
                         onGesture = {},
                         onOpen = {},
                         onAdd = {},
-                        onTransfer = {},
                         onReconcile = {},
                     )
                 }
@@ -99,7 +97,6 @@ class RegisterContentTest {
                         onGesture = {},
                         onOpen = { opened += it },
                         onAdd = {},
-                        onTransfer = {},
                         onReconcile = {},
                         selection = selection,
                         onSelect = { started += it },
@@ -131,7 +128,6 @@ class RegisterContentTest {
                         onGesture = {},
                         onOpen = {},
                         onAdd = {},
-                        onTransfer = {},
                         onReconcile = {},
                     )
                 }
@@ -401,7 +397,6 @@ class RegisterContentTest {
                             onGesture = {},
                             onOpen = {},
                             onAdd = {},
-                            onTransfer = {},
                             onReconcile = {},
                         )
                     }
@@ -411,29 +406,6 @@ class RegisterContentTest {
         compose.onNodeWithTag("register-day-20261007", useUnmergedTree = true).assertTextEquals("oct 7")
         compose.onAllNodesWithText("-$12,40").onFirst().assertIsDisplayed()
         compose.onNodeWithText("-$1.234,56").assertIsDisplayed()
-    }
-
-    @Test
-    fun transferReadsTheDateAndAmountInTheChosenFormat() {
-        var saved: TransferDraft? = null
-        val host = FormSaveHost()
-        compose.setContent {
-            MetroTheme {
-                CompositionLocalProvider(
-                    LocalFormSaveHost provides host,
-                    LocalFormatPrefs provides FormatPrefs(dateFormat = "dd.MM.yyyy", numberFormat = FormatOptions.NUMBER_DOT_COMMA),
-                ) {
-                    Box(Modifier.width(390.dp).height(780.dp)) {
-                        TransferForm(page = sample(), initialDate = "2026-10-07", error = null, onSave = { saved = it })
-                    }
-                }
-            }
-        }
-        compose.onNodeWithText("07.10.2026").assertIsDisplayed()
-        compose.onAllNodes(hasSetTextAction())[1].performTextReplacement("1.234,56")
-        compose.runOnIdle { host.save() }
-        assertEquals(123_456L, saved?.amountMinor)
-        assertEquals(20261007, saved?.date)
     }
 
     @Test

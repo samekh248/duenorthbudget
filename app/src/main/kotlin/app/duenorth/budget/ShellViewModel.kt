@@ -63,7 +63,6 @@ import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.TransactionDraft
-import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.core.UnlockResult
 import app.duenorth.budget.core.UploadResult
 import app.duenorth.budget.core.WriteResult
@@ -122,10 +121,6 @@ sealed interface ShellRoute {
     data class SplitTransaction(
         val accountId: String,
         val transactionId: String,
-    ) : ShellRoute
-
-    data class TransferMoney(
-        val accountId: String,
     ) : ShellRoute
 
     /** The category picker for [transactionId], plus [others] when several inbox rows are filed together. */
@@ -1700,11 +1695,6 @@ class ShellViewModel(
         push(ShellRoute.SplitTransaction(accountId, transactionId))
     }
 
-    fun openTransfer() {
-        val accountId = openAccountId() ?: return
-        push(ShellRoute.TransferMoney(accountId))
-    }
-
     fun openReconcile() {
         val accountId = openAccountId() ?: return
         push(ShellRoute.Reconcile(accountId))
@@ -1806,13 +1796,6 @@ class ShellViewModel(
         launchWrite { id ->
             val result = withContext(Dispatchers.IO) { library.saveTransaction(id, draft) }
             publish(result, draft.accountId, stayOnRegister = true)
-        }
-    }
-
-    fun submitTransfer(draft: TransferDraft) {
-        launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.transfer(id, draft) }
-            publish(result, draft.fromAccountId, stayOnRegister = true)
         }
     }
 
@@ -1939,7 +1922,6 @@ class ShellViewModel(
                         is ForcedWrite.Categories -> library.setTransactionsCategory(id, retry.assignments, true)
                         is ForcedWrite.Split -> library.splitTransaction(id, retry.transactionId, retry.parts, true)
                         is ForcedWrite.Unsplit -> library.unsplitTransaction(id, retry.transactionId, true)
-                        is ForcedWrite.Transfer -> library.transfer(id, retry.draft)
                         is ForcedWrite.Cleared ->
                             library.setTransactionsCleared(id, retry.transactionIds, retry.cleared, true)
                     }
@@ -2353,7 +2335,6 @@ class ShellViewModel(
             is ShellRoute.Register -> route.accountId
             is ShellRoute.EditTransaction -> route.accountId
             is ShellRoute.SplitTransaction -> route.accountId
-            is ShellRoute.TransferMoney -> route.accountId
             is ShellRoute.Reconcile -> route.accountId
             else ->
                 _state.value.register
@@ -2618,7 +2599,6 @@ class ShellViewModel(
         this is ShellRoute.Register ||
             this is ShellRoute.EditTransaction ||
             this is ShellRoute.SplitTransaction ||
-            this is ShellRoute.TransferMoney ||
             this is ShellRoute.PickCategory ||
             this is ShellRoute.Reconcile ||
             this is ShellRoute.ImportPreviewRoute ||

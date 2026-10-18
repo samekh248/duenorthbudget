@@ -14,7 +14,6 @@ object UndoCopy {
     const val DELETE_TRANSACTION = "delete"
     const val SPLIT = "split"
     const val UNSPLIT = "unsplit"
-    const val TRANSFER = "transfer"
     const val RECONCILE = "reconcile"
     const val POST_SCHEDULE = "post"
     const val SKIP_SCHEDULE = "skip"
