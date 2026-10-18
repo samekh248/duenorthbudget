@@ -239,7 +239,7 @@ fun EditAccountScreen(
     ) {
         MetroText(AccountScreenCopy.EDIT, Metro.typography.header)
         MetroField(name, { name = it }, AccountScreenCopy.NAME, Modifier.testTag("account-edit-name"))
-        MetroField(note, { note = it }, AccountScreenCopy.NOTE, Modifier.testTag("account-edit-note"))
+        MetroField(note, { note = it }, AccountScreenCopy.NOTE, Modifier.testTag("account-edit-note"), lines = 2..6)
         if (error != null) MetroText(error, Metro.typography.body, Modifier.testTag("account-error"), color = Metro.accent.text)
         RememberFormSave { onSave(name, note) }
         if (!formSaveOnBar()) {

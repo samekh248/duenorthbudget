@@ -4,6 +4,7 @@ package app.duenorth.budget.core
 object UndoCopy {
     const val ASSIGN = "assign"
     const val MOVE = "move"
+    const val BUDGET_EDIT = "budget edit"
     const val HOLD = "hold"
     const val CARRYOVER = "rollover"
     const val CATEGORY = "category change"

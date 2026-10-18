@@ -32,6 +32,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -68,6 +69,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -129,6 +131,17 @@ fun Modifier.metroPress(
         }.background(if (pressed) pressedColor else Color.Transparent)
 }
 
+/**
+ * What Enter does in a one-line [MetroField]: the app provides its form's save, so pressing Enter (or the
+ * keyboard's done key) submits the page the way the bar's save does. Null leaves Enter closing the keyboard.
+ */
+val LocalFieldSubmit = staticCompositionLocalOf<(() -> Unit)?> { null }
+
+/**
+ * A text box. One line unless [lines] is given: Enter in a one-line box submits the form through
+ * [LocalFieldSubmit] (a box asking for [ImeAction.Next] moves on instead), and only a multi-line box takes
+ * Enter as a new line.
+ */
 @Composable
 fun MetroField(
     value: String,
@@ -141,6 +154,7 @@ fun MetroField(
     lines: IntRange? = null,
 ) {
     val colors = Metro.colors
+    val submit = LocalFieldSubmit.current
     val field = if (colors.isDark) Color.White else Color(0xFFBFBFBF)
     val ink = Color.Black
     val hintColor = if (colors.isDark) Color(0xFF909090) else Color(0xFF8F8F8F)
@@ -161,8 +175,27 @@ fun MetroField(
             textStyle = Metro.typography.control.copy(color = ink),
             cursorBrush = SolidColor(Metro.accent.fill),
             visualTransformation = if (conceal) PasswordVisualTransformation() else VisualTransformation.None,
-            keyboardOptions = keyboardOptions,
-            singleLine = lines == null && keyboardOptions != KeyboardOptions.Default,
+            keyboardOptions =
+                if (lines == null && keyboardOptions.imeAction in setOf(ImeAction.Default, ImeAction.Unspecified)) {
+                    keyboardOptions.copy(imeAction = ImeAction.Done)
+                } else {
+                    keyboardOptions
+                },
+            keyboardActions =
+                if (lines == null) {
+                    KeyboardActions(
+                        onDone = {
+                            defaultKeyboardAction(ImeAction.Done)
+                            submit?.invoke()
+                        },
+                        onGo = { submit?.invoke() },
+                        onSend = { submit?.invoke() },
+                        onSearch = { submit?.invoke() },
+                    )
+                } else {
+                    KeyboardActions.Default
+                },
+            singleLine = lines == null,
             minLines = lines?.first ?: 1,
             maxLines = lines?.last ?: Int.MAX_VALUE,
             modifier = Modifier.fillMaxWidth().then(if (lines != null) Modifier.padding(vertical = 10.dp) else Modifier),
@@ -727,6 +760,8 @@ fun MetroPivot(
     items: List<PivotItem>,
     modifier: Modifier = Modifier,
     initialItem: Int = 0,
+    /** Holds the pivot on its item: no swiping, and the headers do not switch. */
+    locked: Boolean = false,
     onGesture: (Boolean) -> Unit = {},
     /** Called with the item index once a swipe or header tap settles. */
     onSelected: (Int) -> Unit = {},
@@ -752,6 +787,7 @@ fun MetroPivot(
     }
 
     fun goTo(index: Int) {
+        if (locked) return
         scope.launch {
             val target = pager.currentPage + PivotMotion.delta(itemOf(pager.currentPage), index, count)
             if (animations) {
@@ -839,7 +875,7 @@ fun MetroPivot(
             state = pager,
             modifier = Modifier.weight(1f),
             beyondViewportPageCount = 1,
-            userScrollEnabled = count > 1,
+            userScrollEnabled = count > 1 && !locked,
         ) { page ->
             Box(Modifier.fillMaxSize()) {
                 items[itemOf(page)].content()

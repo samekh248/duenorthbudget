@@ -37,7 +37,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
-import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.HttpActualTransport
@@ -46,6 +45,7 @@ import app.duenorth.budget.core.ServerAddress
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.MotionPolicy
+import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -281,6 +281,9 @@ fun DueNorthApp(model: ShellViewModel) {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
                     },
                     onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::deleteTransaction) },
+                    onEditBudget = model::startBudgetEdit,
+                    onEndBudgetEdit = model::endBudgetEdit,
+                    onCancelBudgetEdit = model::cancelBudgetEdit,
                 )
             }
         val actions = formSaveHost.bar ?: ScreenBar.forState(state, handlers)
@@ -288,9 +291,12 @@ fun DueNorthApp(model: ShellViewModel) {
             actions,
             syncing = state.syncing || state.importFetchPending,
             progress = state.syncProgress,
+            bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
         ) { modifier ->
             CompositionLocalProvider(
                 LocalFormSaveHost provides formSaveHost,
+                // Enter in a one-line box saves the page, unless a picker drawn over the form owns the bar.
+                LocalFieldSubmit provides { if (formSaveHost.bar == null) formSaveHost.save() },
                 LocalFormatPrefs provides state.formatPrefs,
             ) {
                 // Each new page turns in; a route that only updates in place keeps its class and stays put.
@@ -299,7 +305,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     when (val route = state.route) {
                         ShellRoute.Home ->
                             HomePivot(
-                                shell = state.shell,
+                                shell = state.editingShell(),
                                 loading = state.loading,
                                 openMonth = state.openMonth,
                                 monthWindow = model.monthWindow(),
@@ -331,8 +337,25 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSelectMonth = model::selectOpenMonth,
                                 onBudgetCategory = if (state.shell == null) null else model::openCategoryBudget,
                                 onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
-                                onToBudget =
-                                    if (state.shell?.mode == BudgetMode.ENVELOPE) model::openBreakdown else null,
+                                // Tapping to budget opens edit mode; in edit mode it opens the breakdown.
+                                onToBudget = if (state.shell == null) null else model::startBudgetEdit,
+                                budgetEdit = state.budgetEdit,
+                                budgetEditActions =
+                                    remember(model) {
+                                        BudgetEditActions(
+                                            onFocus = model::focusBudgetBox,
+                                            onKey = model::typeBudgetKey,
+                                            onCover = model::coverBudgetBox,
+                                            onAll = model::allToBudgetBox,
+                                            onDone = model::doneBudgetBox,
+                                            onAvailable = { id ->
+                                                if (model.doneBudgetBox()) model.openMoveFrom(id)
+                                            },
+                                            // The breakdown reads the saved month, not edit mode's changes.
+                                            onToBudget = null,
+                                        )
+                                    },
+                                editError = state.editError,
                                 notice = state.monthNotice,
                                 formatOptions =
                                     FormatOptions(
@@ -756,9 +779,18 @@ fun DueNorthApp(model: ShellViewModel) {
                             }
                         }
                         is ShellRoute.MoveCategory -> {
-                            val shell = state.shell
+                            val shell = state.editingShell()
                             if (shell == null) {
                                 Placeholder()
+                            } else if (state.budgetEdit != null) {
+                                // From edit mode the move lands in its sandbox, on the month being edited.
+                                MoveCategoryScreen(
+                                    shell = shell,
+                                    fromCategoryId = route.fromCategoryId,
+                                    error = state.editError,
+                                    onSave = model::submitMoveCategory,
+                                    modifier = fill,
+                                )
                             } else {
                                 EditorWithMonth(
                                     openMonth = state.openMonth,

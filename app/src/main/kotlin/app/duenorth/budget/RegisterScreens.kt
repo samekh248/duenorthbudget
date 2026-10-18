@@ -969,7 +969,7 @@ fun TransferForm(
         MetroText("transfer", Metro.typography.header)
         MetroField(date, { date = it }, "date", Modifier.padding(top = MetroDimens.Grid))
         MetroField(amount, { amount = it }, "amount", Modifier.padding(top = MetroDimens.Gutter))
-        MetroField(note, { note = it }, "note", Modifier.padding(top = MetroDimens.Gutter))
+        MetroField(note, { note = it }, "note", Modifier.padding(top = MetroDimens.Gutter), lines = NOTE_LINES)
         val shown = localError ?: error
         if (shown != null) {
             MetroText(shown, Metro.typography.body, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)

@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -107,10 +108,16 @@ fun HomePivot(
     onNetWorth: () -> Unit = {},
     onMonthReview: () -> Unit = {},
     onReport: (Int) -> Unit = {},
+    /** The budget's edit mode; null when not editing. */
+    budgetEdit: BudgetEdit? = null,
+    budgetEditActions: BudgetEditActions = BudgetEditActions(),
+    editError: String? = null,
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
     LaunchedEffect(pagerGesture, listGesture) { onGesture(pagerGesture || listGesture) }
+    // Leaving Home mid-scroll (say, to move money from edit mode) must not leave the shell's repaints held back.
+    DisposableEffect(Unit) { onDispose { onGesture(false) } }
     MetroPivot(
         title = SectionTitleCopy.APP,
         items =
@@ -118,6 +125,15 @@ fun HomePivot(
                 PivotItem(HomeSections.BUDGET) {
                     if (shell == null) {
                         if (loading) Placeholder()
+                    } else if (budgetEdit != null) {
+                        BudgetEditSection(
+                            shell,
+                            budgetEdit,
+                            budgetEditActions,
+                            onListGesture = { listGesture = it },
+                            error = editError,
+                            formatOptions = formatOptions,
+                        )
                     } else {
                         Column(Modifier.fillMaxSize()) {
                             BudgetMonthTitle(
@@ -187,6 +203,8 @@ fun HomePivot(
             ),
         modifier = modifier,
         initialItem = initialSection,
+        // Edit mode holds the pivot on the budget, so a stray swipe cannot leave it.
+        locked = budgetEdit != null,
         onGesture = { pagerGesture = it },
         onSelected = onSection,
     )
@@ -884,6 +902,8 @@ fun ShellChrome(
     syncing: Boolean = false,
     progress: Float? = null,
     statusBar: WindowInsets = WindowInsets.statusBars,
+    /** False while a page puts its own panel where the bar goes, as the budget's keypad does. */
+    bar: Boolean = true,
     content: @Composable (Modifier) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -901,7 +921,7 @@ fun ShellChrome(
         ) {
             if (syncing) SyncProgressBar(progress)
             content(Modifier.weight(1f))
-            MetroAppBar(actions, expanded, { expanded = it })
+            if (bar) MetroAppBar(actions, expanded, { expanded = it })
         }
     }
 }

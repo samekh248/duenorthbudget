@@ -458,6 +458,21 @@ class SyncCoordinator(
         return EditResult.Saved
     }
 
+    /** Edit mode's done: every changed budgeted amount for [month], written as one step so one undo takes it all back. */
+    fun assignBudgets(
+        budgetId: String,
+        month: YearMonth,
+        amounts: Map<String, Long>,
+    ): EditResult {
+        if (amounts.isEmpty()) return EditResult.Saved
+        journaled(budgetId, UndoCopy.BUDGET_EDIT) { session ->
+            amounts.forEach { (categoryId, amount) ->
+                BudgetEdits.assign(session, syncClock, month.toActualMonth(), categoryId, amount)
+            }
+        } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
+        return EditResult.Saved
+    }
+
     fun moveCategory(
         budgetId: String,
         fromCategoryId: String,

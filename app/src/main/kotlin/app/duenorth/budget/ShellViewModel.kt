@@ -352,6 +352,8 @@ data class ShellUiState(
     val inboxFiled: List<InboxFiled> = emptyList(),
     /** Inbox rows checked in the inbox's select mode; null when not selecting. */
     val inboxSelection: Set<String>? = null,
+    /** The budget's edit mode, with the box being typed into; null when not editing. */
+    val budgetEdit: BudgetEdit? = null,
     /** Set while a transaction form was opened from the inbox, so saving it goes back home. */
     val editFromInbox: Boolean = false,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
@@ -594,6 +596,8 @@ class ShellViewModel(
     }
 
     fun selectOpenMonth(month: YearMonth) {
+        // Edit mode's changes belong to the month it opened on.
+        if (_state.value.budgetEdit != null) return
         val gesture = shellGate.gestureActive
         val pinned = _state.value.pinnedMonth
         val hit = months.select(month, gesture)
@@ -626,6 +630,8 @@ class ShellViewModel(
     }
 
     fun selectHomeSection(index: Int) {
+        // Edit mode belongs to the budget item and holds the pivot still; leaving it anyway drops the changes.
+        if (index != ScreenBar.HOME_BUDGET && _state.value.budgetEdit != null) cancelBudgetEdit()
         _state.update { it.copy(homeSection = index) }
     }
 
@@ -1030,6 +1036,12 @@ class ShellViewModel(
         _state.update { it.copy(editError = null) }
     }
 
+    /** Opens the move screen for [categoryId] from wherever the person is, as edit mode's available figures do. */
+    fun openMoveFrom(categoryId: String) {
+        push(ShellRoute.MoveCategory(categoryId))
+        _state.update { it.copy(editError = null) }
+    }
+
     fun showHoldMonth() {
         push(ShellRoute.HoldMonth)
         _state.update { it.copy(editError = null) }
@@ -1046,8 +1058,16 @@ class ShellViewModel(
     }
 
     fun saveCategoryBudget(amountText: String) {
-        val shell = _state.value.shell ?: return
         val categoryId = (_state.value.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
+        assignBudget(categoryId, amountText)
+    }
+
+    /** Sets [categoryId]'s budgeted amount for the month being edited; [amountText] reads like "1234.56". */
+    fun assignBudget(
+        categoryId: String,
+        amountText: String,
+    ) {
+        val shell = _state.value.shell ?: return
         val budgeted = MoneyFormat.parse(amountText, shell.currency.decimals)
         if (budgeted == null) {
             _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
@@ -1055,6 +1075,17 @@ class ShellViewModel(
         }
         applyEnvelopeEdit(optimistic = { it.withBudgetedAssignment(categoryId, budgeted) }) {
             sync.assign(shell.budgetId, categoryId, editorMonth(), amountText)
+        }
+    }
+
+    /** Edit mode's done: saves each changed budgeted amount for [month] as one undo step. */
+    fun saveBudgets(
+        month: YearMonth,
+        amounts: Map<String, Long>,
+    ) {
+        val shell = _state.value.shell ?: return
+        applyEnvelopeEdit(optimistic = { amounts.entries.fold(it) { s, (id, minor) -> s.withBudgetedAssignment(id, minor) } }) {
+            sync.assignBudgets(shell.budgetId, month, amounts)
         }
     }
 
@@ -1072,6 +1103,14 @@ class ShellViewModel(
     ) {
         val shell = _state.value.shell ?: return
         val from = (_state.value.route as? ShellRoute.MoveCategory)?.fromCategoryId ?: return
+        if (_state.value.budgetEdit != null) {
+            moveInBudgetEdit(from, toCategoryId, amountText)
+            return
+        }
+        if (toCategoryId == MOVE_TO_BUDGET) {
+            transferToBudget(from, amountText)
+            return
+        }
         if (toCategoryId.isBlank()) {
             _state.update { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
             return
@@ -1195,6 +1234,11 @@ class ShellViewModel(
         }
         if (current.inboxSelection != null && current.route == ShellRoute.Home && current.confirm == null) {
             endInboxSelecting()
+            return true
+        }
+        // Back is edit mode's cancel: it leaves without saving anything changed there.
+        if (current.budgetEdit != null && current.route == ShellRoute.Home && current.confirm == null) {
+            cancelBudgetEdit()
             return true
         }
         if (current.confirm != null) {

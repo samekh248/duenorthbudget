@@ -43,5 +43,10 @@ class MonthShellPreviewTest {
         assertEquals(shell.headerMinor, next.headerMinor)
         assertEquals(4_000L, next.groups.first().categories.first { it.id == "a" }.availableMinor)
         assertEquals(6_000L, next.groups.first().categories.first { it.id == "b" }.availableMinor)
+        // Budgeted follows the move too, so the budget's budgeted column is right before the repaint.
+        val a = shell.groups.first().categories.first { it.id == "a" }
+        val b = shell.groups.first().categories.first { it.id == "b" }
+        assertEquals(a.budgetedMinor - 1_000L, next.groups.first().categories.first { it.id == "a" }.budgetedMinor)
+        assertEquals(b.budgetedMinor + 1_000L, next.groups.first().categories.first { it.id == "b" }.budgetedMinor)
     }
 }

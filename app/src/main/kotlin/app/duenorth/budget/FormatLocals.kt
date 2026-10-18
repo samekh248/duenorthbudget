@@ -30,11 +30,15 @@ fun FormatPrefs.editAmount(
     decimals: Int,
 ): String = MoneyParse.editText(minor, decimals, options)
 
-/** A typed amount rewritten as "1234.56" for code that reads amounts that way. */
+/**
+ * A typed amount rewritten as "1234.56" for code that reads amounts that way. Sums such as "120+45" are
+ * worked out; with the box's previous amount as [base], a leading operator works on it ("+500").
+ */
 fun FormatPrefs.readAmount(
     text: String,
     decimals: Int = 2,
-): String = MoneyParse.canonical(text, numberFormat, decimals)
+    base: Long? = null,
+): String = MoneyParse.canonical(text, numberFormat, decimals, base)
 
 /** A typed date rewritten as `yyyy-MM-dd` for code that reads dates that way. */
 fun FormatPrefs.readDate(text: String): String = DateFormats.toIso(text, dateFormat)

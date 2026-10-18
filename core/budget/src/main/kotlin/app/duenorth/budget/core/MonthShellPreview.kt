@@ -37,16 +37,25 @@ fun MonthShell.withMoveAvailable(
     toCategoryId: String,
     amountMinor: Long,
 ): MonthShell {
+    // A move lowers the source's budgeted and raises the destination's, as EnvelopeBook.moveAvailable writes it.
+    fun shift(id: String) =
+        when (id) {
+            fromCategoryId -> -amountMinor
+            toCategoryId -> amountMinor
+            else -> 0L
+        }
     return copy(
         groups =
             groups.map { group ->
                 group.copy(
+                    availableMinor = group.availableMinor + group.categories.sumOf { shift(it.id) },
                     categories =
                         group.categories.map { row ->
-                            when (row.id) {
-                                fromCategoryId -> row.copy(availableMinor = row.availableMinor - amountMinor)
-                                toCategoryId -> row.copy(availableMinor = row.availableMinor + amountMinor)
-                                else -> row
+                            val delta = shift(row.id)
+                            if (delta == 0L) {
+                                row
+                            } else {
+                                row.copy(budgetedMinor = row.budgetedMinor + delta, availableMinor = row.availableMinor + delta)
                             }
                         },
                 )

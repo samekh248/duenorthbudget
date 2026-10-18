@@ -260,7 +260,15 @@ object MoneyParse {
         text: String,
         numberFormat: String,
         decimals: Int = 2,
-    ): String = normalize(text.trim(), decimals, numberFormat)
+        base: Long? = null,
+    ): String =
+        // A sum ("120+45", or "+500" on top of [base]) comes back worked out; one that does not work out is
+        // left for the checks to reject.
+        if (MoneyMath.isMath(text, base)) {
+            MoneyMath.canonical(text, numberFormat, decimals, base) ?: text.trim()
+        } else {
+            normalize(text.trim(), decimals, numberFormat)
+        }
 
     /** [text] rewritten as plain digits with "." for the decimal point, or left for the checks to reject. */
     private fun normalize(
@@ -347,9 +355,14 @@ object RegisterEntry {
     ): EntryResult<TransactionDraft> {
         val date = parseDate(dateText) ?: return EntryResult.Rejected(RegisterCopy.ENTER_DATE)
         if (payee.trim().isEmpty()) return EntryResult.Rejected(RegisterCopy.ENTER_PAYEE)
+        // A typed sum is worked out first; its result is already in canonical form.
+        val math = MoneyMath.isMath(amountText)
         val magnitude =
-            MoneyParse.parseMagnitude(amountText, decimals, numberFormat)
-                ?: return EntryResult.Rejected(RegisterCopy.ENTER_AMOUNT)
+            MoneyParse.parseMagnitude(
+                if (math) MoneyParse.canonical(amountText, numberFormat, decimals) else amountText,
+                decimals,
+                if (math) FormatOptions.NUMBER_COMMA_DOT else numberFormat,
+            ) ?: return EntryResult.Rejected(RegisterCopy.ENTER_AMOUNT)
         if (magnitude == 0L) return EntryResult.Rejected(RegisterCopy.AMOUNT_ZERO)
         val signed = if (expense) -magnitude else magnitude
         return EntryResult.Ok(
