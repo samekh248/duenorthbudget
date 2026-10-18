@@ -9,7 +9,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
@@ -23,11 +27,15 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountChoice
 import app.duenorth.budget.core.CategoryChoice
+import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.FormatPrefs
@@ -206,6 +214,68 @@ class RegisterContentTest {
         compose.onNodeWithTag("transaction-category-value", useUnmergedTree = true).performClick()
         compose.onNodeWithTag("transaction-category-c-old").assertExists()
         compose.onNodeWithTag("transaction-category-c-gone").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun listOpensOnTheCurrentNameSelectedAndFocused() {
+        form(page = sample().copy(categories = many()))
+        compose.onNodeWithTag("transaction-category-value", useUnmergedTree = true).performClick()
+        val box = compose.onNode(hasSetTextAction() and hasParent(hasTestTag("category-filter")))
+        box.assertIsFocused()
+        box.assertTextEquals("Groceries", includeEditableText = true)
+        box.assert(SemanticsMatcher.expectValue(SemanticsProperties.TextSelectionRange, TextRange(0, "Groceries".length)))
+        compose.onNodeWithTag("transaction-category-none").assertExists()
+        compose.onNodeWithTag("transaction-category-c-6").assertExists()
+    }
+
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun typingReplacesTheNameFiltersAndEnterPicksTheTopMatch() {
+        form(page = sample().copy(categories = many()))
+        compose.onNodeWithTag("transaction-category-value", useUnmergedTree = true).performClick()
+        val box = compose.onNode(hasSetTextAction() and hasParent(hasTestTag("category-filter")))
+        box.performTextInput("ory 5")
+        box.assertTextEquals("ory 5", includeEditableText = true)
+        compose.onNodeWithTag("transaction-category-c-5").assertExists()
+        compose.onNodeWithTag("transaction-category-c-food").assertDoesNotExist()
+        compose.onNodeWithTag("transaction-category-c-6").assertDoesNotExist()
+        compose.onNodeWithTag("transaction-category-none").assertDoesNotExist()
+        box.performImeAction()
+        compose.onNodeWithTag("transaction-category-list").assertDoesNotExist()
+        compose.onNodeWithText("Category 5").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun inboxPickerFiltersAndEnterPicksTheTopMatch() {
+        val picked = mutableListOf<String?>()
+        compose.setContent {
+            MetroTheme {
+                CategoryPickerScreen(
+                    target =
+                        CategoryTarget(
+                            transactionId = "cafe",
+                            accountId = "checking",
+                            payee = "Cafe",
+                            amountMinor = -1_240,
+                            currency = Currencies.byCode("USD")!!,
+                            categories = many(),
+                            categoryId = "c-2",
+                        ),
+                    error = null,
+                    onPick = { picked += it },
+                )
+            }
+        }
+        val box = compose.onNode(hasSetTextAction() and hasParent(hasTestTag("category-filter")))
+        box.assertIsFocused()
+        box.assertTextEquals("Category 2", includeEditableText = true)
+        compose.onNodeWithText("Groceries").assertExists()
+        box.performTextInput("gro")
+        compose.onNodeWithText("Category 1").assertDoesNotExist()
+        box.performImeAction()
+        assertEquals(listOf<String?>("c-food"), picked)
     }
 
     @Test

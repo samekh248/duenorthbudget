@@ -104,6 +104,8 @@ data class CategoryTarget(
     val amountMinor: Long,
     val currency: CurrencySpec,
     val categories: List<CategoryChoice>,
+    /** The transaction's category now, which the picker opens on; null when it has none. */
+    val categoryId: String? = null,
 )
 
 data class TransactionDraft(
@@ -580,6 +582,7 @@ class RegisterBook(
             amountMinor = txn.amount,
             currency = currency(),
             categories = categories(),
+            categoryId = txn.categoryId,
         )
     }
 
