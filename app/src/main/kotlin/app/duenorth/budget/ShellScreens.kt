@@ -123,6 +123,26 @@ fun HomePivot(
         title = SectionTitleCopy.APP,
         items =
             listOf(
+                PivotItem(HomeSections.INBOX) {
+                    if (shell == null) {
+                        if (loading) Placeholder()
+                    } else {
+                        InboxSection(
+                            shell,
+                            onListGesture = { listGesture = it },
+                            onInbox = onInbox,
+                            onAdd = onAddTransaction,
+                            formatOptions = formatOptions,
+                            onAccept = onAcceptInbox,
+                            filed = inboxFiled,
+                            onFiledShown = onInboxFiledShown,
+                            actions = inboxActions,
+                            selection = inboxSelection,
+                            onToggle = onInboxToggle,
+                            lead = inboxLead,
+                        )
+                    }
+                },
                 PivotItem(HomeSections.BUDGET) {
                     if (shell == null) {
                         if (loading) Placeholder()
@@ -170,26 +190,6 @@ fun HomePivot(
                             onListGesture = { listGesture = it },
                             onAccount = onAccount,
                             formatOptions = formatOptions,
-                        )
-                    }
-                },
-                PivotItem(HomeSections.INBOX) {
-                    if (shell == null) {
-                        if (loading) Placeholder()
-                    } else {
-                        InboxSection(
-                            shell,
-                            onListGesture = { listGesture = it },
-                            onInbox = onInbox,
-                            onAdd = onAddTransaction,
-                            formatOptions = formatOptions,
-                            onAccept = onAcceptInbox,
-                            filed = inboxFiled,
-                            onFiledShown = onInboxFiledShown,
-                            actions = inboxActions,
-                            selection = inboxSelection,
-                            onToggle = onInboxToggle,
-                            lead = inboxLead,
                         )
                     }
                 },

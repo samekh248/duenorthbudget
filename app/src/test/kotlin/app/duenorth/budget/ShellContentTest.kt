@@ -57,6 +57,7 @@ class ShellContentTest {
                         openMonth = shell?.month ?: YearMonth.of(2026, 10),
                         monthWindow = MonthWindow.around(YearMonth.of(2026, 10)),
                         onGesture = {},
+                        initialSection = HomeSections.headers.indexOf(HomeSections.BUDGET),
                         modifier = Modifier,
                     )
                 }
@@ -65,8 +66,28 @@ class ShellContentTest {
         compose.onNodeWithText("$0.00").assertIsDisplayed()
         compose.onNodeWithText(ShellCopy.NOTHING_TO_BUDGET).assertIsDisplayed()
         compose.onNodeWithTag("pivot-title").assertTextEquals("DUE NORTH BUDGET")
-        compose.onNodeWithTag("pivot-header-0").assertTextEquals("budget").assertIsSelected()
-        compose.onNodeWithTag("pivot-header-1").assertTextEquals("accounts").assertIsNotSelected()
+        compose.onNodeWithTag("pivot-header-1").assertTextEquals("budget").assertIsSelected()
+        compose.onNodeWithTag("pivot-header-2").assertTextEquals("accounts").assertIsNotSelected()
+    }
+
+    @Test
+    fun homeOpensOnTheInbox() {
+        val shell = sample()
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    HomePivot(
+                        shell = shell,
+                        loading = false,
+                        openMonth = shell.month,
+                        monthWindow = MonthWindow.around(shell.month),
+                        onGesture = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("pivot-header-0").assertTextEquals(HomeSections.INBOX).assertIsSelected()
+        compose.onNodeWithTag("pivot-header-1").assertTextEquals(HomeSections.BUDGET).assertIsNotSelected()
     }
 
     @Test
@@ -83,20 +104,21 @@ class ShellContentTest {
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),
                         onGesture = {},
+                        initialSection = HomeSections.headers.indexOf(HomeSections.BUDGET),
                     )
                 }
             }
         }
         val root = compose.onNodeWithTag("pivot").fetchSemanticsNode().boundsInRoot
         val headers = compose.onNodeWithTag("pivot-headers").fetchSemanticsNode().boundsInRoot
-        val accounts = compose.onNodeWithTag("pivot-header-1").fetchSemanticsNode().boundsInRoot
+        val accounts = compose.onNodeWithTag("pivot-header-2").fetchSemanticsNode().boundsInRoot
         assertTrue("the next header waits in the header row", accounts.left < root.right && accounts.top < headers.bottom)
         compose.onNodeWithTag("to-budget").assertIsDisplayed()
-        compose.onNodeWithTag("pivot-header-1").performClick()
+        compose.onNodeWithTag("pivot-header-2").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("pivot-header-1").assertIsSelected()
-        compose.onNodeWithTag("pivot-header-0").assertIsNotSelected()
-        val lead = compose.onNodeWithTag("pivot-header-1").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("pivot-header-2").assertIsSelected()
+        compose.onNodeWithTag("pivot-header-1").assertIsNotSelected()
+        val lead = compose.onNodeWithTag("pivot-header-2").fetchSemanticsNode().boundsInRoot
         val gutter = 12f * compose.density.density
         assertTrue("the chosen header leads the row, $lead", abs(lead.left - (root.left + gutter)) <= 1f)
         // No peek: the budget item leaves the screen entirely.
@@ -118,6 +140,7 @@ class ShellContentTest {
                         openMonth = openMonth.value,
                         monthWindow = MonthWindow.around(shell.month),
                         onGesture = {},
+                        initialSection = HomeSections.headers.indexOf(HomeSections.BUDGET),
                         onSelectMonth = { openMonth.value = it },
                     )
                 }
@@ -132,7 +155,7 @@ class ShellContentTest {
         val title = compose.onNodeWithText("october 2026", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val dropdown = compose.onNodeWithTag("month-dropdown", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val root = compose.onNodeWithTag("pivot").fetchSemanticsNode().boundsInRoot
-        val header = compose.onNodeWithTag("pivot-header-0").fetchSemanticsNode().boundsInRoot
+        val header = compose.onNodeWithTag("pivot-header-1").fetchSemanticsNode().boundsInRoot
         val titleDp = title.height / density
         assertTrue("month reads as a subheader under the pivot header, ${titleDp}dp", titleDp >= 24f)
         assertTrue("month sits under the header row", title.top >= header.bottom)

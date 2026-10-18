@@ -20,7 +20,8 @@ object HomeSections {
     const val INBOX = "inbox"
     const val REPORTS = ReportsCopy.TITLE
 
-    val headers = listOf(BUDGET, ACCOUNTS, INBOX, REPORTS)
+    // The inbox leads, so the app opens on what needs filing.
+    val headers = listOf(INBOX, BUDGET, ACCOUNTS, REPORTS)
 }
 
 object SectionTitleCopy {

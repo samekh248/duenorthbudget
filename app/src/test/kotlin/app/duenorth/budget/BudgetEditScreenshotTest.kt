@@ -110,6 +110,7 @@ class BudgetEditScreenshotTest {
                             monthWindow = MonthWindow.around(shell.month),
                             onGesture = {},
                             modifier = modifier,
+                            initialSection = HomeSections.headers.indexOf(HomeSections.BUDGET),
                             budgetEdit = edit,
                         )
                     }
