@@ -29,6 +29,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
@@ -369,7 +370,7 @@ class RegisterContentTest {
         compose.onNodeWithTag("transaction-category").assertDoesNotExist()
         compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("5")
         compose.onNodeWithText("${TransactionFormCopy.ALSO_ADDS} Cash").assertIsDisplayed()
-        compose.onNodeWithText("transfer from Checking").assertIsDisplayed()
+        compose.onNodeWithText("transfer from Checking").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("transaction-transfer-preview-amount").assertTextEquals("$5.00")
         compose.onNodeWithTag("transaction-direction-income").performClick()
         compose.onNodeWithTag("transaction-transfer-label").assertTextEquals("transfer from Cash")
@@ -377,6 +378,23 @@ class RegisterContentTest {
         assertEquals("cash", saved?.transferAccountId)
         assertEquals(500L, saved?.amountMinor)
         assertEquals(null, saved?.categoryId)
+    }
+
+    // The form opens on the register's account; picking another moves the transaction there, with its cleared choice.
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun accountAndClearedArePickedOnTheForm() {
+        var saved: TransactionDraft? = null
+        val host = form(row = null, onSave = { saved = it })
+        compose.onNodeWithTag("transaction-account-picker-value").assertTextEquals("Checking").performClick()
+        compose.onNodeWithText("Cash").performClick()
+        compose.onNodeWithTag("transaction-account", useUnmergedTree = true).assertTextEquals("Cash")
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("Cafe")
+        compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("5")
+        compose.onNodeWithTag("transaction-cleared-${TransactionFormCopy.UNCLEARED}").performScrollTo().performClick()
+        compose.runOnIdle { host.save() }
+        assertEquals("cash", saved?.accountId)
+        assertEquals(false, saved?.cleared)
     }
 
     @Test
@@ -400,7 +418,7 @@ class RegisterContentTest {
             )
         val row = page.rows.first().copy(transferId = "t", partnerOffBudget = true, transferAccountId = "broker")
         form(page = page, row = row)
-        compose.onNodeWithTag("transaction-category").assertIsDisplayed()
+        compose.onNodeWithTag("transaction-category").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("transaction-transfer-label").assertTextEquals("transfer to Brokerage")
     }
 

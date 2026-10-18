@@ -104,8 +104,6 @@ sealed interface ShellRoute {
 
     data object Assign : ShellRoute
 
-    data object AddTransaction : ShellRoute
-
     data object Conflicts : ShellRoute
 
     data object ConfirmReplace : ShellRoute
@@ -369,8 +367,8 @@ data class ShellUiState(
     val inboxLead: String? = null,
     /** The budget's edit mode, with the box being typed into; null when not editing. */
     val budgetEdit: BudgetEdit? = null,
-    /** Set while a transaction form was opened from the inbox, so saving it goes back home. */
-    val editFromInbox: Boolean = false,
+    /** Set while a transaction form was opened from home (the inbox or its add), so saving it goes back home. */
+    val editFromHome: Boolean = false,
     /** A new transaction opened from a reconcile's "add it" starts with the amount that balances it, on the statement date. */
     val newTransactionPrefill: NewTransactionPrefill? = null,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
@@ -1265,9 +1263,26 @@ class ShellViewModel(
         applyEnvelopeEdit { sync.moveEnvelopeCategoryOrder(budgetId, categoryId, earlier) }
     }
 
+    /**
+     * Home's add: the full transaction form, starting on the first open budget account (or any open
+     * account); saving comes back home. With no account yet, adding one comes first.
+     */
     fun showAddTransaction() {
-        _state.update { it.copy(route = ShellRoute.AddTransaction, editError = null) }
+        val open =
+            _state.value.shell
+                ?.accounts
+                .orEmpty()
+                .filter { !it.closed }
+        val accountId = (open.firstOrNull { !it.offBudget } ?: open.firstOrNull())?.id
+        if (accountId == null) {
+            openAddAccount()
+            return
+        }
+        push(ShellRoute.EditTransaction(accountId, null))
+        // The form waits for this account's page rather than drawing over another account's.
+        _state.update { it.copy(editFromHome = true, registerSelection = null, register = null) }
         loadPayees()
+        viewModelScope.launch { apply(load(accountId), accountId) }
     }
 
     fun back(): Boolean {
@@ -1366,7 +1381,7 @@ class ShellViewModel(
 
     fun openAccount(accountId: String) {
         push(ShellRoute.Register(accountId))
-        _state.update { it.copy(registerSelection = null, registerSearch = null, editFromInbox = false) }
+        _state.update { it.copy(registerSelection = null, registerSearch = null, editFromHome = false) }
         viewModelScope.launch { apply(load(accountId), accountId) }
     }
 
@@ -1572,7 +1587,7 @@ class ShellViewModel(
                 ?.inbox
                 ?.firstOrNull { it.id == transactionId } ?: return
         push(route(row.accountId))
-        _state.update { it.copy(editFromInbox = true, registerSelection = null) }
+        _state.update { it.copy(editFromHome = true, registerSelection = null) }
         loadPayees()
         viewModelScope.launch { apply(load(row.accountId), row.accountId) }
     }
@@ -1709,7 +1724,7 @@ class ShellViewModel(
 
     fun openNewTransaction() {
         val accountId = openAccountId() ?: return
-        _state.update { it.copy(editFromInbox = false, newTransactionPrefill = null) }
+        _state.update { it.copy(editFromHome = false, newTransactionPrefill = null) }
         push(ShellRoute.EditTransaction(accountId, null))
         loadPayees()
     }
@@ -2273,25 +2288,6 @@ class ShellViewModel(
         }
     }
 
-    fun addTransaction(
-        payee: String,
-        amountText: String,
-    ) {
-        val shell = _state.value.shell ?: return
-        viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { sync.addTransaction(shell.budgetId, payee, amountText) }
-            when (result) {
-                is EditResult.Rejected -> _state.update { it.copy(editError = result.reason) }
-                EditResult.Saved -> {
-                    _state.update { it.copy(editError = null, route = ShellRoute.Home) }
-                    reload()
-                    withContext(Dispatchers.IO) { runCatching { sync.sync(shell.budgetId) } }
-                    reload()
-                }
-            }
-        }
-    }
-
     fun setTheme(mode: String) {
         saveSettings(_state.value.settings.copy(themeMode = mode))
     }
@@ -2463,10 +2459,10 @@ class ShellViewModel(
         when (result) {
             is WriteResult.Saved -> {
                 // Edits started from the inbox go back to it, not to the account's register.
-                val toRegister = stayOnRegister && !_state.value.editFromInbox
+                val toRegister = stayOnRegister && !_state.value.editFromHome
                 // A transaction added or fixed from a reconcile goes back to that reconcile.
                 val toReconcile = toRegister && history.lastOrNull() == ShellRoute.Reconcile(accountId)
-                _state.update { it.copy(editFromInbox = false, newTransactionPrefill = null) }
+                _state.update { it.copy(editFromHome = false, newTransactionPrefill = null) }
                 if (toReconcile) {
                     history.clear()
                     history.addLast(ShellRoute.Home)

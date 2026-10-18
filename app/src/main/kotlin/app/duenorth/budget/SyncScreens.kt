@@ -246,36 +246,6 @@ fun AssignScreen(
 }
 
 @Composable
-fun AddTransactionScreen(
-    error: String?,
-    onAdd: (String, String) -> Unit,
-    modifier: Modifier = Modifier,
-    payees: List<String> = emptyList(),
-) {
-    val prefs = LocalFormatPrefs.current
-    var payee by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        MetroText("spend", Metro.typography.header)
-        PayeeField(payee, { payee = it }, payees, "payee", "spend-payee")
-        MetroField(amount, { amount = it }, "amount", Modifier.testTag("spend-amount"))
-        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        RememberFormSave { onAdd(payee, prefs.readAmount(amount)) }
-        if (!formSaveOnBar()) {
-            MetroButton("add", Modifier.testTag("spend-save")) { onAdd(payee, prefs.readAmount(amount)) }
-        } else {
-            Box(Modifier.testTag("spend-save")) {}
-        }
-    }
-}
-
-@Composable
 fun ConfirmReplaceScreen(
     serverName: String,
     phoneName: String,

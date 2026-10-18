@@ -600,13 +600,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onAssign = model::assign,
                                 modifier = fill,
                             )
-                        ShellRoute.AddTransaction ->
-                            AddTransactionScreen(
-                                error = state.editError,
-                                onAdd = model::addTransaction,
-                                modifier = fill,
-                                payees = PayeeTypeAhead.names(state.payees),
-                            )
                         ShellRoute.Conflicts ->
                             ConflictScreen(
                                 conflicts = state.conflicts,

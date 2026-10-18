@@ -231,6 +231,8 @@ data class TransactionDraft(
     val scheduleId: String? = null,
     /** A transfer: the other account, whose paired transaction this save adds, moves or keeps in step. */
     val transferAccountId: String? = null,
+    /** The cleared flag the form set; null leaves it as it is (a new transaction comes in cleared, as in Actual). */
+    val cleared: Boolean? = null,
 )
 
 data class SplitPart(
@@ -708,6 +710,16 @@ class RegisterBook(
     }
 
     fun save(draft: TransactionDraft): WriteResult {
+        val cleared = draft.cleared ?: return saveFields(draft)
+        // The cleared flag joins the same write, so the save and its flag are one undo step.
+        return write {
+            saveFields(draft).also { result ->
+                if (result is WriteResult.Saved && find(draft.id)?.tombstone == false) setColumns(draft.id, "cleared" to cleared)
+            }
+        }
+    }
+
+    private fun saveFields(draft: TransactionDraft): WriteResult {
         if (draft.transferAccountId != null) return saveTransfer(draft)
         if (draft.payee.trim().isEmpty()) return WriteResult.Rejected(RegisterCopy.ENTER_PAYEE)
         if (draft.amountMinor == 0L) return WriteResult.Rejected(RegisterCopy.AMOUNT_ZERO)

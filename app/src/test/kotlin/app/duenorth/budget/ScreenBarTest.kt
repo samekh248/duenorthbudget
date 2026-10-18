@@ -11,7 +11,7 @@ class ScreenBarTest {
     @Test
     fun homeEnvelopeActions() {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
-        assertEquals(listOf("add", "hold", "categories"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("hold", "add", "categories"), specs.filter { it.primary }.map { it.id })
         assertEquals(
             listOf("edit-budget", "show-hidden", "rules", "settings"),
             specs.filter { !it.primary }.map { it.id },
@@ -22,7 +22,7 @@ class ScreenBarTest {
     @Test
     fun accountsBarOpensSchedules() {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_ACCOUNTS)
-        assertEquals(listOf("add-account", "accounts", "schedules"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("accounts", "add", "schedules"), specs.filter { it.primary }.map { it.id })
         assertEquals("schedules", specs.single { it.id == "schedules" }.label)
     }
 
@@ -106,14 +106,14 @@ class ScreenBarTest {
                 mode = BudgetMode.ENVELOPE,
                 homeSection = ScreenBar.HOME_ACCOUNTS,
             )
-        assertEquals(listOf("add-account", "accounts", "schedules"), specs.filter { it.primary }.map { it.id })
-        assertEquals(listOf("settings"), specs.filter { !it.primary }.map { it.id })
+        assertEquals(listOf("accounts", "add", "schedules"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add-account", "settings"), specs.filter { !it.primary }.map { it.id })
     }
 
     @Test
     fun homeInboxSectionOffersSelectAndSelectModeActsOnTheCheckedRows() {
         val inbox = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX)
-        assertEquals(listOf("add", "select-inbox"), inbox.filter { it.primary }.map { it.id })
+        assertEquals(listOf("select-inbox", "add"), inbox.filter { it.primary }.map { it.id })
         assertEquals(listOf("settings"), inbox.filter { !it.primary }.map { it.id })
         val selecting =
             ScreenBar.specsFor(
@@ -130,7 +130,7 @@ class ScreenBarTest {
     fun homeTrackingOmitsHold() {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.TRACKING)
         val ids = specs.map { it.id }
-        assertEquals(listOf("add", "categories"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("categories", "add"), specs.filter { it.primary }.map { it.id })
         assertFalse(ids.contains("hold"))
     }
 
@@ -155,19 +155,19 @@ class ScreenBarTest {
     @Test
     fun registerActions() {
         val ids = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
-        assertEquals(listOf("add", "search", "reconcile", "import", "edit-account", "bank-link", "close"), ids)
+        assertEquals(listOf("search", "add", "reconcile", "import", "edit-account", "bank-link", "close"), ids)
     }
 
     @Test
     fun registerImportIsInTheMenu() {
         val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE)
-        assertEquals(listOf("add", "search", "reconcile"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("search", "add", "reconcile"), specs.filter { it.primary }.map { it.id })
     }
 
     @Test
     fun bankLinkedRegisterSyncsFromTheBar() {
         val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE, bankLinked = true)
-        assertEquals(listOf("add", "search", "reconcile", "sync"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("search", "add", "reconcile", "sync"), specs.filter { it.primary }.map { it.id })
         assertEquals(listOf("import", "edit-account", "bank-link", "close"), specs.filterNot { it.primary }.map { it.id })
     }
 
@@ -204,7 +204,6 @@ class ScreenBarTest {
             listOf(
                 ShellRoute.Create,
                 ShellRoute.Assign,
-                ShellRoute.AddTransaction,
                 ShellRoute.EditTransaction("a", null),
                 ShellRoute.HoldMonth,
                 ShellRoute.CategoryBudget("c"),

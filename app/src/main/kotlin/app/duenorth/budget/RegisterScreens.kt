@@ -553,13 +553,25 @@ fun TransactionForm(
     var expense by remember(row?.id) { mutableStateOf(startAmount?.let { it <= 0L } ?: true) }
     var note by remember(row?.id) { mutableStateOf(row?.note.orEmpty()) }
     var categoryId by remember(row?.id) { mutableStateOf(row?.categoryId ?: row?.partnerCategoryId) }
+    // The account the transaction sits in: the register's, or the one picked here (a new one from home starts on the first).
+    var accountId by remember(row?.id, page.account.id) { mutableStateOf(page.account.id) }
+    var cleared by remember(row?.id) { mutableStateOf(row?.cleared ?: true) }
+    val accountChoices =
+        remember(page.accounts, page.account, accountId) {
+            val open = page.accounts.filter { !it.closed || it.id == accountId }
+            val own = page.account.let { AccountChoice(it.id, it.name, it.offBudget, it.type, it.closed) }
+            if (open.any { it.id == own.id } || accountId != own.id) open else listOf(own) + open
+        }
+    val account = page.accounts.firstOrNull { it.id == accountId }
+    val accountName = account?.name ?: page.account.name
+    val offBudget = account?.offBudget ?: page.account.offBudget
     // The account this transaction transfers to or from, picked from the payee box (option C, #76).
     var transferTo by remember(row?.id) { mutableStateOf(row?.transferAccountId) }
     val transferAccount = transferTo?.let { id -> page.accounts.firstOrNull { it.id == id } }
     var fieldError by remember(row?.id) { mutableStateOf<Pair<TransactionField, String>?>(null) }
     var overlay by remember(row?.id) { mutableStateOf<FormOverlay>(FormOverlay.None) }
     // A transfer between two budget accounts takes no category; one that crosses the budget's edge does, as in Actual.
-    val mixed = transferAccount != null && transferAccount.offBudget != page.account.offBudget
+    val mixed = transferAccount != null && transferAccount.offBudget != offBudget
     val showCategories = row?.parent != true && (transferTo == null || mixed)
     val options = remember(page.categories, categoryId) { CategoryOptions.of(page.categories, categoryId) }
     val commit = {
@@ -567,7 +579,7 @@ fun TransactionForm(
             val parsed =
                 RegisterEntry.transaction(
                     id = draftId,
-                    accountId = page.account.id,
+                    accountId = accountId,
                     date = date,
                     payee = transferAccount?.name ?: payee,
                     amountText = amount,
@@ -581,7 +593,7 @@ fun TransactionForm(
         ) {
             is EntryResult.Ok -> {
                 fieldError = null
-                onSave(parsed.value)
+                onSave(parsed.value.copy(cleared = cleared))
             }
             is EntryResult.Rejected -> fieldError = TransactionField.of(parsed.reason) to parsed.reason
         }
@@ -599,14 +611,30 @@ fun TransactionForm(
                 .padding(horizontal = MetroDimens.Gutter)
                 .padding(bottom = MetroDimens.Gutter),
         ) {
-            // The page is titled with the account the register is open on, under the ACCOUNTS line.
+            // The page is titled with the transaction's account, under the area's line.
             MetroText(
-                page.account.name,
+                accountName,
                 Metro.typography.header,
                 Modifier.testTag("transaction-account"),
                 maxLines = 1,
                 softWrap = false,
             )
+            LabeledField(TransactionFormCopy.ACCOUNT, null, Modifier.padding(top = MetroDimens.FieldGroupGap)) {
+                MetroComboBox(
+                    choices = accountChoices.map { it.id },
+                    selected = accountId,
+                    label = { id -> accountChoices.firstOrNull { it.id == id }?.name.orEmpty() },
+                    onPick = { picked ->
+                        accountId = picked
+                        // A transfer can't go to the account it comes from.
+                        if (transferTo == picked) {
+                            transferTo = null
+                            payee = ""
+                        }
+                    },
+                    tag = "transaction-account-picker",
+                )
+            }
             LabeledField(TransactionFormCopy.DATE, errorFor(TransactionField.DATE), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
                 val width = rememberFieldWidth(DateFormats.widestSample(dateFormat), Metro.typography.control, DATE_CHEVRON)
                 Box(
@@ -640,7 +668,7 @@ fun TransactionForm(
                         payees,
                         TransactionFormCopy.PAYEE,
                         "transaction-payee",
-                        transfers = { query -> PayeeTypeAhead.transfers(page.accounts, page.account.id, query) },
+                        transfers = { query -> PayeeTypeAhead.transfers(page.accounts, accountId, query) },
                         expense = expense,
                         onTransfer = { transferTo = it.id },
                     )
@@ -672,6 +700,15 @@ fun TransactionForm(
                     )
                 }
             }
+            LabeledField(TransactionFormCopy.CLEARED, null, Modifier.padding(top = MetroDimens.FieldGroupGap)) {
+                MetroSegmentedToggle(
+                    first = TransactionFormCopy.CLEARED,
+                    second = TransactionFormCopy.UNCLEARED,
+                    firstSelected = cleared,
+                    onSelect = { cleared = it },
+                    tag = "transaction-cleared",
+                )
+            }
             LabeledField(TransactionFormCopy.NOTE, errorFor(TransactionField.NOTE), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
                 MetroField(
                     note,
@@ -685,6 +722,7 @@ fun TransactionForm(
             if (transferAccount != null) {
                 TransferPreview(
                     page = page,
+                    from = accountName,
                     other = transferAccount,
                     adding = row?.transferId == null,
                     signed = RegisterEntry.signedAmount(amount, page.currency.decimals, expense, numberFormat),
@@ -760,6 +798,7 @@ private fun TransferTile(
 @Composable
 private fun TransferPreview(
     page: RegisterPage,
+    from: String,
     other: AccountChoice,
     adding: Boolean,
     signed: Long?,
@@ -782,7 +821,7 @@ private fun TransferPreview(
         ) {
             Box(Modifier.width(3.dp).fillMaxHeight().background(Metro.accent.fill))
             Column(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 8.dp)) {
-                MetroText(RegisterEntry.transferLabel(-(signed ?: -1L), page.account.name), Metro.typography.body, maxLines = 2)
+                MetroText(RegisterEntry.transferLabel(-(signed ?: -1L), from), Metro.typography.body, maxLines = 2)
                 MetroText(
                     listOf(other.name, RegisterEntry.registerDateLabel(date), category ?: RegisterCopy.NO_CATEGORY).joinToString(" · "),
                     Metro.typography.caption,
@@ -805,11 +844,14 @@ private fun TransferPreview(
 }
 
 object TransactionFormCopy {
+    const val ACCOUNT = "account"
     const val DATE = "date"
     const val PAYEE = "payee"
     const val AMOUNT = "amount"
     const val CATEGORY = "category"
     const val NOTE = "note"
+    const val CLEARED = "cleared"
+    const val UNCLEARED = "uncleared"
     const val EXPENSE = "expense"
     const val INCOME = "income"
     const val CHOOSE_DATE = "choose date"
