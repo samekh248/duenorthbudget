@@ -478,6 +478,11 @@ class ShellViewModel(
     fun showPayees() {
         history.clear()
         _state.update { it.copy(route = ShellRoute.Payees, writeError = null, payeeMergeTarget = null) }
+        loadPayees()
+    }
+
+    /** Reads the saved payees, which the payees page lists and every payee box offers as you type. */
+    internal fun loadPayees() {
         viewModelScope.launch {
             val budgetId = _state.value.settings.openBudgetId ?: return@launch
             val rows = withContext(Dispatchers.IO) { library.listPayees(budgetId) }
@@ -1242,6 +1247,7 @@ class ShellViewModel(
 
     fun showAddTransaction() {
         _state.update { it.copy(route = ShellRoute.AddTransaction, editError = null) }
+        loadPayees()
     }
 
     fun back(): Boolean {
@@ -1542,6 +1548,7 @@ class ShellViewModel(
                 ?.firstOrNull { it.id == transactionId } ?: return
         push(route(row.accountId))
         _state.update { it.copy(editFromInbox = true, registerSelection = null) }
+        loadPayees()
         viewModelScope.launch { apply(load(row.accountId), row.accountId) }
     }
 
@@ -1679,11 +1686,13 @@ class ShellViewModel(
         val accountId = openAccountId() ?: return
         _state.update { it.copy(editFromInbox = false) }
         push(ShellRoute.EditTransaction(accountId, null))
+        loadPayees()
     }
 
     fun openEdit(transactionId: String) {
         val accountId = openAccountId() ?: return
         push(ShellRoute.EditTransaction(accountId, transactionId))
+        loadPayees()
     }
 
     fun openSplit(transactionId: String) {

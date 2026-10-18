@@ -258,6 +258,7 @@ fun ScheduleEditorScreen(
     error: String?,
     onSave: (ScheduleForm) -> Unit,
     modifier: Modifier = Modifier,
+    payees: List<String> = emptyList(),
 ) {
     val prefs = LocalFormatPrefs.current
     var form by remember(draft.id, prefs) { mutableStateOf(ScheduleForm.from(draft, decimals, prefs)) }
@@ -272,7 +273,7 @@ fun ScheduleEditorScreen(
     ) {
         MetroText(if (draft.id == null) ScheduleScreenCopy.ADD else ScheduleScreenCopy.EDIT, Metro.typography.header)
         MetroField(form.name, { form = form.copy(name = it) }, ScheduleScreenCopy.NAME, Modifier.testTag("schedule-name"))
-        MetroField(form.payee, { form = form.copy(payee = it) }, ScheduleScreenCopy.PAYEE, Modifier.testTag("schedule-payee"))
+        PayeeField(form.payee, { form = form.copy(payee = it) }, payees, ScheduleScreenCopy.PAYEE, "schedule-payee")
         Heading(ScheduleScreenCopy.AMOUNT)
         Choices {
             listOf("is" to ScheduleScreenCopy.EXACTLY, "isapprox" to ScheduleScreenCopy.ABOUT, "isbetween" to ScheduleScreenCopy.BETWEEN)

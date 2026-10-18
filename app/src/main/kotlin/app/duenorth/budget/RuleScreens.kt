@@ -263,7 +263,13 @@ private fun PartAdder(
         ChoiceRow {
             ops.getValue(field).forEach { name -> Choice(name, op == name, "$tag-op-$name") { op = name } }
         }
-        MetroField(text, { text = it }, RuleScreenCopy.VALUE, Modifier.testTag("$tag-value"))
+        if (field == "payee" && op in PAYEE_NAME_OPS) {
+            // A rule names saved payees only, so the list offers no new one.
+            val payees = remember(names) { names.payees.values.sortedBy { it.lowercase() } }
+            PayeeField(text, { text = it }, payees, RuleScreenCopy.VALUE, "$tag-value", offerNew = false)
+        } else {
+            MetroField(text, { text = it }, RuleScreenCopy.VALUE, Modifier.testTag("$tag-value"))
+        }
         if (problem != null) MetroText(problem!!, Metro.typography.caption, color = Metro.accent.text)
         MetroButton(if (action) RuleScreenCopy.ADD_ACTION else RuleScreenCopy.ADD_CONDITION, Modifier.testTag("$tag-button")) {
             val typed =
@@ -283,3 +289,6 @@ private fun PartAdder(
         }
     }
 }
+
+/** Payee ops whose value is one saved payee; "contains", "matches" and the lists take free text. */
+private val PAYEE_NAME_OPS = setOf("is", "isNot", "set")

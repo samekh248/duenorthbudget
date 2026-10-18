@@ -589,6 +589,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 error = state.editError,
                                 onAdd = model::addTransaction,
                                 modifier = fill,
+                                payees = PayeeTypeAhead.names(state.payees),
                             )
                         ShellRoute.Conflicts ->
                             ConflictScreen(
@@ -671,6 +672,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                     dateFormat = state.formatPrefs.dateFormat,
                                     numberFormat = state.formatPrefs.numberFormat,
                                     hideFraction = state.formatPrefs.hideFraction,
+                                    payees = PayeeTypeAhead.names(state.payees),
                                 )
                             }
                         }
@@ -916,6 +918,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                     error = state.editError,
                                     onSave = model::submitSchedule,
                                     modifier = fill,
+                                    payees = PayeeTypeAhead.names(state.payees),
                                 )
                             }
                         }
