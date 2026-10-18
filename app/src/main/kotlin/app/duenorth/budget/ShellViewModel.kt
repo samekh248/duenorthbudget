@@ -21,6 +21,7 @@ import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
 import app.duenorth.budget.core.InboxRow
+import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.MoneyFormat
@@ -352,6 +353,8 @@ data class ShellUiState(
     val inboxFiled: List<InboxFiled> = emptyList(),
     /** Inbox rows checked in the inbox's select mode; null when not selecting. */
     val inboxSelection: Set<String>? = null,
+    /** A transaction just left by a match, shown first in the inbox so it can be filed next. */
+    val inboxLead: String? = null,
     /** The budget's edit mode, with the box being typed into; null when not editing. */
     val budgetEdit: BudgetEdit? = null,
     /** Set while a transaction form was opened from the inbox, so saving it goes back home. */
@@ -1486,6 +1489,31 @@ class ShellViewModel(
         launchWrite { id ->
             val result = withContext(Dispatchers.IO) { library.deleteTransaction(id, transactionId, false) }
             publish(result, row.accountId, stayOnRegister = false)
+        }
+    }
+
+    /**
+     * Match: keeps the bank's transaction with the entry's payee, category and note, and deletes the
+     * entry. When neither side had a category the one left leads the inbox, ready to file.
+     */
+    fun matchTransactions(
+        pair: MatchPair,
+        stayOnRegister: Boolean,
+    ) {
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.matchTransactions(id, pair.bank.id, pair.entered.id) }
+            if (result is WriteResult.Saved) _state.update { it.copy(inboxLead = pair.bank.id) }
+            publish(result, pair.bank.accountId, stayOnRegister)
+        }
+    }
+
+    fun notAMatch(
+        pair: MatchPair,
+        stayOnRegister: Boolean,
+    ) {
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.notAMatch(id, pair.bank.id, pair.entered.id) }
+            publish(result, pair.bank.accountId, stayOnRegister)
         }
     }
 

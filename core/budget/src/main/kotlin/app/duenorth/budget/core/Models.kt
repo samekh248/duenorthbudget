@@ -435,6 +435,8 @@ data class MonthShell(
     val inbox: List<InboxRow>,
     /** Income groups, shown after the expense groups as desktop Actual does. */
     val incomeGroups: List<IncomeGroupRow> = emptyList(),
+    /** Possible matches in on-budget accounts, waiting in the inbox for match or not a match. */
+    val matches: List<MatchPair> = emptyList(),
 )
 
 object ShellCopy {

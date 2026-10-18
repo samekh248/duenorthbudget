@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -66,6 +69,8 @@ import app.duenorth.budget.core.DatePick
 import app.duenorth.budget.core.EntryResult
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.FormatPrefs
+import app.duenorth.budget.core.MatchCopy
+import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MoneyParse
 import app.duenorth.budget.core.RegisterCopy
@@ -108,6 +113,8 @@ fun RegisterScreen(
     onSelect: (String) -> Unit = {},
     onToggleSelected: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    onMatch: (MatchPair) -> Unit = {},
+    onNotAMatch: (MatchPair) -> Unit = {},
 ) {
     val rows = page.rows
     val owed = page.account.type == "credit" && page.balanceMinor < 0
@@ -144,6 +151,8 @@ fun RegisterScreen(
                 onPress = { id -> if (selection != null) onToggleSelected(id) else onOpen(id) },
                 onLongPress = { id -> if (selection == null) onSelect(id) else onToggleSelected(id) },
                 modifier = Modifier.weight(1f).padding(top = MetroDimens.Grid),
+                onMatch = onMatch,
+                onNotAMatch = onNotAMatch,
             )
         }
     }
@@ -158,15 +167,35 @@ private fun RegisterList(
     onPress: (String) -> Unit,
     onLongPress: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onMatch: (MatchPair) -> Unit = {},
+    onNotAMatch: (MatchPair) -> Unit = {},
 ) {
     // A new visit starts at the newest row. Scroll position is not saved.
     val list = rememberLazyListState()
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onGesture(it) }
     }
-    val days = registerDays(rows)
-    val position = rows.withIndex().associate { it.value.id to it.index }
+    // Possible matches sit above the rows, each pair held together, until matched or called not a match.
+    val pairs = if (selection == null) page.matches.filter { pair -> pair.ids.all { id -> rows.any { it.id == id } } } else emptyList()
+    val paired = pairs.flatMapTo(mutableSetOf()) { it.ids }
+    val listed = rows.filter { it.id !in paired }
+    val days = registerDays(listed)
+    val position = listed.withIndex().associate { it.value.id to it.index }
+    val byId = rows.associateBy { it.id }
     LazyColumn(modifier, state = list) {
+        pairs.forEach { pair ->
+            item(key = "match-${pair.key}") {
+                RegisterMatch(
+                    pair = pair,
+                    bank = byId.getValue(pair.bank.id),
+                    entered = byId.getValue(pair.entered.id),
+                    page = page,
+                    onPress = onPress,
+                    onMatch = { onMatch(pair) },
+                    onNotAMatch = { onNotAMatch(pair) },
+                )
+            }
+        }
         days.forEach { day ->
             item(key = "day-${day.first().id}") {
                 MetroText(
@@ -186,6 +215,62 @@ private fun RegisterList(
                     onLongPress = { onLongPress(row.id) },
                 )
             }
+        }
+    }
+}
+
+/**
+ * A possible match on the register: both rows on an accent tint, tied by a bar down the left edge,
+ * each with its date and where it came from, and match or not a match under them.
+ */
+@Composable
+private fun RegisterMatch(
+    pair: MatchPair,
+    bank: RegisterRow,
+    entered: RegisterRow,
+    page: RegisterPage,
+    onPress: (String) -> Unit,
+    onMatch: () -> Unit,
+    onNotAMatch: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().testTag("register-match-${pair.key}")) {
+        MetroText(
+            MatchCopy.POSSIBLE_MATCH,
+            Metro.typography.caption,
+            Modifier.padding(top = 16.dp, bottom = 4.dp),
+            color = Metro.accent.text,
+        )
+        Column(Modifier.fillMaxWidth().ledgerFill(Metro.accent.text.copy(alpha = MATCH_TINT)).padding(bottom = 14.dp)) {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                Box(
+                    Modifier
+                        .padding(vertical = 6.dp)
+                        .width(3.dp)
+                        .fillMaxHeight()
+                        .background(Metro.accent.fill),
+                )
+                Column(Modifier.padding(start = 10.dp)) {
+                    listOf(
+                        bank to "${RegisterEntry.registerDateLabel(bank.date)} · ${MatchCopy.FROM_BANK}",
+                        entered to
+                            listOf(
+                                RegisterEntry.registerDateLabel(entered.date),
+                                registerDetail(entered),
+                            ).filter { it.isNotBlank() }.joinToString(" · "),
+                    ).forEach { (row, detail) ->
+                        RegisterLine(
+                            row,
+                            page,
+                            banded = false,
+                            picked = null,
+                            onPress = { onPress(row.id) },
+                            onLongPress = { onPress(row.id) },
+                            detail = detail,
+                        )
+                    }
+                }
+            }
+            MatchButtons(pair, onMatch, onNotAMatch)
         }
     }
 }
@@ -213,6 +298,7 @@ private fun RegisterLine(
     picked: Boolean?,
     onPress: () -> Unit,
     onLongPress: () -> Unit,
+    detail: String = registerDetail(row),
 ) {
     val accent = Metro.accent.text
     val fill =
@@ -253,7 +339,7 @@ private fun RegisterLine(
             Column(Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter)) {
                 MetroText(row.payee, Metro.typography.body, maxLines = 2)
                 MetroText(
-                    registerDetail(row),
+                    detail,
                     Metro.typography.caption,
                     Modifier.testTag("register-detail-${row.id}"),
                     color = Metro.colors.secondary,
@@ -331,6 +417,9 @@ private val CLEARED_BAR_GAP = 6.dp
 private val SELECT_BOX = 32.dp
 
 private val REGISTER_ROW_AIR = 15.dp
+
+/** How strongly a possible match's rows take the accent. */
+private const val MATCH_TINT = 0.08f
 
 /** The quieter line under a payee: category, then the note. The date heads its day; the bar shows cleared. */
 internal fun registerDetail(row: RegisterRow): String =

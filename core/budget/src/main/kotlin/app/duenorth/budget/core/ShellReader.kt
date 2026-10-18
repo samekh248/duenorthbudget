@@ -60,6 +60,7 @@ object ShellReader {
                     GROUP BY t.acct
                     """.trimIndent(),
                 ).associate { row -> row.str("acct").orEmpty() to row.long("balance") }
+        val onBudget = accounts.filter { !it.bool("offbudget") }.map { it.str("id").orEmpty() }.toSet()
         val categoryNames =
             session
                 .query("SELECT id, name FROM categories WHERE IFNULL(tombstone, 0) = 0")
@@ -174,6 +175,7 @@ object ShellReader {
                         suggestionName = suggestion?.let { categoryNames[it] }.orEmpty(),
                     )
                 },
+            matches = MatchFinder.find(session).filter { it.bank.accountId in onBudget },
         )
     }
 
