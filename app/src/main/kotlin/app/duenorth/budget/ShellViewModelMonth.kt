@@ -44,6 +44,11 @@ fun ShellViewModel.fillMonth(
     kind: MonthFillKind,
     confirmed: Boolean = false,
 ) {
+    // In edit mode a fill only changes the boxes, so there is nothing to confirm.
+    if (state.value.budgetEdit != null) {
+        fillBudgetEdit(kind)
+        return
+    }
     val shell = state.value.shell ?: return
     val month = editorMonth()
     mutate { it.copy(monthNotice = null, fillConfirm = null) }

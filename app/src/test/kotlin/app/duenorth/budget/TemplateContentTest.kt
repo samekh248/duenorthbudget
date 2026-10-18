@@ -33,10 +33,12 @@ class TemplateContentTest {
     val compose = createHostComposeRule()
 
     @Test
-    fun homeMenuHasTemplatesOnlyWhenBothFlagsAreOn() {
+    fun editModeMenuHasTemplatesOnlyWhenBothFlagsAreOn() {
         for (mode in listOf(BudgetMode.ENVELOPE, BudgetMode.TRACKING)) {
-            assertFalse("templates" in ScreenBar.specsFor(ShellRoute.Home, true, mode).map { it.id })
-            assertTrue("templates" in ScreenBar.specsFor(ShellRoute.Home, true, mode, templates = true).map { it.id })
+            assertFalse("templates" in ScreenBar.specsFor(ShellRoute.Home, true, mode, budgetEditing = true).map { it.id })
+            assertTrue("templates" in ScreenBar.specsFor(ShellRoute.Home, true, mode, templates = true, budgetEditing = true).map { it.id })
+            // Templates moved off the budget's own menu into edit mode's.
+            assertFalse("templates" in ScreenBar.specsFor(ShellRoute.Home, true, mode, templates = true).map { it.id })
         }
     }
 

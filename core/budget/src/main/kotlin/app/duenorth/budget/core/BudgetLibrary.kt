@@ -741,6 +741,54 @@ class BudgetLibrary(
             ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
     }
 
+    /**
+     * What applying (or, with [overwrite], overwriting) templates would budget for [month], with edit mode's unsaved
+     * [budgeted] amounts in place first. Runs the templates and rolls every write back, so nothing is saved.
+     * Returns the result and the budgeted amount of each category the templates set.
+     */
+    fun previewTemplates(
+        budgetId: String,
+        month: YearMonth,
+        overwrite: Boolean,
+        budgeted: Map<String, Long>,
+    ): Pair<TemplateResult, Map<String, Long>> {
+        if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF) to emptyMap()
+        return serial {
+            open(budgetId) { session ->
+                val table =
+                    if (session.query("SELECT value FROM preferences WHERE id = 'budgetType'").firstOrNull()?.str("value") == "tracking") {
+                        "reflect_budgets"
+                    } else {
+                        "zero_budgets"
+                    }
+
+                fun amounts(): Map<String, Long> =
+                    session
+                        .query("SELECT category, amount FROM $table WHERE month = ?", listOf(month.toActualMonth()))
+                        .associate { it.str("category").orEmpty() to it.long("amount") }
+                var result: TemplateResult = TemplateResult.Applied(0)
+                var after = emptyMap<String, Long>()
+                var before = emptyMap<String, Long>()
+                try {
+                    session.transaction {
+                        budgeted.forEach { (id, amount) ->
+                            BudgetEdits.assign(session, SyncSchema.clockFor(session), month.toActualMonth(), id, amount)
+                        }
+                        before = amounts()
+                        result = TemplateEngine(session, clock.today()).run(month, overwrite, confirmed = true)
+                        after = amounts()
+                        throw PreviewRollback()
+                    }
+                } catch (_: PreviewRollback) {
+                    // Rolled back: the preview leaves the file as it was.
+                }
+                result to after.filter { (id, amount) -> before[id] != amount }
+            }
+        } ?: (TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS) to emptyMap())
+    }
+
+    private class PreviewRollback : RuntimeException()
+
     fun readCategoryNote(
         budgetId: String,
         categoryId: String,

@@ -1,14 +1,21 @@
 package app.duenorth.budget
 
+import androidx.lifecycle.viewModelScope
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MoneyMath
+import app.duenorth.budget.core.MonthFillCopy
+import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.withBudgetedAssignment
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.YearMonth
 
 // The budget's edit mode: the budgeted column as boxes, typed into on the app's own keypad, with to
@@ -18,6 +25,7 @@ import java.time.YearMonth
 /**
  * Edit mode on the budget item; [categoryId] is the box the keypad is typing into, and [text] what was typed.
  * [budgeted] is each changed category's new budgeted amount, not yet saved, for [budgetId]'s [month].
+ * [templates] is null until the templates run here, then whether any run overwrote.
  */
 data class BudgetEdit(
     val categoryId: String? = null,
@@ -25,6 +33,7 @@ data class BudgetEdit(
     val budgeted: Map<String, Long> = emptyMap(),
     val budgetId: String? = null,
     val month: YearMonth? = null,
+    val templates: Boolean? = null,
 )
 
 /** The month as edit mode shows it: the saved month with the unsaved amounts laid over it. */
@@ -61,8 +70,54 @@ fun ShellViewModel.endBudgetEdit() {
     mutate { it.copy(budgetEdit = null, editError = null) }
     if (shell == null || edit.budgetId != shell.budgetId || edit.month != shell.month) return
     val saved = shell.groups.flatMap { it.categories }.associate { it.id to it.budgetedMinor }
-    val changed = edit.budgeted.filter { (id, minor) -> id in saved && saved[id] != minor }
-    if (changed.isNotEmpty()) saveBudgets(shell.month, changed)
+    // Templates rerun on save, so every amount goes back over theirs; otherwise only what changed. A fill can
+    // reach categories the budget is not showing, which are saved as they are.
+    val changed = if (edit.templates != null) edit.budgeted else edit.budgeted.filter { (id, minor) -> saved[id] != minor }
+    if (changed.isNotEmpty() || edit.templates != null) saveBudgets(shell.month, changed, edit.templates)
+}
+
+/** A month fill in edit mode: copy last month, 3 month average or set to zero land in the boxes, unsaved. */
+fun ShellViewModel.fillBudgetEdit(kind: MonthFillKind) {
+    val edit = state.value.budgetEdit ?: return
+    if (!commitBudgetBox()) return
+    closeBudgetKeypad()
+    val budgetId = edit.budgetId ?: return
+    val month = edit.month ?: return
+    viewModelScope.launch {
+        val targets = withContext(Dispatchers.IO) { sync.fillTargets(budgetId, month, kind) }
+        mutate { current ->
+            val open = current.budgetEdit?.takeIf { it.budgetId == budgetId && it.month == month } ?: return@mutate current
+            if (targets.isNullOrEmpty()) {
+                current.copy(editError = MonthFillCopy.NOTHING_TO_COPY)
+            } else {
+                current.copy(budgetEdit = open.copy(budgeted = open.budgeted + targets), editError = null)
+            }
+        }
+    }
+}
+
+/** Templates in edit mode: works out what they would budget, over edit mode's own amounts, without saving. */
+fun ShellViewModel.applyTemplatesInBudgetEdit(overwrite: Boolean) {
+    val edit = state.value.budgetEdit ?: return
+    val budgetId = edit.budgetId ?: return
+    val month = edit.month ?: return
+    mutate { it.copy(templateBusy = true, templateConfirm = null) }
+    viewModelScope.launch {
+        val (result, amounts) =
+            withContext(Dispatchers.IO) { library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
+        mutate { current ->
+            val open = current.budgetEdit?.takeIf { it.budgetId == budgetId && it.month == month }
+            if (open == null || result !is TemplateResult.Applied) {
+                current.copy(templateResult = result, templateBusy = false)
+            } else {
+                current.copy(
+                    budgetEdit = open.copy(budgeted = open.budgeted + amounts, templates = (open.templates ?: false) || overwrite),
+                    templateResult = result,
+                    templateBusy = false,
+                )
+            }
+        }
+    }
 }
 
 /** cancel, or back: leaves edit mode and drops everything it changed. Nothing was saved, so nothing is undone. */
