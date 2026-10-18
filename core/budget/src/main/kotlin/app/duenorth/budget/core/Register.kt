@@ -87,6 +87,8 @@ data class RegisterPage(
     val rows: List<RegisterRow>,
     val categories: List<CategoryChoice>,
     val accounts: List<AccountChoice>,
+    /** Possible matches in this account, shown above the rows until matched or called not a match. */
+    val matches: List<MatchPair> = emptyList(),
 ) {
     fun matching(payeeQuery: String): List<RegisterRow> {
         val query = payeeQuery.trim()
@@ -555,6 +557,7 @@ class RegisterBook(
             rows = rows,
             categories = categories(),
             accounts = accounts(),
+            matches = MatchFinder.find(session, accountId),
         )
     }
 

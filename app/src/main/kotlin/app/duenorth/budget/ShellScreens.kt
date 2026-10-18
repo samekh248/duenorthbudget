@@ -104,6 +104,7 @@ fun HomePivot(
     /** Rows checked in the inbox's select mode; null when not selecting. */
     inboxSelection: Set<String>? = null,
     onInboxToggle: (String) -> Unit = {},
+    inboxLead: String? = null,
     netWorth: NetWorthPage? = null,
     onNetWorth: () -> Unit = {},
     onMonthReview: () -> Unit = {},
@@ -188,6 +189,7 @@ fun HomePivot(
                             actions = inboxActions,
                             selection = inboxSelection,
                             onToggle = onInboxToggle,
+                            lead = inboxLead,
                         )
                     }
                 },
