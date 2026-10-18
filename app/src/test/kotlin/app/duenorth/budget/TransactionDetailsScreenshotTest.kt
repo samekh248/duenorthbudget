@@ -169,13 +169,14 @@ class TransactionDetailsScreenshotTest {
     private fun transfer() =
         existing().copy(
             id = "payment",
-            payee = "Payment from Checking",
+            payee = "transfer from Checking",
             categoryId = null,
             categoryLabel = "transfer",
             amountMinor = 20_000,
             note = "",
             transferId = "t-1",
             partnerOffBudget = false,
+            transferAccountId = "checking",
         )
 
     private companion object {

@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -61,6 +62,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.AccountChoice
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.DateColumn
@@ -82,6 +84,7 @@ import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.design.components.AppGlyph
+import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroComboBox
@@ -337,7 +340,15 @@ private fun RegisterLine(
                 SelectBox(picked, Modifier.width(SELECT_BOX).padding(top = 2.dp).testTag("register-select-${row.id}"))
             }
             Column(Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter)) {
-                MetroText(row.payee, Metro.typography.body, maxLines = 2)
+                if (row.transferAccountId != null) {
+                    // A transfer leads with its glyph, as Actual marks transfer payees.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppGlyphIcon(AppGlyph.Transfer, accent)
+                        MetroText(row.payee, Metro.typography.body, Modifier.padding(start = 6.dp), maxLines = 2)
+                    }
+                } else {
+                    MetroText(row.payee, Metro.typography.body, maxLines = 2)
+                }
                 MetroText(
                     detail,
                     Metro.typography.caption,
@@ -465,13 +476,14 @@ fun TransactionForm(
     var expense by remember(row?.id) { mutableStateOf(row?.amountMinor?.let { it <= 0L } ?: true) }
     var note by remember(row?.id) { mutableStateOf(row?.note.orEmpty()) }
     var categoryId by remember(row?.id) { mutableStateOf(row?.categoryId ?: row?.partnerCategoryId) }
+    // The account this transaction transfers to or from, picked from the payee box (option C, #76).
+    var transferTo by remember(row?.id) { mutableStateOf(row?.transferAccountId) }
+    val transferAccount = transferTo?.let { id -> page.accounts.firstOrNull { it.id == id } }
     var fieldError by remember(row?.id) { mutableStateOf<Pair<TransactionField, String>?>(null) }
     var overlay by remember(row?.id) { mutableStateOf<FormOverlay>(FormOverlay.None) }
-    val mixed =
-        row?.transferId != null &&
-            row.partnerOffBudget != null &&
-            row.partnerOffBudget != page.account.offBudget
-    val showCategories = row?.parent != true && (row?.transferId == null || mixed)
+    // A transfer between two budget accounts takes no category; one that crosses the budget's edge does, as in Actual.
+    val mixed = transferAccount != null && transferAccount.offBudget != page.account.offBudget
+    val showCategories = row?.parent != true && (transferTo == null || mixed)
     val options = remember(page.categories, categoryId) { CategoryOptions.of(page.categories, categoryId) }
     val commit = {
         when (
@@ -480,13 +492,14 @@ fun TransactionForm(
                     id = draftId,
                     accountId = page.account.id,
                     date = date,
-                    payee = payee,
+                    payee = transferAccount?.name ?: payee,
                     amountText = amount,
                     decimals = page.currency.decimals,
                     expense = expense,
                     categoryId = if (showCategories) categoryId else null,
                     note = note,
                     numberFormat = numberFormat,
+                    transferAccountId = transferTo,
                 )
         ) {
             is EntryResult.Ok -> {
@@ -535,7 +548,26 @@ fun TransactionForm(
                 }
             }
             LabeledField(TransactionFormCopy.PAYEE, errorFor(TransactionField.PAYEE), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
-                PayeeField(payee, { payee = it }, payees, TransactionFormCopy.PAYEE, "transaction-payee")
+                if (transferTo != null) {
+                    TransferTile(
+                        RegisterEntry.transferLabel(if (expense) -1 else 1, transferAccount?.name.orEmpty()),
+                        onClear = {
+                            transferTo = null
+                            payee = ""
+                        },
+                    )
+                } else {
+                    PayeeField(
+                        payee,
+                        { payee = it },
+                        payees,
+                        TransactionFormCopy.PAYEE,
+                        "transaction-payee",
+                        transfers = { query -> PayeeTypeAhead.transfers(page.accounts, page.account.id, query) },
+                        expense = expense,
+                        onTransfer = { transferTo = it.id },
+                    )
+                }
             }
             LabeledField(TransactionFormCopy.AMOUNT, errorFor(TransactionField.AMOUNT), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
                 AmountLine(
@@ -573,6 +605,17 @@ fun TransactionForm(
                     lines = NOTE_LINES,
                 )
             }
+            if (transferAccount != null) {
+                TransferPreview(
+                    page = page,
+                    other = transferAccount,
+                    adding = row?.transferId == null,
+                    signed = RegisterEntry.signedAmount(amount, page.currency.decimals, expense, numberFormat),
+                    date = date,
+                    category = if (showCategories) categoryId?.let(options::name) else null,
+                    format = FormatOptions(hideFraction, numberFormat),
+                )
+            }
         }
         when (val open = overlay) {
             FormOverlay.None -> Unit
@@ -600,6 +643,90 @@ fun TransactionForm(
     }
 }
 
+/** The picked transfer, in place of the payee box: an accent tile reading "transfer to" the account, with a clear button. */
+@Composable
+private fun TransferTile(
+    label: String,
+    onClear: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .background(Metro.accent.fill)
+            .padding(start = 12.dp)
+            .testTag("transaction-transfer"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppGlyphIcon(AppGlyph.Transfer, Metro.accent.onFill)
+        MetroText(
+            label,
+            Metro.typography.control,
+            Modifier.weight(1f).padding(start = 10.dp).testTag("transaction-transfer-label"),
+            color = Metro.accent.onFill,
+            maxLines = 1,
+        )
+        Box(
+            Modifier
+                .size(MetroDimens.TouchTarget)
+                .metroPress(onClear)
+                .semantics { contentDescription = TransactionFormCopy.CLEAR_TRANSFER }
+                .testTag("transaction-transfer-clear"),
+            contentAlignment = Alignment.Center,
+        ) {
+            AppGlyphIcon(AppGlyph.Cancel, Metro.accent.onFill)
+        }
+    }
+}
+
+/** The transaction a transfer adds or keeps in step in the other account, as it will read on that register. */
+@Composable
+private fun TransferPreview(
+    page: RegisterPage,
+    other: AccountChoice,
+    adding: Boolean,
+    signed: Long?,
+    date: Int,
+    category: String?,
+    format: FormatOptions,
+) {
+    Column(Modifier.fillMaxWidth().padding(top = MetroDimens.FieldGroupGap).testTag("transaction-transfer-preview")) {
+        MetroText(
+            "${if (adding) TransactionFormCopy.ALSO_ADDS else TransactionFormCopy.ALSO_CHANGES} ${other.name}",
+            Metro.typography.caption,
+            color = Metro.accent.text,
+        )
+        Row(
+            Modifier
+                .padding(top = MetroDimens.FieldLabelGap)
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .background(Metro.accent.text.copy(alpha = MATCH_TINT)),
+        ) {
+            Box(Modifier.width(3.dp).fillMaxHeight().background(Metro.accent.fill))
+            Column(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 8.dp)) {
+                MetroText(RegisterEntry.transferLabel(-(signed ?: -1L), page.account.name), Metro.typography.body, maxLines = 2)
+                MetroText(
+                    listOf(other.name, RegisterEntry.registerDateLabel(date), category ?: RegisterCopy.NO_CATEGORY).joinToString(" · "),
+                    Metro.typography.caption,
+                    color = Metro.colors.secondary,
+                    maxLines = 2,
+                )
+            }
+            if (signed != null) {
+                MetroText(
+                    MoneyFormat.format(-signed, page.currency, format),
+                    Metro.typography.body,
+                    Modifier.padding(10.dp).testTag("transaction-transfer-preview-amount"),
+                    color = Metro.accent.text,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+        }
+    }
+}
+
 object TransactionFormCopy {
     const val DATE = "date"
     const val PAYEE = "payee"
@@ -612,6 +739,9 @@ object TransactionFormCopy {
     const val DONE = "done"
     const val CANCEL = "cancel"
     const val HIDDEN = "(hidden)"
+    const val ALSO_ADDS = "also adds to"
+    const val ALSO_CHANGES = "also changes in"
+    const val CLEAR_TRANSFER = "not a transfer"
 }
 
 /** Which field a save refusal belongs to, so its message sits under that field (FR-022). */

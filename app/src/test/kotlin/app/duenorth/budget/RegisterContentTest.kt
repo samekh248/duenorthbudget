@@ -17,6 +17,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasParent
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
@@ -281,9 +282,58 @@ class RegisterContentTest {
     @Test
     @Config(sdk = [33], qualifiers = "w411dp-h891dp")
     fun transferHasNoCategoryBox() {
-        val row = sample().rows.first().copy(transferId = "t", partnerOffBudget = false)
+        val row = sample().rows.first().copy(transferId = "t", partnerOffBudget = false, transferAccountId = "cash")
         form(row = row)
         compose.onNodeWithTag("transaction-category").assertDoesNotExist()
+        compose.onNodeWithTag("transaction-transfer-label").assertTextEquals("transfer to Cash")
+        compose.onNodeWithText("${TransactionFormCopy.ALSO_CHANGES} Cash").assertIsDisplayed()
+    }
+
+    // Option C (#76): an account typed in the payee box becomes a transfer tile, with the paired side shown.
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun typingAnAccountOffersATransferAndSavesIt() {
+        var saved: TransactionDraft? = null
+        val host = form(row = null, onSave = { saved = it })
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("ca")
+        compose.onNodeWithTag("transaction-payee-transfer-cash").assertTextEquals("transfer to Cash").performClick()
+        compose.onNodeWithTag("transaction-transfer-label").assertTextEquals("transfer to Cash")
+        compose.onNodeWithTag("transaction-category").assertDoesNotExist()
+        compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("5")
+        compose.onNodeWithText("${TransactionFormCopy.ALSO_ADDS} Cash").assertIsDisplayed()
+        compose.onNodeWithText("transfer from Checking").assertIsDisplayed()
+        compose.onNodeWithTag("transaction-transfer-preview-amount").assertTextEquals("$5.00")
+        compose.onNodeWithTag("transaction-direction-income").performClick()
+        compose.onNodeWithTag("transaction-transfer-label").assertTextEquals("transfer from Cash")
+        compose.runOnIdle { host.save() }
+        assertEquals("cash", saved?.transferAccountId)
+        assertEquals(500L, saved?.amountMinor)
+        assertEquals(null, saved?.categoryId)
+    }
+
+    @Test
+    fun clearingTheTransferGivesThePayeeBoxBack() {
+        var saved: TransactionDraft? = null
+        val row = sample().rows.first().copy(transferId = "t", partnerOffBudget = false, transferAccountId = "cash")
+        val host = form(row = row, onSave = { saved = it })
+        compose.onNodeWithTag("transaction-transfer-clear").performClick()
+        compose.onNodeWithTag("transaction-transfer").assertDoesNotExist()
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("Cafe")
+        compose.runOnIdle { host.save() }
+        assertEquals(null, saved?.transferAccountId)
+        assertEquals("Cafe", saved?.payee)
+    }
+
+    @Test
+    fun anOffBudgetTransferKeepsItsCategory() {
+        val page =
+            sample().copy(
+                accounts = listOf(AccountChoice("broker", "Brokerage", offBudget = true, type = "investment", closed = false)),
+            )
+        val row = page.rows.first().copy(transferId = "t", partnerOffBudget = true, transferAccountId = "broker")
+        form(page = page, row = row)
+        compose.onNodeWithTag("transaction-category").assertIsDisplayed()
+        compose.onNodeWithTag("transaction-transfer-label").assertTextEquals("transfer to Brokerage")
     }
 
     @Test

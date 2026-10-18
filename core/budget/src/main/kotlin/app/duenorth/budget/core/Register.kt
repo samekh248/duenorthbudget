@@ -19,6 +19,8 @@ object RegisterCopy {
     const val SCHEDULE = "schedule"
     const val DELETE = "delete"
     const val TRANSFER = "transfer"
+    const val TRANSFER_TO = "transfer to"
+    const val TRANSFER_FROM = "transfer from"
     const val OWED = "owed"
     const val RECONCILED = "reconciled"
     const val SELECTED = "selected"
@@ -61,6 +63,8 @@ data class RegisterRow(
     val parent: Boolean,
     val parts: List<RegisterPart>,
     val cleared: Boolean = false,
+    /** The account a transfer payee stands for; the payee line reads "transfer to/from" it. */
+    val transferAccountId: String? = null,
 )
 
 data class CategoryChoice(
@@ -118,6 +122,8 @@ data class TransactionDraft(
     val note: String?,
     val force: Boolean = false,
     val scheduleId: String? = null,
+    /** A transfer: the other account, whose paired transaction this save adds, moves or keeps in step. */
+    val transferAccountId: String? = null,
 )
 
 data class TransferDraft(
@@ -341,8 +347,22 @@ object RegisterEntry {
         note: String,
         force: Boolean = false,
         numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
+        transferAccountId: String? = null,
     ): EntryResult<TransactionDraft> =
-        transaction(id, accountId, formatIso(date), payee, amountText, decimals, expense, categoryId, note, force, numberFormat)
+        transaction(
+            id,
+            accountId,
+            formatIso(date),
+            payee,
+            amountText,
+            decimals,
+            expense,
+            categoryId,
+            note,
+            force,
+            numberFormat,
+            transferAccountId,
+        )
 
     fun transaction(
         id: String,
@@ -356,9 +376,10 @@ object RegisterEntry {
         note: String,
         force: Boolean = false,
         numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
+        transferAccountId: String? = null,
     ): EntryResult<TransactionDraft> {
         val date = parseDate(dateText) ?: return EntryResult.Rejected(RegisterCopy.ENTER_DATE)
-        if (payee.trim().isEmpty()) return EntryResult.Rejected(RegisterCopy.ENTER_PAYEE)
+        if (transferAccountId == null && payee.trim().isEmpty()) return EntryResult.Rejected(RegisterCopy.ENTER_PAYEE)
         // A typed sum is worked out first; its result is already in canonical form.
         val math = MoneyMath.isMath(amountText)
         val magnitude =
@@ -379,9 +400,34 @@ object RegisterEntry {
                 categoryId = categoryId?.ifBlank { null },
                 note = note.trim().ifEmpty { null },
                 force = force,
+                transferAccountId = transferAccountId,
             ),
         )
     }
+
+    /** The amount box's text as a signed amount, as [transaction] reads it; null while it isn't one yet. */
+    fun signedAmount(
+        amountText: String,
+        decimals: Int,
+        expense: Boolean,
+        numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
+    ): Long? {
+        val math = MoneyMath.isMath(amountText)
+        val magnitude =
+            MoneyParse.parseMagnitude(
+                if (math) MoneyParse.canonical(amountText, numberFormat, decimals) else amountText,
+                decimals,
+                if (math) FormatOptions.NUMBER_COMMA_DOT else numberFormat,
+            ) ?: return null
+        if (magnitude == 0L) return null
+        return if (expense) -magnitude else magnitude
+    }
+
+    /** A transfer's payee line, as Actual's phone app words it: money out goes "to" the account, money in comes "from" it. */
+    fun transferLabel(
+        amountMinor: Long,
+        accountName: String,
+    ): String = "${if (amountMinor > 0) RegisterCopy.TRANSFER_FROM else RegisterCopy.TRANSFER_TO} $accountName"
 
     fun transfer(
         id: String,
@@ -497,12 +543,16 @@ class RegisterBook(
                         t.cleared AS cleared,
                         t.transferred_id AS transferred_id,
                         COALESCE(p.name, '') AS payee,
+                        p.transfer_acct AS transfer_acct,
+                        COALESCE(target.name, '') AS transfer_name,
                         COALESCE(c.name, '') AS category_name,
                         other.category AS partner_category,
                         partner.offbudget AS partner_off
                     FROM transactions t
                     LEFT JOIN payees p
                         ON p.id = t.description AND IFNULL(p.tombstone, 0) = 0
+                    LEFT JOIN accounts target
+                        ON target.id = p.transfer_acct
                     LEFT JOIN categories c
                         ON c.id = t.category AND IFNULL(c.tombstone, 0) = 0
                     LEFT JOIN transactions other
@@ -528,10 +578,20 @@ class RegisterBook(
                             transferId != null -> RegisterCopy.TRANSFER
                             else -> RegisterCopy.NO_CATEGORY
                         }
+                    val transferAccount = row.str("transfer_acct")
+                    val amount = row.long("amount")
                     RegisterRow(
                         id = id,
                         date = row.long("date").toInt(),
-                        payee = row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE },
+                        payee =
+                            if (transferAccount != null) {
+                                RegisterEntry.transferLabel(
+                                    amount,
+                                    row.str("transfer_name").orEmpty().ifBlank { row.str("payee").orEmpty() },
+                                )
+                            } else {
+                                row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE }
+                            },
                         categoryId = categoryId,
                         categoryLabel = label,
                         amountMinor = row.long("amount"),
@@ -543,6 +603,7 @@ class RegisterBook(
                         parent = parent,
                         parts = parts[id].orEmpty(),
                         cleared = row.bool("cleared"),
+                        transferAccountId = transferAccount,
                     )
                 }
         return RegisterPage(
@@ -587,6 +648,7 @@ class RegisterBook(
     }
 
     fun save(draft: TransactionDraft): WriteResult {
+        if (draft.transferAccountId != null) return saveTransfer(draft)
         if (draft.payee.trim().isEmpty()) return WriteResult.Rejected(RegisterCopy.ENTER_PAYEE)
         if (draft.amountMinor == 0L) return WriteResult.Rejected(RegisterCopy.AMOUNT_ZERO)
         if (!validDate(draft.date)) return WriteResult.Rejected(RegisterCopy.ENTER_DATE)
@@ -629,7 +691,9 @@ class RegisterBook(
                 return@write WriteResult.Saved
             }
             if (partner != null) {
-                return@write saveTransferSide(existing, partner, draft, note)
+                // A transfer given an ordinary payee stops being a transfer: its partner goes, as in Actual.
+                tombstone(partner.id)
+                setColumns(existing.id, "transferred_id" to null)
             }
             val ruled = applyRules(draft, note)
             updateFields(
@@ -892,30 +956,66 @@ class RegisterBook(
         }
     }
 
-    private fun saveTransferSide(
-        side: Txn,
-        partner: Txn,
-        draft: TransactionDraft,
-        note: String?,
-    ): WriteResult {
-        val sideAccount = account(draft.accountId) ?: return WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
-        val partnerAccount = account(partner.accountId) ?: return WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
-        val placed =
-            placeCategory(sideAccount, partnerAccount, draft.categoryId)
-                ?: return WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
-        val sidePayee = transferPayee(partnerAccount.id)
-        val partnerPayee = transferPayee(sideAccount.id)
-        updateFields(side.id, sideAccount.id, placed.first, draft.amountMinor, sidePayee, note, draft.date)
-        updateFields(
-            partner.id,
-            partner.accountId,
-            placed.second,
-            -draft.amountMinor,
-            partnerPayee,
-            note,
-            partner.date,
-        )
-        return WriteResult.Saved
+    /**
+     * Saves [draft] as one side of a transfer with its `transferAccountId`, as Actual does when the payee is an
+     * account's transfer payee: a new transaction gets a partner in that account for the opposite amount; an
+     * ordinary one gains a partner; a transfer keeps its partner in step, or moves it when the account changed.
+     */
+    private fun saveTransfer(draft: TransactionDraft): WriteResult {
+        if (draft.amountMinor == 0L) return WriteResult.Rejected(RegisterCopy.AMOUNT_ZERO)
+        if (!validDate(draft.date)) return WriteResult.Rejected(RegisterCopy.ENTER_DATE)
+        val note = draft.note?.trim()?.ifEmpty { null }
+        return write {
+            val side = account(draft.accountId)
+            val other = draft.transferAccountId?.let { account(it) }
+            if (side == null || side.tombstone) return@write WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+            if (other == null || other.tombstone || other.id == side.id) return@write WriteResult.Rejected(RegisterCopy.CHOOSE_ACCOUNT)
+            val existing = find(draft.id)
+            if (existing != null && existing.tombstone) return@write WriteResult.Saved
+            if (existing != null && (existing.parent || existing.child)) return@write WriteResult.Rejected(RegisterCopy.SPLIT_MUST_ADD)
+            val partner = existing?.transferId?.let { find(it) }?.takeIf { !it.tombstone }
+            guard(listOfNotNull(existing, partner), draft.force, ForcedWrite.Save(draft.copy(force = true)))?.let {
+                return@write it
+            }
+            val placed = placeCategory(side, other, draft.categoryId) ?: return@write WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
+            val sidePayee = transferPayee(other.id)
+            val partnerPayee = transferPayee(side.id)
+            if (partner != null && partner.accountId == other.id) {
+                updateFields(draft.id, side.id, placed.first, draft.amountMinor, sidePayee, note, draft.date)
+                updateFields(partner.id, other.id, placed.second, -draft.amountMinor, partnerPayee, note, partner.date)
+                return@write WriteResult.Saved
+            }
+            partner?.let { tombstone(it.id) }
+            val partnerId = ids()
+            if (existing == null) {
+                insert(
+                    id = draft.id,
+                    accountId = side.id,
+                    categoryId = placed.first,
+                    amount = draft.amountMinor,
+                    payeeId = sidePayee,
+                    note = note,
+                    date = draft.date,
+                    transferId = partnerId,
+                    sort = nextSort(),
+                )
+            } else {
+                updateFields(draft.id, side.id, placed.first, draft.amountMinor, sidePayee, note, draft.date)
+                setColumns(draft.id, "transferred_id" to partnerId)
+            }
+            insert(
+                id = partnerId,
+                accountId = other.id,
+                categoryId = placed.second,
+                amount = -draft.amountMinor,
+                payeeId = partnerPayee,
+                note = note,
+                date = draft.date,
+                transferId = draft.id,
+                sort = nextSort(),
+            )
+            WriteResult.Saved
+        }
     }
 
     private fun placeCategory(

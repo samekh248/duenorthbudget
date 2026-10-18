@@ -289,6 +289,82 @@ class RegisterBookTest {
         }
     }
 
+    // Option C (#76): picking an account in the payee box saves a transfer, as Actual's transfer payees do.
+    @Test
+    fun payeeTransferPairsMovesAndBreaks() {
+        db { session, book ->
+            val before = shell(session).headerMinor
+            assertTrue(book.save(transfer("move", to = "cash", amount = -5_000)) is WriteResult.Saved)
+            assertEquals(-5_000L, book.read("checking")!!.balanceMinor)
+            assertEquals(5_000L, book.read("cash")!!.balanceMinor)
+            assertEquals(before, shell(session).headerMinor)
+            val out = book.read("checking")!!.rows.single()
+            assertEquals("transfer to Cash", out.payee)
+            assertEquals("cash", out.transferAccountId)
+            assertEquals(RegisterCopy.TRANSFER, out.categoryLabel)
+            val back = book.read("cash")!!.rows.single()
+            assertEquals("transfer from Checking", back.payee)
+            assertEquals("move", back.transferId)
+
+            // Kept in step: a new amount moves both sides.
+            book.save(transfer("move", to = "cash", amount = -7_000))
+            assertEquals(7_000L, book.read("cash")!!.balanceMinor)
+            // Another account: the partner moves there.
+            book.save(transfer("move", to = "card", amount = -7_000))
+            assertEquals(0L, book.read("cash")!!.balanceMinor)
+            assertEquals(7_000L, book.read("card")!!.balanceMinor)
+            assertEquals(
+                "transfer to Visa",
+                book
+                    .read("checking")!!
+                    .rows
+                    .single()
+                    .payee,
+            )
+            assertEquals(2, aliveCount(session))
+            // An ordinary payee: the pair breaks and the partner goes.
+            book.save(draft("move", amount = -7_000))
+            assertEquals(0L, book.read("card")!!.balanceMinor)
+            assertEquals(1, aliveCount(session))
+            val plain = book.read("checking")!!.rows.single()
+            assertEquals("Cafe", plain.payee)
+            assertNull(plain.transferId)
+            // And back again: an ordinary row gains a partner.
+            book.save(transfer("move", to = "cash", amount = 2_000))
+            assertEquals(-2_000L, book.read("cash")!!.balanceMinor)
+            assertEquals(
+                "transfer from Cash",
+                book
+                    .read("checking")!!
+                    .rows
+                    .single()
+                    .payee,
+            )
+            book.delete("move", false)
+            assertEquals(0, aliveCount(session))
+        }
+    }
+
+    @Test
+    fun payeeTransferOffBudgetNeedsACategory() {
+        db { session, book ->
+            val refused = book.save(transfer("out", to = "savings", amount = -5_000)) as WriteResult.Rejected
+            assertEquals(RegisterCopy.CHOOSE_CATEGORY, refused.reason)
+            book.save(transfer("out", to = "savings", amount = -5_000, category = "c-food"))
+            assertEquals(-5_000L, spent(session, "c-food"))
+            assertEquals(5_000L, book.read("savings")!!.balanceMinor)
+            assertNull(
+                book
+                    .read("savings")!!
+                    .rows
+                    .single()
+                    .categoryId,
+            )
+            val self = book.save(transfer("self", to = "checking", amount = -100)) as WriteResult.Rejected
+            assertEquals(RegisterCopy.CHOOSE_ACCOUNT, self.reason)
+        }
+    }
+
     @Test
     fun envelopeCardPaymentMovesAndTrackingDoesNot() {
         db { session, book ->
@@ -518,6 +594,13 @@ class RegisterBookTest {
         note: String? = null,
         force: Boolean = false,
     ) = TransactionDraft(id, account, date, payee, amount, category, note, force)
+
+    private fun transfer(
+        id: String,
+        to: String,
+        amount: Long,
+        category: String? = null,
+    ) = TransactionDraft(id, "checking", 20261007, "", amount, category, null, transferAccountId = to)
 
     private fun shell(
         session: SqlSession,

@@ -38,10 +38,17 @@ class PayeeTypeAheadScreenshotTest {
     @Test
     fun entryDark() = snap("payee_typeahead_dark", dark = true)
 
-    /** A new transaction with "co" typed in the payee box: saved payees that match, the top one in the accent. */
+    @Test
+    fun transferLight() = snap("payee_typeahead_transfer_light", dark = false, typed = "sa")
+
+    @Test
+    fun transferDark() = snap("payee_typeahead_transfer_dark", dark = true, typed = "sa")
+
+    /** A new transaction with [typed] in the payee box: matching accounts as transfers, then saved payees; the top one in the accent. */
     private fun snap(
         name: String,
         dark: Boolean,
+        typed: String = "co",
     ) {
         compose.setContent {
             MetroTheme(darkTheme = dark) {
@@ -52,12 +59,12 @@ class PayeeTypeAheadScreenshotTest {
                         initialDate = "2026-10-07",
                         error = null,
                         onSave = {},
-                        payees = listOf("Corner Coffee", "Costco", "City Power", "Bus", "Taco Corner"),
+                        payees = listOf("Corner Coffee", "Costco", "City Power", "Bus", "Taco Corner", "Safeway", "Sam's Club"),
                     )
                 }
             }
         }
-        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("co")
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput(typed)
         compose.waitForIdle()
         compose.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
@@ -69,6 +76,10 @@ class PayeeTypeAheadScreenshotTest {
             currency = Currencies.byCode("USD")!!,
             rows = emptyList(),
             categories = listOf(CategoryChoice("c-food", "Groceries", "Living", income = false)),
-            accounts = listOf(AccountChoice("cash", "Cash", offBudget = false, type = "checking", closed = false)),
+            accounts =
+                listOf(
+                    AccountChoice("cash", "Cash", offBudget = false, type = "checking", closed = false),
+                    AccountChoice("savings", "Savings", offBudget = false, type = "savings", closed = false),
+                ),
         )
 }
