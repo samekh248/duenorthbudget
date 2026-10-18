@@ -50,6 +50,7 @@ object PayeeTypeAhead {
     ): List<String> {
         val typed = query.trim()
         if (typed.isEmpty()) return emptyList()
+
         fun rank(name: String): Int? =
             when {
                 name.startsWith(typed, ignoreCase = true) -> 0
