@@ -16,13 +16,20 @@ class SyncClock(
     private var millis: Long = 0
     private var counter: Int = 0
 
+    /**
+     * The next stamp, always after every stamp this clock has used or restored. A clock ahead of the
+     * phone's time (a server message from a fast clock, or the phone's time set back) keeps counting
+     * from where it is rather than refusing the edit; a full counter moves on to the next millisecond.
+     */
     @Synchronized
     fun send(): String {
         val physical = now()
-        val nextMillis = maxOf(millis, physical)
-        val nextCounter = if (millis == nextMillis) counter + 1 else 0
-        check(nextMillis - physical <= MAX_DRIFT) { "clock drift" }
-        check(nextCounter <= MAX_COUNTER) { "clock overflow" }
+        var nextMillis = maxOf(millis, physical)
+        var nextCounter = if (millis == nextMillis) counter + 1 else 0
+        if (nextCounter > MAX_COUNTER) {
+            nextMillis += 1
+            nextCounter = 0
+        }
         millis = nextMillis
         counter = nextCounter
         return format(nextMillis, nextCounter, nodeId)

@@ -89,12 +89,13 @@ class SyncCoordinatorTest {
     }
 
     @Test
-    fun collisionKeepsBothAmounts() {
+    fun collisionKeepsBothAmountsAndShowsTheNewerOneLikeDesktop() {
         scenario {
             val remote = server.addFile("Home", budgetBytes())
             assertEquals(OpenResult.Opened, openSignedIn(remote))
             server.online = false
             assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            // The server's change is the later one, so Actual on desktop shows 40.
             server.appendChange(remote.fileId, "zero_budgets", "202610-c-food", "amount", "N:4000")
             server.online = true
             sync.sync(remote.fileId)
@@ -103,12 +104,221 @@ class SyncCoordinatorTest {
             assertEquals("Groceries", conflicts.single().label)
             assertEquals("$25.00", conflicts.single().localText)
             assertEquals("$40.00", conflicts.single().remoteText)
-            assertEquals(2_500L, assigned(remote.fileId))
+            assertFalse(conflicts.single().phoneKept)
+            assertEquals(4_000L, assigned(remote.fileId))
             val values = cellValues(remote.fileId, "202610-c-food", "amount")
             assertTrue(values.contains("N:2500"))
             assertTrue(values.contains("N:4000"))
             sync.markConflictsSeen(remote.fileId)
             assertEquals("$25.00", sync.conflicts(remote.fileId).single().localText)
+            // The server stored the phone's 25; it is not sent again on every sync.
+            assertEquals(0, pendingCount(remote.fileId))
+            sync.sync(remote.fileId)
+            assertTrue(
+                server.syncRequests
+                    .last()
+                    .messages
+                    .isEmpty(),
+            )
+            val other = freshPhone()
+            assertNull(other.sync.connect(server.baseUrl, "server-secret").error)
+            assertEquals(OpenResult.Opened, other.sync.open(remote))
+            assertEquals(4_000L, other.library().useDatabase(remote.fileId) { amountOf(it) })
+        }
+    }
+
+    @Test
+    fun collisionWithAnOlderServerChangeKeepsThePhoneAmount() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            server.appendChangeAt(remote.fileId, EARLIER, "zero_budgets", "202610-c-food", "amount", "N:4000")
+            sync.sync(remote.fileId)
+            val conflict = sync.conflicts(remote.fileId).single()
+            assertTrue(conflict.phoneKept)
+            assertEquals(2_500L, assigned(remote.fileId))
+            assertEquals(0, pendingCount(remote.fileId))
+        }
+    }
+
+    @Test
+    fun changeAnOfflineDeviceSendsLateStillArrives() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            // Another device syncs a change; the phone has now seen up to its stamp.
+            server.appendChange(remote.fileId, "zero_budgets", "202611-c-food", "amount", "N:100")
+            assertEquals("synced 3:04 pm", sync.sync(remote.fileId).status)
+            // A third device was offline and only now sends a change it made earlier.
+            server.appendChangeAt(remote.fileId, EARLIER, "zero_budgets", "202610-c-food", "amount", "N:1234")
+            assertEquals("synced 3:04 pm", sync.sync(remote.fileId).status)
+            assertEquals(1_234L, assigned(remote.fileId))
+            assertEquals(server.timestamps(remote.fileId).toSet(), allTimestamps(remote.fileId).toSet())
+        }
+    }
+
+    @Test
+    fun lateOlderChangeNeverOverwritesANewerAmount() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            sync.sync(remote.fileId)
+            server.appendChangeAt(remote.fileId, EARLIER, "zero_budgets", "202610-c-food", "amount", "N:9900")
+            sync.sync(remote.fileId)
+            assertEquals(2_500L, assigned(remote.fileId))
+            assertTrue(cellValues(remote.fileId, "202610-c-food", "amount").contains("N:9900"))
+            assertTrue(sync.conflicts(remote.fileId).isEmpty())
+        }
+    }
+
+    @Test
+    fun messagesTheServerLostAreSentAgain() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            sync.sync(remote.fileId)
+            // Restored from a backup taken before the phone's change reached it.
+            server.forgetMessages(remote.fileId) { false }
+            assertEquals("synced 3:04 pm", sync.sync(remote.fileId).status)
+            assertTrue(server.plainMessages(remote.fileId).any { it.row == "202610-c-food" && it.value == "N:2500" })
+        }
+    }
+
+    @Test
+    fun droppedReplyIsRetriedAndStoredOnce() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            // Two, since HttpURLConnection itself tries a POST once more when the connection drops.
+            server.dropReplies = 2
+            assertEquals("synced 3:04 pm", sync.sync(remote.fileId).status)
+            assertEquals(listOf(1_000L), opened.pauses)
+            assertEquals(0, pendingCount(remote.fileId))
+            val stamps = server.timestamps(remote.fileId)
+            assertEquals(stamps.size, stamps.toSet().size)
+            assertEquals(1, server.plainMessages(remote.fileId).count { it.row == "202610-c-food" && it.column == "amount" })
+        }
+    }
+
+    @Test
+    fun repliesLostEveryTimeKeepTheChangeUntilTheNextSync() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            val waiting = pendingCount(remote.fileId)
+            server.dropReplies = Int.MAX_VALUE
+            assertEquals(SyncCopy.LAST_FAILED, sync.sync(remote.fileId).status)
+            assertEquals(listOf(1_000L, 3_000L), opened.pauses)
+            assertEquals(waiting, pendingCount(remote.fileId))
+            assertEquals(2_500L, assigned(remote.fileId))
+            server.dropReplies = 0
+            restart()
+            assertEquals("synced 3:04 pm", sync.sync(remote.fileId).status)
+            assertEquals(0, pendingCount(remote.fileId))
+            val stamps = server.timestamps(remote.fileId)
+            assertEquals(stamps.size, stamps.toSet().size)
+        }
+    }
+
+    @Test
+    fun badGatewayIsRetried() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            server.badGateways = 1
+            assertEquals("synced 3:04 pm", sync.sync(remote.fileId).status)
+            assertEquals(1, opened.pauses.size)
+            assertEquals(0, pendingCount(remote.fileId))
+        }
+    }
+
+    @Test
+    fun budgetResetOnTheServerSaysSoAndKeepsTheChange() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            server.resetGroup(remote.fileId)
+            assertEquals(SyncCopy.SERVER_RESET, sync.sync(remote.fileId).status)
+            assertEquals(SyncCopy.SERVER_RESET, sync.status(remote.fileId))
+            assertTrue(opened.pauses.isEmpty())
+            assertTrue(pendingCount(remote.fileId) > 0)
+            assertEquals(2_500L, assigned(remote.fileId))
+        }
+    }
+
+    @Test
+    fun editsStillSaveAfterAMessageFromAFastClock() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            // The server's clock is days ahead of this phone's.
+            server.appendChange(remote.fileId, "zero_budgets", "202610-c-food", "amount", "N:4000")
+            sync.sync(remote.fileId)
+            assertEquals(4_000L, assigned(remote.fileId))
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            assertEquals("synced 3:04 pm", sync.sync(remote.fileId).status)
+            assertEquals(2_500L, assigned(remote.fileId))
+            val other = freshPhone()
+            assertNull(other.sync.connect(server.baseUrl, "server-secret").error)
+            assertEquals(OpenResult.Opened, other.sync.open(remote))
+            assertEquals(2_500L, other.library().useDatabase(remote.fileId) { amountOf(it) })
+        }
+    }
+
+    @Test
+    fun openingTheSameBudgetAgainKeepsChangesTheServerHasNotSeen() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            server.online = false
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            server.online = true
+            server.dropReplies = Int.MAX_VALUE
+            // The download works; the sync after it does not reach the server.
+            assertEquals(OpenResult.Opened, sync.open(remote, replace = true))
+            assertEquals(2_500L, assigned(remote.fileId))
+            assertTrue(pendingCount(remote.fileId) > 0)
+            server.dropReplies = 0
+            assertEquals("synced 3:04 pm", sync.sync(remote.fileId).status)
+            assertTrue(server.plainMessages(remote.fileId).any { it.row == "202610-c-food" && it.value == "N:2500" })
+        }
+    }
+
+    @Test
+    fun uploadWhoseReplyWasLostDoesNotMakeASecondCopy() {
+        scenario {
+            val local = (library.create("Trip", "USD") as CreateResult.Created).id
+            assertNull(sync.connect(server.baseUrl, "server-secret").error)
+            server.dropUploads = 1
+            assertTrue(sync.uploadNew(local) is UploadResult.Failed)
+            val again = sync.uploadNew(local)
+            assertTrue(again is UploadResult.Uploaded)
+            assertEquals(1, sync.refreshRemote().files.size)
+            assertEquals((again as UploadResult.Uploaded).fileId, sync.remoteFiles.single().fileId)
+            assertEquals("synced 3:04 pm", sync.sync(local).status)
+        }
+    }
+
+    @Test
+    fun overlappingSyncsSendEachChangeOnce() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            val workers = List(4) { Thread { sync.sync(remote.fileId) } }
+            workers.forEach(Thread::start)
+            workers.forEach { it.join(10_000) }
+            val carrying = server.syncRequests.count { request -> request.messages.isNotEmpty() }
+            assertEquals(1, carrying)
+            assertEquals(0, pendingCount(remote.fileId))
+            assertEquals("synced 3:04 pm", sync.status(remote.fileId))
         }
     }
 
@@ -364,6 +574,26 @@ class SyncCoordinatorTest {
                 ).map { it.str("value").orEmpty() }
         } ?: emptyList()
 
+    private fun pendingCount(id: String): Int =
+        library.useDatabase(id) { session ->
+            session
+                .query("SELECT COUNT(*) AS n FROM messages WHERE pending = 1")
+                .first()
+                .long("n")
+                .toInt()
+        } ?: 0
+
+    private fun allTimestamps(id: String): List<String> =
+        library.useDatabase(id) { session ->
+            session.query("SELECT timestamp FROM messages").mapNotNull { it.str("timestamp") }
+        } ?: emptyList()
+
+    private fun amountOf(session: SqlSession): Long =
+        session
+            .query("SELECT amount FROM zero_budgets WHERE id = ?", listOf("202610-c-food"))
+            .firstOrNull()
+            ?.long("amount") ?: 0L
+
     private fun messageCount(id: String): Int =
         library.useDatabase(id) { session ->
             session
@@ -436,6 +666,9 @@ class SyncCoordinatorTest {
                 mkdirs()
             }
         val secrets = MemorySecretStore()
+
+        /** Each wait before a retried sync, instead of sleeping. */
+        val pauses: MutableList<Long> = java.util.Collections.synchronizedList(mutableListOf())
         private val today = LocalDate.of(2026, 10, 7)
         private val now = Instant.parse("2026-10-07T15:04:00Z").toEpochMilli()
 
@@ -449,6 +682,7 @@ class SyncCoordinatorTest {
                 BudgetClock { today },
                 ZoneOffset.UTC,
                 now = { now },
+                pause = { pauses.add(it) },
             )
 
         val sync: SyncCoordinator by lazy { coordinator() }
@@ -461,6 +695,9 @@ class SyncCoordinatorTest {
         }
     }
 }
+
+/** Before anything the phone writes at its fixed 3:04 pm, from a device that was offline. */
+private const val EARLIER = "2026-10-07T14:00:00.000Z-0000-0FF11E0000000001"
 
 private fun budgetBytes(): ByteArray = sqliteBytes(income = true, currency = "USD")
 

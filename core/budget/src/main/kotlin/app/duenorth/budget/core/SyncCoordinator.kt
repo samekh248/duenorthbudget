@@ -56,6 +56,8 @@ data class BudgetConflict(
     val label: String,
     val localText: String,
     val remoteText: String,
+    /** The phone's value is the newer one, so it is the value every device now shows. */
+    val phoneKept: Boolean = false,
 )
 
 interface SecretStore {
@@ -123,8 +125,12 @@ class SyncCoordinator(
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val ids: () -> String = { UUID.randomUUID().toString() },
     private val now: () -> Long = { System.currentTimeMillis() },
+    /** Waits before each retry of a sync whose connection dropped; one entry per retry. */
+    private val retryDelays: List<Long> = listOf(1_000L, 3_000L),
+    private val pause: (Long) -> Unit = { Thread.sleep(it) },
 ) {
     private val syncClock: SyncClock
+    private val syncLock = Any()
     private val memoryKeys = HashMap<String, SecretKey>()
     private val pendingMaterial = HashMap<String, KeyMaterial>()
 
@@ -323,6 +329,9 @@ class SyncCoordinator(
         val token = syncToken() ?: return OpenResult.Failed(SyncCopy.SIGN_IN_AGAIN)
         val address = activeAddress() ?: return OpenResult.Failed(SyncCopy.ADDRESS_FAILED)
         if (file.encryptKeyId != null && !isUnlocked(file.fileId)) return OpenResult.NeedsPassword
+        // Changes made on this copy that the server has not stored yet survive the fresh download.
+        val unsent =
+            runCatching { library.useDatabase(file.fileId) { SyncSchema.pendingMessages(it) } }.getOrNull().orEmpty()
         val tracker = DownloadTracker()
         val bytes =
             try {
@@ -350,9 +359,15 @@ class SyncCoordinator(
             } else {
                 bytes
             }
-        return try {
+        try {
             library.installDownloaded(file.fileId, file.name, ActualFileFormat.database(plain))
             library.useDatabase(file.fileId) { session ->
+                // A file another phone uploaded carries that phone's sync bookkeeping; none of it is ours.
+                SyncSchema.ensure(session)
+                session.exec("DELETE FROM conflicts")
+                SyncSchema.putState(session, "lastFailure", "")
+                SyncSchema.putState(session, "lastSuccessEpoch", "")
+                SyncSchema.restorePending(session, unsent)
                 SyncSchema.putState(session, "cloudFileId", file.fileId)
                 SyncSchema.putState(session, "groupId", file.groupId)
                 SyncSchema.putState(session, "keyId", file.encryptKeyId.orEmpty())
@@ -365,12 +380,13 @@ class SyncCoordinator(
             }
             library.switchTo(file.fileId)
             if (replace) clearOthers(file.fileId)
-            sync(file.fileId)
-            OpenResult.Opened
         } catch (_: Exception) {
             // The download arrived; it is the file that did not open.
-            OpenResult.Failed(SyncCopy.OPEN_FAILED)
+            return OpenResult.Failed(SyncCopy.OPEN_FAILED)
         }
+        // The budget is open; a sync that fails now shows on the budget and tries again later.
+        runCatching { sync(file.fileId) }
+        return OpenResult.Opened
     }
 
     /** Clears every budget on the phone except [keepId], with its saved key. */
@@ -385,11 +401,23 @@ class SyncCoordinator(
 
     /** Syncs, then posts any due auto-post schedules (spec 010 US3); posting needs no server. */
     fun sync(budgetId: String): SyncResult {
-        val result = syncNetwork(budgetId)
+        val result =
+            try {
+                // One sync at a time per phone: two would send and apply the same messages at once.
+                synchronized(syncLock) { syncNetwork(budgetId) }
+            } catch (_: Exception) {
+                runCatching { fail(budgetId, "failed") }.getOrElse { SyncResult(SyncCopy.LAST_FAILED) }
+            }
         runCatching { library.autoPostSchedules(budgetId) }
         return result
     }
 
+    /**
+     * Actual's sync: send what the server has not stored, apply what it sends back, then compare
+     * merkle tries. When they differ (a device that was offline sent changes older than the last
+     * one this phone saw, or a reply was lost), sync again from where they part, sending every
+     * message from there on, until both sides hold the same messages.
+     */
     private fun syncNetwork(budgetId: String): SyncResult {
         val token = syncToken() ?: return fail(budgetId, "auth")
         val address = activeAddress() ?: return SyncResult("")
@@ -400,49 +428,92 @@ class SyncCoordinator(
             return SyncResult(SyncCopy.PASSWORD_WRONG)
         }
         restoreClock(budgetId)
-        val since = state(budgetId, "lastRemote").orEmpty().ifBlank { SyncClock.ZERO }
-        val pending = pending(budgetId)
-        val body =
-            SyncProto.encodeRequest(
-                fileId = cloud,
-                groupId = group,
-                keyId = state(budgetId, "keyId").orEmpty(),
-                since = since,
-                messages = pending.map { encodeOutgoing(budgetId, it) },
-            )
-        val responseBytes =
-            try {
-                transport.sync(address, token, body)
-            } catch (_: SyncAuthException) {
-                return fail(budgetId, "auth")
-            } catch (_: Exception) {
-                return fail(budgetId, "failed")
+        var since = state(budgetId, "lastRemote").orEmpty().ifBlank { SyncClock.ZERO }
+        var everything = false
+        repeat(MAX_SYNC_ROUNDS) {
+            val outgoing = outgoing(budgetId, since, everything)
+            val body =
+                SyncProto.encodeRequest(
+                    fileId = cloud,
+                    groupId = group,
+                    keyId = state(budgetId, "keyId").orEmpty(),
+                    since = since,
+                    messages = outgoing.map { encodeOutgoing(budgetId, it) },
+                )
+            val responseBytes =
+                try {
+                    send(address, token, body)
+                } catch (_: SyncAuthException) {
+                    return fail(budgetId, "auth")
+                } catch (refused: SyncFileException) {
+                    return fail(budgetId, refused.reason)
+                } catch (_: Exception) {
+                    return fail(budgetId, "failed")
+                }
+            val response =
+                try {
+                    SyncProto.decodeResponse(responseBytes)
+                } catch (_: Exception) {
+                    return fail(budgetId, "failed")
+                }
+            val decoded = mutableListOf<Pair<String, CellMessage>>()
+            for (envelope in response.messages.sortedBy { it.timestamp }) {
+                val cell =
+                    try {
+                        decodeIncoming(budgetId, envelope)
+                    } catch (_: Exception) {
+                        return fail(budgetId, "failed")
+                    } ?: return SyncResult(SyncCopy.PASSWORD_WRONG)
+                decoded.add(envelope.timestamp to cell)
             }
-        val response =
-            try {
-                SyncProto.decodeResponse(responseBytes)
-            } catch (_: Exception) {
-                return fail(budgetId, "failed")
-            }
-        val decoded = mutableListOf<Pair<String, CellMessage>>()
-        for (envelope in response.messages) {
-            val cell = decodeIncoming(budgetId, envelope) ?: return SyncResult(SyncCopy.PASSWORD_WRONG)
-            decoded.add(envelope.timestamp to cell)
+            val serverTrie = SyncMerkle.parse(response.merkle)
+            // All of a reply lands, or none of it: a phone killed halfway applies it again next time.
+            val gap =
+                library.serial {
+                    library.useDatabase(budgetId) { session ->
+                        var differs: Long? = null
+                        session.transaction {
+                            decoded.forEach { (timestamp, cell) ->
+                                syncClock.observe(timestamp)
+                                SyncSchema.applyRemote(session, timestamp, cell)
+                            }
+                            SyncSchema.acceptPending(session, outgoing.map { it.timestamp })
+                            SyncSchema.backfill(session, syncClock)
+                            val newest = (decoded.map { it.first } + listOfNotNull(SyncSchema.state(session, "lastRemote"))).maxOrNull()
+                            if (newest != null) SyncSchema.putState(session, "lastRemote", newest)
+                            differs = serverTrie?.let { SyncMerkle.diff(it, SyncSchema.merkle(session)) }
+                            if (differs == null) {
+                                SyncSchema.putState(session, "lastSuccessEpoch", now().toString())
+                                SyncSchema.putState(session, "lastFailure", "")
+                                SyncSchema.putState(session, "merkle", response.merkle)
+                            }
+                        }
+                        differs ?: NO_GAP
+                    }
+                } ?: return fail(budgetId, "failed")
+            if (gap == NO_GAP) return SyncResult(status(budgetId))
+            since = SyncMerkle.since(gap)
+            everything = true
         }
-        library.useDatabase(budgetId) { session ->
-            decoded.forEach { (timestamp, cell) ->
-                syncClock.observe(timestamp)
-                SyncSchema.applyRemote(session, timestamp, cell)
+        return fail(budgetId, "failed")
+    }
+
+    /** One sync request, tried again after [retryDelays] when the connection drops. */
+    private fun send(
+        address: String,
+        token: String,
+        body: ByteArray,
+    ): ByteArray {
+        var attempt = 0
+        while (true) {
+            try {
+                return transport.sync(address, token, body)
+            } catch (error: SyncNetworkException) {
+                if (!error.transient || attempt >= retryDelays.size) throw error
+                pause(retryDelays[attempt])
+                attempt++
             }
-            SyncSchema.acceptPending(session, pending.map { it.timestamp })
-            SyncSchema.backfill(session, syncClock)
-            val newest = response.messages.maxOfOrNull { it.timestamp }
-            if (newest != null && newest > since) SyncSchema.putState(session, "lastRemote", newest)
-            SyncSchema.putState(session, "lastSuccessEpoch", now().toString())
-            SyncSchema.putState(session, "lastFailure", "")
-            SyncSchema.putState(session, "merkle", response.merkle)
         }
-        return SyncResult(status(budgetId))
     }
 
     fun assign(
@@ -783,6 +854,9 @@ class SyncCoordinator(
         when (state(budgetId, "lastFailure")) {
             "auth" -> return SyncCopy.SIGN_IN_AGAIN
             "failed" -> return SyncCopy.LAST_FAILED
+            "file-has-reset", "file-needs-upload" -> return SyncCopy.SERVER_RESET
+            "file-has-new-key" -> return SyncCopy.SERVER_NEW_KEY
+            "file-not-found" -> return SyncCopy.SERVER_MISSING
         }
         val epoch = state(budgetId, "lastSuccessEpoch")?.toLongOrNull() ?: return ""
         return syncStatusLabel(epoch, zone)
@@ -792,16 +866,20 @@ class SyncCoordinator(
         val currency = currency(budgetId)
         return library.useDatabase(budgetId) { session ->
             SyncSchema.ensure(session)
-            session.query("SELECT id, row, local_value, remote_value FROM conflicts ORDER BY remote_timestamp").map { row ->
-                val local = row.str("local_value")?.toLongOrNull() ?: 0L
-                val remoteValue = row.str("remote_value")?.toLongOrNull() ?: 0L
-                BudgetConflict(
-                    id = row.str("id").orEmpty(),
-                    label = categoryLabel(session, row.str("row").orEmpty()),
-                    localText = MoneyFormat.format(local, currency),
-                    remoteText = MoneyFormat.format(remoteValue, currency),
-                )
-            }
+            session
+                .query(
+                    "SELECT id, row, local_value, remote_value, local_timestamp, remote_timestamp FROM conflicts ORDER BY remote_timestamp",
+                ).map { row ->
+                    val local = row.str("local_value")?.toLongOrNull() ?: 0L
+                    val remoteValue = row.str("remote_value")?.toLongOrNull() ?: 0L
+                    BudgetConflict(
+                        id = row.str("id").orEmpty(),
+                        label = categoryLabel(session, row.str("row").orEmpty()),
+                        localText = MoneyFormat.format(local, currency),
+                        remoteText = MoneyFormat.format(remoteValue, currency),
+                        phoneKept = (row.str("local_timestamp") ?: "") > (row.str("remote_timestamp") ?: ""),
+                    )
+                }
         } ?: emptyList()
     }
 
@@ -912,11 +990,23 @@ class SyncCoordinator(
         val address = activeAddress() ?: return UploadResult.Failed(SyncCopy.ADDRESS_FAILED)
         val database = java.io.File(java.io.File(library.root, budgetId), "db.sqlite")
         if (!database.isFile) return UploadResult.Failed(SyncCopy.LAST_FAILED)
+        var chosenGroup = groupId
         val chosen =
             fileId ?: run {
-                val taken = runCatching { transport.listFiles(address, token).map { it.fileId }.toSet() }.getOrDefault(emptySet())
+                val listed = runCatching { transport.listFiles(address, token) }.getOrNull()
+                // An earlier try may have reached the server even though its answer never came back;
+                // finish that one rather than leave a second copy of the budget on the server.
+                val earlier = state(budgetId, "uploadingFileId")?.takeIf { it.isNotBlank() }
+                val landed = earlier?.let { id -> listed?.firstOrNull { it.fileId == id } }
+                if (landed != null) {
+                    chosenGroup = landed.groupId.ifBlank { null }
+                    return@run landed.fileId
+                }
+                if (earlier != null && listed == null) return@run earlier
+                val taken = listed.orEmpty().map { it.fileId }.toSet()
                 var created = ids()
                 while (created in taken) created = ids()
+                library.useDatabase(budgetId) { SyncSchema.putState(it, "uploadingFileId", created) }
                 created
             }
         return try {
@@ -925,16 +1015,18 @@ class SyncCoordinator(
                     address = address,
                     token = token,
                     fileId = chosen,
-                    groupId = groupId,
+                    groupId = chosenGroup,
                     name = name,
-                    bytes = ActualFileFormat.pack(database.readBytes(), budgetId, name, chosen, groupId),
+                    bytes = ActualFileFormat.pack(database.readBytes(), budgetId, name, chosen, chosenGroup),
                 )
             library.useDatabase(budgetId) { session ->
                 SyncSchema.putState(session, "cloudFileId", chosen)
                 if (group.isNotBlank()) SyncSchema.putState(session, "groupId", group)
+                SyncSchema.putState(session, "uploadingFileId", "")
                 SyncSchema.markBackfilled(session)
             }
-            remoteFiles = transport.listFiles(address, token)
+            // The upload is done; a list that fails now only leaves the server list as it was.
+            runCatching { transport.listFiles(address, token) }.onSuccess { remoteFiles = it }
             UploadResult.Uploaded(chosen)
         } catch (_: SyncAuthException) {
             fail(budgetId, "auth")
@@ -952,30 +1044,40 @@ class SyncCoordinator(
             SyncSchema.putState(session, "lastFailure", kind)
         }
         if (kind == "auth") clearActiveToken()
-        return SyncResult(if (kind == "auth") SyncCopy.SIGN_IN_AGAIN else SyncCopy.LAST_FAILED)
+        return SyncResult(status(budgetId).ifBlank { SyncCopy.LAST_FAILED })
     }
 
-    private fun pending(budgetId: String): List<Pending> =
+    /** Pending messages, or with [everything] every message after [since], as the server wants them. */
+    private fun outgoing(
+        budgetId: String,
+        since: String,
+        everything: Boolean,
+    ): List<Pending> =
         library.useDatabase(budgetId) { session ->
             SyncSchema.ensure(session)
-            session
-                .query(
-                    """
-                    SELECT timestamp, dataset, row, column, value FROM messages
-                    WHERE pending = 1 ORDER BY timestamp
-                    """.trimIndent(),
-                ).map { row ->
-                    Pending(
-                        timestamp = row.str("timestamp").orEmpty(),
-                        cell =
-                            CellMessage(
-                                dataset = row.str("dataset").orEmpty(),
-                                row = row.str("row").orEmpty(),
-                                column = row.str("column").orEmpty(),
-                                value = SyncValues.wire(row.str("column").orEmpty(), row.str("value")),
-                            ),
+            val rows =
+                if (everything) {
+                    session.query(
+                        "SELECT timestamp, dataset, row, column, value FROM messages WHERE timestamp > ? ORDER BY timestamp",
+                        listOf(since),
+                    )
+                } else {
+                    session.query(
+                        "SELECT timestamp, dataset, row, column, value FROM messages WHERE pending = 1 ORDER BY timestamp",
                     )
                 }
+            rows.map { row ->
+                Pending(
+                    timestamp = row.str("timestamp").orEmpty(),
+                    cell =
+                        CellMessage(
+                            dataset = row.str("dataset").orEmpty(),
+                            row = row.str("row").orEmpty(),
+                            column = row.str("column").orEmpty(),
+                            value = SyncValues.wire(row.str("column").orEmpty(), row.str("value")),
+                        ),
+                )
+            }
         } ?: emptyList()
 
     private fun encodeOutgoing(
@@ -1104,6 +1206,8 @@ class SyncCoordinator(
 
     companion object {
         private const val LEGACY_TOKEN = "actual.token"
+        private const val MAX_SYNC_ROUNDS = 5
+        private const val NO_GAP = -1L
         private const val TOKEN_PREFIX = "actual.token."
 
         fun normalizeAddress(raw: String): String? {
