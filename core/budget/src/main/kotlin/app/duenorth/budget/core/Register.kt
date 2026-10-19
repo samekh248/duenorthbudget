@@ -31,6 +31,7 @@ object RegisterCopy {
     const val UNCLEAR = "unclear"
     const val DONE = "done"
     const val NO_TRANSACTIONS = "no transactions"
+    const val SEARCH = "search"
 }
 
 data class RegisterAccount(
@@ -98,6 +99,112 @@ data class RegisterPage(
         val query = payeeQuery.trim()
         if (query.isEmpty()) return rows
         return rows.filter { it.payee.contains(query, ignoreCase = true) }
+    }
+
+    /** The rows [search] keeps, in register order. */
+    fun searched(search: RegisterSearch): List<RegisterRow> = RegisterSearch.filter(rows, search, currency.decimals)
+}
+
+/** Which rows the register's search keeps besides the typed text. */
+enum class RegisterShow(
+    val label: String,
+) {
+    ALL("all"),
+    NOT_CLEARED("not cleared"),
+    NO_CATEGORY("no category"),
+}
+
+/**
+ * The register's search: [query] matches payee, category, note, a split part's category, or an
+ * amount; [show] narrows to rows not cleared or still missing a category.
+ */
+data class RegisterSearch(
+    val query: String = "",
+    val show: RegisterShow = RegisterShow.ALL,
+) {
+    val active: Boolean get() = query.isNotBlank() || show != RegisterShow.ALL
+
+    companion object {
+        const val HINT = "payee, category, note or amount"
+        const val NOTHING = "nothing matches"
+
+        fun filter(
+            rows: List<RegisterRow>,
+            search: RegisterSearch,
+            decimals: Int,
+        ): List<RegisterRow> {
+            if (!search.active) return rows
+            val query = search.query.trim()
+            val amount = amountOf(query, decimals)
+            return rows.filter { row ->
+                shows(row, search.show) && (query.isEmpty() || hasText(row, query) || (amount != null && amount.matches(row)))
+            }
+        }
+
+        /** "2 of 41", the caption over a search that keeps only some rows. */
+        fun count(
+            shown: Int,
+            total: Int,
+        ): String = "$shown of $total"
+
+        private fun shows(
+            row: RegisterRow,
+            show: RegisterShow,
+        ): Boolean =
+            when (show) {
+                RegisterShow.ALL -> true
+                RegisterShow.NOT_CLEARED -> !row.cleared
+                RegisterShow.NO_CATEGORY ->
+                    row.categoryLabel == RegisterCopy.NO_CATEGORY || (row.parent && row.parts.any { it.categoryId.isBlank() })
+            }
+
+        private fun hasText(
+            row: RegisterRow,
+            query: String,
+        ): Boolean =
+            row.payee.contains(query, ignoreCase = true) ||
+                row.categoryLabel.contains(query, ignoreCase = true) ||
+                row.note.contains(query, ignoreCase = true) ||
+                row.parts.any { it.categoryName.contains(query, ignoreCase = true) }
+
+        /**
+         * Reads [query] as an amount when it holds digits and no letters. "42.4" finds 42.40 exactly; "42"
+         * finds every amount of 42 whole units (42.00 to 42.99). Either sign matches, and a split part's
+         * amount counts. The last separator followed by no more than [decimals] digits is the decimal
+         * point, so "1,234.50" and "1.234,50" both read as 1234.50.
+         */
+        internal fun amountOf(
+            query: String,
+            decimals: Int,
+        ): AmountQuery? {
+            if (query.none { it.isDigit() } || query.any { it.isLetter() }) return null
+            val kept = query.filter { it.isDigit() || it == '.' || it == ',' }
+            val point = kept.indexOfLast { it == '.' || it == ',' }
+            val fraction = if (point >= 0) kept.substring(point + 1) else ""
+            val decimal = point >= 0 && decimals > 0 && fraction.length in 1..decimals
+            val whole = (if (decimal) kept.substring(0, point) else kept).filter { it.isDigit() }
+            val units = whole.ifEmpty { "0" }.toLongOrNull() ?: return null
+            val scale = (1..decimals).fold(1L) { acc, _ -> acc * 10 }
+            return if (decimal) {
+                AmountQuery(exact = units * scale + fraction.padEnd(decimals, '0').toLong(), scale = scale)
+            } else {
+                AmountQuery(units = units, scale = scale)
+            }
+        }
+    }
+}
+
+/** A typed amount: an [exact] minor-unit value, or every value of so many whole [units]. */
+internal data class AmountQuery(
+    val exact: Long? = null,
+    val units: Long? = null,
+    val scale: Long,
+) {
+    fun matches(row: RegisterRow): Boolean = hits(row.amountMinor) || row.parts.any { hits(it.amountMinor) }
+
+    private fun hits(minor: Long): Boolean {
+        val size = kotlin.math.abs(minor)
+        return if (exact != null) size == exact else size / scale == units
     }
 }
 

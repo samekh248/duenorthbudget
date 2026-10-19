@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.security.crypto)
     implementation(libs.browser)
+    implementation(libs.work.runtime)
 
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.junit4)

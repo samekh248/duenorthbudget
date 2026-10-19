@@ -44,6 +44,8 @@ import app.duenorth.budget.core.RegisterAccount
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterRow
+import app.duenorth.budget.core.RegisterSearch
+import app.duenorth.budget.core.RegisterShow
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.design.theme.MetroTheme
@@ -118,6 +120,76 @@ class RegisterContentTest {
         compose.onNodeWithTag("register-row-bus").performClick()
         assertEquals(listOf("bus"), toggled)
         assertEquals(emptyList<String>(), opened)
+    }
+
+    @Test
+    fun searchNarrowsTheRowsAndCountsThem() {
+        var search by mutableStateOf<RegisterSearch?>(RegisterSearch())
+        val page =
+            sample().copy(
+                rows =
+                    listOf(
+                        row("cafe", "Cafe"),
+                        row("bus", "Bus", date = 20261001).copy(amountMinor = -275, cleared = true, categoryLabel = "Transit"),
+                        row("gift", "Gift shop", date = 20260930).copy(categoryId = null, categoryLabel = RegisterCopy.NO_CATEGORY),
+                    ),
+            )
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    RegisterScreen(
+                        page = page,
+                        onGesture = {},
+                        onOpen = {},
+                        onAdd = {},
+                        onTransfer = {},
+                        onReconcile = {},
+                        search = search,
+                        onSearch = { search = it },
+                    )
+                }
+            }
+        }
+        val box = compose.onNode(hasSetTextAction() and hasParent(hasTestTag("register-search-box")))
+        box.assertIsFocused()
+        compose.onNodeWithTag("register-search-count").assertDoesNotExist()
+        box.performTextInput("bus")
+        compose.onNodeWithTag("register-row-bus").assertIsDisplayed()
+        compose.onNodeWithTag("register-row-cafe").assertDoesNotExist()
+        compose.onNodeWithTag("register-search-count").assertTextEquals(RegisterSearch.count(1, 3))
+        box.performTextReplacement("2.75")
+        compose.onNodeWithTag("register-row-bus").assertIsDisplayed()
+        box.performTextReplacement("")
+        compose.onNodeWithTag("register-show-not_cleared").performClick()
+        assertEquals(RegisterShow.NOT_CLEARED, search?.show)
+        compose.onNodeWithTag("register-row-bus").assertDoesNotExist()
+        compose.onNodeWithTag("register-row-gift").assertIsDisplayed()
+        compose.onNodeWithTag("register-show-no_category").performClick()
+        compose.onNodeWithTag("register-row-gift").assertIsDisplayed()
+        compose.onNodeWithTag("register-row-cafe").assertDoesNotExist()
+        box.performTextInput("zzz")
+        compose.onNodeWithTag("register-empty").assertTextEquals(RegisterSearch.NOTHING)
+    }
+
+    @Test
+    fun offBudgetSearchHasNoCategoryChoice() {
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    RegisterScreen(
+                        page = sample().copy(account = RegisterAccount("house", "House", offBudget = true, type = "other", closed = false)),
+                        onGesture = {},
+                        onOpen = {},
+                        onAdd = {},
+                        onTransfer = {},
+                        onReconcile = {},
+                        search = RegisterSearch(),
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("register-show-not_cleared").assertIsDisplayed()
+        compose.onNodeWithTag("register-show-no_category").assertDoesNotExist()
     }
 
     @Test

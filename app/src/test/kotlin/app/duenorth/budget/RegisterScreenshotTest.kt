@@ -15,6 +15,7 @@ import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterPart
 import app.duenorth.budget.core.RegisterRow
+import app.duenorth.budget.core.RegisterSearch
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
@@ -113,6 +114,44 @@ class RegisterScreenshotTest {
                                 AppBarButton(AppGlyph.Undo, RegisterCopy.UNCLEAR, onClick = {}),
                                 AppBarButton(AppGlyph.Cancel, RegisterCopy.DONE, onClick = {}),
                             ).asScreenActions(),
+                        expanded = false,
+                        onExpandedChange = {},
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun searchLight() = snapSearch("register_search_light", dark = false)
+
+    @Test
+    fun searchDark() = snapSearch("register_search_dark", dark = true)
+
+    /** The search open over the rows: "groc" keeps Corner Coffee and the split with a groceries part. */
+    private fun snapSearch(
+        name: String,
+        dark: Boolean,
+    ) {
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Column(Modifier.width(390.dp).height(780.dp)) {
+                    SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
+                        RegisterScreen(
+                            page = page(),
+                            onGesture = {},
+                            onOpen = {},
+                            onAdd = {},
+                            onTransfer = {},
+                            onReconcile = {},
+                            search = RegisterSearch(query = "groc"),
+                        )
+                    }
+                    MetroAppBar(
+                        actions =
+                            ScreenBar
+                                .specsFor(ShellRoute.Register("visa"), true, BudgetMode.ENVELOPE)
+                                .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
                         expanded = false,
                         onExpandedChange = {},
                     )

@@ -83,9 +83,15 @@ open class DueNorthApplication : Application() {
                 AndroidSecretStore(this),
                 BudgetClock.System,
             )
+        // Robolectric hosts have no work manager; the app still runs without the hourly sync.
+        runCatching { BackgroundSyncWorker.schedule(this) }
     }
 
     lateinit var sync: SyncCoordinator
+
+    /** The app is on screen, so its own syncs keep it current and the background job skips its turn. */
+    @Volatile
+    var onScreen: Boolean = false
 }
 
 class MainActivity : ComponentActivity() {
@@ -170,7 +176,17 @@ fun DueNorthApp(model: ShellViewModel) {
     DisposableEffect(lifecycle) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_STOP) model.onScreenLocked()
+                when (event) {
+                    Lifecycle.Event.ON_START -> {
+                        (context.applicationContext as? DueNorthApplication)?.onScreen = true
+                        model.onScreenReturned()
+                    }
+                    Lifecycle.Event.ON_STOP -> {
+                        (context.applicationContext as? DueNorthApplication)?.onScreen = false
+                        model.onScreenLocked()
+                    }
+                    else -> Unit
+                }
             }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
@@ -238,6 +254,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onClearSelected = { model.setSelectedCleared(true) },
                     onUnclearSelected = { model.setSelectedCleared(false) },
                     onEndSelecting = model::endSelecting,
+                    onSearch = model::toggleRegisterSearch,
                     onSelectInbox = model::startInboxSelecting,
                     onAcceptSelected = model::acceptSelectedInbox,
                     onCategorizeSelected = model::categorizeSelectedInbox,
@@ -626,6 +643,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                     modifier = fill,
                                     onMatch = { model.matchTransactions(it, stayOnRegister = true) },
                                     onNotAMatch = { model.notAMatch(it, stayOnRegister = true) },
+                                    search = state.registerSearch,
+                                    onSearch = model::setRegisterSearch,
                                 )
                             }
                         }

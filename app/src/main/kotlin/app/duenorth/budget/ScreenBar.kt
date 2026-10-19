@@ -147,6 +147,7 @@ object ScreenBar {
                     // A bank-linked account syncs from the server; import lives in the menu.
                     buildList {
                         add(spec("add", AppGlyph.Add, "add"))
+                        add(spec("search", AppGlyph.Search, RegisterCopy.SEARCH))
                         add(spec("reconcile", AppGlyph.Reconcile, "reconcile"))
                         if (bankLinked) add(spec("sync", AppGlyph.Sync, "sync"))
                         add(menu("import", AppGlyph.Import, "import"))
@@ -400,6 +401,7 @@ class ScreenBarHandlers(
     val onEditBudget: () -> Unit = {},
     val onEndBudgetEdit: () -> Unit = {},
     val onCancelBudgetEdit: () -> Unit = {},
+    val onSearch: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -416,6 +418,7 @@ class ScreenBarHandlers(
             "settings" -> onSettings
             "transfer" -> onTransfer
             "reconcile" -> onReconcile
+            "search" -> onSearch
             "import" -> onImport
             "sync" -> onBankSync
             "save" -> onSave

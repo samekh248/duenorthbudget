@@ -399,6 +399,25 @@ class SyncCoordinator(
         }
     }
 
+    /**
+     * A sync with nobody watching, from the background job: the open budget, only when it lives on
+     * a server this phone is signed in to and needs no password now. Null when it was left alone, so
+     * a budget kept only on the phone, a signed-out phone, or a locked encrypted file sends nothing
+     * and records no failure.
+     */
+    fun syncUnattended(): SyncResult? {
+        val id = library.settings().openBudgetId ?: return null
+        if (!canSyncUnattended(id)) return null
+        return sync(id)
+    }
+
+    private fun canSyncUnattended(budgetId: String): Boolean =
+        signedIn() &&
+            activeAddress() != null &&
+            !state(budgetId, "cloudFileId").isNullOrBlank() &&
+            !state(budgetId, "groupId").isNullOrBlank() &&
+            !needsPassword(budgetId)
+
     /** Syncs, then posts any due auto-post schedules (spec 010 US3); posting needs no server. */
     fun sync(budgetId: String): SyncResult {
         val result =
