@@ -142,7 +142,6 @@ class RegisterContentTest {
                         onGesture = {},
                         onOpen = {},
                         onAdd = {},
-                        onTransfer = {},
                         onReconcile = {},
                         search = search,
                         onSearch = { search = it },
@@ -181,7 +180,6 @@ class RegisterContentTest {
                         onGesture = {},
                         onOpen = {},
                         onAdd = {},
-                        onTransfer = {},
                         onReconcile = {},
                         search = RegisterSearch(),
                     )
