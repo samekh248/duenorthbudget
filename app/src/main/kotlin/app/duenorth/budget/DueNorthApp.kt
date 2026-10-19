@@ -539,6 +539,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSignIn = model::onboardingSignIn,
                                 onBrowser = model::onboardingBrowser,
                                 modifier = fill,
+                                secure = ready.isEmpty() || ServerAddress.isSecure(ready),
                                 replacing =
                                     state.activeInstance
                                         ?.takeIf { onboarding?.progress?.origin == OnboardingOrigin.SETTINGS }

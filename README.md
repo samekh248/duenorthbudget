@@ -27,6 +27,18 @@ Planning uses [GitHub Spec Kit](https://github.com/github/spec-kit).
 
 Specs 001–007 are implemented on `main`. Specs 008–010 are specified and not built yet. Feature quickstarts cover the shipped specs.
 
+### Release signing
+
+Install release builds on a phone that holds a real budget. Debug builds are signed with `app/debug.keystore`, which is public in this repository, so anyone could sign an app that installs over a debug build.
+
+The release key is private and never committed. Point the build at its `keystore.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`), or set `DUENORTH_KEYSTORE`, `DUENORTH_KEYSTORE_PASSWORD`, `DUENORTH_KEY_ALIAS` and `DUENORTH_KEY_PASSWORD`:
+
+```sh
+DUENORTH_SIGNING=/path/to/keystore.properties ./gradlew :app:assembleRelease
+```
+
+Without a key, `assembleRelease` leaves the APK unsigned. Keep a backup of the key: an update signed with any other key will not install over the app.
+
 ### Debug sample budgets
 
 Debug builds expose **sample budgets** on the budgets screen. Pick one to create a filled Actual file on the phone (household, full tour, or wide month). Release builds hide the entry point.

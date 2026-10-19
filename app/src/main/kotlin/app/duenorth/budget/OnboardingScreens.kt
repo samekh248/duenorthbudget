@@ -283,6 +283,8 @@ fun OnboardingSignInScreen(
     modifier: Modifier = Modifier,
     /** The active server this sign-in replaces, when adding a server from settings. */
     replacing: String? = null,
+    /** False for an http:// server: the password would cross the network unencrypted. */
+    secure: Boolean = true,
 ) {
     // Never saved to disk, and cleared when the server refuses it (spec 011 FR-011).
     var password by rememberSaveable { mutableStateOf("") }
@@ -294,6 +296,16 @@ fun OnboardingSignInScreen(
     OnboardingPage(OnboardingScreenCopy.SIGN_IN, "onboarding-signin", modifier) {
         MetroText(host, Metro.typography.subheader)
         MetroText(OnboardingScreenCopy.method(methods), Metro.typography.caption, color = Metro.colors.secondary)
+        if (!secure) {
+            MetroText(
+                OnboardingCopy.PASSWORD_IN_THE_CLEAR,
+                Metro.typography.caption,
+                Modifier
+                    .padding(top = MetroDimens.Row)
+                    .testTag("onboarding-not-encrypted"),
+                color = Metro.colors.secondary,
+            )
+        }
         if (replacing != null) {
             MetroText(
                 OnboardingScreenCopy.replaces(replacing),
