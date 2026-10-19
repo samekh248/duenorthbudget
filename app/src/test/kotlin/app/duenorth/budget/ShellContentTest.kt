@@ -3,9 +3,14 @@ package app.duenorth.budget
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
@@ -22,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.ShellCopy
@@ -422,6 +428,42 @@ class ShellContentTest {
             }
         }
         compose.onNodeWithTag("sample-budgets").assertIsDisplayed()
+    }
+
+    @Test
+    fun goalBarsShowOnGoalRowsOnlyWhileTemplatesAreOn() {
+        val shell =
+            sample().copy(
+                groups =
+                    listOf(
+                        GroupRow(
+                            "g-bills",
+                            "Bills",
+                            18_000,
+                            listOf(
+                                CategoryRow("c-power", "Power", 10_000, 0, 10_000, false, goalMinor = 14_000),
+                                CategoryRow("c-dining", "Dining", 8_000, 0, 8_000, false),
+                            ),
+                        ),
+                    ),
+            )
+        val templatesOn = mutableStateOf(true)
+        compose.setContent {
+            MetroTheme {
+                CompositionLocalProvider(
+                    LocalFormatPrefs provides FormatPrefs(experimental = true, goalTemplates = templatesOn.value),
+                ) {
+                    Box(Modifier.width(390.dp).height(640.dp)) { BudgetSection(shell, onListGesture = {}) }
+                }
+            }
+        }
+        compose
+            .onNodeWithTag("category-goal-c-power")
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(10f / 14f, 0f..1f)))
+        compose.onAllNodesWithTag("category-goal-c-dining").assertCountEquals(0)
+        templatesOn.value = false
+        compose.onAllNodesWithTag("category-goal-c-power").assertCountEquals(0)
     }
 
     private fun sample(): MonthShell =
