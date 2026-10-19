@@ -630,11 +630,19 @@ class BudgetLibrary(
         transactionId: String,
     ): ReconcilePage? = open(budgetId) { ReconcileBook(it).toggleCleared(accountId, transactionId) }
 
+    fun setReconcileCleared(
+        budgetId: String,
+        accountId: String,
+        transactionIds: List<String>,
+        cleared: Boolean,
+    ): ReconcilePage? = open(budgetId) { ReconcileBook(it).setCleared(accountId, transactionIds, cleared) }
+
     fun finishReconcile(
         budgetId: String,
         accountId: String,
+        adjust: Boolean = false,
     ): ReconcileFinishResult =
-        edit(budgetId, UndoCopy.RECONCILE) { ReconcileBook(it).finish(accountId) }
+        edit(budgetId, UndoCopy.RECONCILE) { ReconcileBook(it).finish(accountId, adjust) }
             ?: ReconcileFinishResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun cancelReconcile(

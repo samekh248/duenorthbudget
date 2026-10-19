@@ -294,7 +294,7 @@ internal fun registerDays(rows: List<RegisterRow>): List<List<RegisterRow>> =
  * picked row takes an accent tint.
  */
 @Composable
-private fun RegisterLine(
+internal fun RegisterLine(
     row: RegisterRow,
     page: RegisterPage,
     banded: Boolean,
@@ -302,6 +302,7 @@ private fun RegisterLine(
     onPress: () -> Unit,
     onLongPress: () -> Unit,
     detail: String = registerDetail(row),
+    modifier: Modifier = Modifier,
 ) {
     val accent = Metro.accent.text
     val fill =
@@ -315,7 +316,7 @@ private fun RegisterLine(
     val measurer = rememberTextMeasurer()
     val mark = Metro.typography.caption.copy(color = letter, fontWeight = FontWeight.SemiBold)
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .ledgerFill(fill)
@@ -1004,7 +1005,7 @@ private fun CategoryListRow(
 
 /** The WP8.1 date picker page: looping month, day and year columns in the settings order (FR-005–FR-007). */
 @Composable
-private fun DatePickerPage(
+internal fun DatePickerPage(
     date: Int,
     dateFormat: String,
     onChange: (Int) -> Unit,

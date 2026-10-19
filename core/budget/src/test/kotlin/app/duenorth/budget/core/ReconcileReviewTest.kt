@@ -16,6 +16,7 @@ class ReconcileReviewTest {
             register.save(draft("c", amount = 300))
             register.save(draft("d", amount = 400))
             register.save(draft("e", amount = 500))
+            session.exec("UPDATE transactions SET cleared = 0")
             val reconcile = ReconcileBook(session)
             val started =
                 reconcile.start("checking", "6.00", "2026-10-07") as ReconcileStartResult.Started
@@ -46,6 +47,79 @@ class ReconcileReviewTest {
             assertTrue(reconcile.cancel("checking"))
             assertTrue(row(session, "a").reconciled)
             assertFalse(row(session, "b").cleared)
+        }
+    }
+
+    @Test
+    fun startKeepsClearedMarksAndCancelStillRestores() {
+        db { session, register ->
+            register.save(draft("a", amount = 100))
+            register.save(draft("b", amount = 200))
+            session.exec("UPDATE transactions SET cleared = 0 WHERE id = 'b'")
+            val reconcile = ReconcileBook(session)
+            val started = reconcile.start("checking", "3.00", "2026-10-07") as ReconcileStartResult.Started
+            assertTrue(row(session, "a").cleared)
+            assertEquals(100L, started.page.clearedTotalMinor)
+            assertEquals(200L, started.page.differenceMinor)
+            reconcile.toggleCleared("checking", "a")
+            reconcile.cancel("checking")
+            assertTrue(row(session, "a").cleared)
+            assertFalse(row(session, "b").cleared)
+        }
+    }
+
+    @Test
+    fun anOwedStatementKeepsItsMinus() {
+        db { session, register ->
+            register.save(draft("a", amount = -4_240))
+            val started =
+                ReconcileBook(session).start("checking", "-42.40", "2026-10-07") as ReconcileStartResult.Started
+            assertEquals(-4_240L, started.page.statementMinor)
+            assertEquals(0L, started.page.differenceMinor)
+        }
+    }
+
+    @Test
+    fun finishWhileOffNeedsAdjustAndThenAddsAReconciledAdjustment() {
+        db { session, register ->
+            register.save(draft("a", amount = 1_000))
+            val reconcile = ReconcileBook(session)
+            reconcile.start("checking", "9.69", "2026-09-30")
+            assertEquals(ReconcileFinishResult.Rejected(ReconcileCopy.NOT_BALANCED), reconcile.finish("checking"))
+            assertEquals(ReconcileFinishResult.Finished, reconcile.finish("checking", adjust = true, ids = { "adj" }))
+            val adjustment =
+                session
+                    .query(
+                        """
+                        SELECT t.amount, t.date, t.category, t.reconciled, p.name
+                        FROM transactions t JOIN payees p ON p.id = t.description
+                        WHERE t.id = 'adj'
+                        """.trimIndent(),
+                    ).first()
+            assertEquals(-31L, adjustment.long("amount"))
+            assertEquals(20260930L, adjustment.long("date"))
+            assertEquals(null, adjustment.str("category"))
+            assertTrue(adjustment.bool("reconciled"))
+            assertEquals(ReconcileCopy.ADJUSTMENT_PAYEE, adjustment.str("name"))
+            assertTrue(row(session, "a").reconciled)
+            assertEquals(null, reconcile.read("checking"))
+        }
+    }
+
+    @Test
+    fun setClearedMarksSeveralButLeavesReconciledRows() {
+        db { session, register ->
+            register.save(draft("a", amount = 100))
+            register.save(draft("b", amount = 200))
+            register.save(draft("r", amount = 300))
+            session.exec("UPDATE transactions SET cleared = 0")
+            session.exec("UPDATE transactions SET reconciled = 1, cleared = 1 WHERE id = 'r'")
+            val reconcile = ReconcileBook(session)
+            reconcile.start("checking", "6.00", "2026-10-07")
+            val page = reconcile.setCleared("checking", listOf("a", "b"), true)!!
+            assertEquals(0L, page.differenceMinor)
+            reconcile.setCleared("checking", listOf("r"), false)
+            assertTrue(row(session, "r").cleared)
         }
     }
 

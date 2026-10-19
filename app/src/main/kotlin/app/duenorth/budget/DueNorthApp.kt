@@ -720,24 +720,24 @@ fun DueNorthApp(model: ShellViewModel) {
                             }
                         }
                         is ShellRoute.Reconcile -> {
-                            val page = state.reconcile
                             val register = state.register
-                            if (page == null) {
-                                ReconcileStartScreen(
-                                    accountName = register?.account?.name.orEmpty(),
-                                    error = state.reconcileError,
-                                    onStart = model::startReconcile,
-                                    modifier = fill,
-                                )
+                            if (register == null) {
+                                Placeholder()
                             } else {
-                                ReconcileScreen(
-                                    page = page,
+                                ReconcileRegisterScreen(
+                                    register = register,
+                                    page = state.reconcile,
                                     error = state.reconcileError,
                                     onGesture = model::setRegisterGesture,
+                                    onStart = model::startReconcile,
                                     onToggle = model::toggleReconcileCleared,
+                                    onSetCleared = model::setReconcileCleared,
+                                    onOpen = model::openEdit,
+                                    onAddMissing = model::openNewTransaction,
                                     onFinish = model::finishReconcile,
                                     onCancel = model::cancelReconcile,
                                     modifier = fill,
+                                    today = RegisterEntry.parseDate(state.today) ?: RegisterEntry.parseDate(RegisterEntry.todayIso())!!,
                                 )
                             }
                         }
