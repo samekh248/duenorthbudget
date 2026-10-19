@@ -29,6 +29,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
@@ -43,9 +44,11 @@ import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.RegisterAccount
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterPage
+import app.duenorth.budget.core.RegisterPart
 import app.duenorth.budget.core.RegisterRow
 import app.duenorth.budget.core.RegisterSearch
 import app.duenorth.budget.core.RegisterShow
+import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
@@ -367,7 +370,7 @@ class RegisterContentTest {
         compose.onNodeWithTag("transaction-category").assertDoesNotExist()
         compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("5")
         compose.onNodeWithText("${TransactionFormCopy.ALSO_ADDS} Cash").assertIsDisplayed()
-        compose.onNodeWithText("transfer from Checking").assertIsDisplayed()
+        compose.onNodeWithText("transfer from Checking").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("transaction-transfer-preview-amount").assertTextEquals("$5.00")
         compose.onNodeWithTag("transaction-direction-income").performClick()
         compose.onNodeWithTag("transaction-transfer-label").assertTextEquals("transfer from Cash")
@@ -375,6 +378,97 @@ class RegisterContentTest {
         assertEquals("cash", saved?.transferAccountId)
         assertEquals(500L, saved?.amountMinor)
         assertEquals(null, saved?.categoryId)
+    }
+
+    // The form opens on the register's account; picking another moves the transaction there, with its cleared choice.
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun accountAndClearedArePickedOnTheForm() {
+        var saved: TransactionDraft? = null
+        val host = form(row = null, onSave = { saved = it })
+        compose.onNodeWithTag("transaction-account-picker-value").assertTextEquals("Checking").performClick()
+        compose.onNodeWithText("Cash").performClick()
+        compose.onNodeWithTag("transaction-account", useUnmergedTree = true).assertTextEquals("Cash")
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("Cafe")
+        compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("5")
+        compose.onNodeWithTag("transaction-cleared-${TransactionFormCopy.UNCLEARED}").performScrollTo().performClick()
+        compose.runOnIdle { host.save() }
+        assertEquals("cash", saved?.accountId)
+        assertEquals(false, saved?.cleared)
+    }
+
+    // Option A with no split assumed: the form has one category until add split adds lines, one per tap.
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun addSplitAddsALinePerTapAndSavesTheParts() {
+        var saved: TransactionDraft? = null
+        val page = sample().copy(categories = listOf(GROCERIES, HOUSE))
+        val host = form(page = page, row = null, onSave = { saved = it })
+        compose.onNodeWithTag("transaction-split").assertDoesNotExist()
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("Market")
+        compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("84.60")
+        compose.runOnIdle { host.run(FORM_ADD_SPLIT) }
+        compose.onNodeWithTag("transaction-category").assertDoesNotExist()
+        compose.onNodeWithTag("transaction-split-1-amount").assertExists()
+        compose.onNodeWithTag("transaction-split-2-amount").assertDoesNotExist()
+        compose.runOnIdle { host.run(FORM_ADD_SPLIT) }
+        compose.onNodeWithTag("transaction-split-2-amount").assertExists()
+        compose.onNodeWithTag("transaction-split-2-remove").performScrollTo().performClick()
+        compose.onNodeWithTag("transaction-split-2-amount").assertDoesNotExist()
+
+        compose.onNodeWithTag("transaction-split-0-category-value").performScrollTo().performClick()
+        compose.onNodeWithText("Groceries").performClick()
+        compose.onNodeWithTag("transaction-split-1-category-value").performScrollTo().performClick()
+        compose.onNodeWithText("Household").performClick()
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-split-0-amount"))).performTextInput("60")
+        compose
+            .onNodeWithTag("transaction-split-left", useUnmergedTree = true)
+            .assertTextEquals("$24.60 ${TransactionFormCopy.LEFT}")
+        compose.runOnIdle { host.save() }
+        compose.onNodeWithText(RegisterCopy.ENTER_AMOUNT).assertExists()
+        assertEquals(null, saved)
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-split-1-amount"))).performTextInput("24.60")
+        compose.onNodeWithTag("transaction-split-left", useUnmergedTree = true).assertTextEquals(TransactionFormCopy.ADDS_UP)
+        compose.runOnIdle { host.save() }
+        assertEquals(listOf(SplitPart("c-food", -6_000), SplitPart("c-house", -2_460)), saved?.parts)
+        assertEquals(null, saved?.categoryId)
+    }
+
+    // A saved split opens with its lines; removing one leaves a single category, which unsplits it on save.
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun aSavedSplitOpensWithItsLines() {
+        var saved: TransactionDraft? = null
+        val split =
+            sample().rows.first().copy(
+                categoryId = null,
+                parent = true,
+                parts = listOf(RegisterPart("a", "c-food", "Groceries", -1_000), RegisterPart("b", "c-house", "Household", -240)),
+            )
+        val host = form(page = sample().copy(categories = listOf(GROCERIES, HOUSE)), row = split, onSave = { saved = it })
+        compose.onNodeWithTag("transaction-split-0-category-value").performScrollTo().assertTextEquals("Groceries")
+        compose.onNodeWithTag("transaction-split-left", useUnmergedTree = true).assertTextEquals(TransactionFormCopy.ADDS_UP)
+        compose.runOnIdle { host.save() }
+        assertEquals(listOf(SplitPart("c-food", -1_000), SplitPart("c-house", -240)), saved?.parts)
+        compose.onNodeWithTag("transaction-split-1-remove").performScrollTo().performClick()
+        compose.runOnIdle { host.save() }
+        assertEquals(emptyList<SplitPart>(), saved?.parts)
+        assertEquals("c-food", saved?.categoryId)
+    }
+
+    // Removing down to one line is no split: that line's category goes back in the category box.
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun removingToOneLinePutsTheCategoryBack() {
+        var saved: TransactionDraft? = null
+        val host = form(onSave = { saved = it })
+        compose.runOnIdle { host.run(FORM_ADD_SPLIT) }
+        compose.onNodeWithTag("transaction-split-1-remove").performScrollTo().performClick()
+        compose.onNodeWithTag("transaction-split").assertDoesNotExist()
+        compose.onNodeWithTag("transaction-category-value").assertTextEquals("Groceries")
+        compose.runOnIdle { host.save() }
+        assertEquals(null, saved?.parts)
+        assertEquals("c-food", saved?.categoryId)
     }
 
     @Test
@@ -398,7 +492,7 @@ class RegisterContentTest {
             )
         val row = page.rows.first().copy(transferId = "t", partnerOffBudget = true, transferAccountId = "broker")
         form(page = page, row = row)
-        compose.onNodeWithTag("transaction-category").assertIsDisplayed()
+        compose.onNodeWithTag("transaction-category").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("transaction-transfer-label").assertTextEquals("transfer to Brokerage")
     }
 
@@ -539,6 +633,11 @@ class RegisterContentTest {
         compose.waitForIdle()
         compose.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
+    }
+
+    private companion object {
+        val GROCERIES = CategoryChoice("c-food", "Groceries", "Living", income = false)
+        val HOUSE = CategoryChoice("c-house", "Household", "Living", income = false)
     }
 
     private fun many() =

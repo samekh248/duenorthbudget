@@ -108,6 +108,7 @@ import java.time.LocalDate
 import java.time.Month
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.abs
 import java.time.format.TextStyle as DateTextStyle
 
 @Composable
@@ -553,21 +554,61 @@ fun TransactionForm(
     var expense by remember(row?.id) { mutableStateOf(startAmount?.let { it <= 0L } ?: true) }
     var note by remember(row?.id) { mutableStateOf(row?.note.orEmpty()) }
     var categoryId by remember(row?.id) { mutableStateOf(row?.categoryId ?: row?.partnerCategoryId) }
+    // The account the transaction sits in: the register's, or the one picked here (a new one from home starts on the first).
+    var accountId by remember(row?.id, page.account.id) { mutableStateOf(page.account.id) }
+    var cleared by remember(row?.id) { mutableStateOf(row?.cleared ?: true) }
+    val accountChoices =
+        remember(page.accounts, page.account, accountId) {
+            val open = page.accounts.filter { !it.closed || it.id == accountId }
+            val own = page.account.let { AccountChoice(it.id, it.name, it.offBudget, it.type, it.closed) }
+            if (open.any { it.id == own.id } || accountId != own.id) open else listOf(own) + open
+        }
+    val account = page.accounts.firstOrNull { it.id == accountId }
+    val accountName = account?.name ?: page.account.name
+    val offBudget = account?.offBudget ?: page.account.offBudget
     // The account this transaction transfers to or from, picked from the payee box (option C, #76).
     var transferTo by remember(row?.id) { mutableStateOf(row?.transferAccountId) }
     val transferAccount = transferTo?.let { id -> page.accounts.firstOrNull { it.id == id } }
     var fieldError by remember(row?.id) { mutableStateOf<Pair<TransactionField, String>?>(null) }
     var overlay by remember(row?.id) { mutableStateOf<FormOverlay>(FormOverlay.None) }
     // A transfer between two budget accounts takes no category; one that crosses the budget's edge does, as in Actual.
-    val mixed = transferAccount != null && transferAccount.offBudget != page.account.offBudget
-    val showCategories = row?.parent != true && (transferTo == null || mixed)
+    val mixed = transferAccount != null && transferAccount.offBudget != offBudget
+    // Split lines replace the category box; the form starts on one category and add split adds a line at a time.
+    var splits by remember(row?.id) {
+        mutableStateOf(
+            row?.parts.orEmpty().map { part ->
+                val text = MoneyParse.editText(abs(part.amountMinor), page.currency.decimals, FormatOptions(hideFraction, numberFormat))
+                SplitLine(part.categoryId, text)
+            },
+        )
+    }
+    val splitting = splits.isNotEmpty() && transferTo == null
+    val showCategories = !splitting && (transferTo == null || mixed)
     val options = remember(page.categories, categoryId) { CategoryOptions.of(page.categories, categoryId) }
+    RememberFormAction(FORM_ADD_SPLIT) {
+        // A transfer has no split; the first tap turns the category into the first line.
+        if (transferTo == null) {
+            splits = if (splits.isEmpty()) listOf(SplitLine(categoryId, ""), SplitLine(null, "")) else splits + SplitLine(null, "")
+        }
+    }
+
+    fun splitAmount(line: SplitLine): Long? = RegisterEntry.signedAmount(line.amount, page.currency.decimals, expense, numberFormat)
+
+    fun splitParts(total: Long): Pair<List<SplitPart>?, String?> {
+        if (!splitting) return (if (row?.parent == true) emptyList<SplitPart>() else null) to null
+        val parts =
+            splits.map { line ->
+                val category = line.categoryId ?: return null to RegisterCopy.CHOOSE_CATEGORY
+                SplitPart(category, splitAmount(line) ?: return null to RegisterCopy.ENTER_AMOUNT)
+            }
+        return if (parts.sumOf { it.amountMinor } == total) parts to null else null to RegisterCopy.SPLIT_MUST_ADD
+    }
     val commit = {
         when (
             val parsed =
                 RegisterEntry.transaction(
                     id = draftId,
-                    accountId = page.account.id,
+                    accountId = accountId,
                     date = date,
                     payee = transferAccount?.name ?: payee,
                     amountText = amount,
@@ -580,8 +621,13 @@ fun TransactionForm(
                 )
         ) {
             is EntryResult.Ok -> {
-                fieldError = null
-                onSave(parsed.value)
+                val (parts, refused) = splitParts(parsed.value.amountMinor)
+                if (refused != null) {
+                    fieldError = TransactionField.CATEGORY to refused
+                } else {
+                    fieldError = null
+                    onSave(parsed.value.copy(cleared = cleared, parts = parts))
+                }
             }
             is EntryResult.Rejected -> fieldError = TransactionField.of(parsed.reason) to parsed.reason
         }
@@ -599,14 +645,30 @@ fun TransactionForm(
                 .padding(horizontal = MetroDimens.Gutter)
                 .padding(bottom = MetroDimens.Gutter),
         ) {
-            // The page is titled with the account the register is open on, under the ACCOUNTS line.
+            // The page is titled with the transaction's account, under the area's line.
             MetroText(
-                page.account.name,
+                accountName,
                 Metro.typography.header,
                 Modifier.testTag("transaction-account"),
                 maxLines = 1,
                 softWrap = false,
             )
+            LabeledField(TransactionFormCopy.ACCOUNT, null, Modifier.padding(top = MetroDimens.FieldGroupGap)) {
+                MetroComboBox(
+                    choices = accountChoices.map { it.id },
+                    selected = accountId,
+                    label = { id -> accountChoices.firstOrNull { it.id == id }?.name.orEmpty() },
+                    onPick = { picked ->
+                        accountId = picked
+                        // A transfer can't go to the account it comes from.
+                        if (transferTo == picked) {
+                            transferTo = null
+                            payee = ""
+                        }
+                    },
+                    tag = "transaction-account-picker",
+                )
+            }
             LabeledField(TransactionFormCopy.DATE, errorFor(TransactionField.DATE), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
                 val width = rememberFieldWidth(DateFormats.widestSample(dateFormat), Metro.typography.control, DATE_CHEVRON)
                 Box(
@@ -640,7 +702,7 @@ fun TransactionForm(
                         payees,
                         TransactionFormCopy.PAYEE,
                         "transaction-payee",
-                        transfers = { query -> PayeeTypeAhead.transfers(page.accounts, page.account.id, query) },
+                        transfers = { query -> PayeeTypeAhead.transfers(page.accounts, accountId, query) },
                         expense = expense,
                         onTransfer = { transferTo = it.id },
                     )
@@ -668,9 +730,47 @@ fun TransactionForm(
                         onPick = { categoryId = it },
                         tag = "transaction-category",
                         fullScreenThreshold = CategoryOptions.IN_PLACE_LIMIT,
-                        onOpenFull = { overlay = FormOverlay.CategoryList },
+                        onOpenFull = { overlay = FormOverlay.CategoryList() },
                     )
                 }
+            }
+            if (splitting) {
+                LabeledField(
+                    TransactionFormCopy.SPLIT,
+                    errorFor(TransactionField.CATEGORY),
+                    Modifier.padding(top = MetroDimens.FieldGroupGap),
+                ) {
+                    SplitLines(
+                        lines = splits,
+                        categories = page.categories,
+                        left =
+                            (RegisterEntry.signedAmount(amount, page.currency.decimals, expense, numberFormat) ?: 0L) -
+                                splits.sumOf { splitAmount(it) ?: 0L },
+                        expense = expense,
+                        format = { MoneyFormat.format(it, page.currency, FormatOptions(hideFraction, numberFormat)) },
+                        onLine = { index, line -> splits = splits.mapIndexed { i, old -> if (i == index) line else old } },
+                        onRemove = { index ->
+                            val rest = splits.filterIndexed { i, _ -> i != index }
+                            // One line left is no split: it becomes the category again.
+                            if (rest.size < 2) {
+                                categoryId = rest.firstOrNull()?.categoryId
+                                splits = emptyList()
+                            } else {
+                                splits = rest
+                            }
+                        },
+                        onOpenFull = { overlay = FormOverlay.CategoryList(it) },
+                    )
+                }
+            }
+            LabeledField(TransactionFormCopy.CLEARED, null, Modifier.padding(top = MetroDimens.FieldGroupGap)) {
+                MetroSegmentedToggle(
+                    first = TransactionFormCopy.CLEARED,
+                    second = TransactionFormCopy.UNCLEARED,
+                    firstSelected = cleared,
+                    onSelect = { cleared = it },
+                    tag = "transaction-cleared",
+                )
             }
             LabeledField(TransactionFormCopy.NOTE, errorFor(TransactionField.NOTE), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
                 MetroField(
@@ -685,6 +785,7 @@ fun TransactionForm(
             if (transferAccount != null) {
                 TransferPreview(
                     page = page,
+                    from = accountName,
                     other = transferAccount,
                     adding = row?.transferId == null,
                     signed = RegisterEntry.signedAmount(amount, page.currency.decimals, expense, numberFormat),
@@ -696,11 +797,16 @@ fun TransactionForm(
         }
         when (val open = overlay) {
             FormOverlay.None -> Unit
-            FormOverlay.CategoryList ->
+            is FormOverlay.CategoryList ->
                 CategoryListPage(
-                    options = options,
-                    onPick = {
-                        categoryId = it
+                    options = open.line?.let { CategoryOptions.of(page.categories, splits.getOrNull(it)?.categoryId) } ?: options,
+                    onPick = { picked ->
+                        val line = open.line
+                        if (line == null) {
+                            categoryId = picked
+                        } else {
+                            splits = splits.mapIndexed { i, old -> if (i == line) old.copy(categoryId = picked) else old }
+                        }
                         overlay = FormOverlay.None
                     },
                     onBack = { overlay = FormOverlay.None },
@@ -717,6 +823,79 @@ fun TransactionForm(
                     onCancel = { overlay = FormOverlay.None },
                 )
         }
+    }
+}
+
+/** The bar's add split action, which the transaction form carries out. */
+const val FORM_ADD_SPLIT = "add-split"
+
+/** One split line as typed: its category (none picked yet is null) and its amount box. */
+data class SplitLine(
+    val categoryId: String?,
+    val amount: String,
+)
+
+/**
+ * The split lines in place of the category box: each a category and its amount, with a remove button,
+ * then what is left to assign of the transaction's amount (option A).
+ */
+@Composable
+private fun SplitLines(
+    lines: List<SplitLine>,
+    categories: List<CategoryChoice>,
+    left: Long,
+    expense: Boolean,
+    format: (Long) -> String,
+    onLine: (Int, SplitLine) -> Unit,
+    onRemove: (Int) -> Unit,
+    onOpenFull: (Int) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().testTag("transaction-split"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        lines.forEachIndexed { index, line ->
+            val options = remember(categories, line.categoryId) { CategoryOptions.of(categories, line.categoryId) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                MetroComboBox(
+                    choices = options.choices,
+                    selected = line.categoryId,
+                    label = { id -> if (id == null) TransactionFormCopy.CHOOSE_CATEGORY else options.label(id) },
+                    onPick = { onLine(index, line.copy(categoryId = it)) },
+                    tag = "transaction-split-$index-category",
+                    modifier = Modifier.weight(1f),
+                    fullScreenThreshold = CategoryOptions.IN_PLACE_LIMIT,
+                    onOpenFull = { onOpenFull(index) },
+                )
+                MetroField(
+                    line.amount,
+                    { onLine(index, line.copy(amount = it)) },
+                    TransactionFormCopy.AMOUNT,
+                    Modifier.width(SPLIT_AMOUNT_WIDTH).testTag("transaction-split-$index-amount"),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    fill = false,
+                )
+                Box(
+                    Modifier
+                        .size(MetroDimens.TouchTarget)
+                        .metroPress { onRemove(index) }
+                        .semantics { contentDescription = TransactionFormCopy.REMOVE_LINE }
+                        .testTag("transaction-split-$index-remove"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AppGlyphIcon(AppGlyph.Cancel, Metro.colors.secondary)
+                }
+            }
+        }
+        // Money out splits into money out: the sign follows the transaction's, so over means past the total.
+        val over = left != 0L && (left < 0L) != expense
+        MetroText(
+            when {
+                left == 0L -> TransactionFormCopy.ADDS_UP
+                over -> "${format(abs(left))} ${TransactionFormCopy.OVER}"
+                else -> "${format(abs(left))} ${TransactionFormCopy.LEFT}"
+            },
+            Metro.typography.body,
+            Modifier.testTag("transaction-split-left"),
+            color = if (left == 0L) Metro.colors.secondary else Metro.accent.text,
+        )
     }
 }
 
@@ -760,6 +939,7 @@ private fun TransferTile(
 @Composable
 private fun TransferPreview(
     page: RegisterPage,
+    from: String,
     other: AccountChoice,
     adding: Boolean,
     signed: Long?,
@@ -782,7 +962,7 @@ private fun TransferPreview(
         ) {
             Box(Modifier.width(3.dp).fillMaxHeight().background(Metro.accent.fill))
             Column(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 8.dp)) {
-                MetroText(RegisterEntry.transferLabel(-(signed ?: -1L), page.account.name), Metro.typography.body, maxLines = 2)
+                MetroText(RegisterEntry.transferLabel(-(signed ?: -1L), from), Metro.typography.body, maxLines = 2)
                 MetroText(
                     listOf(other.name, RegisterEntry.registerDateLabel(date), category ?: RegisterCopy.NO_CATEGORY).joinToString(" · "),
                     Metro.typography.caption,
@@ -805,11 +985,20 @@ private fun TransferPreview(
 }
 
 object TransactionFormCopy {
+    const val ACCOUNT = "account"
     const val DATE = "date"
     const val PAYEE = "payee"
     const val AMOUNT = "amount"
     const val CATEGORY = "category"
     const val NOTE = "note"
+    const val CLEARED = "cleared"
+    const val SPLIT = "split"
+    const val LEFT = "left to assign"
+    const val OVER = "over"
+    const val ADDS_UP = "split adds up"
+    const val REMOVE_LINE = "remove line"
+    const val CHOOSE_CATEGORY = "category"
+    const val UNCLEARED = "uncleared"
     const val EXPENSE = "expense"
     const val INCOME = "income"
     const val CHOOSE_DATE = "choose date"
@@ -834,6 +1023,7 @@ enum class TransactionField {
         fun of(reason: String): TransactionField =
             when (reason) {
                 RegisterCopy.ENTER_DATE -> DATE
+                RegisterCopy.SPLIT_MUST_ADD -> CATEGORY
                 RegisterCopy.ENTER_PAYEE -> PAYEE
                 RegisterCopy.ENTER_AMOUNT, RegisterCopy.AMOUNT_ZERO -> AMOUNT
                 RegisterCopy.CHOOSE_CATEGORY -> CATEGORY
@@ -846,7 +1036,10 @@ enum class TransactionField {
 sealed interface FormOverlay {
     data object None : FormOverlay
 
-    data object CategoryList : FormOverlay
+    /** The full category list, for the category box or, with [line], a split line. */
+    data class CategoryList(
+        val line: Int? = null,
+    ) : FormOverlay
 
     data class DatePicker(
         val draft: Int,
@@ -894,6 +1087,7 @@ class CategoryOptions private constructor(
 }
 
 private val NOTE_LINES = 2..6
+private val SPLIT_AMOUNT_WIDTH = 110.dp
 private val DATE_CHEVRON = 42.dp
 private const val AMOUNT_WHOLE = 9_999_999L
 
