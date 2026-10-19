@@ -373,6 +373,8 @@ data class ShellUiState(
     val budgetEdit: BudgetEdit? = null,
     /** Set while a transaction form was opened from the inbox, so saving it goes back home. */
     val editFromInbox: Boolean = false,
+    /** A new transaction opened from a reconcile's "add it" starts with the amount that balances it, on the statement date. */
+    val newTransactionPrefill: NewTransactionPrefill? = null,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
     val settingsPage: SettingsPage = SettingsPage.BUDGET,
     val settingsScroll: Map<SettingsPage, Int> = emptyMap(),
@@ -1684,9 +1686,18 @@ class ShellViewModel(
 
     fun openNewTransaction() {
         val accountId = openAccountId() ?: return
-        _state.update { it.copy(editFromInbox = false) }
+        _state.update { it.copy(editFromInbox = false, newTransactionPrefill = null) }
         push(ShellRoute.EditTransaction(accountId, null))
         loadPayees()
+    }
+
+    /** A reconcile's "add it": a new transaction for the difference, dated on the statement, so saving it balances. */
+    fun addMissingForReconcile() {
+        val page = _state.value.reconcile ?: return openNewTransaction()
+        openNewTransaction()
+        _state.update {
+            it.copy(newTransactionPrefill = NewTransactionPrefill(page.differenceMinor, RegisterEntry.formatIso(page.statementDate)))
+        }
     }
 
     fun openEdit(transactionId: String) {
@@ -1744,11 +1755,27 @@ class ShellViewModel(
         }
     }
 
-    fun finishReconcile() {
+    /** A hint's "clear both" or "unclear it": several rows' cleared marks set in one go. */
+    fun setReconcileCleared(
+        transactionIds: List<String>,
+        cleared: Boolean,
+    ) {
         val accountId = reconcileAccountId() ?: return
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
-            when (val result = withContext(Dispatchers.IO) { library.finishReconcile(budgetId, accountId) }) {
+            val page =
+                withContext(Dispatchers.IO) {
+                    library.setReconcileCleared(budgetId, accountId, transactionIds, cleared)
+                }
+            if (page != null) _state.update { it.copy(reconcile = page) }
+        }
+    }
+
+    fun finishReconcile(adjust: Boolean = false) {
+        val accountId = reconcileAccountId() ?: return
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            when (val result = withContext(Dispatchers.IO) { library.finishReconcile(budgetId, accountId, adjust) }) {
                 ReconcileFinishResult.Finished -> {
                     history.clear()
                     history.addLast(ShellRoute.Home)
@@ -2415,7 +2442,25 @@ class ShellViewModel(
             is WriteResult.Saved -> {
                 // Edits started from the inbox go back to it, not to the account's register.
                 val toRegister = stayOnRegister && !_state.value.editFromInbox
-                _state.update { it.copy(editFromInbox = false) }
+                // A transaction added or fixed from a reconcile goes back to that reconcile.
+                val toReconcile = toRegister && history.lastOrNull() == ShellRoute.Reconcile(accountId)
+                _state.update { it.copy(editFromInbox = false, newTransactionPrefill = null) }
+                if (toReconcile) {
+                    history.clear()
+                    history.addLast(ShellRoute.Home)
+                    history.addLast(ShellRoute.Register(accountId))
+                    _state.update {
+                        it.copy(
+                            route = ShellRoute.Reconcile(accountId),
+                            writeError = null,
+                            confirm = null,
+                            registerSelection = null,
+                        )
+                    }
+                    apply(load(accountId), accountId)
+                    reloadReconcile(accountId)
+                    return
+                }
                 if (toRegister) {
                     history.clear()
                     history.addLast(ShellRoute.Home)
@@ -2864,3 +2909,8 @@ class ShellViewModel(
             }
     }
 }
+
+data class NewTransactionPrefill(
+    val amountMinor: Long,
+    val dateIso: String,
+)

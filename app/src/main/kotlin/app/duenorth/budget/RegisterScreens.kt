@@ -294,7 +294,7 @@ internal fun registerDays(rows: List<RegisterRow>): List<List<RegisterRow>> =
  * picked row takes an accent tint.
  */
 @Composable
-private fun RegisterLine(
+internal fun RegisterLine(
     row: RegisterRow,
     page: RegisterPage,
     banded: Boolean,
@@ -302,6 +302,7 @@ private fun RegisterLine(
     onPress: () -> Unit,
     onLongPress: () -> Unit,
     detail: String = registerDetail(row),
+    modifier: Modifier = Modifier,
 ) {
     val accent = Metro.accent.text
     val fill =
@@ -315,7 +316,7 @@ private fun RegisterLine(
     val measurer = rememberTextMeasurer()
     val mark = Metro.typography.caption.copy(color = letter, fontWeight = FontWeight.SemiBold)
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .ledgerFill(fill)
@@ -457,6 +458,8 @@ fun TransactionForm(
     numberFormat: String = FormatPrefs().numberFormat,
     hideFraction: Boolean = FormatPrefs().hideFraction,
     payees: List<String> = emptyList(),
+    /** A new transaction's starting amount, signed: a reconcile's "add it" fills in what balances it. */
+    initialAmountMinor: Long? = null,
 ) {
     val draftId = remember(row?.id, page.account.id) { row?.id ?: UUID.randomUUID().toString() }
     var date by remember(row?.id) {
@@ -465,15 +468,16 @@ fun TransactionForm(
     var payee by remember(row?.id) {
         mutableStateOf(if (row == null || row.payee == ShellCopy.NO_PAYEE) "" else row.payee)
     }
+    val startAmount = row?.amountMinor ?: initialAmountMinor
     var amount by remember(row?.id) {
         mutableStateOf(
-            row
+            startAmount
                 ?.let {
-                    MoneyParse.editText(it.amountMinor, page.currency.decimals, FormatOptions(hideFraction, numberFormat))
+                    MoneyParse.editText(it, page.currency.decimals, FormatOptions(hideFraction, numberFormat))
                 }.orEmpty(),
         )
     }
-    var expense by remember(row?.id) { mutableStateOf(row?.amountMinor?.let { it <= 0L } ?: true) }
+    var expense by remember(row?.id) { mutableStateOf(startAmount?.let { it <= 0L } ?: true) }
     var note by remember(row?.id) { mutableStateOf(row?.note.orEmpty()) }
     var categoryId by remember(row?.id) { mutableStateOf(row?.categoryId ?: row?.partnerCategoryId) }
     // The account this transaction transfers to or from, picked from the payee box (option C, #76).
@@ -1004,7 +1008,7 @@ private fun CategoryListRow(
 
 /** The WP8.1 date picker page: looping month, day and year columns in the settings order (FR-005–FR-007). */
 @Composable
-private fun DatePickerPage(
+internal fun DatePickerPage(
     date: Int,
     dateFormat: String,
     onChange: (Int) -> Unit,

@@ -3,6 +3,7 @@ package app.duenorth.budget.core
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.util.UUID
 
 object ReconcileCopy {
     const val ENTER_BALANCE = "enter the statement balance"
@@ -16,6 +17,49 @@ object ReconcileCopy {
     const val RECONCILE = "reconcile"
     const val FINISH = "finish"
     const val CANCEL = "cancel"
+    const val ADJUSTMENT_PAYEE = "Reconciliation balance adjustment"
+    const val START = "start"
+    const val STATEMENT_BALANCE = "statement ending balance"
+    const val STATEMENT_DATE = "statement ending date"
+    const val PREFILLED = "starts at your cleared balance"
+    const val OFF_BY = "off by"
+    const val BALANCED = "balanced"
+    const val TAP_TO_CLEAR = "tap each transaction you find on your statement"
+    const val AFTER_STATEMENT = "after the statement"
+    const val RECONCILED_THROUGH = "reconciled through"
+    const val FINISH_LOCKS = "finish locks"
+    const val FINISH_ANYWAY = "finish anyway?"
+    const val ADD_AND_FINISH = "add and finish"
+    const val KEEP_LOOKING = "keep looking"
+    const val CLEAR_IT = "clear it"
+    const val CLEAR_BOTH = "clear both"
+    const val UNCLEAR_IT = "unclear it"
+    const val ADD_IT = "add it"
+    const val MISSING = "missing from your register?"
+    const val SWAPPED = "a multiple of 9: two digits swapped?"
+    const val PLACES_TO_LOOK = "some places to look"
+    const val NO_CATEGORY_LATER = "it has no category; you can give it one later."
+
+    fun adjustExplain(account: String) = "add an adjustment so $account matches your bank. it is marked so you can find it later."
+
+    fun exact(
+        payee: String,
+        date: String,
+        amount: String,
+    ) = "$payee on $date is exactly $amount and isn't cleared"
+
+    fun nothingExact(amount: String) = "nothing is exactly $amount · $PLACES_TO_LOOK"
+
+    fun late(
+        payee: String,
+        amount: String,
+        date: String,
+    ) = "$payee $amount is dated $date, after the statement"
+
+    fun maybeNot(
+        payee: String,
+        amount: String,
+    ) = "$payee $amount is cleared but may not be on it"
 }
 
 @Serializable
@@ -91,11 +135,13 @@ class ReconcileBook(
     ): ReconcileStartResult {
         val account = account(accountId) ?: return ReconcileStartResult.Rejected(ShellCopy.NO_ACCOUNTS)
         val currency = currency()
-        val minor =
+        val magnitude =
             MoneyParse.parseMagnitude(balanceText, currency.decimals)
                 ?: return ReconcileStartResult.Rejected(
                     if (balanceText.isBlank()) ReconcileCopy.ENTER_BALANCE else ReconcileCopy.TOO_MANY_DECIMALS,
                 )
+        // A card's statement can be owed, so a leading minus is kept.
+        val minor = if (balanceText.trim().startsWith("-")) -magnitude else magnitude
         val date =
             RegisterEntry.parseDate(dateText)
                 ?: return ReconcileStartResult.Rejected(
@@ -104,13 +150,9 @@ class ReconcileBook(
         loadSession(accountId)?.let { existing ->
             return ReconcileStartResult.Started(page(account, existing))
         }
+        // Cleared marks made in the register stay; the baseline only lets cancel put them back.
         val baseline = snapshot(accountId)
         session.transaction {
-            for ((id, entry) in baseline) {
-                if (!entry.reconciled) {
-                    SyncSchema.write(session, "transactions", id, "cleared", 0)
-                }
-            }
             saveSession(
                 accountId,
                 ReconcileSession(
@@ -138,14 +180,53 @@ class ReconcileBook(
         return page(account, sessionData)
     }
 
-    fun finish(accountId: String): ReconcileFinishResult {
+    /** Sets several rows' cleared mark at once, as a helper's "clear both" does. Reconciled rows are left alone. */
+    fun setCleared(
+        accountId: String,
+        transactionIds: List<String>,
+        cleared: Boolean,
+    ): ReconcilePage? {
+        val account = account(accountId) ?: return null
+        val sessionData = loadSession(accountId) ?: return null
+        session.transaction {
+            for (id in transactionIds) {
+                val row = find(accountId, id) ?: continue
+                if (!row.reconciled) SyncSchema.write(session, "transactions", id, "cleared", cleared)
+            }
+        }
+        return page(account, sessionData)
+    }
+
+    /**
+     * Locks the cleared rows. When the cleared total is still off and [adjust] is set, a cleared
+     * "reconciliation balance adjustment" for the difference is added on the statement date first, as Actual does.
+     */
+    fun finish(
+        accountId: String,
+        adjust: Boolean = false,
+        ids: () -> String = { UUID.randomUUID().toString() },
+    ): ReconcileFinishResult {
         val account = account(accountId) ?: return ReconcileFinishResult.Rejected(ShellCopy.NO_ACCOUNTS)
         val sessionData = loadSession(accountId) ?: return ReconcileFinishResult.Rejected(ReconcileCopy.NO_SESSION)
         val current = page(account, sessionData)
-        if (current.differenceMinor != 0L) {
+        if (current.differenceMinor != 0L && !adjust) {
             return ReconcileFinishResult.Rejected(ReconcileCopy.NOT_BALANCED)
         }
         session.transaction {
+            if (current.differenceMinor != 0L) {
+                val register = RegisterBook(session, ids)
+                register.insertImportedTransaction(
+                    id = ids(),
+                    accountId = accountId,
+                    categoryId = null,
+                    amount = current.differenceMinor,
+                    payeeId = register.payeeIdForName(ReconcileCopy.ADJUSTMENT_PAYEE),
+                    note = null,
+                    date = sessionData.statementDate,
+                    financialId = null,
+                    importedPayee = null,
+                )
+            }
             session
                 .query(
                     """
