@@ -120,6 +120,8 @@ object ShellReader {
                                         availableMinor = cat.availableMinor,
                                         carryover = cat.carryover,
                                         hidden = cat.hidden,
+                                        goalMinor = cat.goalMinor,
+                                        longGoal = cat.longGoal,
                                     )
                                 }
                         GroupRow(
@@ -188,6 +190,8 @@ object ShellReader {
         val availableMinor: Long,
         val carryover: Boolean,
         val hidden: Boolean = false,
+        val goalMinor: Long? = null,
+        val longGoal: Boolean = false,
     )
 
     data class LoadedIncomeRow(
@@ -268,7 +272,7 @@ object ShellReader {
         val table = if (mode == BudgetMode.ENVELOPE) "zero_budgets" else "reflect_budgets"
         val assignments =
             session.query(
-                "SELECT month, category, amount, carryover FROM $table",
+                "SELECT month, category, amount, carryover, goal, long_goal FROM $table",
             )
         val buffers =
             if (mode == BudgetMode.ENVELOPE) {
@@ -314,6 +318,11 @@ object ShellReader {
                     },
                 buffers = buffers,
             )
+        val target = viewMonth.toActualMonth()
+        val targetAssignments =
+            assignments
+                .filter { it.long("month").toInt() == target }
+                .associateBy { it.str("category").orEmpty() }
         val categoryRows =
             allCategories.mapNotNull { row ->
                 val id = row.str("id").orEmpty()
@@ -327,13 +336,10 @@ object ShellReader {
                     availableMinor = stat.availableMinor,
                     carryover = stat.carryover,
                     hidden = row.bool("hidden"),
+                    goalMinor = targetAssignments[id]?.takeIf { it.values["goal"] != null }?.long("goal"),
+                    longGoal = targetAssignments[id]?.bool("long_goal") == true,
                 )
             }
-        val target = viewMonth.toActualMonth()
-        val targetAssignments =
-            assignments
-                .filter { it.long("month").toInt() == target }
-                .associateBy { it.str("category").orEmpty() }
         val incomeRows =
             allCategories.filter { it.bool("is_income") }.map { row ->
                 val id = row.str("id").orEmpty()

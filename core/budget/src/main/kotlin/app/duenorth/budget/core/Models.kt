@@ -369,7 +369,22 @@ data class CategoryRow(
     val availableMinor: Long,
     val carryover: Boolean,
     val hidden: Boolean = false,
-)
+    /** The month's template target (`goal`), written when templates are applied; null when the category has none. */
+    val goalMinor: Long? = null,
+    /** True for a `#goal` saving target, measured against the balance rather than what was budgeted. */
+    val longGoal: Boolean = false,
+) {
+    /**
+     * How far along the goal is, from 0 to 1, as Actual judges it: a `#goal` by the balance, any other
+     * template by what was budgeted this month. Null when there is no goal to measure.
+     */
+    val goalProgress: Float?
+        get() {
+            val goal = goalMinor?.takeIf { it > 0 } ?: return null
+            val funded = if (longGoal) availableMinor else budgetedMinor
+            return (funded.toDouble() / goal).coerceIn(0.0, 1.0).toFloat()
+        }
+}
 
 /** An income category for the month: what came in, and in tracking files what was budgeted. */
 data class IncomeCategoryRow(

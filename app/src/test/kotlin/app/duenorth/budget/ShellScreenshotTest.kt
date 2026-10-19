@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
@@ -15,6 +16,7 @@ import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MonthShell
@@ -53,6 +55,38 @@ class ShellScreenshotTest {
         )
 
     // Home with show hidden categories on: hidden groups and categories come back dimmed.
+    @Test
+    fun homeGoalsLight() = snap("home_goals_light", dark = false, shell = withGoals(), prefs = templatesOn)
+
+    @Test
+    fun homeGoalsDark() = snap("home_goals_dark", dark = true, shell = withGoals(), prefs = templatesOn)
+
+    private val templatesOn = FormatPrefs(experimental = true, goalTemplates = true)
+
+    /** Rent and Rainy day are on target, Power and Gas are short, Rainy day saves toward a #goal. */
+    private fun withGoals(): MonthShell =
+        sample().let { shell ->
+            val goals =
+                mapOf(
+                    "c-rent" to (110_000L to false),
+                    "c-power" to (18_000L to false),
+                    "c-gas" to (16_000L to false),
+                    "c-groceries" to (20_000L to false),
+                    "c-rainy" to (200_000L to true),
+                )
+            shell.copy(
+                groups =
+                    shell.groups.map { group ->
+                        group.copy(
+                            categories =
+                                group.categories.map { row ->
+                                    goals[row.id]?.let { (goal, long) -> row.copy(goalMinor = goal, longGoal = long) } ?: row
+                                },
+                        )
+                    },
+            )
+        }
+
     @Test
     fun homeHiddenShownLight() = snap("home_hidden_shown_light", dark = false, shell = withHidden())
 
@@ -138,49 +172,52 @@ class ShellScreenshotTest {
         filed: Boolean = false,
         selection: Set<String>? = null,
         netWorth: NetWorthPage? = null,
+        prefs: FormatPrefs = FormatPrefs(),
     ) {
         val inbox = section == HomeSections.headers.indexOf(HomeSections.INBOX)
         val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
         val justFiled = if (filed) listOf(InboxFiled(shell.inbox.first(), 0, "Dining")) else emptyList()
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
-                Column(Modifier.width(390.dp).height(780.dp)) {
-                    HomePivot(
-                        shell = shown,
-                        loading = false,
-                        openMonth = shell.month,
-                        monthWindow = MonthWindow.around(shell.month),
-                        initialSection = section,
-                        onGesture = {},
-                        modifier = Modifier.weight(1f),
-                        inboxFiled = justFiled,
-                        inboxSelection = selection,
-                        netWorth = netWorth,
-                    )
-                    MetroAppBar(
-                        actions =
-                            when {
-                                inbox && selection != null ->
-                                    listOf(
-                                        AppBarButton(AppGlyph.Save, InboxCopy.ACCEPT, onClick = {}),
-                                        AppBarButton(AppGlyph.Categories, InboxCopy.CATEGORIZE, onClick = {}),
-                                        AppBarButton(AppGlyph.Cancel, InboxCopy.CANCEL, onClick = {}),
-                                    )
-                                inbox ->
-                                    listOf(
-                                        AppBarButton(AppGlyph.Add, "add", onClick = {}),
-                                        AppBarButton(AppGlyph.Select, InboxCopy.SELECT, onClick = {}),
-                                    )
-                                else ->
-                                    listOf(
-                                        AppBarButton(AppGlyph.Budgets, "budgets", onClick = {}),
-                                        AppBarButton(AppGlyph.Sync, "sync", onClick = {}),
-                                        AppBarButton(AppGlyph.Appearance, "appearance", onClick = {}),
-                                    )
-                            }.asScreenActions(),
-                        expanded = false,
-                        onExpandedChange = {},
-                    )
+                CompositionLocalProvider(LocalFormatPrefs provides prefs) {
+                    Column(Modifier.width(390.dp).height(780.dp)) {
+                        HomePivot(
+                            shell = shown,
+                            loading = false,
+                            openMonth = shell.month,
+                            monthWindow = MonthWindow.around(shell.month),
+                            initialSection = section,
+                            onGesture = {},
+                            modifier = Modifier.weight(1f),
+                            inboxFiled = justFiled,
+                            inboxSelection = selection,
+                            netWorth = netWorth,
+                        )
+                        MetroAppBar(
+                            actions =
+                                when {
+                                    inbox && selection != null ->
+                                        listOf(
+                                            AppBarButton(AppGlyph.Save, InboxCopy.ACCEPT, onClick = {}),
+                                            AppBarButton(AppGlyph.Categories, InboxCopy.CATEGORIZE, onClick = {}),
+                                            AppBarButton(AppGlyph.Cancel, InboxCopy.CANCEL, onClick = {}),
+                                        )
+                                    inbox ->
+                                        listOf(
+                                            AppBarButton(AppGlyph.Add, "add", onClick = {}),
+                                            AppBarButton(AppGlyph.Select, InboxCopy.SELECT, onClick = {}),
+                                        )
+                                    else ->
+                                        listOf(
+                                            AppBarButton(AppGlyph.Budgets, "budgets", onClick = {}),
+                                            AppBarButton(AppGlyph.Sync, "sync", onClick = {}),
+                                            AppBarButton(AppGlyph.Appearance, "appearance", onClick = {}),
+                                        )
+                                }.asScreenActions(),
+                            expanded = false,
+                            onExpandedChange = {},
+                        )
+                    }
                 }
             }
         }

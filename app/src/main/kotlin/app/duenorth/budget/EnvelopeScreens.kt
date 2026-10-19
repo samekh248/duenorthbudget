@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,6 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -465,18 +469,20 @@ fun CategoryLine(
     modifier: Modifier = Modifier,
     formatOptions: FormatOptions = formatOptions(),
     banded: Boolean = false,
+    /** Goals only show while templates are on, as Actual only judges them then. */
+    showGoal: Boolean = LocalFormatPrefs.current.templatesOn,
 ) {
     val money = shell.currency
-    Box(
+    val progress = if (showGoal) category.goalProgress else null
+    Column(
         modifier
             .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
             .ledgerFill(if (banded) ledgerBand else Color.Transparent)
             .then(if (onOpen != null) Modifier.metroPress { onOpen(category.id) } else Modifier)
             .testTag("category-${category.id}"),
     ) {
         Row(
-            Modifier.fillMaxWidth().align(Alignment.CenterStart),
+            Modifier.fillMaxWidth().heightIn(min = MetroDimens.TouchTarget),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MetroText(
@@ -505,8 +511,29 @@ fun CategoryLine(
                 "category-available-${category.id}",
             )
         }
+        if (progress != null) GoalBar(progress, Modifier.padding(bottom = GOAL_BAR_GAP).testTag("category-goal-${category.id}"))
     }
 }
+
+/** A thin bar across the row: the accent fills as much of the goal as is funded, the rest is a faint track. */
+@Composable
+private fun GoalBar(
+    progress: Float,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(GOAL_BAR_HEIGHT)
+            .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) },
+    ) {
+        if (progress > 0f) Box(Modifier.weight(progress).fillMaxHeight().background(Metro.accent.fill))
+        if (progress < 1f) Box(Modifier.weight(1f - progress).fillMaxHeight().background(Metro.colors.secondary.copy(alpha = 0.25f)))
+    }
+}
+
+private val GOAL_BAR_HEIGHT = 3.dp
+private val GOAL_BAR_GAP = 6.dp
 
 @Composable
 internal fun LedgerHeadings(modifier: Modifier = Modifier) {

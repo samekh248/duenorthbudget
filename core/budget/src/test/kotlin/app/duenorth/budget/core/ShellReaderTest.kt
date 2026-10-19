@@ -90,6 +90,62 @@ class ShellReaderTest {
     }
 
     @Test
+    fun readsTheViewMonthsGoalsForEachCategory() {
+        val file = File.createTempFile("shell", ".sqlite")
+        file.delete()
+        JdbcSessionOpener().use(file) { session ->
+            ActualSchema.create(session)
+            session.exec("INSERT INTO preferences (id, value) VALUES (?, ?)", listOf("budgetType", "envelope"))
+            session.exec(
+                "INSERT INTO category_groups (id, name, is_income, sort_order) VALUES (?, ?, ?, ?)",
+                listOf("g-liv", "Living", 0, 0),
+            )
+            listOf("c-power" to "Power", "c-car" to "Car repair", "c-dining" to "Dining").forEachIndexed { i, (id, name) ->
+                session.exec(
+                    "INSERT INTO categories (id, name, is_income, cat_group, sort_order) VALUES (?, ?, ?, ?, ?)",
+                    listOf(id, name, 0, "g-liv", i),
+                )
+            }
+            listOf(
+                listOf("b1", 202609, "c-car", 110_000, null, null),
+                listOf("b2", 202610, "c-power", 10_000, 14_000, null),
+                listOf("b3", 202610, "c-car", 15_000, 200_000, 1),
+                listOf("b4", 202610, "c-dining", 8_000, null, null),
+                listOf("b5", 202611, "c-dining", 8_000, 9_000, null),
+            ).forEach {
+                session.exec("INSERT INTO zero_budgets (id, month, category, amount, goal, long_goal) VALUES (?, ?, ?, ?, ?, ?)", it)
+            }
+            val shell = ShellReader.read(session, BudgetMetadata("home", "Home"), LocalDate.of(2026, 10, 7))
+            val rows =
+                shell.groups
+                    .single()
+                    .categories
+                    .associateBy { it.id }
+            assertEquals(14_000L to false, rows.getValue("c-power").let { it.goalMinor to it.longGoal })
+            assertEquals(200_000L to true, rows.getValue("c-car").let { it.goalMinor to it.longGoal })
+            // November's goal is not October's.
+            assertEquals(null to false, rows.getValue("c-dining").let { it.goalMinor to it.longGoal })
+            // A template goal measures what was budgeted; a #goal measures the balance (1100 + 150 of 2000).
+            assertEquals(10f / 14f, rows.getValue("c-power").goalProgress!!, 0.0001f)
+            assertEquals(0.625f, rows.getValue("c-car").goalProgress!!, 0.0001f)
+            assertEquals(null, rows.getValue("c-dining").goalProgress)
+        }
+    }
+
+    @Test
+    fun goalProgressStaysBetweenEmptyAndFull() {
+        fun row(
+            budgeted: Long,
+            available: Long,
+            goal: Long?,
+            long: Boolean = false,
+        ) = CategoryRow("c", "C", budgeted, 0, available, carryover = false, goalMinor = goal, longGoal = long)
+        assertEquals(1f, row(20_000, 0, 10_000).goalProgress!!, 0f)
+        assertEquals(0f, row(0, -5_000, 10_000, long = true).goalProgress!!, 0f)
+        assertEquals(null, row(5_000, 5_000, 0).goalProgress)
+    }
+
+    @Test
     fun hiddenGroupsAndCategoriesStayOutUnlessAskedFor() {
         val file = File.createTempFile("shell", ".sqlite")
         file.delete()
