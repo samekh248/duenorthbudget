@@ -43,6 +43,7 @@ import app.duenorth.budget.core.ReconcileStartResult
 import app.duenorth.budget.core.RefreshGate
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
+import app.duenorth.budget.core.RegisterSearch
 import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportRange
@@ -276,6 +277,8 @@ data class ShellUiState(
     val register: RegisterPage? = null,
     /** Transactions picked in the register's select mode; null when not selecting. */
     val registerSelection: Set<String>? = null,
+    /** The register's search, open over the rows; null when closed. */
+    val registerSearch: RegisterSearch? = null,
     val categoryTarget: CategoryTarget? = null,
     val createError: String? = null,
     val writeError: String? = null,
@@ -415,6 +418,9 @@ class ShellViewModel(
     /** `onboarding.json` writes, one at a time and in order. */
     internal val onboardingWrites = Dispatchers.IO.limitedParallelism(1)
 
+    /** When the last sync the screen started without being asked began, in epoch millis; launch syncs at start. */
+    private var lastScreenSync = System.currentTimeMillis()
+
     init {
         viewModelScope.launch {
             restoreOnboarding()
@@ -424,6 +430,23 @@ class ShellViewModel(
             if (_state.value.locked) return@launch
             withContext(Dispatchers.IO) { runCatching { sync.sync(id) } }
             reload()
+        }
+    }
+
+    /**
+     * The app came back on screen: pick up what other devices sent while it was away, quietly, at
+     * most once a minute. Edit mode and a locked budget wait, since a sync would change what they show.
+     */
+    fun onScreenReturned() {
+        val current = _state.value
+        val id = current.settings.openBudgetId ?: return
+        if (current.locked || current.syncing || current.budgetEdit != null) return
+        val now = System.currentTimeMillis()
+        if (now - lastScreenSync < RETURN_SYNC_GAP_MS) return
+        lastScreenSync = now
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { sync.sync(id) } }
+            if (_state.value.settings.openBudgetId == id) reload()
         }
     }
 
@@ -1258,6 +1281,11 @@ class ShellViewModel(
             endSelecting()
             return true
         }
+        // Back closes the register's search before it leaves the account.
+        if (current.registerSearch != null && current.route is ShellRoute.Register && current.confirm == null) {
+            closeRegisterSearch()
+            return true
+        }
         if (current.inboxSelection != null && current.route == ShellRoute.Home && current.confirm == null) {
             endInboxSelecting()
             return true
@@ -1343,7 +1371,7 @@ class ShellViewModel(
 
     fun openAccount(accountId: String) {
         push(ShellRoute.Register(accountId))
-        _state.update { it.copy(registerSelection = null, editFromInbox = false) }
+        _state.update { it.copy(registerSelection = null, registerSearch = null, editFromInbox = false) }
         viewModelScope.launch { apply(load(accountId), accountId) }
     }
 
@@ -1919,6 +1947,19 @@ class ShellViewModel(
 
     fun endSelecting() {
         _state.update { it.copy(registerSelection = null) }
+    }
+
+    /** The register's search button: opens the search over the rows, or closes it when open. */
+    fun toggleRegisterSearch() {
+        _state.update { it.copy(registerSearch = if (it.registerSearch == null) RegisterSearch() else null) }
+    }
+
+    fun setRegisterSearch(search: RegisterSearch) {
+        _state.update { if (it.registerSearch == null) it else it.copy(registerSearch = search) }
+    }
+
+    fun closeRegisterSearch() {
+        _state.update { it.copy(registerSearch = null) }
     }
 
     /** Clears or unclears every picked transaction as one undo step, then leaves select mode. */
@@ -2914,3 +2955,6 @@ data class NewTransactionPrefill(
     val amountMinor: Long,
     val dateIso: String,
 )
+
+/** The shortest gap between two syncs the screen starts on its own, as when the app comes back. */
+private const val RETURN_SYNC_GAP_MS = 60_000L

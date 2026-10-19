@@ -380,6 +380,7 @@ enum class AppGlyph {
     Zero,
     Undo,
     Select,
+    Search,
 }
 
 @Immutable
@@ -574,6 +575,7 @@ object AppGlyphInk {
             AppGlyph.Zero -> 1
             AppGlyph.Undo -> 3
             AppGlyph.Select -> 4
+            AppGlyph.Search -> 2
         }
 
     fun DrawScope.draw(
@@ -725,6 +727,11 @@ object AppGlyphInk {
                         strokeWidth = 1.6.dp.toPx(),
                     )
                 }
+            }
+            AppGlyph.Search -> {
+                // A lens with its handle running down to the right: the WP "search" glyph.
+                drawCircle(color, radius = 5.5.dp.toPx(), center = Offset(9.5.dp.toPx(), 9.5.dp.toPx()), style = stroke)
+                drawLine(color, Offset(13.5.dp.toPx(), 13.5.dp.toPx()), Offset(18.dp.toPx(), 18.dp.toPx()), strokeWidth = 1.6.dp.toPx())
             }
             AppGlyph.Breakdown -> {
                 drawLine(color, Offset(4.dp.toPx(), 5.dp.toPx()), Offset(18.dp.toPx(), 5.dp.toPx()), strokeWidth = 1.6.dp.toPx())

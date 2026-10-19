@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -39,6 +41,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -47,6 +51,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -79,12 +84,15 @@ import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterRow
+import app.duenorth.budget.core.RegisterSearch
+import app.duenorth.budget.core.RegisterShow
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
+import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroComboBox
@@ -118,8 +126,10 @@ fun RegisterScreen(
     modifier: Modifier = Modifier,
     onMatch: (MatchPair) -> Unit = {},
     onNotAMatch: (MatchPair) -> Unit = {},
+    search: RegisterSearch? = null,
+    onSearch: (RegisterSearch) -> Unit = {},
 ) {
-    val rows = page.rows
+    val rows = if (search == null) page.rows else page.searched(search)
     val owed = page.account.type == "credit" && page.balanceMinor < 0
     Column(
         modifier
@@ -143,8 +153,15 @@ fun RegisterScreen(
                 color = Metro.accent.text,
             )
         }
+        if (search != null) {
+            RegisterSearchBar(search, page, shown = rows.size, onSearch = onSearch)
+        }
         if (rows.isEmpty()) {
-            MetroText(RegisterCopy.NO_TRANSACTIONS, Metro.typography.body, Modifier.padding(top = MetroDimens.Grid))
+            MetroText(
+                if (search?.active == true) RegisterSearch.NOTHING else RegisterCopy.NO_TRANSACTIONS,
+                Metro.typography.body,
+                Modifier.padding(top = MetroDimens.Grid).testTag("register-empty"),
+            )
         } else {
             RegisterList(
                 rows,
@@ -153,11 +170,60 @@ fun RegisterScreen(
                 selection,
                 onPress = { id -> if (selection != null) onToggleSelected(id) else onOpen(id) },
                 onLongPress = { id -> if (selection == null) onSelect(id) else onToggleSelected(id) },
-                modifier = Modifier.weight(1f).padding(top = MetroDimens.Grid),
+                modifier = Modifier.weight(1f).padding(top = if (search == null) MetroDimens.Grid else 0.dp),
                 onMatch = onMatch,
                 onNotAMatch = onNotAMatch,
+                searching = search?.active == true,
             )
         }
+    }
+}
+
+/**
+ * The register's search, under the balance: a box that opens focused with the keyboard up, then
+ * all, not cleared, and no category (an off-budget account has no categories, so it gets the first two).
+ * While anything narrows the rows, "2 of 41" says how many are left.
+ */
+@Composable
+private fun RegisterSearchBar(
+    search: RegisterSearch,
+    page: RegisterPage,
+    shown: Int,
+    onSearch: (RegisterSearch) -> Unit,
+) {
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    Column(Modifier.fillMaxWidth().padding(top = MetroDimens.Gutter).testTag("register-search")) {
+        CompositionLocalProvider(LocalFieldSubmit provides { keyboard?.hide() }) {
+            MetroField(
+                search.query,
+                { onSearch(search.copy(query = it)) },
+                RegisterSearch.HINT,
+                Modifier.focusRequester(focus).testTag("register-search-box"),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
+            )
+        }
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+            RegisterShow.entries
+                .filter { it != RegisterShow.NO_CATEGORY || !page.account.offBudget }
+                .forEach { option ->
+                    Choice(option.label, option == search.show, "register-show-${option.name.lowercase()}") {
+                        onSearch(search.copy(show = option))
+                    }
+                }
+        }
+        if (search.active) {
+            MetroText(
+                RegisterSearch.count(shown, page.rows.size),
+                Metro.typography.caption,
+                Modifier.testTag("register-search-count"),
+                color = Metro.colors.secondary,
+            )
+        }
+    }
+    LaunchedEffect(Unit) {
+        focus.requestFocus()
+        keyboard?.show()
     }
 }
 
@@ -172,6 +238,7 @@ private fun RegisterList(
     modifier: Modifier = Modifier,
     onMatch: (MatchPair) -> Unit = {},
     onNotAMatch: (MatchPair) -> Unit = {},
+    searching: Boolean = false,
 ) {
     // A new visit starts at the newest row. Scroll position is not saved.
     val list = rememberLazyListState()
@@ -179,7 +246,15 @@ private fun RegisterList(
         snapshotFlow { list.isScrollInProgress }.collect { onGesture(it) }
     }
     // Possible matches sit above the rows, each pair held together, until matched or called not a match.
-    val pairs = if (selection == null) page.matches.filter { pair -> pair.ids.all { id -> rows.any { it.id == id } } } else emptyList()
+    // A search lists only the rows it keeps, so possible matches wait until it closes.
+    val pairs =
+        if (selection == null &&
+            !searching
+        ) {
+            page.matches.filter { pair -> pair.ids.all { id -> rows.any { it.id == id } } }
+        } else {
+            emptyList()
+        }
     val paired = pairs.flatMapTo(mutableSetOf()) { it.ids }
     val listed = rows.filter { it.id !in paired }
     val days = registerDays(listed)

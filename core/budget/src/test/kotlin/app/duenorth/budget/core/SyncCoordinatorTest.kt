@@ -143,6 +143,41 @@ class SyncCoordinatorTest {
     }
 
     @Test
+    fun backgroundSyncPicksUpAnotherDevicesChange() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            server.appendChange(remote.fileId, "zero_budgets", "202610-c-food", "amount", "N:1234")
+            assertEquals("synced 3:04 pm", sync.syncUnattended()?.status)
+            assertEquals(1_234L, assigned(remote.fileId))
+        }
+    }
+
+    @Test
+    fun backgroundSyncLeavesAPhoneOnlyBudgetAlone() {
+        scenario {
+            val kept = (library.create("Trip", "JPY") as CreateResult.Created).id
+            assertNull(sync.syncUnattended())
+            assertTrue(server.syncRequests.isEmpty())
+            assertEquals("", sync.status(kept))
+        }
+    }
+
+    @Test
+    fun backgroundSyncWaitsForTheBudgetPassword() {
+        scenario {
+            val remote = server.addEncrypted("Secret", budgetBytes(), "violet-quartz-991")
+            assertNull(sync.connect(server.baseUrl, "server-secret").error)
+            assertTrue(sync.unlock(remote, "violet-quartz-991", askEachTime = true) is UnlockResult.Unlocked)
+            assertEquals(OpenResult.Opened, sync.open(remote))
+            val before = server.syncRequests.size
+            sync.lock(remote.fileId)
+            assertNull(sync.syncUnattended())
+            assertEquals(before, server.syncRequests.size)
+        }
+    }
+
+    @Test
     fun changeAnOfflineDeviceSendsLateStillArrives() {
         scenario {
             val remote = server.addFile("Home", budgetBytes())
