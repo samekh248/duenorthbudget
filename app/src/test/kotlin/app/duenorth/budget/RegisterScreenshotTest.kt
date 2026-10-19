@@ -72,7 +72,6 @@ class RegisterScreenshotTest {
                             onGesture = {},
                             onOpen = {},
                             onAdd = {},
-                            onTransfer = {},
                             onReconcile = {},
                         )
                     }
@@ -102,7 +101,6 @@ class RegisterScreenshotTest {
                             onGesture = {},
                             onOpen = {},
                             onAdd = {},
-                            onTransfer = {},
                             onReconcile = {},
                             selection = setOf("cafe", "coffee"),
                         )
@@ -179,7 +177,6 @@ class RegisterScreenshotTest {
                             onGesture = {},
                             onOpen = {},
                             onAdd = {},
-                            onTransfer = {},
                             onReconcile = {},
                         )
                     }

@@ -233,17 +233,6 @@ data class TransactionDraft(
     val transferAccountId: String? = null,
 )
 
-data class TransferDraft(
-    val id: String,
-    val fromAccountId: String,
-    val toAccountId: String,
-    val date: Int,
-    val amountMinor: Long,
-    val categoryId: String?,
-    val note: String?,
-    val force: Boolean = false,
-)
-
 data class SplitPart(
     val categoryId: String,
     val amountMinor: Long,
@@ -274,10 +263,6 @@ sealed interface ForcedWrite {
 
     data class Unsplit(
         val transactionId: String,
-    ) : ForcedWrite
-
-    data class Transfer(
-        val draft: TransferDraft,
     ) : ForcedWrite
 
     data class Cleared(
@@ -535,38 +520,6 @@ object RegisterEntry {
         amountMinor: Long,
         accountName: String,
     ): String = "${if (amountMinor > 0) RegisterCopy.TRANSFER_FROM else RegisterCopy.TRANSFER_TO} $accountName"
-
-    fun transfer(
-        id: String,
-        fromAccountId: String,
-        toAccountId: String,
-        dateText: String,
-        amountText: String,
-        decimals: Int,
-        categoryId: String?,
-        note: String,
-        force: Boolean = false,
-    ): EntryResult<TransferDraft> {
-        if (toAccountId.isBlank() || toAccountId == fromAccountId) {
-            return EntryResult.Rejected(RegisterCopy.CHOOSE_ACCOUNT)
-        }
-        val date = parseDate(dateText) ?: return EntryResult.Rejected(RegisterCopy.ENTER_DATE)
-        val magnitude =
-            MoneyParse.parseMagnitude(amountText, decimals) ?: return EntryResult.Rejected(RegisterCopy.ENTER_AMOUNT)
-        if (magnitude == 0L) return EntryResult.Rejected(RegisterCopy.AMOUNT_ZERO)
-        return EntryResult.Ok(
-            TransferDraft(
-                id = id,
-                fromAccountId = fromAccountId,
-                toAccountId = toAccountId,
-                date = date,
-                amountMinor = magnitude,
-                categoryId = categoryId?.ifBlank { null },
-                note = note.trim().ifEmpty { null },
-                force = force,
-            ),
-        )
-    }
 
     fun split(
         total: Long,
@@ -988,80 +941,6 @@ class RegisterBook(
             setColumns(txn.id, "isParent" to 0, "category" to category)
             WriteResult.Saved
         }
-
-    fun transfer(draft: TransferDraft): WriteResult {
-        if (draft.fromAccountId == draft.toAccountId || draft.toAccountId.isBlank()) {
-            return WriteResult.Rejected(RegisterCopy.CHOOSE_ACCOUNT)
-        }
-        if (draft.amountMinor <= 0L) {
-            return WriteResult.Rejected(if (draft.amountMinor == 0L) RegisterCopy.AMOUNT_ZERO else RegisterCopy.ENTER_AMOUNT)
-        }
-        if (!validDate(draft.date)) return WriteResult.Rejected(RegisterCopy.ENTER_DATE)
-        val note = draft.note?.trim()?.ifEmpty { null }
-        return write {
-            val from = account(draft.fromAccountId)
-            val to = account(draft.toAccountId)
-            if (from == null || to == null || from.tombstone || to.tombstone) {
-                return@write WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
-            }
-            val placed = placeCategory(from, to, draft.categoryId) ?: return@write WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
-            val toId = "${draft.id}-to"
-            val existing = find(draft.id)
-            val partner = find(toId)
-            if (existing != null && existing.tombstone) return@write WriteResult.Saved
-            guard(
-                listOfNotNull(existing, partner).filter { !it.tombstone },
-                draft.force,
-                ForcedWrite.Transfer(draft.copy(force = true)),
-            )?.let { return@write it }
-            val fromPayee = transferPayee(to.id)
-            val toPayee = transferPayee(from.id)
-            if (existing == null) {
-                insert(
-                    id = draft.id,
-                    accountId = from.id,
-                    categoryId = placed.first,
-                    amount = -draft.amountMinor,
-                    payeeId = fromPayee,
-                    note = note,
-                    date = draft.date,
-                    transferId = toId,
-                    sort = nextSort(),
-                )
-                insert(
-                    id = toId,
-                    accountId = to.id,
-                    categoryId = placed.second,
-                    amount = draft.amountMinor,
-                    payeeId = toPayee,
-                    note = note,
-                    date = draft.date,
-                    transferId = draft.id,
-                    sort = nextSort(),
-                )
-            } else {
-                updateFields(draft.id, from.id, placed.first, -draft.amountMinor, fromPayee, note, draft.date)
-                if (partner == null || partner.tombstone) {
-                    insert(
-                        id = toId,
-                        accountId = to.id,
-                        categoryId = placed.second,
-                        amount = draft.amountMinor,
-                        payeeId = toPayee,
-                        note = note,
-                        date = draft.date,
-                        transferId = draft.id,
-                        sort = nextSort(),
-                    )
-                } else {
-                    updateFields(toId, to.id, placed.second, draft.amountMinor, toPayee, note, draft.date)
-                }
-                setColumns(draft.id, "transferred_id" to toId)
-                setColumns(toId, "transferred_id" to draft.id)
-            }
-            WriteResult.Saved
-        }
-    }
 
     /**
      * Saves [draft] as one side of a transfer with its `transferAccountId`, as Actual does when the payee is an

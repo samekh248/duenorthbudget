@@ -84,7 +84,6 @@ class MatchContentTest {
                         onGesture = {},
                         onOpen = {},
                         onAdd = {},
-                        onTransfer = {},
                         onReconcile = {},
                         onMatch = { matched += it },
                     )

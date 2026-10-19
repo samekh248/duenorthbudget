@@ -260,7 +260,7 @@ class RegisterBookTest {
         db { session, book ->
             val before = shell(session).headerMinor
             assertTrue(
-                book.transfer(TransferDraft("move", "checking", "cash", 20261007, 10_000, "c-food", null))
+                book.save(transfer("move", to = "cash", amount = -10_000, category = "c-food"))
                     is WriteResult.Saved,
             )
             assertEquals(-10_000L, book.read("checking")!!.balanceMinor)
@@ -280,10 +280,10 @@ class RegisterBookTest {
             assertEquals(0L, book.read("cash")!!.balanceMinor)
             assertEquals(0, aliveCount(session))
             val needsCategory =
-                book.transfer(TransferDraft("out", "checking", "savings", 20261007, 5_000, null, null))
+                book.save(transfer("out", to = "savings", amount = -5_000))
                     as WriteResult.Rejected
             assertEquals(RegisterCopy.CHOOSE_CATEGORY, needsCategory.reason)
-            book.transfer(TransferDraft("out", "checking", "savings", 20261007, 5_000, "c-food", null))
+            book.save(transfer("out", to = "savings", amount = -5_000, category = "c-food"))
             assertEquals(5_000L, book.read("savings")!!.balanceMinor)
             assertEquals(-5_000L, spent(session, "c-food"))
         }
@@ -378,7 +378,7 @@ class RegisterBookTest {
             book.save(draft("swipe", account = "card", amount = -4_000, payee = "Store"))
             assertEquals(0L, available(shell(session), "Groceries"))
             assertEquals(4_000L, available(shell(session), "Payment"))
-            book.transfer(TransferDraft("bill", "checking", "card", 20261007, 4_000, null, null))
+            book.save(transfer("bill", to = "card", amount = -4_000))
             val after = shell(session)
             assertEquals(0L, available(after, "Groceries"))
             assertEquals(0L, available(after, "Payment"))

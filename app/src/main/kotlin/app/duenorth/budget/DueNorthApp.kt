@@ -231,7 +231,6 @@ fun DueNorthApp(model: ShellViewModel) {
                     onHold = model::showHoldMonth,
                     onCategories = model::showManageCategories,
                     onSettings = model::showSettings,
-                    onTransfer = model::openTransfer,
                     onReconcile = model::openReconcile,
                     onImport = {
                         val accountId =
@@ -634,7 +633,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                     onSelect = model::startSelecting,
                                     onToggleSelected = model::toggleSelected,
                                     onAdd = model::openNewTransaction,
-                                    onTransfer = model::openTransfer,
                                     onReconcile = model::openReconcile,
                                     onImportFile = {
                                         importAccountId = route.accountId
@@ -709,20 +707,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                     error = state.writeError,
                                     onSave = model::submitSplit,
                                     onUnsplit = model::unsplit,
-                                    modifier = fill,
-                                )
-                            }
-                        }
-                        is ShellRoute.TransferMoney -> {
-                            val page = state.register
-                            if (page == null) {
-                                Placeholder()
-                            } else {
-                                TransferForm(
-                                    page = page,
-                                    initialDate = state.today,
-                                    error = state.writeError,
-                                    onSave = model::submitTransfer,
                                     modifier = fill,
                                 )
                             }

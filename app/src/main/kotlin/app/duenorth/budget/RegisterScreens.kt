@@ -89,7 +89,6 @@ import app.duenorth.budget.core.RegisterShow
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.TransactionDraft
-import app.duenorth.budget.core.TransferDraft
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.LocalFieldSubmit
@@ -117,7 +116,6 @@ fun RegisterScreen(
     onGesture: (Boolean) -> Unit,
     onOpen: (String) -> Unit,
     onAdd: () -> Unit,
-    onTransfer: () -> Unit,
     onReconcile: () -> Unit,
     onImportFile: (() -> Unit)? = null,
     selection: Set<String>? = null,
@@ -1252,85 +1250,6 @@ private fun SplitLineEditor(
         MetroField(amount, onAmount, "amount", Modifier.padding(top = MetroDimens.Gutter))
         categories.forEach { category ->
             ChoiceLine(category.name, category.id == categoryId) { onCategory(category.id) }
-        }
-    }
-}
-
-@Composable
-fun TransferForm(
-    page: RegisterPage,
-    initialDate: String,
-    error: String?,
-    onSave: (TransferDraft) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val draftId = remember(page.account.id) { UUID.randomUUID().toString() }
-    val others = page.accounts.filter { it.id != page.account.id }
-    var toId by remember(page.account.id) { mutableStateOf(others.firstOrNull()?.id.orEmpty()) }
-    val prefs = LocalFormatPrefs.current
-    var date by remember(prefs.dateFormat) { mutableStateOf(prefs.showDate(initialDate)) }
-    var amount by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var categoryId by remember(toId) { mutableStateOf<String?>(null) }
-    var localError by remember { mutableStateOf<String?>(null) }
-    val selected = others.firstOrNull { it.id == toId }
-    val needsCategory = selected != null && selected.offBudget != page.account.offBudget
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-    ) {
-        MetroText("transfer", Metro.typography.header)
-        MetroField(date, { date = it }, "date", Modifier.padding(top = MetroDimens.Grid))
-        MetroField(amount, { amount = it }, "amount", Modifier.padding(top = MetroDimens.Gutter))
-        MetroField(note, { note = it }, "note", Modifier.padding(top = MetroDimens.Gutter), lines = NOTE_LINES)
-        val shown = localError ?: error
-        if (shown != null) {
-            MetroText(shown, Metro.typography.body, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)
-        }
-        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
-            items(others, key = { it.id }) { account ->
-                ChoiceLine(account.name, account.id == toId) { toId = account.id }
-            }
-            if (needsCategory) {
-                item {
-                    MetroText(
-                        "category",
-                        Metro.typography.caption,
-                        Modifier.padding(top = MetroDimens.Grid, bottom = MetroDimens.Gutter),
-                        color = Metro.colors.secondary,
-                    )
-                }
-                items(page.categories, key = { "cat-${it.id}" }) { category ->
-                    ChoiceLine(category.name, category.id == categoryId) { categoryId = category.id }
-                }
-            }
-        }
-        val commitTransfer = {
-            when (
-                val parsed =
-                    RegisterEntry.transfer(
-                        id = draftId,
-                        fromAccountId = page.account.id,
-                        toAccountId = toId,
-                        dateText = prefs.readDate(date),
-                        amountText = prefs.readAmount(amount, page.currency.decimals),
-                        decimals = page.currency.decimals,
-                        categoryId = if (needsCategory) categoryId else null,
-                        note = note,
-                    )
-            ) {
-                is EntryResult.Ok -> {
-                    localError = null
-                    onSave(parsed.value)
-                }
-                is EntryResult.Rejected -> localError = parsed.reason
-            }
-        }
-        RememberFormSave(commitTransfer)
-        if (!formSaveOnBar()) {
-            MetroButton("save", Modifier.padding(top = MetroDimens.Grid), onClick = commitTransfer)
         }
     }
 }

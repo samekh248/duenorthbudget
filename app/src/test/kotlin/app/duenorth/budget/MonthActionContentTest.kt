@@ -227,6 +227,7 @@ class MonthActionContentTest {
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),
                         onGesture = {},
+                        initialSection = HomeSections.headers.indexOf(HomeSections.BUDGET),
                         onBudgetCategory = { opened = it },
                     )
                 }
@@ -323,6 +324,7 @@ class MonthActionContentTest {
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),
                         onGesture = {},
+                        initialSection = HomeSections.headers.indexOf(HomeSections.BUDGET),
                         onToBudget = if (mode.value == BudgetMode.ENVELOPE) ({ opened++ }) else null,
                     )
                 }

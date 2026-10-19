@@ -168,7 +168,7 @@ class ShellScreenshotTest {
         name: String,
         dark: Boolean,
         shell: MonthShell,
-        section: Int = 0,
+        section: Int = HomeSections.headers.indexOf(HomeSections.BUDGET),
         filed: Boolean = false,
         selection: Set<String>? = null,
         netWorth: NetWorthPage? = null,
