@@ -458,6 +458,8 @@ fun TransactionForm(
     numberFormat: String = FormatPrefs().numberFormat,
     hideFraction: Boolean = FormatPrefs().hideFraction,
     payees: List<String> = emptyList(),
+    /** A new transaction's starting amount, signed: a reconcile's "add it" fills in what balances it. */
+    initialAmountMinor: Long? = null,
 ) {
     val draftId = remember(row?.id, page.account.id) { row?.id ?: UUID.randomUUID().toString() }
     var date by remember(row?.id) {
@@ -466,15 +468,16 @@ fun TransactionForm(
     var payee by remember(row?.id) {
         mutableStateOf(if (row == null || row.payee == ShellCopy.NO_PAYEE) "" else row.payee)
     }
+    val startAmount = row?.amountMinor ?: initialAmountMinor
     var amount by remember(row?.id) {
         mutableStateOf(
-            row
+            startAmount
                 ?.let {
-                    MoneyParse.editText(it.amountMinor, page.currency.decimals, FormatOptions(hideFraction, numberFormat))
+                    MoneyParse.editText(it, page.currency.decimals, FormatOptions(hideFraction, numberFormat))
                 }.orEmpty(),
         )
     }
-    var expense by remember(row?.id) { mutableStateOf(row?.amountMinor?.let { it <= 0L } ?: true) }
+    var expense by remember(row?.id) { mutableStateOf(startAmount?.let { it <= 0L } ?: true) }
     var note by remember(row?.id) { mutableStateOf(row?.note.orEmpty()) }
     var categoryId by remember(row?.id) { mutableStateOf(row?.categoryId ?: row?.partnerCategoryId) }
     // The account this transaction transfers to or from, picked from the payee box (option C, #76).

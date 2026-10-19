@@ -373,6 +373,8 @@ data class ShellUiState(
     val budgetEdit: BudgetEdit? = null,
     /** Set while a transaction form was opened from the inbox, so saving it goes back home. */
     val editFromInbox: Boolean = false,
+    /** A new transaction opened from a reconcile's "add it" starts with the amount that balances it, on the statement date. */
+    val newTransactionPrefill: NewTransactionPrefill? = null,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
     val settingsPage: SettingsPage = SettingsPage.BUDGET,
     val settingsScroll: Map<SettingsPage, Int> = emptyMap(),
@@ -1684,9 +1686,18 @@ class ShellViewModel(
 
     fun openNewTransaction() {
         val accountId = openAccountId() ?: return
-        _state.update { it.copy(editFromInbox = false) }
+        _state.update { it.copy(editFromInbox = false, newTransactionPrefill = null) }
         push(ShellRoute.EditTransaction(accountId, null))
         loadPayees()
+    }
+
+    /** A reconcile's "add it": a new transaction for the difference, dated on the statement, so saving it balances. */
+    fun addMissingForReconcile() {
+        val page = _state.value.reconcile ?: return openNewTransaction()
+        openNewTransaction()
+        _state.update {
+            it.copy(newTransactionPrefill = NewTransactionPrefill(page.differenceMinor, RegisterEntry.formatIso(page.statementDate)))
+        }
     }
 
     fun openEdit(transactionId: String) {
@@ -2433,7 +2444,7 @@ class ShellViewModel(
                 val toRegister = stayOnRegister && !_state.value.editFromInbox
                 // A transaction added or fixed from a reconcile goes back to that reconcile.
                 val toReconcile = toRegister && history.lastOrNull() == ShellRoute.Reconcile(accountId)
-                _state.update { it.copy(editFromInbox = false) }
+                _state.update { it.copy(editFromInbox = false, newTransactionPrefill = null) }
                 if (toReconcile) {
                     history.clear()
                     history.addLast(ShellRoute.Home)
@@ -2898,3 +2909,8 @@ class ShellViewModel(
             }
     }
 }
+
+data class NewTransactionPrefill(
+    val amountMinor: Long,
+    val dateIso: String,
+)

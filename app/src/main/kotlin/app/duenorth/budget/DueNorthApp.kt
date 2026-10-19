@@ -662,10 +662,12 @@ fun DueNorthApp(model: ShellViewModel) {
                             if (page == null) {
                                 Placeholder()
                             } else {
+                                val prefill = state.newTransactionPrefill.takeIf { route.transactionId == null }
                                 TransactionForm(
                                     page = page,
                                     row = page.rows.firstOrNull { it.id == route.transactionId },
-                                    initialDate = state.today,
+                                    initialDate = prefill?.dateIso ?: state.today,
+                                    initialAmountMinor = prefill?.amountMinor,
                                     error = state.writeError,
                                     onSave = model::submitTransaction,
                                     modifier = fill,
@@ -733,7 +735,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                     onToggle = model::toggleReconcileCleared,
                                     onSetCleared = model::setReconcileCleared,
                                     onOpen = model::openEdit,
-                                    onAddMissing = model::openNewTransaction,
+                                    onAddMissing = model::addMissingForReconcile,
                                     onFinish = model::finishReconcile,
                                     onCancel = model::cancelReconcile,
                                     modifier = fill,

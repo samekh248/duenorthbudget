@@ -114,6 +114,28 @@ class ReconcileRegisterTest {
         compose.onNodeWithTag("register-row-old").assertExists()
     }
 
+    @Test
+    fun addItStartsTheNewTransactionAtTheDifference() {
+        compose.setContent {
+            MetroTheme {
+                CompositionLocalProvider(LocalFormSaveHost provides FormSaveHost()) {
+                    Box(Modifier.width(390.dp).height(780.dp)) {
+                        TransactionForm(
+                            page = register(),
+                            row = null,
+                            initialDate = "2026-09-30",
+                            error = null,
+                            onSave = {},
+                            initialAmountMinor = -4_217,
+                        )
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText("42.17").assertIsDisplayed()
+        compose.onNodeWithText("Wed 09/30/2026").assertIsDisplayed()
+    }
+
     @Test fun snapStartLight() = snap("reconcile_start_light", null, dark = false)
 
     @Test fun snapStartDark() = snap("reconcile_start_dark", null, dark = true)
