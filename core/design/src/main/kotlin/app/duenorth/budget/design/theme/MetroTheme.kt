@@ -121,6 +121,9 @@ data class MetroColors(
     val outline: Color,
     /** Figures that are in the red, such as a negative to budget. The red accent's text, so it reads on either theme. */
     val error: Color,
+    /** A block behind a figure in the red: the Windows Phone red swatch, with white on it. */
+    val errorFill: Color = Color(0xFFE51400),
+    val onErrorFill: Color = Color(0xFFFFFFFF),
 ) {
     companion object {
         val Light =

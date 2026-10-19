@@ -509,6 +509,10 @@ internal fun GroupGap() {
     Spacer(Modifier.height(MetroDimens.Grid))
 }
 
+/**
+ * A caption over a figure. With [error] the figure is in the red, and it shows in more than color: the label
+ * reads "overbudgeted" and the figure sits on a solid red block.
+ */
 @Composable
 internal fun BudgetTotal(
     label: String,
@@ -522,18 +526,34 @@ internal fun BudgetTotal(
     val align = if (alignEnd) TextAlign.End else TextAlign.Start
     Column(modifier, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
         MetroText(
-            label,
+            if (error) ShellCopy.OVERBUDGETED else label,
             Metro.typography.caption.copy(textAlign = align),
             color = if (error) Metro.colors.error else Metro.colors.secondary,
+            modifier = if (error) Modifier.testTag("$amountTag-error") else Modifier,
         )
-        MetroText(
-            amount,
-            Metro.typography.subheader.copy(textAlign = align),
-            color = if (error) Metro.colors.error else amountColor,
-            modifier = Modifier.testTag(amountTag),
-        )
+        if (error) {
+            MetroText(
+                amount,
+                Metro.typography.subheader.copy(textAlign = align),
+                color = Metro.colors.onErrorFill,
+                modifier =
+                    Modifier
+                        .background(Metro.colors.errorFill)
+                        .padding(horizontal = ERROR_BLOCK_PADDING)
+                        .testTag(amountTag),
+            )
+        } else {
+            MetroText(
+                amount,
+                Metro.typography.subheader.copy(textAlign = align),
+                color = amountColor,
+                modifier = Modifier.testTag(amountTag),
+            )
+        }
     }
 }
+
+private val ERROR_BLOCK_PADDING = 8.dp
 
 @Composable
 private fun GroupLine(

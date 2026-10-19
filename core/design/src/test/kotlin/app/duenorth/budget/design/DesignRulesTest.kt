@@ -59,6 +59,9 @@ class DesignRulesTest {
     fun errorMeetsCaptionContrast() {
         assertTrue(Contrast.ratio(MetroColors.Light.error, MetroColors.Light.background) >= Contrast.MIN_TEXT)
         assertTrue(Contrast.ratio(MetroColors.Dark.error, MetroColors.Dark.background) >= Contrast.MIN_TEXT)
+        listOf(MetroColors.Light, MetroColors.Dark).forEach {
+            assertTrue(Contrast.ratio(it.onErrorFill, it.errorFill) >= Contrast.MIN_TEXT)
+        }
     }
 
     @Test
