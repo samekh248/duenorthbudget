@@ -16,6 +16,7 @@ object RegisterCopy {
     const val RECONCILE_WARN = "this reconciliation will no longer match"
     const val NO_CATEGORY = "no category"
     const val SPLIT = "split"
+    const val ADD_SPLIT = "add split"
     const val SCHEDULE = "schedule"
     const val DELETE = "delete"
     const val TRANSFER = "transfer"
@@ -233,6 +234,11 @@ data class TransactionDraft(
     val transferAccountId: String? = null,
     /** The cleared flag the form set; null leaves it as it is (a new transaction comes in cleared, as in Actual). */
     val cleared: Boolean? = null,
+    /**
+     * The form's split lines: two or more split the transaction across them, empty puts a split
+     * back to one category, and null leaves any split as it is.
+     */
+    val parts: List<SplitPart>? = null,
 )
 
 data class SplitPart(
@@ -710,12 +716,24 @@ class RegisterBook(
     }
 
     fun save(draft: TransactionDraft): WriteResult {
-        val cleared = draft.cleared ?: return saveFields(draft)
-        // The cleared flag joins the same write, so the save and its flag are one undo step.
+        val parts = draft.parts?.takeIf { it.isNotEmpty() }
+        if (parts != null) {
+            if (draft.transferAccountId != null || parts.size < 2) return WriteResult.Rejected(RegisterCopy.SPLIT_MUST_ADD)
+            if (parts.any { it.amountMinor == 0L }) return WriteResult.Rejected(RegisterCopy.AMOUNT_ZERO)
+            if (parts.sumOf { it.amountMinor } != draft.amountMinor) return WriteResult.Rejected(RegisterCopy.SPLIT_MUST_ADD)
+        }
+        if (draft.cleared == null && parts == null) return saveFields(draft)
+        // The split and the cleared flag join the same write, so the save is one undo step.
         return write {
-            saveFields(draft).also { result ->
-                if (result is WriteResult.Saved && find(draft.id)?.tombstone == false) setColumns(draft.id, "cleared" to cleared)
+            if (parts?.any { !categoryAlive(it.categoryId) } == true) return@write WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
+            val result = saveFields(draft)
+            if (result !is WriteResult.Saved || find(draft.id)?.tombstone != false) return@write result
+            // The fields were saved (and any reconciled warning answered), so the split goes ahead.
+            if (parts != null) split(draft.id, parts, force = true)
+            draft.cleared?.let { cleared ->
+                (listOf(draft.id) + children(draft.id).map { it.id }).forEach { setColumns(it, "cleared" to cleared) }
             }
+            result
         }
     }
 
@@ -734,7 +752,7 @@ class RegisterBook(
             val existing = find(draft.id)
             if (existing != null && existing.tombstone) return@write WriteResult.Saved
             if (existing == null) {
-                val ruled = applyRules(draft, note)
+                val ruled = keepSplit(draft, applyRules(draft, note))
                 insert(
                     id = ruled.id,
                     accountId = ruled.accountId,
@@ -753,7 +771,13 @@ class RegisterBook(
             guard(listOfNotNull(existing, partner), draft.force, ForcedWrite.Save(draft.copy(force = true)))?.let {
                 return@write it
             }
-            if (existing.parent) {
+            if (existing.parent && draft.parts != null) {
+                // The form edits the split itself: its lines are rewritten after this save, or it goes back to one category.
+                if (draft.parts.isEmpty()) {
+                    children(existing.id).forEach { tombstone(it.id) }
+                    setColumns(existing.id, "isParent" to 0)
+                }
+            } else if (existing.parent) {
                 if (draft.amountMinor != existing.amount || draft.categoryId != null) {
                     return@write WriteResult.Rejected(RegisterCopy.SPLIT_MUST_ADD)
                 }
@@ -767,7 +791,7 @@ class RegisterBook(
                 tombstone(partner.id)
                 setColumns(existing.id, "transferred_id" to null)
             }
-            val ruled = applyRules(draft, note)
+            val ruled = keepSplit(draft, applyRules(draft, note))
             updateFields(
                 existing.id,
                 ruled.accountId,
@@ -780,6 +804,12 @@ class RegisterBook(
             WriteResult.Saved
         }
     }
+
+    /** A split keeps the amount its lines add up to and leaves the category to them. */
+    private fun keepSplit(
+        draft: TransactionDraft,
+        ruled: TransactionDraft,
+    ): TransactionDraft = if (draft.parts.isNullOrEmpty()) ruled else ruled.copy(amountMinor = draft.amountMinor, categoryId = null)
 
     private fun applyRules(
         draft: TransactionDraft,

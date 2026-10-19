@@ -1744,11 +1744,6 @@ class ShellViewModel(
         loadPayees()
     }
 
-    fun openSplit(transactionId: String) {
-        val accountId = openAccountId() ?: return
-        push(ShellRoute.SplitTransaction(accountId, transactionId))
-    }
-
     fun openReconcile() {
         val accountId = openAccountId() ?: return
         push(ShellRoute.Reconcile(accountId))

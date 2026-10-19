@@ -17,6 +17,7 @@ import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.RegisterAccount
 import app.duenorth.budget.core.RegisterPage
+import app.duenorth.budget.core.RegisterPart
 import app.duenorth.budget.core.RegisterRow
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.ScreenAction
@@ -84,6 +85,25 @@ class TransactionDetailsScreenshotTest {
 
     @Test
     fun largeFontDark() = snap("transaction_font2x_dark", dark = true, fontScale = 2f)
+
+    // Option A: a saved split opens with its lines, and add split on the bar adds another.
+    @Test
+    fun splitLight() = snap("transaction_split_light", dark = false, row = split()) { it.run(FORM_ADD_SPLIT) }
+
+    @Test
+    fun splitDark() = snap("transaction_split_dark", dark = true, row = split()) { it.run(FORM_ADD_SPLIT) }
+
+    private fun split() =
+        existing().copy(
+            id = "market",
+            payee = "Market",
+            categoryId = null,
+            categoryLabel = "split",
+            amountMinor = -8_460,
+            note = "",
+            parent = true,
+            parts = listOf(RegisterPart("p1", "c-food", "Groceries", -6_000), RegisterPart("p2", "c-house", "Household", -2_460)),
+        )
 
     private fun open(tag: String) {
         compose.onNodeWithTag(tag, useUnmergedTree = true).performClick()

@@ -297,7 +297,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onServerBudgets = model::showServerBudgets,
                     onSignOut = model::signOutInstance,
                     onExport = model::exportBudget,
-                    onSplitTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::openSplit) },
+                    onAddSplit = { formSaveHost.run(FORM_ADD_SPLIT) },
                     onScheduleTransaction = {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
                     },

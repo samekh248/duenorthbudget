@@ -204,7 +204,6 @@ class ScreenBarTest {
             listOf(
                 ShellRoute.Create,
                 ShellRoute.Assign,
-                ShellRoute.EditTransaction("a", null),
                 ShellRoute.HoldMonth,
                 ShellRoute.CategoryBudget("c"),
                 ShellRoute.ImportPreviewRoute("a"),
@@ -274,9 +273,11 @@ class ScreenBarTest {
         fun menu(kind: TransactionMenu) =
             ScreenBar
                 .specsFor(ShellRoute.EditTransaction("a", "t"), hasBudget = true, mode = BudgetMode.ENVELOPE, transaction = kind)
-        assertEquals(listOf("save", "cancel"), menu(TransactionMenu.ORDINARY).filter { it.primary }.map { it.id })
+        assertEquals(listOf("save", "add-split", "cancel"), menu(TransactionMenu.ORDINARY).filter { it.primary }.map { it.id })
+        assertEquals(listOf("save", "add-split", "cancel"), menu(TransactionMenu.NEW).filter { it.primary }.map { it.id })
+        assertEquals(listOf("save", "cancel"), menu(TransactionMenu.TRANSFER).filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("split-transaction", "schedule-transaction", "delete-transaction"),
+            listOf("schedule-transaction", "delete-transaction"),
             menu(TransactionMenu.ORDINARY).filter { !it.primary }.map { it.id },
         )
         assertEquals(listOf("delete-transaction"), menu(TransactionMenu.TRANSFER).filter { !it.primary }.map { it.id })

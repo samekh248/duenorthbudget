@@ -218,14 +218,22 @@ object ScreenBar {
                 }
             ShellRoute.Create,
             ShellRoute.Assign,
-            is ShellRoute.EditTransaction,
-            ->
-                saveCancel() +
+            -> saveCancel()
+            is ShellRoute.EditTransaction ->
+                when (transaction) {
+                    // Add split sits between save and cancel; each tap adds one split line to the form.
+                    TransactionMenu.NEW, TransactionMenu.ORDINARY ->
+                        listOf(
+                            spec("save", AppGlyph.Save, "save"),
+                            spec("add-split", AppGlyph.Categories, RegisterCopy.ADD_SPLIT),
+                            spec("cancel", AppGlyph.Cancel, "cancel"),
+                        )
+                    TransactionMenu.TRANSFER -> saveCancel()
+                } +
                     when (transaction) {
                         TransactionMenu.NEW -> emptyList()
                         TransactionMenu.ORDINARY ->
                             listOf(
-                                menu("split-transaction", AppGlyph.Categories, RegisterCopy.SPLIT),
                                 menu("schedule-transaction", AppGlyph.Calendar, RegisterCopy.SCHEDULE),
                                 menu("delete-transaction", AppGlyph.Cancel, RegisterCopy.DELETE),
                             )
@@ -397,7 +405,7 @@ class ScreenBarHandlers(
     val onAcceptSelected: () -> Unit = {},
     val onCategorizeSelected: () -> Unit = {},
     val onEndInboxSelecting: () -> Unit = {},
-    val onSplitTransaction: () -> Unit = {},
+    val onAddSplit: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
     val onEditBudget: () -> Unit = {},
@@ -462,7 +470,7 @@ class ScreenBarHandlers(
             "accept-selected" -> onAcceptSelected
             "categorize-selected" -> onCategorizeSelected
             "end-inbox-selecting" -> onEndInboxSelecting
-            "split-transaction" -> onSplitTransaction
+            "add-split" -> onAddSplit
             "schedule-transaction" -> onScheduleTransaction
             "delete-transaction" -> onDeleteTransaction
             "edit-budget" -> onEditBudget
