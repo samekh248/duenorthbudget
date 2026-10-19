@@ -21,6 +21,21 @@ class LocalActualServer(
     private val methods: List<String> = listOf("password", "openid"),
 ) : Closeable {
     var beforeSync: () -> Unit = {}
+
+    /** The next this many syncs store what the phone sent, then hang up before answering. */
+    @Volatile
+    var dropReplies: Int = 0
+
+    /** The next this many uploads store the file, then hang up before answering. */
+    @Volatile
+    var dropUploads: Int = 0
+
+    /** The next this many syncs answer 502, as a proxy in front of a restarting server does. */
+    @Volatile
+    var badGateways: Int = 0
+
+    /** Every sync request the phone made, decoded. */
+    val syncRequests: MutableList<DecodedRequest> = java.util.Collections.synchronizedList(mutableListOf())
     var rejectToken: Boolean = false
     var online: Boolean = true
     var openIdCancelled: Boolean = false
@@ -120,6 +135,40 @@ class LocalActualServer(
             files.getValue(fileId).envelopes.add(Envelope(stamp, false, content))
         }
     }
+
+    /** A change another device made at [timestamp] and only now sent, such as one that was offline. */
+    fun appendChangeAt(
+        fileId: String,
+        timestamp: String,
+        dataset: String,
+        row: String,
+        column: String,
+        value: String,
+    ) {
+        val content = SyncProto.encodeMessage(CellMessage(dataset, row, column, value))
+        synchronized(lock) {
+            files.getValue(fileId).envelopes.add(Envelope(timestamp, false, content))
+        }
+    }
+
+    /** Actual's "reset sync" on desktop: a new group, and the old messages are gone. */
+    fun resetGroup(fileId: String) {
+        synchronized(lock) {
+            val file = files.getValue(fileId)
+            file.groupId = UUID.randomUUID().toString()
+            file.envelopes.clear()
+        }
+    }
+
+    /** Forgets messages the server stored, as a server restored from an older backup would. */
+    fun forgetMessages(
+        fileId: String,
+        keep: (Envelope) -> Boolean,
+    ) {
+        synchronized(lock) { files.getValue(fileId).envelopes.retainAll(keep) }
+    }
+
+    fun timestamps(fileId: String): List<String> = synchronized(lock) { files.getValue(fileId).envelopes.map { it.timestamp } }
 
     fun plainMessages(fileId: String): List<CellMessage> =
         synchronized(lock) {
@@ -312,6 +361,11 @@ class LocalActualServer(
         val group =
             synchronized(lock) {
                 val current = files[fileId]
+                // Actual refuses a file from an older group: its sync state no longer matches.
+                if (current != null && groupHeader != current.groupId) {
+                    exchange.respond(400, "file-has-reset".toByteArray(), "text/plain")
+                    return
+                }
                 if (current == null) {
                     val created = groupHeader ?: UUID.randomUUID().toString()
                     files[fileId] =
@@ -324,6 +378,11 @@ class LocalActualServer(
                     current.groupId
                 }
             }
+        if (dropUploads > 0) {
+            dropUploads--
+            exchange.close()
+            return
+        }
         exchange.respond(200, """{"status":"ok","groupId":"$group"}""".toByteArray(), "application/json")
     }
 
@@ -333,26 +392,44 @@ class LocalActualServer(
             return
         }
         val request = SyncProto.decodeRequest(exchange.requestBody.readBytes())
+        syncRequests.add(request)
+        if (badGateways > 0) {
+            badGateways--
+            exchange.respond(502, "bad gateway".toByteArray(), "text/plain")
+            return
+        }
         if (request.since.isBlank()) {
             exchange.respond(422, """{"status":"error","reason":"unprocessable-entity"}""".toByteArray(), "application/json")
             return
         }
-        synchronized(lock) {
-            val file = files[request.fileId]
-            if (file == null) {
-                exchange.respond(400, "file-not-found".toByteArray(), "text/plain")
-                return
+        // Like Actual's server: read what the phone has not seen before storing what it sent.
+        val outgoing =
+            synchronized(lock) {
+                val file = files[request.fileId]
+                if (file == null) {
+                    exchange.respond(400, "file-not-found".toByteArray(), "text/plain")
+                    return
+                }
+                if (request.groupId != file.groupId) {
+                    exchange.respond(400, "file-has-reset".toByteArray(), "text/plain")
+                    return
+                }
+                val newer = file.envelopes.filter { it.timestamp > request.since }.sortedBy { it.timestamp }
+                request.messages.forEach { envelope ->
+                    if (file.envelopes.none { it.timestamp == envelope.timestamp }) file.envelopes.add(envelope)
+                }
+                newer
             }
-            request.messages.forEach { envelope ->
-                if (file.envelopes.none { it.timestamp == envelope.timestamp }) file.envelopes.add(envelope)
-            }
-        }
         beforeSync()
+        if (dropReplies > 0) {
+            dropReplies--
+            exchange.close()
+            return
+        }
         val response =
             synchronized(lock) {
                 val file = files.getValue(request.fileId)
-                val outgoing = file.envelopes.filter { it.timestamp > request.since }
-                SyncProto.encodeResponse("""{"hash":${file.envelopes.size}}""", outgoing)
+                SyncProto.encodeResponse(SyncMerkle.build(file.envelopes.map { it.timestamp }).toJson(), outgoing)
             }
         exchange.responseHeaders.add("X-ACTUAL-SYNC-METHOD", "simple")
         exchange.respond(200, response, "application/actual-sync")

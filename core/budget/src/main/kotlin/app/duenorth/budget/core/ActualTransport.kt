@@ -92,9 +92,26 @@ class SyncAuthException(
     message: String,
 ) : Exception(message)
 
+/** The server could not be reached or answered with an error; [status] is 0 when no answer came. */
 class SyncNetworkException(
     cause: Exception,
-) : Exception(cause)
+    val status: Int = 0,
+) : Exception(cause) {
+    /** Worth trying again in a moment: the connection dropped, or a proxy or the server was briefly down. */
+    val transient: Boolean get() = status == 0 || status == 408 || status == 429 || status in 500..599
+}
+
+/**
+ * The server refused this budget's sync for good until the person acts: Actual's `file-has-reset`,
+ * `file-has-new-key`, `file-not-found` or `file-needs-upload`.
+ */
+class SyncFileException(
+    val reason: String,
+) : Exception(reason) {
+    companion object {
+        val REASONS = setOf("file-has-reset", "file-has-new-key", "file-not-found", "file-needs-upload")
+    }
+}
 
 class DownloadTracker {
     var received: Long = 0
@@ -125,6 +142,9 @@ object SyncCopy {
     const val NO_SERVER_FILES = "no budgets on this server"
     const val SYNCING = "syncing"
     const val NOT_REACHED = "server has not been reached"
+    const val SERVER_RESET = "this budget was reset on the server; open it again from the server"
+    const val SERVER_NEW_KEY = "this budget's password changed on the server; open it again"
+    const val SERVER_MISSING = "this budget is no longer on the server"
 }
 
 /**
@@ -287,7 +307,11 @@ class HttpActualTransport : ActualTransport {
                 body = body,
             )
         if (response.code == 401) throw SyncAuthException(SyncCopy.SIGN_IN_AGAIN)
-        if (response.code != 200) throw SyncNetworkException(IOException("sync ${response.code}"))
+        if (response.code == 400) {
+            val reason = fileReason(response.bytes)
+            if (reason != null) throw SyncFileException(reason)
+        }
+        if (response.code != 200) throw SyncNetworkException(IOException("sync ${response.code}"), response.code)
         return response.bytes
     }
 
@@ -337,6 +361,14 @@ class HttpActualTransport : ActualTransport {
         val error = (data as? JsonObject)?.let { it.string("error_code") ?: it.string("error_type") }
         if (error != null) throw BankLinkException((data as JsonObject).string("reason") ?: error)
         return data
+    }
+
+    /** Actual answers a refused sync with the reason as plain text, or inside `{"reason": …}`. */
+    private fun fileReason(bytes: ByteArray): String? {
+        val text = bytes.toString(Charsets.UTF_8).trim()
+        if (text in SyncFileException.REASONS) return text
+        val reason = runCatching { jsonObject(bytes).string("reason") }.getOrNull()
+        return reason?.takeIf { it in SyncFileException.REASONS }
     }
 
     private fun jsonObject(bytes: ByteArray): JsonObject = json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject

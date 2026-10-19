@@ -187,12 +187,12 @@ fun ConflictScreen(
                 Column(Modifier.padding(vertical = 12.dp)) {
                     MetroText(conflict.label, Metro.typography.subheader)
                     MetroText(
-                        "phone ${conflict.localText}",
+                        "phone ${conflict.localText}" + if (conflict.phoneKept) " · kept" else "",
                         Metro.typography.body,
                         Modifier.testTag("conflict-local-${conflict.id}"),
                     )
                     MetroText(
-                        "server ${conflict.remoteText}",
+                        "server ${conflict.remoteText}" + if (conflict.phoneKept) "" else " · kept",
                         Metro.typography.body,
                         Modifier.testTag("conflict-remote-${conflict.id}"),
                     )

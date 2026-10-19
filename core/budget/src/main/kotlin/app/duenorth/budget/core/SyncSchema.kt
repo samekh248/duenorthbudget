@@ -17,6 +17,15 @@ data class JournalCell(
     val rowExisted: Boolean,
 )
 
+/** One row of the `messages` table; [value] is in Actual's wire form. */
+data class StoredMessage(
+    val timestamp: String,
+    val dataset: String,
+    val row: String,
+    val column: String,
+    val value: String?,
+)
+
 object SyncSchema {
     const val BACKFILL_STATE = "parity-backfill"
 
@@ -357,6 +366,11 @@ object SyncSchema {
 
     internal fun isIdentity(column: String): Boolean = column in identityColumns
 
+    /**
+     * Stores a server message and, as Actual does, writes its value only when it is the newest
+     * message for that cell: a message that arrives late (from a device that was offline) never
+     * overwrites a newer value. A pending phone value it differs from is kept as a conflict.
+     */
     fun applyRemote(
         session: SqlSession,
         timestamp: String,
@@ -367,6 +381,13 @@ object SyncSchema {
         if (session.query("SELECT timestamp FROM messages WHERE timestamp = ?", listOf(timestamp)).isNotEmpty()) {
             return ApplyOutcome.Duplicate
         }
+        val newest =
+            session
+                .query(
+                    "SELECT MAX(timestamp) AS t FROM messages WHERE dataset = ? AND row = ? AND column = ?",
+                    listOf(message.dataset, message.row, message.column),
+                ).firstOrNull()
+                ?.str("t")
         val pending =
             session
                 .query(
@@ -407,9 +428,8 @@ object SyncSchema {
                     ),
                 )
                 outcome = ApplyOutcome.Conflict
-            } else {
-                writeCell(session, message.dataset, message.row, message.column, remote)
             }
+            if (newest == null || timestamp > newest) writeCell(session, message.dataset, message.row, message.column, remote)
         }
         return outcome
     }
@@ -450,28 +470,72 @@ object SyncSchema {
         )
     }
 
+    /** Messages the server has not stored yet, oldest first. */
+    fun pendingMessages(session: SqlSession): List<StoredMessage> {
+        ensure(session)
+        return session
+            .query("SELECT timestamp, dataset, row, column, value FROM messages WHERE pending = 1 ORDER BY timestamp")
+            .map { row ->
+                StoredMessage(
+                    timestamp = row.str("timestamp").orEmpty(),
+                    dataset = row.str("dataset").orEmpty(),
+                    row = row.str("row").orEmpty(),
+                    column = row.str("column").orEmpty(),
+                    value = row.str("value"),
+                )
+            }
+    }
+
+    /**
+     * Puts [messages] back as pending into a freshly downloaded file, writing each value unless the
+     * file already holds a newer message for that cell, so the next sync sends them.
+     */
+    fun restorePending(
+        session: SqlSession,
+        messages: List<StoredMessage>,
+    ) {
+        if (messages.isEmpty()) return
+        ensure(session)
+        session.transaction {
+            messages.sortedBy { it.timestamp }.forEach { message ->
+                if (session.query("SELECT 1 AS x FROM messages WHERE timestamp = ?", listOf(message.timestamp)).isNotEmpty()) {
+                    return@forEach
+                }
+                val newest =
+                    session
+                        .query(
+                            "SELECT MAX(timestamp) AS t FROM messages WHERE dataset = ? AND row = ? AND column = ?",
+                            listOf(message.dataset, message.row, message.column),
+                        ).firstOrNull()
+                        ?.str("t")
+                session.exec(
+                    "INSERT INTO messages (timestamp, dataset, row, column, value, pending) VALUES (?, ?, ?, ?, ?, 1)",
+                    listOf(message.timestamp, message.dataset, message.row, message.column, message.value),
+                )
+                if (newest == null || message.timestamp > newest) {
+                    writeCell(session, message.dataset, message.row, message.column, SyncValues.deserialize(message.value))
+                }
+            }
+            val latest = messages.maxOf { it.timestamp }
+            if ((state(session, "clock") ?: "") < latest) writeState(session, "clock", latest)
+        }
+    }
+
+    /** The merkle trie of every message the server should hold, pruned as the server prunes it. */
+    fun merkle(session: SqlSession): SyncMerkle {
+        ensure(session)
+        return SyncMerkle.build(
+            session.query("SELECT timestamp FROM messages WHERE pending = 0").mapNotNull { it.str("timestamp") },
+        )
+    }
+
+    /** The server stored these messages; they are no longer pending, conflict or not. */
     fun acceptPending(
         session: SqlSession,
         timestamps: List<String>,
     ) {
         timestamps.forEach { stamp ->
-            val row =
-                session
-                    .query(
-                        "SELECT dataset, row, column FROM messages WHERE timestamp = ?",
-                        listOf(stamp),
-                    ).firstOrNull() ?: return@forEach
-            val conflict =
-                session.query(
-                    """
-                    SELECT id FROM conflicts
-                    WHERE dataset = ? AND row = ? AND column = ? AND local_timestamp = ?
-                    """.trimIndent(),
-                    listOf(row.str("dataset"), row.str("row"), row.str("column"), stamp),
-                )
-            if (conflict.isEmpty()) {
-                session.exec("UPDATE messages SET pending = 0 WHERE timestamp = ?", listOf(stamp))
-            }
+            session.exec("UPDATE messages SET pending = 0 WHERE timestamp = ?", listOf(stamp))
         }
     }
 
