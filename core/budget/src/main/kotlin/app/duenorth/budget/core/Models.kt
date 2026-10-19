@@ -460,6 +460,9 @@ object ShellCopy {
     const val CHOOSE_CURRENCY = "choose a currency"
     const val UNKNOWN_SAMPLE = "unknown sample"
     const val TO_BUDGET = "to budget"
+
+    /** Takes to budget's place over the figure when more is budgeted than there is. */
+    const val OVERBUDGETED = "overbudgeted"
     const val BALANCE = "balance"
     const val NOTHING_TO_BUDGET = "nothing to budget"
     const val SHOW_HIDDEN = "show hidden categories"

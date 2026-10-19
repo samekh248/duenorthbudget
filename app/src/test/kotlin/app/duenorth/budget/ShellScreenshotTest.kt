@@ -54,6 +54,13 @@ class ShellScreenshotTest {
             shell = sample().copy(headerMinor = 0, groups = emptyList(), accounts = emptyList(), inbox = emptyList()),
         )
 
+    // More budgeted than there is to budget: the figure turns red.
+    @Test
+    fun homeOverbudgetedLight() = snap("home_overbudgeted_light", dark = false, shell = sample().copy(headerMinor = -12_550))
+
+    @Test
+    fun homeOverbudgetedDark() = snap("home_overbudgeted_dark", dark = true, shell = sample().copy(headerMinor = -12_550))
+
     // Home with show hidden categories on: hidden groups and categories come back dimmed.
     @Test
     fun homeGoalsLight() = snap("home_goals_light", dark = false, shell = withGoals(), prefs = templatesOn)
