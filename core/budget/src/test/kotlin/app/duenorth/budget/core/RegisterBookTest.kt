@@ -428,6 +428,52 @@ class RegisterBookTest {
         }
     }
 
+    // The form's cleared choice rides on the save; leaving it out keeps the row as it is.
+    @Test
+    fun saveSetsClearedAndMovesBetweenAccounts() {
+        db { _, book ->
+            book.save(draft("cafe").copy(cleared = false))
+            assertFalse(book.read("checking")!!.rows.single().cleared)
+            book.save(draft("cafe", amount = -1_200))
+            assertFalse(book.read("checking")!!.rows.single().cleared)
+            book.save(draft("cafe", account = "savings").copy(cleared = true))
+            assertTrue(book.read("checking")!!.rows.isEmpty())
+            assertTrue(book.read("savings")!!.rows.single().cleared)
+            book.save(transfer("move", "cash", -500).copy(cleared = false))
+            assertFalse(book.read("checking")!!.rows.single { it.id == "move" }.cleared)
+        }
+    }
+
+    // The form's split lines save with the transaction: a new split, an edited one, and back to one category.
+    @Test
+    fun saveSplitsFromTheFormAndPutsItBack() {
+        db { _, book ->
+            val lines = listOf(SplitPart("c-food", -6_000), SplitPart("c-house", -2_460))
+            val market = draft("market", amount = -8_460, category = null)
+            assertTrue(book.save(market.copy(parts = lines, cleared = false)) is WriteResult.Saved)
+            var row = book.read("checking")!!.rows.single()
+            assertTrue(row.parent)
+            assertEquals(lines.map { it.categoryId to it.amountMinor }, row.parts.map { it.categoryId to it.amountMinor })
+            assertFalse(row.cleared)
+
+            val wrong = market.copy(parts = listOf(SplitPart("c-food", -1_000), SplitPart("c-house", -1_000)))
+            assertEquals(RegisterCopy.SPLIT_MUST_ADD, (book.save(wrong) as WriteResult.Rejected).reason)
+
+            val bigger = listOf(SplitPart("c-food", -7_000), SplitPart("c-house", -2_460), SplitPart("c-food", -540))
+            assertTrue(book.save(draft("market", amount = -10_000, category = null).copy(parts = bigger)) is WriteResult.Saved)
+            row = book.read("checking")!!.rows.single()
+            assertEquals(-10_000L, row.amountMinor)
+            assertEquals(3, row.parts.size)
+
+            assertTrue(book.save(draft("market", amount = -10_000, category = "c-house").copy(parts = emptyList())) is WriteResult.Saved)
+            row = book.read("checking")!!.rows.single()
+            assertFalse(row.parent)
+            assertTrue(row.parts.isEmpty())
+            assertEquals("c-house", row.categoryId)
+            assertEquals(-10_000L, book.read("checking")!!.balanceMinor)
+        }
+    }
+
     @Test
     fun clearsAndUnclearsSeveralAtOnceWithSplitPartsFollowing() {
         db { session, book ->

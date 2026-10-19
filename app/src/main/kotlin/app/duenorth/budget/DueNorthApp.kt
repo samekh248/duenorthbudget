@@ -297,7 +297,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onServerBudgets = model::showServerBudgets,
                     onSignOut = model::signOutInstance,
                     onExport = model::exportBudget,
-                    onSplitTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::openSplit) },
+                    onAddSplit = { formSaveHost.run(FORM_ADD_SPLIT) },
                     onScheduleTransaction = {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
                     },
@@ -599,13 +599,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                 error = state.editError,
                                 onAssign = model::assign,
                                 modifier = fill,
-                            )
-                        ShellRoute.AddTransaction ->
-                            AddTransactionScreen(
-                                error = state.editError,
-                                onAdd = model::addTransaction,
-                                modifier = fill,
-                                payees = PayeeTypeAhead.names(state.payees),
                             )
                         ShellRoute.Conflicts ->
                             ConflictScreen(

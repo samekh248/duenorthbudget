@@ -112,26 +112,28 @@ object ScreenBar {
                             spec("categorize-selected", AppGlyph.Categories, InboxCopy.CATEGORIZE),
                             spec("end-inbox-selecting", AppGlyph.Cancel, InboxCopy.CANCEL),
                         )
+                    // Add a transaction sits second on every home bar: the middle of three, where the thumb lands.
                     homeSection == HOME_INBOX ->
                         listOf(
-                            spec("add", AppGlyph.Add, "add"),
                             spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT),
+                            addTransaction(),
                         ) + undo(undoLabel) + settings()
                     homeSection == HOME_ACCOUNTS ->
                         listOf(
-                            spec("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
                             spec("accounts", AppGlyph.Budgets, AccountScreenCopy.MANAGE),
+                            addTransaction(),
                             spec("schedules", AppGlyph.Calendar, ScheduleScreenCopy.SCHEDULES),
+                            menu("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
                         ) + undo(undoLabel) + settings()
                     mode == BudgetMode.TRACKING ->
                         listOf(
-                            spec("add", AppGlyph.Add, "add"),
                             spec("categories", AppGlyph.Categories, "categories"),
+                            addTransaction(),
                         ) + editBudget() + hidden(showHidden) + rules() + undo(undoLabel) + settings()
                     else ->
                         listOf(
-                            spec("add", AppGlyph.Add, "add"),
                             spec("hold", AppGlyph.Hold, "hold"),
+                            addTransaction(),
                             spec("categories", AppGlyph.Categories, "categories"),
                         ) + editBudget() + hidden(showHidden) + rules() + undo(undoLabel) + settings()
                 }
@@ -146,8 +148,8 @@ object ScreenBar {
                 } else {
                     // A bank-linked account syncs from the server; import lives in the menu.
                     buildList {
-                        add(spec("add", AppGlyph.Add, "add"))
                         add(spec("search", AppGlyph.Search, RegisterCopy.SEARCH))
+                        add(addTransaction())
                         add(spec("reconcile", AppGlyph.Reconcile, "reconcile"))
                         if (bankLinked) add(spec("sync", AppGlyph.Sync, "sync"))
                         add(menu("import", AppGlyph.Import, "import"))
@@ -216,20 +218,27 @@ object ScreenBar {
                 }
             ShellRoute.Create,
             ShellRoute.Assign,
-            is ShellRoute.EditTransaction,
-            ->
-                saveCancel() +
+            -> saveCancel()
+            is ShellRoute.EditTransaction ->
+                when (transaction) {
+                    // Add split sits between save and cancel; each tap adds one split line to the form.
+                    TransactionMenu.NEW, TransactionMenu.ORDINARY ->
+                        listOf(
+                            spec("save", AppGlyph.Save, "save"),
+                            spec("add-split", AppGlyph.Categories, RegisterCopy.ADD_SPLIT),
+                            spec("cancel", AppGlyph.Cancel, "cancel"),
+                        )
+                    TransactionMenu.TRANSFER -> saveCancel()
+                } +
                     when (transaction) {
                         TransactionMenu.NEW -> emptyList()
                         TransactionMenu.ORDINARY ->
                             listOf(
-                                menu("split-transaction", AppGlyph.Categories, RegisterCopy.SPLIT),
                                 menu("schedule-transaction", AppGlyph.Calendar, RegisterCopy.SCHEDULE),
                                 menu("delete-transaction", AppGlyph.Cancel, RegisterCopy.DELETE),
                             )
                         TransactionMenu.TRANSFER -> listOf(menu("delete-transaction", AppGlyph.Cancel, RegisterCopy.DELETE))
                     }
-            ShellRoute.AddTransaction,
             is ShellRoute.SplitTransaction,
             ShellRoute.HoldMonth,
             is ShellRoute.ToBudget,
@@ -296,6 +305,9 @@ object ScreenBar {
         val row = state.register?.rows?.firstOrNull { it.id == id } ?: return TransactionMenu.NEW
         return if (row.transferId != null) TransactionMenu.TRANSFER else TransactionMenu.ORDINARY
     }
+
+    /** Add a transaction: the full form, on the register's account or, from home, the first one. */
+    private fun addTransaction() = spec("add", AppGlyph.Add, "add")
 
     private fun saveCancel() =
         listOf(
@@ -393,7 +405,7 @@ class ScreenBarHandlers(
     val onAcceptSelected: () -> Unit = {},
     val onCategorizeSelected: () -> Unit = {},
     val onEndInboxSelecting: () -> Unit = {},
-    val onSplitTransaction: () -> Unit = {},
+    val onAddSplit: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
     val onEditBudget: () -> Unit = {},
@@ -406,11 +418,7 @@ class ScreenBarHandlers(
         state: ShellUiState,
     ): () -> Unit =
         when (id) {
-            "add" ->
-                when (state.route) {
-                    is ShellRoute.Register -> onAdd
-                    else -> onAdd
-                }
+            "add" -> onAdd
             "hold" -> onHold
             "categories" -> onCategories
             "settings" -> onSettings
@@ -462,7 +470,7 @@ class ScreenBarHandlers(
             "accept-selected" -> onAcceptSelected
             "categorize-selected" -> onCategorizeSelected
             "end-inbox-selecting" -> onEndInboxSelecting
-            "split-transaction" -> onSplitTransaction
+            "add-split" -> onAddSplit
             "schedule-transaction" -> onScheduleTransaction
             "delete-transaction" -> onDeleteTransaction
             "edit-budget" -> onEditBudget
