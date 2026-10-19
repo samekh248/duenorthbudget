@@ -419,6 +419,7 @@ fun BudgetSection(
                 amount = MoneyFormat.format(shell.headerMinor, shell.currency, formatOptions),
                 amountColor = Metro.accent.text,
                 amountTag = "to-budget",
+                error = shell.headerMinor < 0,
                 modifier =
                     if (onToBudget == null) {
                         Modifier
@@ -516,14 +517,19 @@ internal fun BudgetTotal(
     amountTag: String,
     alignEnd: Boolean = false,
     modifier: Modifier = Modifier,
+    error: Boolean = false,
 ) {
     val align = if (alignEnd) TextAlign.End else TextAlign.Start
     Column(modifier, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
-        MetroText(label, Metro.typography.caption.copy(textAlign = align), color = Metro.colors.secondary)
+        MetroText(
+            label,
+            Metro.typography.caption.copy(textAlign = align),
+            color = if (error) Metro.colors.error else Metro.colors.secondary,
+        )
         MetroText(
             amount,
             Metro.typography.subheader.copy(textAlign = align),
-            color = amountColor,
+            color = if (error) Metro.colors.error else amountColor,
             modifier = Modifier.testTag(amountTag),
         )
     }

@@ -119,6 +119,8 @@ data class MetroColors(
     val secondary: Color,
     val chrome: Color,
     val outline: Color,
+    /** Figures that are in the red, such as a negative to budget. The red accent's text, so it reads on either theme. */
+    val error: Color,
 ) {
     companion object {
         val Light =
@@ -129,6 +131,7 @@ data class MetroColors(
                 secondary = Color(0xFF8C8C8C),
                 chrome = Color(0xFFDDDDDD),
                 outline = Color(0xFFBFBFBF),
+                error = Color(0xFFC41100),
             )
 
         val Dark =
@@ -139,6 +142,7 @@ data class MetroColors(
                 secondary = Color(0xFF999999),
                 chrome = Color(0xFF1F1F1F),
                 outline = Color(0xFFFFFFFF),
+                error = Color(0xFFFF5C4D),
             )
     }
 }

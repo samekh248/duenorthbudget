@@ -56,6 +56,12 @@ class DesignRulesTest {
     }
 
     @Test
+    fun errorMeetsCaptionContrast() {
+        assertTrue(Contrast.ratio(MetroColors.Light.error, MetroColors.Light.background) >= Contrast.MIN_TEXT)
+        assertTrue(Contrast.ratio(MetroColors.Dark.error, MetroColors.Dark.background) >= Contrast.MIN_TEXT)
+    }
+
+    @Test
     fun pivotHeadersLeadWithTheSelectedItemAndWrap() {
         assertEquals(listOf(0, 1, 2, 3, 4, 5), PivotMotion.order(0, 6))
         assertEquals(listOf(4, 5, 0, 1, 2, 3), PivotMotion.order(4, 6))

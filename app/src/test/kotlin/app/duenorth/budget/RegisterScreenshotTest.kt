@@ -140,7 +140,6 @@ class RegisterScreenshotTest {
                             onGesture = {},
                             onOpen = {},
                             onAdd = {},
-                            onTransfer = {},
                             onReconcile = {},
                             search = RegisterSearch(query = "groc"),
                         )

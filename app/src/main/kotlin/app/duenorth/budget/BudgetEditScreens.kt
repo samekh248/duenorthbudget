@@ -127,6 +127,7 @@ fun BudgetEditSection(
                         amount = MoneyFormat.format(toBudget, money, formatOptions),
                         amountColor = Metro.accent.text,
                         amountTag = "edit-to-budget",
+                        error = toBudget < 0,
                         modifier = actions.onToBudget?.let { Modifier.metroPress(onClick = it) } ?: Modifier,
                     )
                 } else {
