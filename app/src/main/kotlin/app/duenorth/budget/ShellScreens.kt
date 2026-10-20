@@ -234,29 +234,14 @@ fun MonthControl(
             if (previous != null) {
                 MonthIconButton(AppGlyph.ChevronLeft, "month-previous") { onSelect(previous) }
             }
-            if (Metro.style.relief && !Metro.style.panels) {
-                // Relief: the month stands up (or, carved, is cut in) as the control that opens the month list.
-                Box(Modifier.weight(1f)) {
-                    MetroText(
-                        monthLabel(month),
-                        Metro.typography.subheader,
-                        Modifier
-                            .relief(Metro.style.control, small = true)
-                            .metroPress { expanded = !expanded }
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                            .testTag("month-label"),
-                    )
-                }
-            } else {
-                MetroText(
-                    monthLabel(month),
-                    Metro.typography.subheader,
-                    Modifier
-                        .weight(1f)
-                        .metroPress { expanded = !expanded }
-                        .testTag("month-label"),
-                )
-            }
+            MetroText(
+                monthLabel(month),
+                Metro.typography.subheader,
+                Modifier
+                    .weight(1f)
+                    .metroPress { expanded = !expanded }
+                    .testTag("month-label"),
+            )
             if (month != calendar) {
                 MonthIconButton(AppGlyph.Calendar, "month-current") { onSelect(calendar) }
             }

@@ -42,7 +42,7 @@ fun <T> MetroComboBox(
             .fillMaxWidth()
             .then(
                 if (Metro.style.relief) {
-                    // Open, or under carved, the box is pressed in; otherwise it stands up like a button.
+                    // Open, the box is pressed in; otherwise it stands up like a button (under mica, a field).
                     Modifier.relief(if (open) Relief.Inset else Metro.style.control, small = true)
                 } else {
                     Modifier.border(MetroDimens.Stroke, if (open) Metro.accent.fill else Metro.colors.foreground)

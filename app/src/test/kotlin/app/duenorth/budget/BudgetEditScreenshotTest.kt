@@ -41,7 +41,7 @@ class BudgetEditScreenshotTest {
     fun keypadDark() = snap("budget_edit_keypad_dark", dark = true, edit = BudgetEdit("c-groceries", "+80"))
 
     // Everything budgeted: the pinned to budget goes away.
-    // The relief styles on the keypad: keys stand up, carved cuts the operators in.
+    // The relief styles on the keypad: keys stand up (tile relief) or are layer cards (mica).
     @Test
     fun styleKeypads() =
         MetroStyle.entries.filter { it.relief }.forEach { style ->

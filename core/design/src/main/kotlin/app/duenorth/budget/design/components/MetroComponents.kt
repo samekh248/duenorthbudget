@@ -475,14 +475,7 @@ fun MetroAppBar(
     }
     val style = Metro.style
     val chrome =
-        if (style.carvedControls) {
-            // Carved: the bar is a groove cut into the page a gutter in from its edges, with its buttons standing in it.
-            Modifier
-                .background(colors.background)
-                .windowInsetsPadding(windowInsets)
-                .padding(start = MetroDimens.Gutter, end = MetroDimens.Gutter, bottom = MetroDimens.Gutter)
-                .relief(Relief.Inset)
-        } else if (style.layers) {
+        if (style.layers) {
             // Mica: an acrylic sheet floating a gutter in from the screen's edges, over the page's content.
             Modifier
                 .background(colors.background)
@@ -589,8 +582,8 @@ private fun AppBarIcon(
         val style = Metro.style
         // Tile relief fills add with the accent, so the day's main action leads the bar.
         val filled = style.filledAdd && action.glyph == AppGlyph.Add
-        // The button's own face is the ground it stands on: the groove's page, or the bar's chrome.
-        val ground = if (style.carvedControls) colors.background else colors.chrome
+        // The button's own face is the ground it stands on: the bar's chrome.
+        val ground = colors.chrome
         val accent = Metro.accent
         Box(
             Modifier

@@ -68,15 +68,15 @@ internal fun cardListPadding(
     top: Dp = 0.dp,
 ): PaddingValues = if (on) PaddingValues(start = MetroDimens.Gutter, end = MetroDimens.Gutter, top = top) else PaddingValues()
 
-/** Whether the style draws each group or day as one block ([LedgerGroup]) rather than as loose rows. */
+/** Whether the style draws each group or day as one panel ([LedgerGroup]) rather than as loose rows. */
 internal val ledgerBlocks: Boolean
     @Composable
     @ReadOnlyComposable
-    get() = Metro.style.panels || Metro.style.channels
+    get() = Metro.style.panels
 
 /**
- * A group of ledger rows as one block: under tile relief a raised square panel holding [heading] and the rows,
- * under carved the [heading] on the page and the rows in a channel cut under it. The rows sit a gutter in.
+ * A group of ledger rows as one panel holding [heading] and the rows: raised and square under tile relief, a layer
+ * card under mica. The rows sit a gutter in.
  */
 @Composable
 internal fun LedgerGroup(
@@ -84,27 +84,14 @@ internal fun LedgerGroup(
     heading: @Composable () -> Unit,
     rows: @Composable ColumnScope.() -> Unit,
 ) {
-    if (Metro.style.channels) {
-        Column(modifier.fillMaxWidth()) {
-            Box(Modifier.padding(horizontal = MetroDimens.Gutter)) { heading() }
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .relief(Relief.Inset)
-                    .padding(horizontal = MetroDimens.Gutter, vertical = 4.dp),
-                content = rows,
-            )
-        }
-    } else {
-        Column(
-            modifier
-                .fillMaxWidth()
-                .relief(Relief.Raised)
-                .padding(horizontal = MetroDimens.Gutter)
-                .padding(bottom = MetroDimens.Row),
-        ) {
-            heading()
-            rows()
-        }
+    Column(
+        modifier
+            .fillMaxWidth()
+            .relief(Relief.Raised)
+            .padding(horizontal = MetroDimens.Gutter)
+            .padding(bottom = MetroDimens.Row),
+    ) {
+        heading()
+        rows()
     }
 }

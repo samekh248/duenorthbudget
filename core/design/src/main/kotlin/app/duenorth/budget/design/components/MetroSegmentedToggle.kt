@@ -40,18 +40,12 @@ fun MetroSegmentedToggle(
     tag: String,
     modifier: Modifier = Modifier,
 ) {
-    // Carved: the two options share a track cut into the page; mica, a track on a layer card. Other relief styles
-    // stand them up side by side.
+    // Mica: the two options share a track on a layer card. Tile relief stands them up side by side.
     val style = Metro.style
-    val track =
-        when {
-            style.carvedControls -> Modifier.relief(Relief.Inset, small = true).padding(4.dp)
-            style.layers -> Modifier.relief(Relief.Raised).padding(3.dp)
-            else -> Modifier
-        }
+    val track = if (style.layers) Modifier.relief(Relief.Raised).padding(3.dp) else Modifier
     Row(
         modifier.height(IntrinsicSize.Min).then(track).testTag(tag),
-        horizontalArrangement = Arrangement.spacedBy(if (style.relief && !style.trackedToggle) 10.dp else 0.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (style.relief && !style.layers) 10.dp else 0.dp),
     ) {
         Segment(first, firstSelected, "$tag-$first") { onSelect(true) }
         Segment(second, !firstSelected, "$tag-$second") { onSelect(false) }
@@ -72,17 +66,12 @@ private fun Segment(
     Box(
         Modifier
             .fillMaxHeight()
-            .heightIn(min = if (style.trackedToggle) MetroDimens.TouchTarget - 8.dp else MetroDimens.TouchTarget)
+            .heightIn(min = if (style.layers) MetroDimens.TouchTarget - 8.dp else MetroDimens.TouchTarget)
             .then(
                 when {
-                    // The chosen option is the accent: pressed in under pressed metro, standing out otherwise.
-                    relief && selected ->
-                        Modifier.relief(
-                            if (style == MetroStyle.PressedMetro) Relief.Inset else Relief.Raised,
-                            small = true,
-                            fill = accent.fill,
-                        )
-                    style.trackedToggle -> Modifier
+                    // The chosen option stands out in the accent.
+                    relief && selected -> Modifier.relief(Relief.Raised, small = true, fill = accent.fill)
+                    style.layers -> Modifier
                     relief -> Modifier.relief(Relief.Raised, small = true)
                     else ->
                         Modifier

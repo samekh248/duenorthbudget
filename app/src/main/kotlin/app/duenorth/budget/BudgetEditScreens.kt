@@ -392,7 +392,7 @@ private fun BudgetKeypad(
                         .acrylicSheet(Metro.surface)
                 } else {
                     Modifier
-                        .background(if (style.carvedControls) Metro.colors.background else Metro.colors.chrome)
+                        .background(Metro.colors.chrome)
                         .windowInsetsPadding(WindowInsets.navigationBars)
                 },
             ).padding(6.dp)
@@ -412,9 +412,8 @@ private fun BudgetKeypad(
                             else -> true
                         }
                     val accent = key == BudgetEditCopy.DONE
-                    // Relief: keys stand up like a calculator's, done in the accent; carved cuts the operators in.
-                    val operator = row.indexOf(key) >= 3 && !accent
-                    val ground = if (style.carvedControls || style.layers) Metro.colors.background else Metro.colors.chrome
+                    // Relief: keys stand up like a calculator's, done in the accent. Mica's keys are layer cards.
+                    val ground = if (style.layers) Metro.colors.background else Metro.colors.chrome
                     val run: () -> Unit =
                         when (key) {
                             BudgetEditCopy.COVER -> actions.onCover
@@ -432,7 +431,6 @@ private fun BudgetKeypad(
                                 when {
                                     !style.relief -> Modifier.background(if (accent) Metro.accent.fill else Metro.colors.background)
                                     accent -> Modifier.relief(Relief.Raised, small = true, fill = Metro.accent.fill)
-                                    operator && style.carvedControls -> Modifier.relief(Relief.Inset, small = true, fill = ground)
                                     else -> Modifier.relief(Relief.Raised, small = true, fill = ground)
                                 },
                             ).then(if (enabled) Modifier.metroPress(onClick = run) else Modifier)

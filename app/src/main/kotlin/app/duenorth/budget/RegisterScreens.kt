@@ -420,7 +420,7 @@ internal fun RegisterLine(
     val measurer = rememberTextMeasurer()
     val mark = Metro.typography.caption.copy(color = letter, fontWeight = FontWeight.SemiBold)
     // A relief style marks cleared with a small square key at the row's end instead of the edge bar: standing up
-    // (cut in, under carved) and dim when not cleared, pressed in and filled with the accent when cleared.
+    // and dim when not cleared, pressed in and filled with the accent when cleared.
     val surface = Metro.surface
     val relief = surface.style.relief
     val ground = Metro.colors.background

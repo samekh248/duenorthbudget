@@ -65,18 +65,15 @@ It replaces the first mockups (a dark pivot with no panorama).
   body 16, secondary text 14 semilight.
 - Content over chrome: no drop shadows, no gradients, no rounded cards, no
   elevation, no Material ripple. Flat color fills only. The exceptions are
-  a relief style or mica, which the person picks (below).
+  tile relief and mica, which the person picks (below).
 - Metro is the default style. Under settings, appearance, the person may
-  instead pick one of three relief styles, which are Metro with soft light
-  and shade: pressed metro (only things you touch stand up, and press in
-  under the finger), tile relief (groups and register days lift as square
-  panels, to budget is a flat accent tile, add is the accent button), or
-  carved (lists and fields are cut into the page, and the chosen thing
-  rises). A relief style may use soft shadows. It keeps everything else
-  here: square corners, flat accent fills, the type, the pivot, the title
-  area, round app-bar buttons in their order, the motion, the accent, and
-  4.5:1 text. Its grey page moves the accent's text just far enough to keep
-  4.5:1. Each style is drawn in light and dark.
+  instead pick tile relief, which is Metro with soft light and shade: groups
+  and register days lift as square panels, to budget is a flat accent tile,
+  and add is the accent button. It may use soft shadows. It keeps everything
+  else here: square corners, flat accent fills, the type, the pivot, the
+  title area, round app-bar buttons in their order, the motion, the accent,
+  and 4.5:1 text. Its grey page moves the accent's text just far enough to
+  keep 4.5:1. Each style is drawn in light and dark.
 - The person may also pick mica, the Windows 11 look: a tinted page, rounded
   layer cards edged by a hairline for groups, days, fields and keys, a
   selector bar (smaller headers, the chosen one underlined in the accent) in
@@ -176,7 +173,7 @@ remove or redefine a principle. MINOR: add a principle or materially expand
 one. PATCH: wording only. Plans and reviews MUST check these principles. A
 violation is listed with a justification before the work proceeds.
 
-**Version**: 1.4.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-20
+**Version**: 1.5.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-20
 
 **Amendment 1.0.1**: Wording only. Budget screens now live in
 `docs/design/metro-mockups.svg`. The principles are unchanged.
@@ -199,3 +196,7 @@ fills. Chosen by the owner on 2026-10-20 from three mockups.
 **Amendment 1.4.0**: Principle on Metro 2 expanded. The person may also pick
 mica: rounded layer cards, a selector bar and floating acrylic bars. Chosen
 by the owner on 2026-10-20 from three acrylic mockups.
+
+**Amendment 1.5.0**: Principle on Metro 2 narrowed. Pressed metro and carved
+are removed; the styles are metro, tile relief and mica. Chosen by the owner
+on 2026-10-20 after trying them on a phone.
