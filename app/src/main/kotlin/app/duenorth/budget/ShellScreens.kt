@@ -35,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -72,16 +71,13 @@ import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroPivot
 import app.duenorth.budget.design.components.MetroText
-import app.duenorth.budget.design.components.PillCorner
 import app.duenorth.budget.design.components.PivotItem
-import app.duenorth.budget.design.components.Relief
 import app.duenorth.budget.design.components.ScreenAction
-import app.duenorth.budget.design.components.darken
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.components.relief
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
-import app.duenorth.budget.design.theme.MetroStyle
+import app.duenorth.budget.design.theme.Relief
 import kotlinx.coroutines.flow.first
 import java.time.YearMonth
 
@@ -238,16 +234,16 @@ fun MonthControl(
             if (previous != null) {
                 MonthIconButton(AppGlyph.ChevronLeft, "month-previous") { onSelect(previous) }
             }
-            if (Metro.style.relief) {
-                // Soft relief: the month is a raised pill that opens the month list.
+            if (Metro.style.relief && !Metro.style.panels) {
+                // Relief: the month stands up (or, carved, is cut in) as the control that opens the month list.
                 Box(Modifier.weight(1f)) {
                     MetroText(
                         monthLabel(month),
                         Metro.typography.subheader,
                         Modifier
-                            .relief(Relief.Raised, small = true, corner = PillCorner)
+                            .relief(Metro.style.control, small = true)
                             .metroPress { expanded = !expanded }
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
                             .testTag("month-label"),
                     )
                 }
@@ -431,15 +427,16 @@ fun BudgetSection(
     }
     val style = Metro.style
     val error = shell.headerMinor < 0
-    // Glow tiles writes the figures on the accent tile, so they take the tile's ink.
-    val onTile = if (style.heroTile) Metro.accent.onFill else null
-    val well = if (style.wells) Modifier.relief(Relief.Inset).padding(horizontal = 14.dp, vertical = 8.dp) else Modifier
+    // Tile relief sets to budget on a flat accent tile (red while overbudgeted) and held on a raised neutral one.
+    val tiles = style.heroTiles
+    val onTile = if (tiles) (if (error) Metro.colors.onErrorFill else Metro.accent.onFill) else null
+    val tile = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .then(heroFrame(style, error)),
-            horizontalArrangement = if (style.wells) Arrangement.spacedBy(MetroDimens.Gutter) else Arrangement.SpaceBetween,
+                .then(if (tiles) Modifier.padding(top = 6.dp) else Modifier),
+            horizontalArrangement = if (tiles) Arrangement.spacedBy(MetroDimens.Gutter) else Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top,
         ) {
             BudgetTotal(
@@ -450,7 +447,16 @@ fun BudgetSection(
                 error = error,
                 labelColor = onTile,
                 modifier =
-                    (if (style.wells) Modifier.weight(1f) else Modifier).then(well).then(
+                    (
+                        if (tiles) {
+                            Modifier
+                                .weight(1.3f)
+                                .relief(Relief.Raised, small = true, fill = if (error) Metro.colors.errorFill else Metro.accent.fill)
+                                .then(tile)
+                        } else {
+                            Modifier
+                        }
+                    ).then(
                         if (onToBudget == null) {
                             Modifier
                         } else {
@@ -462,11 +468,10 @@ fun BudgetSection(
                 BudgetTotal(
                     label = "held",
                     amount = MoneyFormat.format(shell.bufferedMinor, shell.currency, formatOptions),
-                    amountColor = onTile ?: Metro.colors.secondary,
+                    amountColor = Metro.colors.secondary,
                     amountTag = "held-amount",
                     alignEnd = true,
-                    labelColor = onTile,
-                    modifier = (if (style.wells) Modifier.weight(1f) else Modifier).then(well),
+                    modifier = if (tiles) Modifier.weight(1f).relief(Relief.Raised, small = true).then(tile) else Modifier,
                 )
             }
         }
@@ -481,7 +486,7 @@ fun BudgetSection(
                 MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.caption, Modifier.padding(top = MetroDimens.Grid))
             }
         } else {
-            val cards = style.cards
+            val cards = ledgerBlocks
             LazyColumn(
                 Modifier
                     .fillMaxWidth()
@@ -504,11 +509,10 @@ fun BudgetSection(
                     ).withIndex()
                         .associate { it.value to it.index }
                 if (cards) {
-                    // Each group is one raised card, so its heading and rows travel together.
+                    // Each group is one block (panel or channel), so its heading and rows travel together.
                     shell.groups.forEach { group ->
                         item(key = group.id) {
-                            LedgerCard(arrivalModifier(group.id, arrivals)) {
-                                GroupLine(group, shell, formatOptions = formatOptions)
+                            LedgerGroup(arrivalModifier(group.id, arrivals), { GroupLine(group, shell, formatOptions = formatOptions) }) {
                                 group.categories.forEach { CategoryLine(it, shell, onCategory, formatOptions = formatOptions) }
                             }
                             GroupGap()
@@ -516,8 +520,7 @@ fun BudgetSection(
                     }
                     shell.incomeGroups.forEach { group ->
                         item(key = "income-${group.id}") {
-                            LedgerCard {
-                                IncomeGroupLine(group, shell, formatOptions = formatOptions)
+                            LedgerGroup(heading = { IncomeGroupLine(group, shell, formatOptions = formatOptions) }) {
                                 group.categories.forEach { IncomeCategoryLine(it, shell, onCategory, formatOptions = formatOptions) }
                             }
                             GroupGap()
@@ -623,26 +626,6 @@ internal fun BudgetTotal(
 
 private val ERROR_BLOCK_PADDING = 8.dp
 
-/**
- * What the to budget row sits on in each style: nothing in Metro, a raised tile in quiet relief, and the lit
- * accent tile in glow tiles (solid red while the month is overbudgeted). Soft clay puts each figure in its own well.
- */
-@Composable
-private fun heroFrame(
-    style: MetroStyle,
-    error: Boolean,
-): Modifier =
-    when {
-        style.heroTile -> {
-            val fill = if (error) Metro.colors.errorFill else Metro.accent.fill
-            Modifier
-                .relief(Relief.Raised, brush = Brush.linearGradient(listOf(fill, fill.darken(0.25f))))
-                .padding(horizontal = 20.dp, vertical = 14.dp)
-        }
-        style == MetroStyle.QuietRelief -> Modifier.relief(Relief.Raised).padding(horizontal = 18.dp, vertical = 12.dp)
-        else -> Modifier
-    }
-
 @Composable
 private fun GroupLine(
     group: GroupRow,
@@ -742,7 +725,7 @@ fun AccountsSection(
             amountColor = Metro.accent.text,
             amountTag = "accounts-total",
         )
-        val cards = Metro.style.cards
+        val cards = ledgerBlocks
         LazyColumn(
             Modifier
                 .fillMaxWidth()
@@ -755,10 +738,11 @@ fun AccountsSection(
             if (cards) {
                 groups.forEach { (id, name, rows) ->
                     item(key = "account-group-$id") {
-                        LedgerCard {
+                        LedgerGroup(heading = {
                             GroupHeading(name, "account-group", id) {
                                 MetroText(money(rows.sumOf { a -> a.balanceMinor }), Metro.typography.groupHeader, it)
                             }
+                        }) {
                             rows.forEach { AccountLine(it, money(it.balanceMinor), onAccount, arrivalModifier(it.id, arrivals)) }
                         }
                         GroupGap()

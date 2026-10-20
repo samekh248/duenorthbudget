@@ -2,6 +2,7 @@ package app.duenorth.budget.design.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.MetroStyle
+import app.duenorth.budget.design.theme.Relief
 
 /**
  * Two Metro toggle buttons joined edge to edge, for a choice between two named options on one
@@ -37,9 +40,13 @@ fun MetroSegmentedToggle(
     tag: String,
     modifier: Modifier = Modifier,
 ) {
-    // Soft relief: the two options share a pressed-in track, and the chosen one stands out of it.
-    val track = if (Metro.style.relief) Modifier.relief(Relief.Inset, small = true).padding(4.dp) else Modifier
-    Row(modifier.height(IntrinsicSize.Min).then(track).testTag(tag)) {
+    // Carved: the two options share a track cut into the page. Other relief styles stand them up side by side.
+    val style = Metro.style
+    val track = if (style.carvedControls) Modifier.relief(Relief.Inset, small = true).padding(4.dp) else Modifier
+    Row(
+        modifier.height(IntrinsicSize.Min).then(track).testTag(tag),
+        horizontalArrangement = Arrangement.spacedBy(if (style.relief && !style.carvedControls) 10.dp else 0.dp),
+    ) {
         Segment(first, firstSelected, "$tag-$first") { onSelect(true) }
         Segment(second, !firstSelected, "$tag-$second") { onSelect(false) }
     }
@@ -54,15 +61,23 @@ private fun Segment(
 ) {
     val accent = Metro.accent
     val ink = Metro.colors.foreground
-    val relief = Metro.style.relief
+    val style = Metro.style
+    val relief = style.relief
     Box(
         Modifier
             .fillMaxHeight()
-            .heightIn(min = if (relief) MetroDimens.TouchTarget - 8.dp else MetroDimens.TouchTarget)
+            .heightIn(min = if (style.carvedControls) MetroDimens.TouchTarget - 8.dp else MetroDimens.TouchTarget)
             .then(
                 when {
-                    relief && selected -> Modifier.relief(Relief.Raised, small = true)
-                    relief -> Modifier
+                    // The chosen option is the accent: pressed in under pressed metro, standing out otherwise.
+                    relief && selected ->
+                        Modifier.relief(
+                            if (style == MetroStyle.PressedMetro) Relief.Inset else Relief.Raised,
+                            small = true,
+                            fill = accent.fill,
+                        )
+                    style.carvedControls -> Modifier
+                    relief -> Modifier.relief(Relief.Raised, small = true)
                     else ->
                         Modifier
                             .background(if (selected) accent.fill else Color.Transparent)
@@ -82,7 +97,6 @@ private fun Segment(
             color =
                 when {
                     !selected -> ink
-                    relief -> accent.text
                     else -> accent.onFill
                 },
             maxLines = 1,

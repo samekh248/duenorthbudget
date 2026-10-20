@@ -95,7 +95,7 @@ class ShellScreenshotTest {
             )
         }
 
-    // The soft-relief styles (settings, appearance, style): the month with goals, and the accounts list.
+    // The relief styles (settings, appearance, style): the month with goals, and the accounts list.
     @Test
     fun styleHomes() =
         MetroStyle.entries.filter { it.relief }.forEach { style ->
@@ -115,10 +115,10 @@ class ShellScreenshotTest {
     @Test
     fun styleOverbudgetedDark() =
         snap(
-            "style_glow-tiles_home_overbudgeted_dark",
+            "style_tile-relief_home_overbudgeted_dark",
             dark = true,
             shell = sample().copy(headerMinor = -12_550),
-            style = MetroStyle.GlowTiles,
+            style = MetroStyle.TileRelief,
         )
 
     @Test

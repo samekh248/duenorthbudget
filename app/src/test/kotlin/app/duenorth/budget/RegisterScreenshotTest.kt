@@ -127,7 +127,7 @@ class RegisterScreenshotTest {
     @Test
     fun searchDark() = snapSearch("register_search_dark", dark = true)
 
-    // The soft-relief styles on the register, plain and searching.
+    // The relief styles on the register (plain and searching) and the transaction form.
     @Test
     fun styleRegisters() =
         MetroStyle.entries.filter { it.relief }.forEach { style ->
@@ -135,6 +135,7 @@ class RegisterScreenshotTest {
                 val theme = if (dark) "dark" else "light"
                 snapSearch("style_${style.id}_register_$theme", dark, style, search = null)
                 snapSearch("style_${style.id}_register_search_$theme", dark, style)
+                snapEntry("style_${style.id}_entry_$theme", dark, style)
             }
         }
 
@@ -202,9 +203,10 @@ class RegisterScreenshotTest {
     private fun snapEntry(
         name: String,
         dark: Boolean,
+        style: MetroStyle = MetroStyle.Metro,
     ) {
         captureRoboImage("src/test/snapshots/$name.png") {
-            MetroTheme(darkTheme = dark) {
+            MetroTheme(darkTheme = dark, style = style) {
                 Column(Modifier.width(390.dp).height(780.dp)) {
                     TransactionForm(
                         page = page(),

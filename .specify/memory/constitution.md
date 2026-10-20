@@ -65,18 +65,18 @@ It replaces the first mockups (a dark pivot with no panorama).
   body 16, secondary text 14 semilight.
 - Content over chrome: no drop shadows, no gradients, no rounded cards, no
   elevation, no Material ripple. Flat color fills only. The one exception is
-  a soft-relief style the person picks (below).
+  a relief style the person picks (below).
 - Metro is the default style. Under settings, appearance, the person may
-  instead pick one of three soft-relief (neumorphic) styles: soft clay
-  (every group on a raised card, budget figures in pressed-in wells, a
-  floating app bar), quiet relief (flat lists, relief only on things you
-  touch), or glow tiles (tinted page, to budget on a lit accent tile, goal
-  progress in grooves). A soft-relief style may use soft light-and-shade
-  shadows, accent gradients and rounded shapes. It keeps everything else
-  here: the type, the pivot, the title area, the app bar's buttons and
-  order, the motion, the accent, and 4.5:1 text. Its tinted page moves the
-  accent's text just far enough to keep 4.5:1. Each style is drawn in light
-  and dark.
+  instead pick one of three relief styles, which are Metro with soft light
+  and shade: pressed metro (only things you touch stand up, and press in
+  under the finger), tile relief (groups and register days lift as square
+  panels, to budget is a flat accent tile, add is the accent button), or
+  carved (lists and fields are cut into the page, and the chosen thing
+  rises). A relief style may use soft shadows. It keeps everything else
+  here: square corners, flat accent fills, the type, the pivot, the title
+  area, round app-bar buttons in their order, the motion, the accent, and
+  4.5:1 text. Its grey page moves the accent's text just far enough to keep
+  4.5:1. Each style is drawn in light and dark.
 - Light (white, black text) and dark (pure black) MUST both exist. The
   app follows the phone's setting unless the person overrides it. One accent
   drives highlights and tiles. The default swatch is Windows Phone magenta
@@ -186,6 +186,6 @@ now carry a small uppercase section title over the page title, so a person can
 tell where the page sits. Chosen by the owner on 2026-10-15.
 
 **Amendment 1.3.0**: Principle on Metro 2 expanded. Metro stays the default,
-and the person may pick one of three soft-relief styles (soft clay, quiet
-relief, glow tiles), which may use shadows, gradients and rounded shapes.
-Chosen by the owner on 2026-10-20 from three mockups.
+and the person may pick one of three relief styles (pressed metro, tile
+relief, carved): Metro with soft shadows, keeping square corners and flat
+fills. Chosen by the owner on 2026-10-20 from three mockups.

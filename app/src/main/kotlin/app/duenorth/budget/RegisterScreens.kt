@@ -100,13 +100,13 @@ import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroPickerColumn
 import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
-import app.duenorth.budget.design.components.Relief
 import app.duenorth.budget.design.components.ScreenAction
+import app.duenorth.budget.design.components.controlFrame
 import app.duenorth.budget.design.components.drawRelief
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
-import app.duenorth.budget.design.theme.MetroStyle
+import app.duenorth.budget.design.theme.Relief
 import java.time.LocalDate
 import java.time.Month
 import java.util.Locale
@@ -262,7 +262,7 @@ private fun RegisterList(
     val days = registerDays(listed)
     val position = listed.withIndex().associate { it.value.id to it.index }
     val byId = rows.associateBy { it.id }
-    val cards = Metro.style.cards
+    val cards = ledgerBlocks
     LazyColumn(modifier.bleedGutter(cards), state = list, contentPadding = cardListPadding(cards)) {
         pairs.forEach { pair ->
             item(key = "match-${pair.key}") {
@@ -278,7 +278,7 @@ private fun RegisterList(
             }
         }
         if (cards) {
-            // Each day is one raised card under its date, so the rows of a day travel together.
+            // Each day is one block (panel or channel) under its date, so the rows of a day travel together.
             days.forEach { day ->
                 item(key = "day-${day.first().id}") {
                     MetroText(
@@ -287,7 +287,7 @@ private fun RegisterList(
                         Modifier.padding(top = 16.dp, bottom = 8.dp).testTag("register-day-${day.first().date}"),
                         color = Metro.accent.text,
                     )
-                    LedgerCard(Modifier.padding(bottom = 4.dp)) {
+                    LedgerGroup(Modifier.padding(bottom = 4.dp), heading = {}) {
                         day.forEach { row ->
                             RegisterLine(
                                 row,
@@ -419,8 +419,8 @@ internal fun RegisterLine(
     val letter = if (row.cleared) Metro.colors.background else Metro.colors.secondary.copy(alpha = 0.7f)
     val measurer = rememberTextMeasurer()
     val mark = Metro.typography.caption.copy(color = letter, fontWeight = FontWeight.SemiBold)
-    // A soft-relief style marks cleared with a small key at the row's end instead of the edge bar:
-    // raised and dim when not cleared, filled with the accent when cleared.
+    // A relief style marks cleared with a small square key at the row's end instead of the edge bar: standing up
+    // (cut in, under carved) and dim when not cleared, pressed in and filled with the accent when cleared.
     val surface = Metro.surface
     val relief = surface.style.relief
     val ground = Metro.colors.background
@@ -430,7 +430,6 @@ internal fun RegisterLine(
             color = if (row.cleared) Metro.accent.onFill else Metro.colors.secondary,
             fontWeight = FontWeight.SemiBold,
         )
-    val keyCorner = if (surface.style.squareButtons || surface.style == MetroStyle.QuietRelief) 8.dp else CLEARED_KEY / 2
     Column(
         modifier
             .fillMaxWidth()
@@ -442,10 +441,10 @@ internal fun RegisterLine(
                     val topLeft = Offset(size.width - side, (size.height - side) / 2)
                     drawRelief(
                         surface,
-                        if (row.cleared) Relief.Inset else Relief.Raised,
+                        if (row.cleared) Relief.Inset else surface.style.control,
                         topLeft,
                         Size(side, side),
-                        keyCorner.toPx(),
+                        0f,
                         if (row.cleared) accentFill else ground,
                         small = true,
                     )
@@ -564,7 +563,7 @@ private fun SelectBox(
 
 private val CLEARED_BAR = 16.dp
 
-/** The cleared key of a soft-relief style: a touch smaller than the payee's two lines. */
+/** The cleared key of a relief style: a touch smaller than the payee's two lines. */
 private val CLEARED_KEY = 28.dp
 private val CLEARED_BAR_INSET = 2.dp
 private val CLEARED_BAR_GAP = 6.dp
@@ -743,7 +742,7 @@ fun TransactionForm(
                     Modifier
                         .widthIn(max = width)
                         .fillMaxWidth()
-                        .border(MetroDimens.Stroke, Metro.colors.foreground)
+                        .controlFrame()
                         .testTag("transaction-date"),
                 ) {
                     MetroComboValue(

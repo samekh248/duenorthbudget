@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.Relief
 
 /**
  * The Windows Phone 8.1 combo box: the current value in a bordered box with a chevron. With
@@ -41,7 +42,8 @@ fun <T> MetroComboBox(
             .fillMaxWidth()
             .then(
                 if (Metro.style.relief) {
-                    Modifier.relief(if (open) Relief.Inset else Relief.Raised, small = true).padding(horizontal = 4.dp)
+                    // Open, or under carved, the box is pressed in; otherwise it stands up like a button.
+                    Modifier.relief(if (open) Relief.Inset else Metro.style.control, small = true)
                 } else {
                     Modifier.border(MetroDimens.Stroke, if (open) Metro.accent.fill else Metro.colors.foreground)
                 },

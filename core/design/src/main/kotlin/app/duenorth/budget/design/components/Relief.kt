@@ -3,6 +3,7 @@ package app.duenorth.budget.design.components
 import android.graphics.BlurMaskFilter
 import android.graphics.Paint
 import android.graphics.RectF
+import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -20,19 +21,18 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.design.theme.Metro
+import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroSurface
+import app.duenorth.budget.design.theme.Relief
 import androidx.compose.ui.graphics.Path as ComposePath
-
-/** Raised stands off the page; inset is pressed into it. */
-enum class Relief { Raised, Inset }
 
 /** A corner large enough to make any shape a circle or a pill. */
 val PillCorner: Dp = 999.dp
 
 /**
- * Draws a soft-relief surface behind the content: a card ([small] false) or a control ([small] true), in the
- * style's light and shade, filled with [fill] or [brush]. Under the Metro style it draws nothing, so callers
- * add it unconditionally.
+ * Draws a relief surface behind the content: a panel ([small] false) or a control ([small] true), in the style's
+ * light and shade, filled with [fill] or [brush]. Corners are square, as in Metro, unless [corner] is given (the
+ * app bar's round buttons). Under the Metro style it draws nothing, so callers add it unconditionally.
  */
 @Composable
 fun Modifier.relief(
@@ -44,7 +44,7 @@ fun Modifier.relief(
 ): Modifier {
     val surface = Metro.surface
     if (!surface.style.relief) return this
-    val radius = corner ?: if (small) surface.controlCorner else surface.corner
+    val radius = corner ?: 0.dp
     return drawBehind { drawRelief(surface, relief, Offset.Zero, size, radius.toPx(), fill, brush, small) }
 }
 
@@ -142,3 +142,13 @@ private fun blurred(
         this.color = color.toArgb()
         maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
     }
+
+/**
+ * The edge of a Metro box (a date box, a check box, a picker cell): the 2.5 dp outline in [color], or under a
+ * relief style the control's own relief instead, filled with [fill].
+ */
+@Composable
+fun Modifier.controlFrame(
+    color: Color = Metro.colors.foreground,
+    fill: Color = Metro.colors.background,
+): Modifier = if (Metro.style.relief) relief(Metro.style.control, small = true, fill = fill) else border(MetroDimens.Stroke, color)

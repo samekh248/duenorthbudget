@@ -8,32 +8,34 @@ import androidx.compose.ui.unit.dp
 
 /**
  * The look the person picks under settings, appearance. Metro is the flat Metro 2 look and the default. The
- * other three are the soft-relief (neumorphic) styles the owner chose on 2026-10-20 from three mockups: each
- * keeps Metro's type, pivot and app bar order, and draws its surfaces with light and shade instead of lines.
+ * other three are Metro with soft relief, chosen by the owner on 2026-10-20 from three mockups. Each keeps
+ * Metro's type, pivot, square corners, flat accent fills, round app-bar buttons and grid; only light and shade
+ * are added, and each style follows one rule for where they go.
  */
 enum class MetroStyle(
     val id: String,
     val label: String,
-    /** Category groups and register days sit on raised cards. */
-    val cards: Boolean = false,
-    /** The app bar floats as a raised dock with a margin, instead of running edge to edge. */
-    val dock: Boolean = false,
-    /** Budget figures (to budget, held, available) sit in pressed-in wells. */
-    val wells: Boolean = false,
-    /** To budget sits on a raised accent tile. */
-    val heroTile: Boolean = false,
-    /** App-bar buttons are rounded squares, and add is filled with the accent. */
-    val squareButtons: Boolean = false,
-    /** Goal progress runs in a pressed-in groove with a lit fill. */
-    val grooves: Boolean = false,
+    /** Category groups and register days lift off the page as square panels (tile relief). */
+    val panels: Boolean = false,
+    /** Category rows and register days sit in channels cut into the page (carved). */
+    val channels: Boolean = false,
+    /** To budget is a flat accent tile, held a raised neutral one (tile relief). */
+    val heroTiles: Boolean = false,
+    /** Add is the one accent button on the app bar (tile relief). */
+    val filledAdd: Boolean = false,
+    /** Controls are cut into the page and only the chosen part rises (carved); otherwise controls stand up. */
+    val carvedControls: Boolean = false,
 ) {
     Metro("metro", "metro"),
-    SoftClay("soft-clay", "soft clay", cards = true, dock = true, wells = true),
-    QuietRelief("quiet-relief", "quiet relief"),
-    GlowTiles("glow-tiles", "glow tiles", cards = true, dock = true, heroTile = true, squareButtons = true, grooves = true),
+    PressedMetro("pressed-metro", "pressed metro"),
+    TileRelief("tile-relief", "tile relief", panels = true, heroTiles = true, filledAdd = true),
+    Carved("carved", "carved", channels = true, carvedControls = true),
     ;
 
     val relief: Boolean get() = this != Metro
+
+    /** The relief of a control at rest: raised, or pressed in under the carved style. */
+    val control: Relief get() = if (carvedControls) Relief.Inset else Relief.Raised
 
     companion object {
         val Default = Metro
@@ -42,9 +44,13 @@ enum class MetroStyle(
     }
 }
 
+/** Raised stands off the page; inset is pressed into it. */
+enum class Relief { Raised, Inset }
+
 /**
- * How a soft-relief style lights its surfaces: a [highlight] thrown up and left and a [shade] thrown down and
- * right, [depth] apart and softened by [blur]. Small things (buttons, marks, wells) use half of each.
+ * How a relief style lights its surfaces: a [highlight] thrown up and left and a [shade] thrown down and right,
+ * [depth] apart and softened by [blur]. Both are translucent, so the same light works on the page, on the app
+ * bar's chrome and on an accent fill. Small things (buttons, keys, boxes) use half of each.
  */
 @Immutable
 data class MetroSurface(
@@ -53,110 +59,53 @@ data class MetroSurface(
     val shade: Color,
     val depth: Dp,
     val blur: Dp,
-    /** Corner of a card; controls round to [controlCorner]. */
-    val corner: Dp,
-    val controlCorner: Dp,
 ) {
     companion object {
-        val Flat =
-            MetroSurface(
-                style = MetroStyle.Metro,
-                highlight = Color.Transparent,
-                shade = Color.Transparent,
-                depth = 0.dp,
-                blur = 0.dp,
-                corner = 0.dp,
-                controlCorner = 0.dp,
-            )
+        val Flat = MetroSurface(MetroStyle.Metro, Color.Transparent, Color.Transparent, 0.dp, 0.dp)
 
         fun of(
             style: MetroStyle,
             dark: Boolean,
         ): MetroSurface =
-            when (style) {
-                MetroStyle.Metro -> Flat
-                MetroStyle.SoftClay ->
-                    MetroSurface(
-                        style,
-                        highlight = Color(if (dark) 0xFF383D46 else 0xFFFFFFFF),
-                        shade = Color(if (dark) 0xFF181A1F else 0xFFB3BCC9),
-                        depth = 6.dp,
-                        blur = 14.dp,
-                        corner = 22.dp,
-                        controlCorner = 26.dp,
-                    )
-                MetroStyle.QuietRelief ->
-                    MetroSurface(
-                        style,
-                        highlight = Color(if (dark) 0xFF25272B else 0xFFFFFFFF),
-                        shade = Color(if (dark) 0xFF08090A else 0xFFCDD2D9),
-                        depth = 3.dp,
-                        blur = 7.dp,
-                        corner = 14.dp,
-                        controlCorner = 12.dp,
-                    )
-                MetroStyle.GlowTiles ->
-                    MetroSurface(
-                        style,
-                        highlight = Color(if (dark) 0xFF283044 else 0xFFF5F8FD),
-                        shade = Color(if (dark) 0xFF0E121B else 0xFFA9B4C6),
-                        depth = 8.dp,
-                        blur = 18.dp,
-                        corner = 22.dp,
-                        controlCorner = 16.dp,
-                    )
+            if (style == MetroStyle.Metro) {
+                Flat
+            } else {
+                MetroSurface(
+                    style,
+                    highlight = if (dark) Color.White.copy(alpha = 0.075f) else Color.White.copy(alpha = 0.95f),
+                    shade = if (dark) Color.Black.copy(alpha = 0.75f) else Color.Black.copy(alpha = 0.17f),
+                    depth = 5.dp,
+                    blur = 14.dp,
+                )
             }
     }
 }
 
-/** The page colors of each soft-relief style. Metro's own are [MetroColors.Light] and [MetroColors.Dark]. */
+/**
+ * The page colors of each relief style: Metro's black and white ink on a light or dark grey, since relief needs
+ * a page that is neither white nor black. Metro's own are [MetroColors.Light] and [MetroColors.Dark].
+ */
 internal object StylePalettes {
     fun colors(
         style: MetroStyle,
         dark: Boolean,
     ): MetroColors {
         val metro = if (dark) MetroColors.Dark else MetroColors.Light
-        val palette =
+        val (background, chrome) =
             when (style) {
                 MetroStyle.Metro -> return metro
-                MetroStyle.SoftClay ->
-                    if (dark) {
-                        Palette(0xFF2A2E35, 0xFFECEEF2, 0xFFA3A9B4, 0xFF22252B, 0xFF4A505B)
-                    } else {
-                        Palette(0xFFE4E8EE, 0xFF1D2128, 0xFF5B6370, 0xFFD3D9E2, 0xFFB3BCC9)
-                    }
-                MetroStyle.QuietRelief ->
-                    if (dark) {
-                        Palette(0xFF17181B, 0xFFF6F6F7, 0xFFA2A6AD, 0xFF222428, 0xFF3A3D42)
-                    } else {
-                        Palette(0xFFF3F4F6, 0xFF0E0F11, 0xFF5A5F67, 0xFFE4E7EB, 0xFFCDD2D9)
-                    }
-                MetroStyle.GlowTiles ->
-                    if (dark) {
-                        Palette(0xFF1B2130, 0xFFEEF2F8, 0xFF9CA8BD, 0xFF151A26, 0xFF3A4458)
-                    } else {
-                        Palette(0xFFDAE1EB, 0xFF141B27, 0xFF4F5B6F, 0xFFCBD3DF, 0xFFA9B4C6)
-                    }
+                MetroStyle.PressedMetro -> if (dark) 0xFF121212 to 0xFF1F1F1F else 0xFFF2F2F2 to 0xFFE3E3E3
+                MetroStyle.TileRelief -> if (dark) 0xFF101010 to 0xFF1F1F1F else 0xFFEEEEEE to 0xFFE3E3E3
+                MetroStyle.Carved -> if (dark) 0xFF1B1B1B to 0xFF262626 else 0xFFE4E4E4 to 0xFFD6D6D6
             }
-        val background = Color(palette.background)
-        return MetroColors(
-            isDark = dark,
-            background = background,
-            foreground = Color(palette.foreground),
-            secondary = Color(palette.secondary),
-            chrome = Color(palette.chrome),
-            outline = Color(palette.outline),
-            error = Contrast.ensure(metro.error, background),
+        val page = Color(background)
+        return metro.copy(
+            background = page,
+            chrome = Color(chrome),
+            secondary = Contrast.ensure(Color(if (dark) 0xFF9E9E9E else 0xFF636363), page),
+            error = Contrast.ensure(metro.error, page),
         )
     }
-
-    private class Palette(
-        val background: Long,
-        val foreground: Long,
-        val secondary: Long,
-        val chrome: Long,
-        val outline: Long,
-    )
 }
 
 /** Moves [text] toward black (on a light page) or white (on a dark one) until it reads at [Contrast.MIN_TEXT]. */

@@ -54,6 +54,7 @@ import app.duenorth.budget.design.components.MetroComboValue
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.ScreenAction
+import app.duenorth.budget.design.components.controlFrame
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -187,7 +188,7 @@ private fun StartPanel(
         MetroField(balance, onBalance, ReconcileCopy.STATEMENT, Modifier.testTag("statement-balance"))
         MetroText(ReconcileCopy.PREFILLED, Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
         Label(ReconcileCopy.STATEMENT_DATE, Modifier.padding(top = 10.dp))
-        Box(Modifier.widthIn(max = 240.dp).fillMaxWidth().border(MetroDimens.Stroke, Metro.colors.foreground)) {
+        Box(Modifier.widthIn(max = 240.dp).fillMaxWidth().controlFrame()) {
             MetroComboValue(dateText, "statement-date", onPickDate, Modifier.fillMaxWidth())
         }
         if (error != null) {

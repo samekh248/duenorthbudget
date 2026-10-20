@@ -52,7 +52,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -85,6 +84,7 @@ import app.duenorth.budget.design.metroTilt
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroWeights
+import app.duenorth.budget.design.theme.Relief
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlin.math.floor
@@ -212,7 +212,7 @@ private fun MetroFieldFrame(
     field: @Composable (TextStyle, SolidColor) -> Unit,
 ) {
     val colors = Metro.colors
-    // A soft-relief style presses the box into the page and writes in the page's own ink.
+    // A relief style cuts the box into the page and writes in the page's own ink.
     val relief = Metro.style.relief
     val background = if (colors.isDark) Color.White else Color(0xFFBFBFBF)
     val hintColor =
@@ -356,7 +356,7 @@ private fun MetroActionButton(
             ).graphicsLayer { rotationZ = if (pressed && animations) 2.5f else 0f }
             .then(
                 if (relief) {
-                    // Soft relief: the button stands off the page and presses in under the finger.
+                    // Relief: the button stands off the page and presses in under the finger.
                     Modifier.relief(if (pressed) Relief.Inset else Relief.Raised, small = true)
                 } else {
                     Modifier
@@ -452,21 +452,15 @@ fun MetroAppBar(
     }
     val style = Metro.style
     val chrome =
-        when {
-            // A dock floats over the page with a margin; the bar's ground is the page itself.
-            style.dock ->
-                Modifier
-                    .background(colors.background)
-                    .windowInsetsPadding(windowInsets)
-                    .padding(start = MetroDimens.Gutter, end = MetroDimens.Gutter, top = 6.dp, bottom = MetroDimens.Gutter)
-                    .relief(Relief.Raised, corner = DOCK_CORNER)
-            // Quiet relief keeps a full-width bar on the page color, parted from the list by a hairline.
-            style.relief ->
-                Modifier
-                    .background(colors.background)
-                    .drawBehind { drawLine(colors.outline, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
-                    .windowInsetsPadding(windowInsets)
-            else -> Modifier.background(colors.chrome).windowInsetsPadding(windowInsets)
+        if (style.carvedControls) {
+            // Carved: the bar is a groove cut into the page a gutter in from its edges, with its buttons standing in it.
+            Modifier
+                .background(colors.background)
+                .windowInsetsPadding(windowInsets)
+                .padding(start = MetroDimens.Gutter, end = MetroDimens.Gutter, bottom = MetroDimens.Gutter)
+                .relief(Relief.Inset)
+        } else {
+            Modifier.background(colors.chrome).windowInsetsPadding(windowInsets)
         }
     Column(
         modifier
@@ -532,8 +526,6 @@ fun MetroAppBar(
     }
 }
 
-private val DOCK_CORNER = 28.dp
-
 /** The three small dots of the WP8.1 ellipsis. */
 @Composable
 private fun EllipsisDots(color: Color) {
@@ -565,8 +557,10 @@ private fun AppBarIcon(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val style = Metro.style
-        // Glow tiles fills add with the accent, so the day's main action leads the bar.
-        val filled = style.squareButtons && action.glyph == AppGlyph.Add
+        // Tile relief fills add with the accent, so the day's main action leads the bar.
+        val filled = style.filledAdd && action.glyph == AppGlyph.Add
+        // The button's own face is the ground it stands on: the groove's page, or the bar's chrome.
+        val ground = if (style.carvedControls) colors.background else colors.chrome
         val accent = Metro.accent
         Box(
             Modifier
@@ -574,12 +568,8 @@ private fun AppBarIcon(
                 .then(
                     when {
                         filled ->
-                            Modifier.relief(
-                                Relief.Raised,
-                                small = true,
-                                brush = Brush.linearGradient(listOf(accent.fill, accent.fill.darken(0.25f))),
-                            )
-                        style.relief -> Modifier.relief(Relief.Raised, small = true, corner = if (style.squareButtons) null else PillCorner)
+                            Modifier.relief(Relief.Raised, small = true, corner = PillCorner, fill = accent.fill)
+                        style.relief -> Modifier.relief(Relief.Raised, small = true, corner = PillCorner, fill = ground)
                         else -> Modifier.border(MetroDimens.AppBarStroke, colors.foreground, CircleShape)
                     },
                 ),
@@ -998,6 +988,3 @@ fun MetroPivot(
         }
     }
 }
-
-/** [this] moved [amount] of the way to black: the deep end of a lit accent fill. */
-fun Color.darken(amount: Float): Color = lerp(this, Color.Black, amount)

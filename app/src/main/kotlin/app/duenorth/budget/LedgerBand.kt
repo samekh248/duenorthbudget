@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,10 +16,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import app.duenorth.budget.design.components.Relief
 import app.duenorth.budget.design.components.relief
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.Relief
 
 /**
  * The faint band under every other row of a ledger list (the register, accounts and the budget), which
@@ -41,8 +42,8 @@ internal fun Modifier.ledgerFill(fill: Color): Modifier =
 internal fun ledgerBanded(index: Int): Boolean = index % 2 == 1
 
 /**
- * Under a card style, widens a list by the screen gutter on each side, so the cards' shadows fall into the
- * gutter instead of being cut at the list's edge. Pair it with [cardListPadding] to keep the cards in place.
+ * Under a block style, widens a list by the screen gutter on each side, so the blocks' light and shade fall into the
+ * gutter instead of being cut at the list's edge. Pair it with [cardListPadding] to keep the blocks in place.
  */
 internal fun Modifier.bleedGutter(on: Boolean): Modifier =
     if (!on) {
@@ -59,26 +60,51 @@ internal fun Modifier.bleedGutter(on: Boolean): Modifier =
     }
 
 /**
- * The content padding that brings a [bleedGutter] list's rows back to the gutter. A card list also takes the
- * air above it as [top] padding instead of a margin, so the first card's light is not cut at the list's edge.
+ * The content padding that brings a [bleedGutter] list's rows back to the gutter. A block list also takes the
+ * air above it as [top] padding instead of a margin, so the first block's light is not cut at the list's edge.
  */
 internal fun cardListPadding(
     on: Boolean,
     top: Dp = 0.dp,
 ): PaddingValues = if (on) PaddingValues(start = MetroDimens.Gutter, end = MetroDimens.Gutter, top = top) else PaddingValues()
 
-/** A raised card holding a group of ledger rows, under a card style. Its rows sit a gutter in from its edge. */
+/** Whether the style draws each group or day as one block ([LedgerGroup]) rather than as loose rows. */
+internal val ledgerBlocks: Boolean
+    @Composable
+    @ReadOnlyComposable
+    get() = Metro.style.panels || Metro.style.channels
+
+/**
+ * A group of ledger rows as one block: under tile relief a raised square panel holding [heading] and the rows,
+ * under carved the [heading] on the page and the rows in a channel cut under it. The rows sit a gutter in.
+ */
 @Composable
-internal fun LedgerCard(
+internal fun LedgerGroup(
     modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
+    heading: @Composable () -> Unit,
+    rows: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(
-        modifier
-            .fillMaxWidth()
-            .relief(Relief.Raised)
-            .padding(horizontal = MetroDimens.Gutter)
-            .padding(bottom = MetroDimens.Row),
-        content = content,
-    )
+    if (Metro.style.channels) {
+        Column(modifier.fillMaxWidth()) {
+            Box(Modifier.padding(horizontal = MetroDimens.Gutter)) { heading() }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .relief(Relief.Inset)
+                    .padding(horizontal = MetroDimens.Gutter, vertical = 4.dp),
+                content = rows,
+            )
+        }
+    } else {
+        Column(
+            modifier
+                .fillMaxWidth()
+                .relief(Relief.Raised)
+                .padding(horizontal = MetroDimens.Gutter)
+                .padding(bottom = MetroDimens.Row),
+        ) {
+            heading()
+            rows()
+        }
+    }
 }
