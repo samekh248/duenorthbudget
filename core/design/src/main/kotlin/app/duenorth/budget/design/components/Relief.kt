@@ -14,7 +14,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -28,6 +30,13 @@ import androidx.compose.ui.graphics.Path as ComposePath
 
 /** A corner large enough to make any shape a circle or a pill. */
 val PillCorner: Dp = 999.dp
+
+/** Mica's corners: a layer card (a group, a day, the keypad's sheet) and a control on one (a field, a key). */
+object LayerCorner {
+    val Card = 8.dp
+    val Control = 6.dp
+    val Floating = 12.dp
+}
 
 /**
  * Draws a relief surface behind the content: a panel ([small] false) or a control ([small] true), in the style's
@@ -44,7 +53,13 @@ fun Modifier.relief(
 ): Modifier {
     val surface = Metro.surface
     if (!surface.style.relief) return this
-    val radius = corner ?: 0.dp
+    val radius =
+        when {
+            // Mica rounds everything a little, and turns the app bar's round buttons into rounded squares too.
+            surface.style.layers && (corner == null || corner == PillCorner) ->
+                if (small) LayerCorner.Control else LayerCorner.Card
+            else -> corner ?: 0.dp
+        }
     return drawBehind { drawRelief(surface, relief, Offset.Zero, size, radius.toPx(), fill, brush, small) }
 }
 
@@ -60,6 +75,10 @@ fun DrawScope.drawRelief(
     small: Boolean = false,
 ) {
     if (size.width <= 0f || size.height <= 0f) return
+    if (surface.style.layers) {
+        drawLayer(surface, relief, topLeft, size, radius, fill, brush)
+        return
+    }
     val scale = if (small) 0.5f else 1f
     val depth = surface.depth.toPx() * scale
     val blur = (surface.blur.toPx() * scale).coerceAtLeast(1f)
@@ -133,6 +152,100 @@ fun DrawScope.drawRelief(
         }
     }
 }
+
+/**
+ * Mica's version of [drawRelief]: the [MetroSurface.layer] card (or [fill], when it is not the page, such as an
+ * accent) edged by a hairline. Inset is a field: the same card with a line under it, as Windows 11 draws a text box.
+ */
+private fun DrawScope.drawLayer(
+    surface: MetroSurface,
+    relief: Relief,
+    topLeft: Offset,
+    size: Size,
+    radius: Float,
+    fill: Color,
+    brush: Brush?,
+) {
+    val r = radius.coerceAtMost(minOf(size.width, size.height) / 2f)
+    val corner = CornerRadius(r)
+    val onPage = brush == null && fill == surface.page
+    when {
+        brush != null -> drawRoundRect(brush, topLeft, size, corner)
+        onPage -> drawRoundRect(surface.layer, topLeft, size, corner)
+        else -> drawRoundRect(fill, topLeft, size, corner)
+    }
+    if (!onPage) return
+    val hair = 1.dp.toPx()
+    drawRoundRect(
+        surface.stroke,
+        Offset(topLeft.x + hair / 2, topLeft.y + hair / 2),
+        Size(size.width - hair, size.height - hair),
+        CornerRadius((r - hair / 2).coerceAtLeast(0f)),
+        style = Stroke(hair),
+    )
+    if (relief == Relief.Inset) {
+        val shape =
+            ComposePath().apply {
+                addRoundRect(RoundRect(topLeft.x, topLeft.y, topLeft.x + size.width, topLeft.y + size.height, corner))
+            }
+        clipPath(shape) {
+            drawRect(surface.underline, Offset(topLeft.x, topLeft.y + size.height - hair), Size(size.width, hair))
+        }
+    }
+}
+
+/**
+ * One slice of a mica layer card split across list items (the budget editor's groups, which scroll one row at a
+ * time): the card's [top] corners on the first slice, its [bottom] ones on the last, plain sides between. Under
+ * any other style it draws nothing.
+ */
+@Composable
+fun Modifier.layerSlice(
+    top: Boolean,
+    bottom: Boolean,
+): Modifier {
+    val surface = Metro.surface
+    if (!surface.style.layers) return this
+    return drawBehind {
+        val r = LayerCorner.Card.toPx()
+        val above = if (top) 0f else 2 * r
+        val below = if (bottom) 0f else 2 * r
+        clipRect {
+            drawRoundRect(surface.layer, Offset(0f, -above), Size(size.width, size.height + above + below), CornerRadius(r))
+            val hair = 1.dp.toPx()
+            drawRoundRect(
+                surface.stroke,
+                Offset(hair / 2, hair / 2 - above),
+                Size(size.width - hair, size.height + above + below - hair),
+                CornerRadius(r - hair / 2),
+                style = Stroke(hair),
+            )
+        }
+    }
+}
+
+/**
+ * A floating acrylic sheet (mica's app bar and keypad): the [MetroSurface.acrylic] tint with a soft drop shadow,
+ * rounded by [LayerCorner.Floating].
+ */
+fun Modifier.acrylicSheet(surface: MetroSurface): Modifier =
+    drawBehind {
+        val r = LayerCorner.Floating.toPx()
+        val blur = surface.blur.toPx()
+        drawIntoCanvas { canvas ->
+            val rect = RectF(0f, surface.depth.toPx(), size.width, size.height + surface.depth.toPx())
+            canvas.nativeCanvas.drawRoundRect(rect, r, r, blurred(surface.shade, blur))
+        }
+        drawRoundRect(surface.acrylic, cornerRadius = CornerRadius(r))
+        val hair = 1.dp.toPx()
+        drawRoundRect(
+            surface.stroke,
+            Offset(hair / 2, hair / 2),
+            Size(size.width - hair, size.height - hair),
+            CornerRadius(r - hair / 2),
+            style = Stroke(hair),
+        )
+    }
 
 private fun blurred(
     color: Color,

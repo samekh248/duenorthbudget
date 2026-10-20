@@ -64,8 +64,8 @@ It replaces the first mockups (a dark pivot with no panorama).
   under the phone-kit sizes: header 48 semilight, subheader 26 semilight,
   body 16, secondary text 14 semilight.
 - Content over chrome: no drop shadows, no gradients, no rounded cards, no
-  elevation, no Material ripple. Flat color fills only. The one exception is
-  a relief style the person picks (below).
+  elevation, no Material ripple. Flat color fills only. The exceptions are
+  a relief style or mica, which the person picks (below).
 - Metro is the default style. Under settings, appearance, the person may
   instead pick one of three relief styles, which are Metro with soft light
   and shade: pressed metro (only things you touch stand up, and press in
@@ -77,6 +77,12 @@ It replaces the first mockups (a dark pivot with no panorama).
   area, round app-bar buttons in their order, the motion, the accent, and
   4.5:1 text. Its grey page moves the accent's text just far enough to keep
   4.5:1. Each style is drawn in light and dark.
+- The person may also pick mica, the Windows 11 look: a tinted page, rounded
+  layer cards edged by a hairline for groups, days, fields and keys, a
+  selector bar (smaller headers, the chosen one underlined in the accent) in
+  place of the pivot's big headers, and an acrylic app bar and keypad that
+  float above the page with a soft shadow. It keeps the type, the title area,
+  flat accent fills, the motion, the accent and 4.5:1 text.
 - Light (white, black text) and dark (pure black) MUST both exist. The
   app follows the phone's setting unless the person overrides it. One accent
   drives highlights and tiles. The default swatch is Windows Phone magenta
@@ -170,7 +176,7 @@ remove or redefine a principle. MINOR: add a principle or materially expand
 one. PATCH: wording only. Plans and reviews MUST check these principles. A
 violation is listed with a justification before the work proceeds.
 
-**Version**: 1.3.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-20
+**Version**: 1.4.0 | **Ratified**: 2026-10-06 | **Last Amended**: 2026-10-20
 
 **Amendment 1.0.1**: Wording only. Budget screens now live in
 `docs/design/metro-mockups.svg`. The principles are unchanged.
@@ -189,3 +195,7 @@ tell where the page sits. Chosen by the owner on 2026-10-15.
 and the person may pick one of three relief styles (pressed metro, tile
 relief, carved): Metro with soft shadows, keeping square corners and flat
 fills. Chosen by the owner on 2026-10-20 from three mockups.
+
+**Amendment 1.4.0**: Principle on Metro 2 expanded. The person may also pick
+mica: rounded layer cards, a selector bar and floating acrylic bars. Chosen
+by the owner on 2026-10-20 from three acrylic mockups.

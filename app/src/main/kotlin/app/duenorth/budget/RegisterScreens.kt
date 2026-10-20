@@ -439,12 +439,17 @@ internal fun RegisterLine(
                 if (relief) {
                     val side = CLEARED_KEY.toPx()
                     val topLeft = Offset(size.width - side, (size.height - side) / 2)
+                    // Mica rounds the key into a dot, a hairline ring until it is cleared.
                     drawRelief(
                         surface,
-                        if (row.cleared) Relief.Inset else surface.style.control,
+                        when {
+                            row.cleared -> Relief.Inset
+                            surface.style.layers -> Relief.Raised
+                            else -> surface.style.control
+                        },
                         topLeft,
                         Size(side, side),
-                        0f,
+                        if (surface.style.layers) side / 2 else 0f,
                         if (row.cleared) accentFill else ground,
                         small = true,
                     )

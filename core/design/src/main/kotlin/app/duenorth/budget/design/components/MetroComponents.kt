@@ -42,16 +42,22 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -78,6 +84,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.PivotMotion
 import app.duenorth.budget.design.metroTilt
@@ -221,11 +228,27 @@ private fun MetroFieldFrame(
             colors.isDark -> Color(0xFF909090)
             else -> Color(0xFF8F8F8F)
         }
+    // Mica marks the field being typed in with an accent line under it, as Windows 11 does.
+    var focused by remember { mutableStateOf(false) }
+    val focusLine = Metro.accent.fill
     Box(
         modifier
             .then(if (fill) Modifier.fillMaxWidth() else Modifier)
             .then(if (relief) Modifier.relief(Relief.Inset, small = true) else Modifier.background(background))
-            .heightIn(min = MetroDimens.TouchTarget)
+            .then(
+                if (Metro.style.layers) {
+                    Modifier.onFocusChanged { focused = it.hasFocus }.drawWithContent {
+                        drawContent()
+                        if (focused) {
+                            val line = 2.dp.toPx()
+                            val inset = LayerCorner.Control.toPx() / 2
+                            drawRect(focusLine, Offset(inset, size.height - line), Size(size.width - 2 * inset, line))
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            ).heightIn(min = MetroDimens.TouchTarget)
             .padding(horizontal = if (relief) 14.dp else 8.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -459,6 +482,13 @@ fun MetroAppBar(
                 .windowInsetsPadding(windowInsets)
                 .padding(start = MetroDimens.Gutter, end = MetroDimens.Gutter, bottom = MetroDimens.Gutter)
                 .relief(Relief.Inset)
+        } else if (style.layers) {
+            // Mica: an acrylic sheet floating a gutter in from the screen's edges, over the page's content.
+            Modifier
+                .background(colors.background)
+                .windowInsetsPadding(windowInsets)
+                .padding(start = MetroDimens.Gutter, end = MetroDimens.Gutter, bottom = MetroDimens.Gutter)
+                .acrylicSheet(Metro.surface)
         } else {
             Modifier.background(colors.chrome).windowInsetsPadding(windowInsets)
         }
@@ -569,6 +599,8 @@ private fun AppBarIcon(
                     when {
                         filled ->
                             Modifier.relief(Relief.Raised, small = true, corner = PillCorner, fill = accent.fill)
+                        // Mica's other buttons are bare glyphs on the acrylic.
+                        style.layers -> Modifier
                         style.relief -> Modifier.relief(Relief.Raised, small = true, corner = PillCorner, fill = ground)
                         else -> Modifier.border(MetroDimens.AppBarStroke, colors.foreground, CircleShape)
                     },
@@ -923,7 +955,11 @@ fun MetroPivot(
             maxLines = 1,
             softWrap = false,
         )
-        val gapPx = with(LocalDensity.current) { MetroDimens.Grid.roundToPx() }
+        // Mica swaps the pivot's big headers for a Windows 11 selector bar: smaller headers, the chosen one underlined.
+        val layers = Metro.style.layers
+        val headerStyle = if (layers) type.sectionHeader.copy(fontSize = 30.sp) else type.sectionHeader
+        val selectorLine = Metro.accent.fill
+        val gapPx = with(LocalDensity.current) { (if (layers) 20.dp else MetroDimens.Grid).roundToPx() }
         val gutterPx = with(LocalDensity.current) { MetroDimens.Gutter.roundToPx() }
         Layout(
             content = {
@@ -939,9 +975,10 @@ fun MetroPivot(
                         )
                         MetroText(
                             items[index].header,
-                            type.sectionHeader,
+                            headerStyle,
                             Modifier
                                 .heightIn(min = MetroDimens.TouchTarget)
+                                .then(if (layers && isSelected) Modifier.drawBehind { drawSelectorLine(selectorLine) } else Modifier)
                                 .semantics {
                                     role = Role.Tab
                                     this.selected = isSelected
@@ -987,4 +1024,15 @@ fun MetroPivot(
             }
         }
     }
+}
+
+/** The short accent line under mica's chosen pivot header. */
+private fun DrawScope.drawSelectorLine(color: Color) {
+    val line = 3.dp.toPx()
+    drawRoundRect(
+        color,
+        Offset(0f, size.height - line),
+        Size(28.dp.toPx(), line),
+        CornerRadius(line / 2),
+    )
 }

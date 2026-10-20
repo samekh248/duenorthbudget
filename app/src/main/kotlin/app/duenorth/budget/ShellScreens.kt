@@ -435,7 +435,14 @@ fun BudgetSection(
         Row(
             Modifier
                 .fillMaxWidth()
-                .then(if (tiles) Modifier.padding(top = 6.dp) else Modifier),
+                .then(
+                    when {
+                        tiles -> Modifier.padding(top = 6.dp)
+                        // Mica holds both figures on one layer card.
+                        style.layers -> Modifier.padding(top = 6.dp).relief(Relief.Raised).padding(horizontal = 12.dp, vertical = 8.dp)
+                        else -> Modifier
+                    },
+                ),
             horizontalArrangement = if (tiles) Arrangement.spacedBy(MetroDimens.Gutter) else Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top,
         ) {
