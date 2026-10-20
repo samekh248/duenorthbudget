@@ -37,7 +37,9 @@ fun MetroSegmentedToggle(
     tag: String,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier.height(IntrinsicSize.Min).testTag(tag)) {
+    // Soft relief: the two options share a pressed-in track, and the chosen one stands out of it.
+    val track = if (Metro.style.relief) Modifier.relief(Relief.Inset, small = true).padding(4.dp) else Modifier
+    Row(modifier.height(IntrinsicSize.Min).then(track).testTag(tag)) {
         Segment(first, firstSelected, "$tag-$first") { onSelect(true) }
         Segment(second, !firstSelected, "$tag-$second") { onSelect(false) }
     }
@@ -52,13 +54,21 @@ private fun Segment(
 ) {
     val accent = Metro.accent
     val ink = Metro.colors.foreground
+    val relief = Metro.style.relief
     Box(
         Modifier
             .fillMaxHeight()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .background(if (selected) accent.fill else Color.Transparent)
-            .border(MetroDimens.Stroke, if (selected) accent.fill else ink)
-            .metroPress(onClick)
+            .heightIn(min = if (relief) MetroDimens.TouchTarget - 8.dp else MetroDimens.TouchTarget)
+            .then(
+                when {
+                    relief && selected -> Modifier.relief(Relief.Raised, small = true)
+                    relief -> Modifier
+                    else ->
+                        Modifier
+                            .background(if (selected) accent.fill else Color.Transparent)
+                            .border(MetroDimens.Stroke, if (selected) accent.fill else ink)
+                },
+            ).metroPress(onClick)
             .semantics {
                 this.selected = selected
                 role = Role.Tab
@@ -66,6 +76,17 @@ private fun Segment(
             .testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
-        MetroText(label, Metro.typography.control, color = if (selected) accent.onFill else ink, maxLines = 1, softWrap = false)
+        MetroText(
+            label,
+            Metro.typography.control,
+            color =
+                when {
+                    !selected -> ink
+                    relief -> accent.text
+                    else -> accent.onFill
+                },
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }

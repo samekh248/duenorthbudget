@@ -39,8 +39,13 @@ fun <T> MetroComboBox(
     Column(
         modifier
             .fillMaxWidth()
-            .border(MetroDimens.Stroke, if (open) Metro.accent.fill else Metro.colors.foreground)
-            .testTag(tag),
+            .then(
+                if (Metro.style.relief) {
+                    Modifier.relief(if (open) Relief.Inset else Relief.Raised, small = true).padding(horizontal = 4.dp)
+                } else {
+                    Modifier.border(MetroDimens.Stroke, if (open) Metro.accent.fill else Metro.colors.foreground)
+                },
+            ).testTag(tag),
     ) {
         if (!open) {
             MetroComboValue(

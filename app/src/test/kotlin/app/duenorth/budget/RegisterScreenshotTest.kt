@@ -21,6 +21,7 @@ import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.asScreenActions
+import app.duenorth.budget.design.theme.MetroStyle
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -126,13 +127,26 @@ class RegisterScreenshotTest {
     @Test
     fun searchDark() = snapSearch("register_search_dark", dark = true)
 
+    // The soft-relief styles on the register, plain and searching.
+    @Test
+    fun styleRegisters() =
+        MetroStyle.entries.filter { it.relief }.forEach { style ->
+            for (dark in listOf(false, true)) {
+                val theme = if (dark) "dark" else "light"
+                snapSearch("style_${style.id}_register_$theme", dark, style, search = null)
+                snapSearch("style_${style.id}_register_search_$theme", dark, style)
+            }
+        }
+
     /** The search open over the rows: "groc" keeps Corner Coffee and the split with a groceries part. */
     private fun snapSearch(
         name: String,
         dark: Boolean,
+        style: MetroStyle = MetroStyle.Metro,
+        search: RegisterSearch? = RegisterSearch(query = "groc"),
     ) {
         captureRoboImage("src/test/snapshots/$name.png") {
-            MetroTheme(darkTheme = dark) {
+            MetroTheme(darkTheme = dark, style = style) {
                 Column(Modifier.width(390.dp).height(780.dp)) {
                     SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
                         RegisterScreen(
@@ -141,7 +155,7 @@ class RegisterScreenshotTest {
                             onOpen = {},
                             onAdd = {},
                             onReconcile = {},
-                            search = RegisterSearch(query = "groc"),
+                            search = search,
                         )
                     }
                     MetroAppBar(

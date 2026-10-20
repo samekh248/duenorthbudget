@@ -50,13 +50,16 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
@@ -209,20 +212,27 @@ private fun MetroFieldFrame(
     field: @Composable (TextStyle, SolidColor) -> Unit,
 ) {
     val colors = Metro.colors
+    // A soft-relief style presses the box into the page and writes in the page's own ink.
+    val relief = Metro.style.relief
     val background = if (colors.isDark) Color.White else Color(0xFFBFBFBF)
-    val hintColor = if (colors.isDark) Color(0xFF909090) else Color(0xFF8F8F8F)
+    val hintColor =
+        when {
+            relief -> colors.secondary
+            colors.isDark -> Color(0xFF909090)
+            else -> Color(0xFF8F8F8F)
+        }
     Box(
         modifier
             .then(if (fill) Modifier.fillMaxWidth() else Modifier)
-            .background(background)
+            .then(if (relief) Modifier.relief(Relief.Inset, small = true) else Modifier.background(background))
             .heightIn(min = MetroDimens.TouchTarget)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = if (relief) 14.dp else 8.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         if (empty) {
             MetroText(hint, Metro.typography.control, color = hintColor)
         }
-        field(Metro.typography.control.copy(color = Color.Black), SolidColor(Metro.accent.fill))
+        field(Metro.typography.control.copy(color = if (relief) colors.foreground else Color.Black), SolidColor(Metro.accent.fill))
     }
 }
 
@@ -332,6 +342,7 @@ private fun MetroActionButton(
     val colors = Metro.colors
     val accent = Metro.accent
     val animations = Metro.animations
+    val relief = Metro.style.relief
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     Box(
@@ -343,15 +354,27 @@ private fun MetroActionButton(
                 role = Role.Button,
                 onClick = onClick,
             ).graphicsLayer { rotationZ = if (pressed && animations) 2.5f else 0f }
-            .border(MetroDimens.Stroke, colors.foreground)
-            .background(if (pressed) accent.fill else Color.Transparent)
-            .padding(horizontal = 9.5.dp, vertical = 3.5.dp),
+            .then(
+                if (relief) {
+                    // Soft relief: the button stands off the page and presses in under the finger.
+                    Modifier.relief(if (pressed) Relief.Inset else Relief.Raised, small = true)
+                } else {
+                    Modifier
+                        .border(MetroDimens.Stroke, colors.foreground)
+                        .background(if (pressed) accent.fill else Color.Transparent)
+                },
+            ).padding(horizontal = 9.5.dp, vertical = 3.5.dp),
         contentAlignment = Alignment.Center,
     ) {
         MetroText(
             label,
             Metro.typography.body.copy(fontWeight = MetroWeights.Semibold),
-            color = if (pressed) Color.White else colors.foreground,
+            color =
+                when {
+                    relief && pressed -> accent.text
+                    pressed -> Color.White
+                    else -> colors.foreground
+                },
         )
     }
 }
@@ -427,6 +450,24 @@ fun MetroAppBar(
             onDispose { if (host.expanded === registration) host.expanded = null }
         }
     }
+    val style = Metro.style
+    val chrome =
+        when {
+            // A dock floats over the page with a margin; the bar's ground is the page itself.
+            style.dock ->
+                Modifier
+                    .background(colors.background)
+                    .windowInsetsPadding(windowInsets)
+                    .padding(start = MetroDimens.Gutter, end = MetroDimens.Gutter, top = 6.dp, bottom = MetroDimens.Gutter)
+                    .relief(Relief.Raised, corner = DOCK_CORNER)
+            // Quiet relief keeps a full-width bar on the page color, parted from the list by a hairline.
+            style.relief ->
+                Modifier
+                    .background(colors.background)
+                    .drawBehind { drawLine(colors.outline, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }
+                    .windowInsetsPadding(windowInsets)
+            else -> Modifier.background(colors.chrome).windowInsetsPadding(windowInsets)
+        }
     Column(
         modifier
             .fillMaxWidth()
@@ -436,8 +477,7 @@ fun MetroAppBar(
                 } else {
                     Modifier
                 },
-            ).background(colors.chrome)
-            .windowInsetsPadding(windowInsets)
+            ).then(chrome)
             .animateContentSize(tween(MetroMotion.SHORT_MS, easing = MetroMotion.EaseOut)),
     ) {
         Box(Modifier.fillMaxWidth().heightIn(min = MetroDimens.AppBar)) {
@@ -492,6 +532,8 @@ fun MetroAppBar(
     }
 }
 
+private val DOCK_CORNER = 28.dp
+
 /** The three small dots of the WP8.1 ellipsis. */
 @Composable
 private fun EllipsisDots(color: Color) {
@@ -522,13 +564,28 @@ private fun AppBarIcon(
             ).semantics { contentDescription = action.label },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        val style = Metro.style
+        // Glow tiles fills add with the accent, so the day's main action leads the bar.
+        val filled = style.squareButtons && action.glyph == AppGlyph.Add
+        val accent = Metro.accent
         Box(
             Modifier
                 .size(MetroDimens.AppBarIcon)
-                .border(MetroDimens.AppBarStroke, colors.foreground, CircleShape),
+                .then(
+                    when {
+                        filled ->
+                            Modifier.relief(
+                                Relief.Raised,
+                                small = true,
+                                brush = Brush.linearGradient(listOf(accent.fill, accent.fill.darken(0.25f))),
+                            )
+                        style.relief -> Modifier.relief(Relief.Raised, small = true, corner = if (style.squareButtons) null else PillCorner)
+                        else -> Modifier.border(MetroDimens.AppBarStroke, colors.foreground, CircleShape)
+                    },
+                ),
             contentAlignment = Alignment.Center,
         ) {
-            AppGlyphIcon(action.glyph)
+            AppGlyphIcon(action.glyph, if (filled) accent.onFill else colors.foreground)
         }
         if (showLabel) {
             MetroText(
@@ -941,3 +998,6 @@ fun MetroPivot(
         }
     }
 }
+
+/** [this] moved [amount] of the way to black: the deep end of a lit accent fill. */
+fun Color.darken(amount: Float): Color = lerp(this, Color.Black, amount)

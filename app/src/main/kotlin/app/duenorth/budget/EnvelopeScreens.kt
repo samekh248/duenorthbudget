@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -45,7 +47,10 @@ import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.PillCorner
+import app.duenorth.budget.design.components.Relief
 import app.duenorth.budget.design.components.metroPress
+import app.duenorth.budget.design.components.relief
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 
@@ -488,7 +493,7 @@ fun CategoryLine(
             MetroText(
                 category.name,
                 Metro.typography.body,
-                Modifier.weight(LEDGER_NAME).padding(end = MetroDimens.Gutter),
+                Modifier.weight(if (Metro.style.wells) LEDGER_NAME_BESIDE_WELL else LEDGER_NAME).padding(end = MetroDimens.Gutter),
                 color = if (category.hidden) Metro.colors.secondary else Metro.colors.foreground,
                 maxLines = 2,
             )
@@ -509,6 +514,7 @@ fun CategoryLine(
                 Metro.typography.body,
                 Metro.accent.text,
                 "category-available-${category.id}",
+                well = Metro.style.wells,
             )
         }
         if (progress != null) GoalBar(progress, Modifier.padding(bottom = GOAL_BAR_GAP).testTag("category-goal-${category.id}"))
@@ -521,6 +527,10 @@ private fun GoalBar(
     progress: Float,
     modifier: Modifier = Modifier,
 ) {
+    if (Metro.style.grooves) {
+        GoalGroove(progress, modifier)
+        return
+    }
     Row(
         modifier
             .fillMaxWidth()
@@ -532,16 +542,54 @@ private fun GoalBar(
     }
 }
 
+/** Glow tiles' goal bar: a pressed-in groove, lit with the accent as far as the goal is funded. */
+@Composable
+private fun GoalGroove(
+    progress: Float,
+    modifier: Modifier = Modifier,
+) {
+    val fill = Metro.accent.fill
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(GOAL_GROOVE_HEIGHT)
+            .relief(Relief.Inset, small = true, corner = PillCorner)
+            .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) },
+    ) {
+        if (progress > 0f) {
+            Box(
+                Modifier
+                    .fillMaxWidth(progress)
+                    .fillMaxHeight()
+                    .background(Brush.horizontalGradient(listOf(fill.copy(alpha = 0.75f), fill)), RoundedCornerShape(PillCorner)),
+            )
+        }
+    }
+}
+
+private val GOAL_GROOVE_HEIGHT = 8.dp
 private val GOAL_BAR_HEIGHT = 3.dp
 private val GOAL_BAR_GAP = 6.dp
 
 @Composable
 internal fun LedgerHeadings(modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-        Spacer(Modifier.weight(LEDGER_NAME))
+        Spacer(Modifier.weight(if (Metro.style.wells) LEDGER_NAME_BESIDE_WELL else LEDGER_NAME))
         LedgerCell("budgeted", Metro.typography.caption, Metro.colors.secondary, "ledger-budgeted")
         LedgerCell("spent", Metro.typography.caption, Metro.colors.secondary, "ledger-spent")
-        LedgerCell("available", Metro.typography.caption, Metro.colors.secondary, "ledger-available")
+        // Over soft clay's wells the heading takes the wider well column and sits over the figure inside it.
+        val wells = Metro.style.wells
+        MetroText(
+            "available",
+            Metro.typography.caption.copy(textAlign = TextAlign.End),
+            Modifier
+                .weight(if (wells) LEDGER_WELL else LEDGER_FIGURE)
+                .padding(end = if (wells) 8.dp else 0.dp)
+                .testTag("ledger-available"),
+            color = Metro.colors.secondary,
+            maxLines = 1,
+            softWrap = false,
+        )
     }
 }
 
@@ -551,11 +599,24 @@ internal fun RowScope.LedgerCell(
     style: TextStyle,
     color: Color,
     tag: String,
+    /** Soft clay sets the figure in a pressed-in well. */
+    well: Boolean = false,
 ) {
     MetroText(
         text,
         style.copy(textAlign = TextAlign.End),
-        Modifier.weight(LEDGER_FIGURE).testTag(tag),
+        Modifier
+            .weight(if (well) LEDGER_WELL else LEDGER_FIGURE)
+            .then(
+                if (well) {
+                    Modifier
+                        .padding(start = 6.dp)
+                        .relief(Relief.Inset, small = true, corner = PillCorner)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                } else {
+                    Modifier
+                },
+            ).testTag(tag),
         color = color,
         maxLines = 1,
         softWrap = false,
@@ -564,3 +625,9 @@ internal fun RowScope.LedgerCell(
 
 internal const val LEDGER_NAME = 1.8f
 internal const val LEDGER_FIGURE = 1f
+
+/** Soft clay's available column: wide enough for a figure and its well's padding. */
+internal const val LEDGER_WELL = 1.35f
+
+/** The name column gives up a little room to soft clay's wells, so every figure still fits. */
+internal const val LEDGER_NAME_BESIDE_WELL = 1.5f

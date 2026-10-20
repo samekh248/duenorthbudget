@@ -27,6 +27,7 @@ import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.asScreenActions
+import app.duenorth.budget.design.theme.MetroStyle
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -93,6 +94,32 @@ class ShellScreenshotTest {
                     },
             )
         }
+
+    // The soft-relief styles (settings, appearance, style): the month with goals, and the accounts list.
+    @Test
+    fun styleHomes() =
+        MetroStyle.entries.filter { it.relief }.forEach { style ->
+            for (dark in listOf(false, true)) {
+                val theme = if (dark) "dark" else "light"
+                snap("style_${style.id}_home_$theme", dark, withGoals(), prefs = templatesOn, style = style)
+                snap(
+                    "style_${style.id}_accounts_$theme",
+                    dark,
+                    sample().copy(accounts = manyAccounts()),
+                    section = HomeSections.headers.indexOf(HomeSections.ACCOUNTS),
+                    style = style,
+                )
+            }
+        }
+
+    @Test
+    fun styleOverbudgetedDark() =
+        snap(
+            "style_glow-tiles_home_overbudgeted_dark",
+            dark = true,
+            shell = sample().copy(headerMinor = -12_550),
+            style = MetroStyle.GlowTiles,
+        )
 
     @Test
     fun homeHiddenShownLight() = snap("home_hidden_shown_light", dark = false, shell = withHidden())
@@ -180,12 +207,13 @@ class ShellScreenshotTest {
         selection: Set<String>? = null,
         netWorth: NetWorthPage? = null,
         prefs: FormatPrefs = FormatPrefs(),
+        style: MetroStyle = MetroStyle.Metro,
     ) {
         val inbox = section == HomeSections.headers.indexOf(HomeSections.INBOX)
         val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
         val justFiled = if (filed) listOf(InboxFiled(shell.inbox.first(), 0, "Dining")) else emptyList()
         captureRoboImage("src/test/snapshots/$name.png") {
-            MetroTheme(darkTheme = dark) {
+            MetroTheme(darkTheme = dark, style = style) {
                 CompositionLocalProvider(LocalFormatPrefs provides prefs) {
                     Column(Modifier.width(390.dp).height(780.dp)) {
                         HomePivot(
@@ -213,6 +241,12 @@ class ShellScreenshotTest {
                                         listOf(
                                             AppBarButton(AppGlyph.Add, "add", onClick = {}),
                                             AppBarButton(AppGlyph.Select, InboxCopy.SELECT, onClick = {}),
+                                        )
+                                    style.relief ->
+                                        listOf(
+                                            AppBarButton(AppGlyph.Hold, "hold", onClick = {}),
+                                            AppBarButton(AppGlyph.Add, "add", onClick = {}),
+                                            AppBarButton(AppGlyph.Categories, "categories", onClick = {}),
                                         )
                                     else ->
                                         listOf(

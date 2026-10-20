@@ -42,6 +42,7 @@ import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.MetroStyle
 
 /** One pivot item's scrolling column; its scroll offset is handed back when it leaves (research R3). */
 @Composable
@@ -213,6 +214,8 @@ internal fun AppearanceItem(
     onTheme: (String) -> Unit,
     onAccent: (String) -> Unit,
     onLauncherIcon: (LauncherIcon) -> Unit,
+    styleId: String = MetroStyle.Default.id,
+    onStyle: (String) -> Unit = {},
 ) {
     SettingsHeading("theme", first = true)
     ThemeMode.entries.forEach { mode ->
@@ -223,6 +226,10 @@ internal fun AppearanceItem(
                 ThemeMode.DARK -> "dark"
             }
         ChoiceRow(label, ThemeMode.fromStored(themeMode) == mode, "settings-theme-${mode.stored()}") { onTheme(mode.stored()) }
+    }
+    SettingsHeading("style")
+    MetroStyle.entries.forEach { style ->
+        ChoiceRow(style.label, MetroStyle.fromId(styleId) == style, "settings-style-${style.id}") { onStyle(style.id) }
     }
     SettingsHeading("accent")
     Column(
