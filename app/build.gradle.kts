@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -34,11 +36,34 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        // The release key is private and never in this repository: its path and passwords come from
+        // a keystore.properties named by DUENORTH_SIGNING (or at the repo root), or DUENORTH_* variables.
+        // Without one, the release APK is left unsigned.
+        val signing =
+            Properties().apply {
+                val named = System.getenv("DUENORTH_SIGNING")?.let(::File) ?: rootProject.file("keystore.properties")
+                if (named.isFile) named.inputStream().use(::load)
+            }
+
+        fun signingValue(
+            key: String,
+            env: String,
+        ): String? = signing.getProperty(key) ?: System.getenv(env)
+        val releaseStore = signingValue("storeFile", "DUENORTH_KEYSTORE")
+        if (releaseStore != null) {
+            create("release") {
+                storeFile = file(releaseStore)
+                storePassword = signingValue("storePassword", "DUENORTH_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "DUENORTH_KEY_ALIAS")
+                keyPassword = signingValue("keyPassword", "DUENORTH_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

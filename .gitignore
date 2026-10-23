@@ -22,3 +22,7 @@ captures/
 .env*
 *.tmp
 *.swp
+keystore.properties
+*.jks
+*.keystore
+!app/debug.keystore
