@@ -50,6 +50,7 @@ import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.MetroStyle
 import app.duenorth.budget.design.theme.MetroTheme
 import app.duenorth.budget.design.turnstileIn
 import java.io.File
@@ -232,6 +233,7 @@ fun DueNorthApp(model: ShellViewModel) {
     MetroTheme(
         darkTheme = dark,
         accent = Accent.fromId(state.settings.accent),
+        style = MetroStyle.fromId(state.settings.style),
         animationsEnabled = MotionPolicy.enabled(scale),
     ) {
         val openName =
@@ -419,6 +421,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 openBudgetId = state.settings.openBudgetId,
                                 themeMode = state.settings.themeMode,
                                 accentId = state.settings.accent,
+                                styleId = state.settings.style,
                                 formatPrefs = state.formatPrefs,
                                 cloudFileId = state.cloudFileId,
                                 encrypted = state.budgetEncrypted,
@@ -428,6 +431,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onOpenBudget = model::requestSwitch,
                                 onTheme = model::setTheme,
                                 onAccent = model::setAccent,
+                                onStyle = model::setStyle,
                                 launcherIcon = launcherIcon,
                                 onLauncherIcon = {
                                     LauncherIcons.set(context, it)

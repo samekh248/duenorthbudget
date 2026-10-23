@@ -25,6 +25,7 @@ import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.PivotItem
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.MetroStyle
 
 enum class AdvancedConfirm {
     Rebuild,
@@ -119,6 +120,8 @@ fun SettingsScreen(
     onOpenBudget: (String) -> Unit,
     onTheme: (String) -> Unit,
     onAccent: (String) -> Unit,
+    styleId: String = MetroStyle.Default.id,
+    onStyle: (String) -> Unit = {},
     onPayees: () -> Unit,
     onDateFormat: (String) -> Unit,
     onNumberFormat: (String) -> Unit,
@@ -178,6 +181,8 @@ fun SettingsScreen(
                                 launcherIcon = launcherIcon,
                                 onTheme = onTheme,
                                 onAccent = onAccent,
+                                styleId = styleId,
+                                onStyle = onStyle,
                                 onLauncherIcon = onLauncherIcon,
                             )
                         SettingsPage.ADVANCED ->

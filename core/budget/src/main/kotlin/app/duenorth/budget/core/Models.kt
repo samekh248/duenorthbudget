@@ -335,6 +335,8 @@ data class PhoneSettings(
     val openBudgetId: String? = null,
     val themeMode: String = "system",
     val accent: String = "magenta",
+    /** The look: "metro", or a soft-relief style ("soft-clay", "quiet-relief", "glow-tiles"). */
+    val style: String = "metro",
     val netWorthIncludeOffBudget: Boolean = true,
     val serverAddress: String? = null,
     val instances: List<SavedInstance> = emptyList(),

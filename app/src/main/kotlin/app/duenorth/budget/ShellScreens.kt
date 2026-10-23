@@ -74,8 +74,10 @@ import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.PivotItem
 import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
+import app.duenorth.budget.design.components.relief
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.Relief
 import kotlinx.coroutines.flow.first
 import java.time.YearMonth
 
@@ -408,24 +410,51 @@ fun BudgetSection(
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
+    val style = Metro.style
+    val error = shell.headerMinor < 0
+    // Tile relief sets to budget on a flat accent tile (red while overbudgeted) and held on a raised neutral one.
+    val tiles = style.heroTiles
+    val onTile = if (tiles) (if (error) Metro.colors.onErrorFill else Metro.accent.onFill) else null
+    val tile = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            Modifier
+                .fillMaxWidth()
+                .then(
+                    when {
+                        tiles -> Modifier.padding(top = 6.dp)
+                        // Mica holds both figures on one layer card.
+                        style.layers -> Modifier.padding(top = 6.dp).relief(Relief.Raised).padding(horizontal = 12.dp, vertical = 8.dp)
+                        else -> Modifier
+                    },
+                ),
+            horizontalArrangement = if (tiles) Arrangement.spacedBy(MetroDimens.Gutter) else Arrangement.SpaceBetween,
             verticalAlignment = Alignment.Top,
         ) {
             BudgetTotal(
                 label = shell.headerLabel,
                 amount = MoneyFormat.format(shell.headerMinor, shell.currency, formatOptions),
-                amountColor = Metro.accent.text,
+                amountColor = onTile ?: Metro.accent.text,
                 amountTag = "to-budget",
-                error = shell.headerMinor < 0,
+                error = error,
+                labelColor = onTile,
                 modifier =
-                    if (onToBudget == null) {
-                        Modifier
-                    } else {
-                        Modifier.metroPress(onClick = onToBudget).testTag("to-budget-figure")
-                    },
+                    (
+                        if (tiles) {
+                            Modifier
+                                .weight(1.3f)
+                                .relief(Relief.Raised, small = true, fill = if (error) Metro.colors.errorFill else Metro.accent.fill)
+                                .then(tile)
+                        } else {
+                            Modifier
+                        }
+                    ).then(
+                        if (onToBudget == null) {
+                            Modifier
+                        } else {
+                            Modifier.metroPress(onClick = onToBudget).testTag("to-budget-figure")
+                        },
+                    ),
             )
             if (shell.bufferedMinor != 0L) {
                 BudgetTotal(
@@ -434,6 +463,7 @@ fun BudgetSection(
                     amountColor = Metro.colors.secondary,
                     amountTag = "held-amount",
                     alignEnd = true,
+                    modifier = if (tiles) Modifier.weight(1f).relief(Relief.Raised, small = true).then(tile) else Modifier,
                 )
             }
         }
@@ -448,9 +478,20 @@ fun BudgetSection(
                 MetroText(ShellCopy.NOTHING_TO_BUDGET, Metro.typography.caption, Modifier.padding(top = MetroDimens.Grid))
             }
         } else {
-            LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid), state = list) {
+            val cards = ledgerBlocks
+            LazyColumn(
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = if (cards) 0.dp else MetroDimens.Grid)
+                    .bleedGutter(cards),
+                state = list,
+                contentPadding = cardListPadding(cards, top = MetroDimens.Grid),
+            ) {
                 if (shell.groups.any { it.categories.isNotEmpty() }) {
-                    item(key = "ledger-headings") { LedgerHeadings() }
+                    item(key = "ledger-headings") {
+                        LedgerHeadings(if (cards) Modifier.padding(horizontal = MetroDimens.Gutter) else Modifier)
+                    }
                 }
                 // Bands alternate down the whole list, carrying on across group headings.
                 val position =
@@ -459,6 +500,26 @@ fun BudgetSection(
                             shell.incomeGroups.flatMap { g -> g.categories.map { it.id } }
                     ).withIndex()
                         .associate { it.value to it.index }
+                if (cards) {
+                    // Each group is one block (panel or channel), so its heading and rows travel together.
+                    shell.groups.forEach { group ->
+                        item(key = group.id) {
+                            LedgerGroup(arrivalModifier(group.id, arrivals), { GroupLine(group, shell, formatOptions = formatOptions) }) {
+                                group.categories.forEach { CategoryLine(it, shell, onCategory, formatOptions = formatOptions) }
+                            }
+                            GroupGap()
+                        }
+                    }
+                    shell.incomeGroups.forEach { group ->
+                        item(key = "income-${group.id}") {
+                            LedgerGroup(heading = { IncomeGroupLine(group, shell, formatOptions = formatOptions) }) {
+                                group.categories.forEach { IncomeCategoryLine(it, shell, onCategory, formatOptions = formatOptions) }
+                            }
+                            GroupGap()
+                        }
+                    }
+                    return@LazyColumn
+                }
                 shell.groups.forEach { group ->
                     item(key = group.id) {
                         GroupLine(
@@ -522,13 +583,15 @@ internal fun BudgetTotal(
     alignEnd: Boolean = false,
     modifier: Modifier = Modifier,
     error: Boolean = false,
+    /** Ink for the caption, on a tile; null keeps the page's secondary (or error) color. */
+    labelColor: Color? = null,
 ) {
     val align = if (alignEnd) TextAlign.End else TextAlign.Start
     Column(modifier, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
         MetroText(
             if (error) ShellCopy.OVERBUDGETED else label,
             Metro.typography.caption.copy(textAlign = align),
-            color = if (error) Metro.colors.error else Metro.colors.secondary,
+            color = labelColor?.copy(alpha = 0.85f) ?: if (error) Metro.colors.error else Metro.colors.secondary,
             modifier = if (error) Modifier.testTag("$amountTag-error") else Modifier,
         )
         if (error) {
@@ -654,23 +717,48 @@ fun AccountsSection(
             amountColor = Metro.accent.text,
             amountTag = "accounts-total",
         )
-        LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid), state = list) {
-            groups.forEach { (id, name, rows) ->
-                item(key = "account-group-$id") {
-                    GroupHeading(name, "account-group", id) {
-                        MetroText(money(rows.sumOf { a -> a.balanceMinor }), Metro.typography.groupHeader, it)
+        val cards = ledgerBlocks
+        LazyColumn(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(top = if (cards) 0.dp else MetroDimens.Grid)
+                .bleedGutter(cards),
+            state = list,
+            contentPadding = cardListPadding(cards, top = MetroDimens.Grid),
+        ) {
+            if (cards) {
+                groups.forEach { (id, name, rows) ->
+                    item(key = "account-group-$id") {
+                        LedgerGroup(heading = {
+                            GroupHeading(name, "account-group", id) {
+                                MetroText(money(rows.sumOf { a -> a.balanceMinor }), Metro.typography.groupHeader, it)
+                            }
+                        }) {
+                            rows.forEach { AccountLine(it, money(it.balanceMinor), onAccount, arrivalModifier(it.id, arrivals)) }
+                        }
+                        GroupGap()
                     }
                 }
-                items(rows, key = { it.id }) {
-                    AccountLine(
-                        it,
-                        money(it.balanceMinor),
-                        onAccount,
-                        arrivalModifier(it.id, arrivals),
-                        banded = ledgerBanded(position.getValue(it.id)),
-                    )
+            }
+            if (!cards) {
+                groups.forEach { (id, name, rows) ->
+                    item(key = "account-group-$id") {
+                        GroupHeading(name, "account-group", id) {
+                            MetroText(money(rows.sumOf { a -> a.balanceMinor }), Metro.typography.groupHeader, it)
+                        }
+                    }
+                    items(rows, key = { it.id }) {
+                        AccountLine(
+                            it,
+                            money(it.balanceMinor),
+                            onAccount,
+                            arrivalModifier(it.id, arrivals),
+                            banded = ledgerBanded(position.getValue(it.id)),
+                        )
+                    }
+                    item(key = "account-gap-$id") { GroupGap() }
                 }
-                item(key = "account-gap-$id") { GroupGap() }
             }
             if (closed.isNotEmpty()) {
                 item(key = "account-group-closed") {

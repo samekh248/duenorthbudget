@@ -101,9 +101,12 @@ import app.duenorth.budget.design.components.MetroPickerColumn
 import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.ScreenAction
+import app.duenorth.budget.design.components.controlFrame
+import app.duenorth.budget.design.components.drawRelief
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.Relief
 import java.time.LocalDate
 import java.time.Month
 import java.util.Locale
@@ -259,7 +262,8 @@ private fun RegisterList(
     val days = registerDays(listed)
     val position = listed.withIndex().associate { it.value.id to it.index }
     val byId = rows.associateBy { it.id }
-    LazyColumn(modifier, state = list) {
+    val cards = ledgerBlocks
+    LazyColumn(modifier.bleedGutter(cards), state = list, contentPadding = cardListPadding(cards)) {
         pairs.forEach { pair ->
             item(key = "match-${pair.key}") {
                 RegisterMatch(
@@ -272,6 +276,32 @@ private fun RegisterList(
                     onNotAMatch = { onNotAMatch(pair) },
                 )
             }
+        }
+        if (cards) {
+            // Each day is one block (panel or channel) under its date, so the rows of a day travel together.
+            days.forEach { day ->
+                item(key = "day-${day.first().id}") {
+                    MetroText(
+                        RegisterEntry.registerDateLabel(day.first().date),
+                        Metro.typography.caption,
+                        Modifier.padding(top = 16.dp, bottom = 8.dp).testTag("register-day-${day.first().date}"),
+                        color = Metro.accent.text,
+                    )
+                    LedgerGroup(Modifier.padding(bottom = 4.dp), heading = {}) {
+                        day.forEach { row ->
+                            RegisterLine(
+                                row,
+                                page,
+                                banded = false,
+                                picked = selection?.let { row.id in it },
+                                onPress = { onPress(row.id) },
+                                onLongPress = { onLongPress(row.id) },
+                            )
+                        }
+                    }
+                }
+            }
+            return@LazyColumn
         }
         days.forEach { day ->
             item(key = "day-${day.first().id}") {
@@ -389,12 +419,44 @@ internal fun RegisterLine(
     val letter = if (row.cleared) Metro.colors.background else Metro.colors.secondary.copy(alpha = 0.7f)
     val measurer = rememberTextMeasurer()
     val mark = Metro.typography.caption.copy(color = letter, fontWeight = FontWeight.SemiBold)
+    // A relief style marks cleared with a small square key at the row's end instead of the edge bar: standing up
+    // and dim when not cleared, pressed in and filled with the accent when cleared.
+    val surface = Metro.surface
+    val relief = surface.style.relief
+    val ground = Metro.colors.background
+    val accentFill = Metro.accent.fill
+    val keyMark =
+        Metro.typography.caption.copy(
+            color = if (row.cleared) Metro.accent.onFill else Metro.colors.secondary,
+            fontWeight = FontWeight.SemiBold,
+        )
     Column(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .ledgerFill(fill)
             .drawBehind {
+                if (relief) {
+                    val side = CLEARED_KEY.toPx()
+                    val topLeft = Offset(size.width - side, (size.height - side) / 2)
+                    // Mica rounds the key into a dot, a hairline ring until it is cleared.
+                    drawRelief(
+                        surface,
+                        when {
+                            row.cleared -> Relief.Inset
+                            surface.style.layers -> Relief.Raised
+                            else -> surface.style.control
+                        },
+                        topLeft,
+                        Size(side, side),
+                        if (surface.style.layers) side / 2 else 0f,
+                        if (row.cleared) accentFill else ground,
+                        small = true,
+                    )
+                    val c = measurer.measure(RegisterCopy.CLEARED_MARK, keyMark)
+                    drawText(c, topLeft = Offset(topLeft.x + (side - c.size.width) / 2, topLeft.y + (side - c.size.height) / 2))
+                    return@drawBehind
+                }
                 // The bar sits at the right edge, past the screen gutter.
                 val gutter = MetroDimens.Gutter.toPx()
                 val inset = 6.dp.toPx()
@@ -404,8 +466,15 @@ internal fun RegisterLine(
                 drawText(c, topLeft = Offset(left + (CLEARED_BAR.toPx() - c.size.width) / 2, (size.height - c.size.height) / 2))
             }.metroPress(onPress, onLongPress)
             .padding(vertical = REGISTER_ROW_AIR)
-            .padding(end = CLEARED_BAR + CLEARED_BAR_INSET + CLEARED_BAR_GAP - MetroDimens.Gutter)
-            .semantics {
+            .padding(
+                end =
+                    if (relief) {
+                        CLEARED_KEY + CLEARED_BAR_GAP
+                    } else {
+                        CLEARED_BAR + CLEARED_BAR_INSET + CLEARED_BAR_GAP -
+                            MetroDimens.Gutter
+                    },
+            ).semantics {
                 stateDescription = if (row.cleared) RegisterCopy.CLEARED else RegisterCopy.NOT_CLEARED
                 if (picked != null) selected = picked
             }.testTag("register-row-${row.id}"),
@@ -498,6 +567,9 @@ private fun SelectBox(
 }
 
 private val CLEARED_BAR = 16.dp
+
+/** The cleared key of a relief style: a touch smaller than the payee's two lines. */
+private val CLEARED_KEY = 28.dp
 private val CLEARED_BAR_INSET = 2.dp
 private val CLEARED_BAR_GAP = 6.dp
 private val SELECT_BOX = 32.dp
@@ -675,7 +747,7 @@ fun TransactionForm(
                     Modifier
                         .widthIn(max = width)
                         .fillMaxWidth()
-                        .border(MetroDimens.Stroke, Metro.colors.foreground)
+                        .controlFrame()
                         .testTag("transaction-date"),
                 ) {
                     MetroComboValue(

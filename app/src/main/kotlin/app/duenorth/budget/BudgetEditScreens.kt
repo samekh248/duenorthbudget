@@ -24,6 +24,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
@@ -36,9 +39,13 @@ import app.duenorth.budget.core.MoneyMath
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.acrylicSheet
+import app.duenorth.budget.design.components.layerSlice
 import app.duenorth.budget.design.components.metroPress
+import app.duenorth.budget.design.components.relief
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.Relief
 
 object BudgetEditCopy {
     const val EDIT = "edit budget"
@@ -160,13 +167,17 @@ fun BudgetEditSection(
                 .flatMap { g -> g.categories.map { it.id } }
                 .withIndex()
                 .associate { it.value to it.index }
+        val layers = Metro.style.layers
         LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(horizontal = MetroDimens.Gutter), state = list) {
             shell.groups.forEach { group ->
                 item(key = group.id) {
                     val shift = if (group.categories.any { it.id == focused?.id }) delta else 0L
+                    // Mica draws each group as a layer card, sliced across its rows so they still scroll one by one.
                     Row(
                         Modifier
                             .fillMaxWidth()
+                            .layerSlice(top = true, bottom = group.categories.isEmpty())
+                            .then(if (layers) Modifier.padding(horizontal = MetroDimens.Gutter) else Modifier)
                             .heightIn(min = 40.dp)
                             .padding(top = MetroDimens.Row)
                             .testTag("edit-group-${group.id}"),
@@ -185,6 +196,10 @@ fun BudgetEditSection(
                 items(group.categories, key = { "edit-${it.id}" }) { category ->
                     val open = category.id == focused?.id
                     EditLine(
+                        modifier =
+                            Modifier
+                                .layerSlice(top = false, bottom = category.id == group.categories.last().id)
+                                .then(if (layers) Modifier.padding(horizontal = MetroDimens.Gutter) else Modifier),
                         category = category,
                         boxText =
                             when {
@@ -194,7 +209,7 @@ fun BudgetEditSection(
                         hint = if (open && edit.text.isEmpty()) prefs.editSignedAmount(category.budgetedMinor, money.decimals) else null,
                         available = MoneyFormat.format(category.availableMinor + if (open) delta else 0L, money, formatOptions),
                         open = open,
-                        banded = ledgerBanded(position.getValue(category.id)),
+                        banded = !layers && ledgerBanded(position.getValue(category.id)),
                         onFocus = { actions.onFocus(category.id) },
                         onAvailable = { actions.onAvailable(category.id) },
                     )
@@ -247,6 +262,7 @@ private fun listIndex(
 
 @Composable
 private fun EditLine(
+    modifier: Modifier,
     category: CategoryRow,
     boxText: String,
     hint: String?,
@@ -259,6 +275,7 @@ private fun EditLine(
     Row(
         Modifier
             .fillMaxWidth()
+            .then(modifier)
             .heightIn(min = MetroDimens.TouchTarget)
             .ledgerFill(if (banded) ledgerBand else Color.Transparent)
             .testTag("edit-category-${category.id}"),
@@ -271,14 +288,35 @@ private fun EditLine(
             color = if (category.hidden) Metro.colors.secondary else Metro.colors.foreground,
             maxLines = 2,
         )
-        // Windows Phone text boxes: filled at rest, white with an accent edge while typing.
+        // Windows Phone text boxes: filled at rest, white with an accent edge while typing. A relief style cuts the
+        // box into the page instead, and keeps the accent edge while typing.
+        val relief = Metro.style.relief
+        val accentLine = Metro.accent.fill
         Box(
             Modifier
                 .weight(BOX_WEIGHT)
                 .height(36.dp)
-                .background(if (open) Color.White else Metro.colors.chrome)
-                .then(if (open) Modifier.border(2.dp, Metro.accent.fill) else Modifier)
-                .metroPress(onClick = onFocus)
+                .then(
+                    if (relief) {
+                        Modifier.relief(Relief.Inset, small = true)
+                    } else {
+                        Modifier.background(if (open) Color.White else Metro.colors.chrome)
+                    },
+                ).then(
+                    when {
+                        !open -> Modifier
+                        // Mica underlines the open box in the accent, as it does a field being typed in.
+                        Metro.style.layers ->
+                            Modifier.drawBehind {
+                                drawRect(
+                                    accentLine,
+                                    Offset(3.dp.toPx(), size.height - 2.dp.toPx()),
+                                    Size(size.width - 6.dp.toPx(), 2.dp.toPx()),
+                                )
+                            }
+                        else -> Modifier.border(2.dp, Metro.accent.fill)
+                    },
+                ).metroPress(onClick = onFocus)
                 .padding(horizontal = 8.dp)
                 .testTag("edit-box-${category.id}"),
             contentAlignment = Alignment.CenterEnd,
@@ -293,7 +331,7 @@ private fun EditLine(
                 color =
                     when {
                         hint != null -> Color(0xFF8F8F8F)
-                        open -> Color.Black
+                        open && !relief -> Color.Black
                         else -> Metro.colors.foreground
                     },
                 maxLines = 1,
@@ -340,12 +378,24 @@ private fun BudgetKeypad(
             listOf("7", "8", "9", "×", BudgetEditCopy.ALL),
             listOf(decimalPoint, "0", BudgetKeys.EQUALS, "÷", BudgetEditCopy.DONE),
         )
+    val style = Metro.style
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Metro.colors.chrome)
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(6.dp)
+            .then(
+                if (style.layers) {
+                    // Mica: the pad is an acrylic sheet floating over the list, its keys layer cards on it.
+                    Modifier
+                        .background(Metro.colors.background)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(8.dp)
+                        .acrylicSheet(Metro.surface)
+                } else {
+                    Modifier
+                        .background(Metro.colors.chrome)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                },
+            ).padding(6.dp)
             .testTag("budget-keypad"),
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 6.dp), verticalAlignment = Alignment.Bottom) {
@@ -362,6 +412,8 @@ private fun BudgetKeypad(
                             else -> true
                         }
                     val accent = key == BudgetEditCopy.DONE
+                    // Relief: keys stand up like a calculator's, done in the accent. Mica's keys are layer cards.
+                    val ground = if (style.layers) Metro.colors.background else Metro.colors.chrome
                     val run: () -> Unit =
                         when (key) {
                             BudgetEditCopy.COVER -> actions.onCover
@@ -375,8 +427,13 @@ private fun BudgetKeypad(
                             .weight(1f)
                             .padding(3.dp)
                             .height(48.dp)
-                            .background(if (accent) Metro.accent.fill else Metro.colors.background)
-                            .then(if (enabled) Modifier.metroPress(onClick = run) else Modifier)
+                            .then(
+                                when {
+                                    !style.relief -> Modifier.background(if (accent) Metro.accent.fill else Metro.colors.background)
+                                    accent -> Modifier.relief(Relief.Raised, small = true, fill = Metro.accent.fill)
+                                    else -> Modifier.relief(Relief.Raised, small = true, fill = ground)
+                                },
+                            ).then(if (enabled) Modifier.metroPress(onClick = run) else Modifier)
                             .testTag("key-$key"),
                         contentAlignment = Alignment.Center,
                     ) {

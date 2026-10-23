@@ -231,18 +231,23 @@ val LocalAccent = staticCompositionLocalOf { Accent.Default.colors(dark = false)
 val LocalAppAccent = staticCompositionLocalOf { Accent.Default }
 val LocalMetroTypography = staticCompositionLocalOf { MetroTypography.Default }
 val LocalAnimationsEnabled = staticCompositionLocalOf { true }
+val LocalMetroSurface = staticCompositionLocalOf { MetroSurface.Flat }
 
 @Composable
 fun MetroTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     accent: Accent = Accent.Default,
     animationsEnabled: Boolean = true,
+    style: MetroStyle = MetroStyle.Default,
     content: @Composable () -> Unit,
 ) {
-    val colors = if (darkTheme) MetroColors.Dark else MetroColors.Light
+    val colors = StylePalettes.colors(style, darkTheme)
+    val accentColors = accent.colors(darkTheme)
     CompositionLocalProvider(
         LocalMetroColors provides colors,
-        LocalAccent provides accent.colors(darkTheme),
+        // A tinted page can pull an accent's text under 4.5:1, so it moves just far enough to read again.
+        LocalAccent provides accentColors.copy(text = Contrast.ensure(accentColors.text, colors.background)),
+        LocalMetroSurface provides MetroSurface.of(style, darkTheme),
         LocalAppAccent provides accent,
         LocalMetroTypography provides MetroTypography.Default,
         LocalAnimationsEnabled provides animationsEnabled,
@@ -270,6 +275,17 @@ object Metro {
         @Composable
         @ReadOnlyComposable
         get() = LocalAnimationsEnabled.current
+
+    /** The chosen style's light and shade; [MetroSurface.Flat] under the Metro style. */
+    val surface: MetroSurface
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalMetroSurface.current
+
+    val style: MetroStyle
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalMetroSurface.current.style
 }
 
 object MetroDimens {

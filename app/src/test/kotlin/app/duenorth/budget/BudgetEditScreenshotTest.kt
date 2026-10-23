@@ -12,6 +12,7 @@ import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.ScreenAction
+import app.duenorth.budget.design.theme.MetroStyle
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -40,6 +41,15 @@ class BudgetEditScreenshotTest {
     fun keypadDark() = snap("budget_edit_keypad_dark", dark = true, edit = BudgetEdit("c-groceries", "+80"))
 
     // Everything budgeted: the pinned to budget goes away.
+    // The relief styles on the keypad: keys stand up (tile relief) or are layer cards (mica).
+    @Test
+    fun styleKeypads() =
+        MetroStyle.entries.filter { it.relief }.forEach { style ->
+            for (dark in listOf(false, true)) {
+                snap("style_${style.id}_keypad_${if (dark) "dark" else "light"}", dark, BudgetEdit("c-groceries", "+80"), style = style)
+            }
+        }
+
     @Test
     fun fullyBudgetedLight() = snap("budget_edit_zero_light", dark = false, edit = BudgetEdit(), toBudget = 0, held = 0)
 
@@ -88,10 +98,11 @@ class BudgetEditScreenshotTest {
         edit: BudgetEdit,
         toBudget: Long = 42_000,
         held: Long = 25_000,
+        style: MetroStyle = MetroStyle.Metro,
     ) {
         val shell = sample().copy(headerMinor = toBudget, bufferedMinor = held)
         captureRoboImage("src/test/snapshots/$name.png") {
-            MetroTheme(darkTheme = dark) {
+            MetroTheme(darkTheme = dark, style = style) {
                 Box(Modifier.width(390.dp).height(780.dp)) {
                     ShellChrome(
                         actions =

@@ -2293,6 +2293,10 @@ class ShellViewModel(
         saveSettings(_state.value.settings.copy(accent = id))
     }
 
+    fun setStyle(id: String) {
+        saveSettings(_state.value.settings.copy(style = id))
+    }
+
     /**
      * A server budget replaces whatever is on the phone. When other budgets are there, the
      * person sees which ones get cleared first; otherwise it opens straight away.

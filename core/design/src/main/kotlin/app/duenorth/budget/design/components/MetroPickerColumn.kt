@@ -102,8 +102,10 @@ fun MetroPickerColumn(
                     .fillMaxWidth()
                     .height(rowHeight)
                     .padding(vertical = 3.dp)
-                    .background(if (chosen) Metro.accent.fill else Color.Transparent)
-                    .border(MetroDimens.Stroke, if (chosen) Metro.accent.fill else Metro.colors.outline)
+                    .controlFrame(
+                        if (chosen) Metro.accent.fill else Metro.colors.outline,
+                        fill = if (chosen) Metro.accent.fill else Metro.colors.background,
+                    ).background(if (chosen) Metro.accent.fill else Color.Transparent)
                     .metroPress {
                         scope.launch { state.animateScrollToItem(index - PickerColumn.VISIBLE / 2) }
                     }.semantics { selected = chosen }

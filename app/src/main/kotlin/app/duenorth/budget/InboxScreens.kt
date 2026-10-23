@@ -83,6 +83,7 @@ import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.controlFrame
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -847,7 +848,7 @@ private fun InboxCheck(
     Box(
         Modifier
             .size(CHECK_SIZE)
-            .border(MetroDimens.Stroke, Metro.colors.foreground)
+            .controlFrame(fill = if (checked) Metro.accent.fill else Metro.colors.background)
             .background(if (checked) Metro.accent.fill else Color.Transparent)
             .testTag(if (checked) "inbox-checked-$id" else "inbox-unchecked-$id"),
         contentAlignment = Alignment.Center,

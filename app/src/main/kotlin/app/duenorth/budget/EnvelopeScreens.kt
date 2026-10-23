@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -521,10 +523,13 @@ private fun GoalBar(
     progress: Float,
     modifier: Modifier = Modifier,
 ) {
+    // Mica rounds the bar's ends, as Windows 11 draws a progress bar.
+    val layers = Metro.style.layers
     Row(
         modifier
             .fillMaxWidth()
-            .height(GOAL_BAR_HEIGHT)
+            .height(if (layers) GOAL_BAR_HEIGHT + 1.dp else GOAL_BAR_HEIGHT)
+            .then(if (layers) Modifier.clip(RoundedCornerShape(2.dp)) else Modifier)
             .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) },
     ) {
         if (progress > 0f) Box(Modifier.weight(progress).fillMaxHeight().background(Metro.accent.fill))
