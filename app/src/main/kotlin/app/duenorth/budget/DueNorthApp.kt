@@ -126,6 +126,23 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private const val EXPORTS_DIR = "exports"
+
+/** Opens a server-supplied link in a browser tab, but only a web page: never another app's scheme. */
+internal fun openWebPage(
+    context: android.content.Context,
+    url: String,
+): Boolean {
+    if (!isWebUrl(url)) return false
+    CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+    return true
+}
+
+internal fun isWebUrl(url: String): Boolean {
+    val scheme = Uri.parse(url.trim()).scheme?.lowercase()
+    return scheme == "https" || scheme == "http"
+}
+
 @Composable
 fun DueNorthApp(model: ShellViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
@@ -143,12 +160,15 @@ fun DueNorthApp(model: ShellViewModel) {
         }
     LaunchedEffect(state.openIdRedirectUrl) {
         val url = state.openIdRedirectUrl ?: return@LaunchedEffect
-        CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+        openWebPage(context, url)
         model.clearOpenIdRedirect()
     }
     LaunchedEffect(state.pendingExport) {
         val export = state.pendingExport ?: return@LaunchedEffect
-        val file = File(context.cacheDir, export.fileName)
+        // Only this folder is shared through the FileProvider; an earlier export is not kept around.
+        val folder = File(context.cacheDir, EXPORTS_DIR).apply { deleteRecursively() }
+        folder.mkdirs()
+        val file = File(folder, export.fileName)
         file.writeBytes(export.bytes)
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         val share =
@@ -523,6 +543,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSignIn = model::onboardingSignIn,
                                 onBrowser = model::onboardingBrowser,
                                 modifier = fill,
+                                secure = ready.isEmpty() || ServerAddress.isSecure(ready),
                                 replacing =
                                     state.activeInstance
                                         ?.takeIf { onboarding?.progress?.origin == OnboardingOrigin.SETTINGS }
@@ -996,7 +1017,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                     onToken = model::sendSimpleFinToken,
                                     onCountry = model::findGoCardlessBanks,
                                     onInstitution = model::startGoCardless,
-                                    onOpenBank = { url -> CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url)) },
+                                    onOpenBank = { url -> openWebPage(context, url) },
                                     onSignedIn = model::checkGoCardless,
                                     onLink = model::linkBank,
                                     onRemove = model::removeBankLink,

@@ -415,6 +415,37 @@ class OnboardingFlowTest {
         assertEquals(listOf("Household"), library.list().map { it.name })
     }
 
+    @Test
+    fun aBareAddressThatOnlyAnswersOverHttpAsksBeforeSigningIn() {
+        val httpOnly =
+            ProbeHttp { url ->
+                if (url.startsWith("https://")) throw IOException("refused")
+                readyHttp.get(url)
+            }
+        val (_, model) = model("http-only", http = httpOnly)
+        model.onboardingChooseServer()
+        model.onboardingAddress("budget.lan")
+        model.onboardingCheck()
+        await {
+            model.state.value.onboarding
+                ?.addressError != null
+        }
+        val ui = model.state.value.onboarding!!
+        assertEquals(OnboardingCopy.HTTP_ONLY, ui.addressError)
+        assertEquals("http://budget.lan", ui.progress.addressText)
+        assertNull(ui.progress.readyAddress)
+        assertEquals(ShellRoute.OnboardingAddress, model.state.value.route)
+
+        // `next` again is the person choosing http://.
+        model.onboardingCheck()
+        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        assertEquals(
+            "http://budget.lan",
+            model.state.value.onboarding!!
+                .progress.readyAddress,
+        )
+    }
+
     /** An Actual file made on another "phone", as the server would hand it back. */
     private fun budgetBytes(name: String): ByteArray {
         val source = root("source-$name")

@@ -804,6 +804,8 @@ class ShellViewModel(
 
     fun completeOpenId(callbackUrl: String?) {
         if (callbackUrl.isNullOrBlank()) return
+        // Any app can send a link; only the sign-in return address is a sign-in.
+        if (!isOpenIdReturn(callbackUrl)) return
         val token =
             extractOAuthToken(callbackUrl) ?: run {
                 _state.update { it.copy(serverError = SyncCopy.SIGN_IN_FAILED) }
@@ -2911,6 +2913,12 @@ class ShellViewModel(
 
     companion object {
         const val OPEN_ID_RETURN = "duenorth://oauth"
+
+        internal fun isOpenIdReturn(callbackUrl: String): Boolean {
+            val uri = android.net.Uri.parse(callbackUrl)
+            val expected = android.net.Uri.parse(OPEN_ID_RETURN)
+            return uri.scheme.equals(expected.scheme, ignoreCase = true) && uri.host.equals(expected.host, ignoreCase = true)
+        }
 
         fun factory(
             library: BudgetLibrary,

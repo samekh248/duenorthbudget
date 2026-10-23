@@ -186,7 +186,17 @@ fun ShellViewModel.onboardingCheck() {
     onboardingJob =
         viewModelScope.launch {
             val check = withContext(Dispatchers.IO) { probe.check(parsed) }
-            if (check is ServerCheck.Ready) {
+            if (check is ServerCheck.Ready && !check.secure && parsed.candidates.size > 1) {
+                // Only http:// answered a bare address. Say so, and let the person choose it, instead of
+                // sending the password unencrypted without asking.
+                updateOnboarding {
+                    it.copy(
+                        progress = it.progress.copy(addressText = check.address),
+                        checking = false,
+                        addressError = OnboardingCopy.HTTP_ONLY,
+                    )
+                }
+            } else if (check is ServerCheck.Ready) {
                 updateOnboarding {
                     it.copy(
                         progress =
