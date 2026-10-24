@@ -489,11 +489,14 @@ fun CategoryLine(
     modifier: Modifier = Modifier,
     formatOptions: FormatOptions = formatOptions(),
     banded: Boolean = false,
-    /** Goals only show while templates are on, as Actual only judges them then. */
+    /**
+     * Goals only show while templates are on, as Actual only judges them then. Every row keeps a bar while they are,
+     * an empty track until templates give the category a goal, so the rows line up.
+     */
     showGoal: Boolean = LocalFormatPrefs.current.templatesOn,
 ) {
     val money = shell.currency
-    val progress = if (showGoal) category.goalProgress else null
+    val progress = if (showGoal) category.goalProgress ?: 0f else null
     Column(
         modifier
             .fillMaxWidth()
