@@ -799,6 +799,19 @@ class BudgetLibrary(
 
     private class PreviewRollback : RuntimeException()
 
+    /** What each template asks for in [month] on its own (the template editor's preview); writes nothing. */
+    fun previewCategoryTemplates(
+        budgetId: String,
+        categoryId: String,
+        month: YearMonth,
+        templates: List<Template>,
+    ): List<Long?> =
+        if (templates.isEmpty()) {
+            emptyList()
+        } else {
+            open(budgetId) { TemplateEngine(it, clock.today()).preview(categoryId, month, templates) } ?: templates.map { null }
+        }
+
     fun readCategoryNote(
         budgetId: String,
         categoryId: String,

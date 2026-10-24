@@ -204,6 +204,11 @@ object ScreenBar {
                     } else {
                         listOf(menu("delete-schedule", AppGlyph.Cancel, ScheduleScreenCopy.DELETE))
                     }
+            // A template's form saves from the bar; one already in the note can also be removed there.
+            is ShellRoute.TemplateEditor ->
+                saveCancel() +
+                    if (route.index == null) emptyList() else listOf(menu("remove-template", AppGlyph.Cancel, TemplateEditorCopy.REMOVE))
+            is ShellRoute.TemplateKinds -> listOf(spec("cancel", AppGlyph.Cancel, "cancel"))
             is ShellRoute.RuleEditor ->
                 saveCancel() +
                     if (route.ruleId == null) emptyList() else listOf(menu("delete-rule", AppGlyph.Cancel, RuleScreenCopy.DELETE))
@@ -412,6 +417,7 @@ class ScreenBarHandlers(
     val onEndBudgetEdit: () -> Unit = {},
     val onCancelBudgetEdit: () -> Unit = {},
     val onSearch: () -> Unit = {},
+    val onRemoveTemplate: () -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -476,6 +482,7 @@ class ScreenBarHandlers(
             "edit-budget" -> onEditBudget
             "end-budget-edit" -> onEndBudgetEdit
             "cancel-budget-edit" -> onCancelBudgetEdit
+            "remove-template" -> onRemoveTemplate
             else -> ({})
         }
 }

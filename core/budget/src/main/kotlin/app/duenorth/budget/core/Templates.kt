@@ -450,6 +450,25 @@ class TemplateEngine(
         return TemplateResult.Applied(applied.size)
     }
 
+    /**
+     * What each of [templates] asks for in [month] on its own, for category [categoryId], before priorities share out
+     * to budget. Remainder and goal lines ask for nothing of their own and come back null.
+     */
+    fun preview(
+        categoryId: String,
+        month: YearMonth,
+        templates: List<Template>,
+    ): List<Long?> {
+        val detailed = ShellReader.loadDetailed(session, month)
+        val category = Category(categoryId, "", visible = true, income = false, templates = templates, errors = emptyList())
+        return templates.map { template ->
+            when (template) {
+                is Template.Remainder, is Template.Goal -> null
+                else -> amountFor(template, category, month, detailed.categories, detailed.figures.headerMinor)
+            }
+        }
+    }
+
     private fun amountFor(
         template: Template,
         category: Category,

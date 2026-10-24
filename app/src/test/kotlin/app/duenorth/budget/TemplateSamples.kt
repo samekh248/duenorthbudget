@@ -39,4 +39,11 @@ internal object TemplateSamples {
         )
 
     const val NOTE = "groceries and takeout\n#template 2200 up to 3000"
+
+    /** A note with several templates, one that does not read, and the person's own words. */
+    const val TILES =
+        "weekly shop on sunday\n#template-1 400 up to 600\n#template-2 10% of previous all income\n#goal 500\n" +
+            "#template fifty dollars"
+
+    val tileAmounts: List<Long?> = listOf(40_000, 16_000, null, null)
 }
