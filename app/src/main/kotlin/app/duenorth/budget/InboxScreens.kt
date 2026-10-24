@@ -13,7 +13,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -76,7 +75,6 @@ import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.RegisterEntry
-import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
@@ -153,10 +151,7 @@ fun InboxSection(
     val entries = inboxEntries(inbox, filed)
     var menu by remember { mutableStateOf<Pair<InboxRow, Rect>?>(null) }
     if (entries.isEmpty() && pair == null) {
-        Column(modifier.padding(MetroDimens.Gutter), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            MetroText(ShellCopy.NOTHING_TO_CATEGORIZE, Metro.typography.body)
-            if (onAdd != null) MetroButton("add", onClick = onAdd)
-        }
+        InboxEmpty(modifier, onAdd)
         return
     }
     val list = rememberLazyListState()

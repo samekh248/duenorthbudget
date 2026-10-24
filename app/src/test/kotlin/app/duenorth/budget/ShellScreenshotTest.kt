@@ -112,6 +112,23 @@ class ShellScreenshotTest {
             }
         }
 
+    // The empty inbox's tray in every style, since the style draws the tray.
+    @Test
+    fun inboxEmpty() =
+        MetroStyle.entries.forEach { style ->
+            for (dark in listOf(false, true)) {
+                val name = if (style == MetroStyle.Metro) "inbox_empty" else "style_${style.id}_inbox_empty"
+                snap(
+                    "${name}_${if (dark) "dark" else "light"}",
+                    dark,
+                    sample().copy(inbox = emptyList()),
+                    section = HomeSections.headers.indexOf(HomeSections.INBOX),
+                    style = style,
+                    onAdd = {},
+                )
+            }
+        }
+
     @Test
     fun styleOverbudgetedDark() =
         snap(
@@ -208,6 +225,7 @@ class ShellScreenshotTest {
         netWorth: NetWorthPage? = null,
         prefs: FormatPrefs = FormatPrefs(),
         style: MetroStyle = MetroStyle.Metro,
+        onAdd: (() -> Unit)? = null,
     ) {
         val inbox = section == HomeSections.headers.indexOf(HomeSections.INBOX)
         val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
@@ -227,6 +245,7 @@ class ShellScreenshotTest {
                             inboxFiled = justFiled,
                             inboxSelection = selection,
                             netWorth = netWorth,
+                            onAddTransaction = onAdd,
                         )
                         MetroAppBar(
                             actions =
