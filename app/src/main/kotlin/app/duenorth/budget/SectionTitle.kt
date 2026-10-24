@@ -53,6 +53,8 @@ object SectionTitle {
                 ShellRoute.AddAccount,
                 -> HomeSections.ACCOUNTS
                 is ShellRoute.CategoryBudget,
+                is ShellRoute.TemplateKinds,
+                is ShellRoute.TemplateEditor,
                 is ShellRoute.MoveCategory,
                 is ShellRoute.ToBudget,
                 ShellRoute.HoldMonth,

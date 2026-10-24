@@ -44,6 +44,8 @@ import app.duenorth.budget.core.OnboardingOrigin
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.ServerAddress
 import app.duenorth.budget.core.SyncCoordinator
+import app.duenorth.budget.core.TemplateLines
+import app.duenorth.budget.core.TemplateNote
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.MotionPolicy
 import app.duenorth.budget.design.components.LocalFieldSubmit
@@ -276,6 +278,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onUnclearSelected = { model.setSelectedCleared(false) },
                     onEndSelecting = model::endSelecting,
                     onSearch = model::toggleRegisterSearch,
+                    onRemoveTemplate = model::removeTemplate,
                     onSelectInbox = model::startInboxSelecting,
                     onAcceptSelected = model::acceptSelectedInbox,
                     onCategorizeSelected = model::categorizeSelectedInbox,
@@ -808,8 +811,13 @@ fun DueNorthApp(model: ShellViewModel) {
                                         onToggleCarryover = model::toggleCategoryCarryover,
                                         modifier = inner,
                                         note = state.categoryNote.takeIf { state.formatPrefs.templatesOn },
-                                        onSaveNote = model::saveCategoryNote,
+                                        onSaveNote = model::saveCategoryNoteText,
+                                        templateAmounts = state.categoryTemplateAmounts,
+                                        onOpenTemplate = model::openTemplate,
+                                        onAddTemplate = { model.openTemplateKinds() },
+                                        onMoveTemplate = model::moveTemplate,
                                     )
+                                    LaunchedEffect(state.categoryNote, shell.month) { model.refreshTemplateAmounts() }
                                 }
                             }
                         }
@@ -1025,19 +1033,83 @@ fun DueNorthApp(model: ShellViewModel) {
                                 )
                             }
                         }
-                        ShellRoute.Templates ->
+                        is ShellRoute.TemplateKinds -> {
+                            val shell = state.shell
+                            val category = shell?.groups?.flatMap { it.categories }?.firstOrNull { it.id == route.categoryId }
+                            if (category == null) {
+                                Placeholder()
+                            } else {
+                                TemplateKindsScreen(
+                                    categoryName = category.name,
+                                    line =
+                                        route.index?.let { index ->
+                                            state.categoryNote?.let {
+                                                TemplateNote
+                                                    .parse(it)
+                                                    .entries
+                                                    .getOrNull(index)
+                                                    ?.line
+                                            }
+                                        },
+                                    onPick = model::pickTemplateKind,
+                                    onRemove = model::removeTemplate,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        is ShellRoute.TemplateEditor -> {
+                            val shell = state.shell
+                            val category = shell?.groups?.flatMap { it.categories }?.firstOrNull { it.id == route.categoryId }
+                            if (shell == null || category == null) {
+                                Placeholder()
+                            } else {
+                                TemplateEditorScreen(
+                                    categoryName = category.name,
+                                    kind = route.kind,
+                                    initial = state.templateDraftStart(route),
+                                    isNew = route.index == null,
+                                    month = shell.month,
+                                    currency = shell.currency,
+                                    schedules = state.templateSchedules,
+                                    sources =
+                                        listOf(
+                                            PercentSource(TemplateLines.ALL_INCOME, TemplateLines.ALL_INCOME),
+                                            PercentSource(TemplateLines.AVAILABLE_FUNDS, TemplateLines.AVAILABLE_FUNDS),
+                                        ) + shell.incomeGroups.flatMap { it.categories }.map { PercentSource(it.name, it.name) },
+                                    preview = state.templatePreview,
+                                    onPreview = model::previewTemplate,
+                                    onSave = model::saveTemplate,
+                                    onRemove = model::removeTemplate,
+                                    modifier = fill,
+                                )
+                            }
+                        }
+                        ShellRoute.Templates -> {
+                            // A note saved from a chip's form (or a chip moved) changes the lanes.
+                            LaunchedEffect(state.undoLabel) { model.refreshTemplatePlan() }
                             TemplatesScreen(
-                                month = state.pinnedMonth ?: state.openMonth,
+                                month = state.budgetEdit?.month ?: state.pinnedMonth ?: state.openMonth,
                                 result = state.templateResult,
                                 busy = state.templateBusy,
                                 confirm = state.templateConfirm,
-                                onCheck = model::checkTemplates,
-                                onApply = { model.applyTemplates(overwrite = false) },
-                                onOverwrite = { model.applyTemplates(overwrite = true) },
+                                onCheck = {
+                                    model.checkTemplates()
+                                    model.refreshTemplatePlan()
+                                },
+                                onApply = { model.previewApplyTemplates(overwrite = false) },
+                                onOverwrite = { model.previewApplyTemplates(overwrite = true) },
                                 onConfirm = model::confirmTemplateOverwrite,
                                 onKeep = model::keepTemplates,
                                 modifier = fill,
+                                plan = state.templatePlan,
+                                currency = state.shell?.currency,
+                                applyPreview = state.templateApplyPreview,
+                                onOpenChip = model::openTemplateChip,
+                                onMoveChip = model::moveTemplateToPriority,
+                                onConfirmPreview = model::confirmApplyPreview,
+                                onKeepPreview = model::keepApplyPreview,
                             )
+                        }
                         is ShellRoute.RuleEditor -> {
                             val draft = state.ruleDraft
                             val shell = state.shell

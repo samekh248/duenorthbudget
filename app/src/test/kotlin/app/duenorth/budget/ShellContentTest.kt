@@ -484,9 +484,13 @@ class ShellContentTest {
             .onNodeWithTag("category-goal-c-power")
             .assertIsDisplayed()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(10f / 14f, 0f..1f)))
-        compose.onAllNodesWithTag("category-goal-c-dining").assertCountEquals(0)
+        // A category without a goal keeps an empty bar, so every row lines up.
+        compose
+            .onNodeWithTag("category-goal-c-dining")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(0f, 0f..1f)))
         templatesOn.value = false
         compose.onAllNodesWithTag("category-goal-c-power").assertCountEquals(0)
+        compose.onAllNodesWithTag("category-goal-c-dining").assertCountEquals(0)
     }
 
     private fun sample(): MonthShell =

@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +64,10 @@ fun CategoryBudgetScreen(
     modifier: Modifier = Modifier,
     note: String? = null,
     onSaveNote: (String) -> Unit = {},
+    templateAmounts: List<Long?> = emptyList(),
+    onOpenTemplate: (Int) -> Unit = {},
+    onAddTemplate: () -> Unit = {},
+    onMoveTemplate: (Int, Int) -> Unit = { _, _ -> },
 ) {
     val category = shell.groups.flatMap { it.categories }.first { it.id == categoryId }
     val prefs = LocalFormatPrefs.current
@@ -75,6 +81,7 @@ fun CategoryBudgetScreen(
         modifier
             .fillMaxSize()
             .background(Metro.colors.background)
+            .verticalScroll(rememberScrollState())
             .padding(MetroDimens.Gutter),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -98,8 +105,19 @@ fun CategoryBudgetScreen(
                 onToggleCarryover(!category.carryover)
             }
         }
-        // Only while budget templates are on (spec 010 US5).
-        if (note != null) CategoryNoteEditor(note, onSaveNote)
+        // Only while budget templates are on (spec 010 US5): the note's template lines as tiles, then its own text.
+        if (note != null) {
+            TemplateTiles(
+                note,
+                templateAmounts,
+                shell.currency,
+                onOpenTemplate,
+                onAddTemplate,
+                onMoveTemplate,
+                Modifier.padding(top = 12.dp),
+            )
+            CategoryNoteText(note, onSaveNote, Modifier.padding(top = 12.dp))
+        }
     }
 }
 
@@ -471,11 +489,14 @@ fun CategoryLine(
     modifier: Modifier = Modifier,
     formatOptions: FormatOptions = formatOptions(),
     banded: Boolean = false,
-    /** Goals only show while templates are on, as Actual only judges them then. */
+    /**
+     * Goals only show while templates are on, as Actual only judges them then. Every row keeps a bar while they are,
+     * an empty track until templates give the category a goal, so the rows line up.
+     */
     showGoal: Boolean = LocalFormatPrefs.current.templatesOn,
 ) {
     val money = shell.currency
-    val progress = if (showGoal) category.goalProgress else null
+    val progress = if (showGoal) category.goalProgress ?: 0f else null
     Column(
         modifier
             .fillMaxWidth()

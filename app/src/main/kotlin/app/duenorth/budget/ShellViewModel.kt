@@ -62,6 +62,9 @@ import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.core.Template
+import app.duenorth.budget.core.TemplateKind
+import app.duenorth.budget.core.TemplatePlan
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.UnlockResult
@@ -81,6 +84,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.time.YearMonth
 
@@ -241,6 +245,21 @@ sealed interface ShellRoute {
     // Spec 010 US5.
     data object Templates : ShellRoute, StackRoute
 
+    /** Category page → add template: the grid of kinds; with [index], what a line that does not read becomes. */
+    data class TemplateKinds(
+        val categoryId: String,
+        val index: Int? = null,
+    ) : ShellRoute,
+        StackRoute
+
+    /** Category page → a template tile (or a kind just picked): its form; [index] is null for a new one. */
+    data class TemplateEditor(
+        val categoryId: String,
+        val index: Int?,
+        val kind: TemplateKind,
+    ) : ShellRoute,
+        StackRoute
+
     // Spec 010 US6.
     data class BankLink(
         val accountId: String,
@@ -354,6 +373,16 @@ data class ShellUiState(
     val templateConfirm: String? = null,
     /** The open category's note while templates are on; null until read. */
     val categoryNote: String? = null,
+    /** What each of the note's template lines asks for in the open month, in line order (null for none). */
+    val categoryTemplateAmounts: List<Long?> = emptyList(),
+    /** The template being edited and what it would give this month. */
+    val templatePreview: Pair<Template, Long?>? = null,
+    /** Schedule names a schedule template can pay. */
+    val templateSchedules: List<String> = emptyList(),
+    /** Every category's templates in priority lanes, for the templates screen; null until worked out. */
+    val templatePlan: TemplatePlan? = null,
+    /** What apply or overwrite would change, shown before it does. */
+    val templateApplyPreview: TemplateApplyPreview? = null,
     val bankLink: BankLinkUi? = null,
     /** First-run progress while the phone has no budget (spec 011); null otherwise. */
     val onboarding: OnboardingUi? = null,
@@ -390,6 +419,9 @@ class ShellViewModel(
     private val registerGate = RefreshGate<RegisterPage>()
     internal val months = OpenMonthStore()
     private val history = ArrayDeque<ShellRoute>()
+
+    /** Category note saves, written in the order they were made. */
+    internal val noteWrites = Mutex()
     private val _state =
         MutableStateFlow(
             ShellUiState(
@@ -1317,6 +1349,10 @@ class ShellViewModel(
         }
         if (current.templateConfirm != null) {
             _state.update { it.copy(templateConfirm = null) }
+            return true
+        }
+        if (current.templateApplyPreview != null && current.route == ShellRoute.Templates) {
+            _state.update { it.copy(templateApplyPreview = null) }
             return true
         }
         if (current.accountForceConfirm != null) {
@@ -2380,6 +2416,11 @@ class ShellViewModel(
         _state.update { it.copy(openMonth = calendar, pinnedMonth = null) }
         val accountId = (_state.value.route as? ShellRoute.Register)?.accountId
         apply(load(accountId), accountId)
+    }
+
+    /** Shows [route] in place of the current page, so back skips the page it replaces. */
+    internal fun replaceRoute(route: ShellRoute) {
+        _state.update { it.copy(route = route, writeError = null, confirm = null) }
     }
 
     internal fun push(route: ShellRoute) {

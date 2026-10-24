@@ -12,7 +12,10 @@ import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.MonthShell
+import app.duenorth.budget.core.Template
+import app.duenorth.budget.core.TemplateChip
 import app.duenorth.budget.core.TemplateCopy
+import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.UndoCopy
 import app.duenorth.budget.design.theme.MetroTheme
@@ -24,6 +27,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.math.BigDecimal
 
 /** Spec 010 T063: the templates menu gate, check results, overwrite confirm, and the category note. */
 @RunWith(RobolectricTestRunner::class)
@@ -98,9 +102,9 @@ class TemplateContentTest {
             }
         }
         compose.onNodeWithTag("category-note-save").assertDoesNotExist()
-        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("category-note"))).performTextInput("#template 50")
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("category-note"))).performTextInput("buy in bulk")
         compose.onNodeWithTag("category-note-save").performClick()
-        assertEquals("#template 50", saved)
+        assertEquals("buy in bulk", saved)
     }
 
     @Test
@@ -136,6 +140,232 @@ class TemplateContentTest {
         }
         assertEquals(TemplateResult.Applied(1), model.state.value.templateResult)
         assertEquals(UndoCopy.TEMPLATES, library.undoLabel(model.state.value.settings.openBudgetId!!))
+    }
+
+    @Test
+    fun tilesShowEachTemplateWhatItAsksAndTheLineThatDoesNotRead() {
+        var opened: Int? = null
+        compose.setContent {
+            MetroTheme {
+                CategoryBudgetScreen(
+                    TemplateSamples.shell,
+                    "c-food",
+                    null,
+                    {},
+                    {},
+                    {},
+                    note = TemplateSamples.TILES,
+                    templateAmounts = TemplateSamples.tileAmounts,
+                    onOpenTemplate = { opened = it },
+                )
+            }
+        }
+        compose.onNodeWithText("\$400.00 every month").assertExists()
+        compose.onNodeWithText("held up to \$600.00").assertExists()
+        compose.onNodeWithText("10% of all income").assertExists()
+        compose.onNodeWithText("goal of \$500.00").assertExists()
+        compose.onNodeWithText(TemplateEditorCopy.UNREADABLE).assertExists()
+        compose.onNodeWithTag("template-asks", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("\$560.00").assertExists()
+        // The note box shows only the person's own words.
+        compose.onNodeWithText("weekly shop on sunday").assertExists()
+        compose.onNodeWithTag("template-tile-1").performClick()
+        assertEquals(1, opened)
+    }
+
+    @Test
+    fun theFormWritesTheLineAsItIsFilledIn() {
+        compose.setContent {
+            MetroTheme {
+                TemplateEditorScreen(
+                    categoryName = "Food",
+                    kind = TemplateKind.MONTHLY,
+                    initial = TemplateKind.MONTHLY.blank(1, TemplateSamples.october, ""),
+                    isNew = true,
+                    month = TemplateSamples.october,
+                    currency = TemplateSamples.shell.currency,
+                    schedules = emptyList(),
+                    sources = emptyList(),
+                    preview = null,
+                    onPreview = {},
+                    onSave = {},
+                    onRemove = {},
+                )
+            }
+        }
+        compose.onNodeWithText(TemplateEditorCopy.NEEDS).assertExists()
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("template-amount"))).performTextInput("400")
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("template-cap"))).performTextInput("600")
+        compose.onNodeWithText("#template-1 400 up to 600").assertExists()
+        compose.onNodeWithTag("template-order-up").performClick()
+        compose.onNodeWithText("#template-2 400 up to 600").assertExists()
+        compose.onNodeWithTag("template-remove").assertDoesNotExist()
+    }
+
+    @Test
+    fun addEditMoveAndRemoveTemplatesThroughTheNote() {
+        val (model, library) = household("template-editor")
+        model.setExperimental(true)
+        model.setGoalTemplates(true)
+        await { model.state.value.formatPrefs.templatesOn }
+        model.openCategoryBudget("c-gas")
+        await { model.state.value.categoryNote != null }
+        model.saveCategoryNote("fill up on fridays")
+        await { model.state.value.categoryNote == "fill up on fridays" }
+
+        model.openTemplateKinds()
+        assertEquals(ShellRoute.TemplateKinds("c-gas"), model.state.value.route)
+        model.pickTemplateKind(TemplateKind.MONTHLY)
+        val route = model.state.value.route as ShellRoute.TemplateEditor
+        assertEquals(Template.Simple(BigDecimal.ZERO, null, 0), model.state.value.templateDraftStart(route))
+        model.saveTemplate(Template.Simple(BigDecimal("120"), null, 0))
+        assertEquals(ShellRoute.CategoryBudget("c-gas"), model.state.value.route)
+        assertEquals("fill up on fridays\n#template 120", model.state.value.categoryNote)
+
+        model.openTemplateKinds()
+        model.pickTemplateKind(TemplateKind.AVERAGE)
+        assertEquals(1, (model.state.value.templateDraftStart(model.state.value.route as ShellRoute.TemplateEditor)).priority)
+        model.saveTemplate(Template.Average(3, 1))
+        assertEquals("fill up on fridays\n#template 120\n#template-1 average 3 months", model.state.value.categoryNote)
+
+        model.moveTemplate(1, 0)
+        assertEquals("fill up on fridays\n#template average 3 months\n#template-1 120", model.state.value.categoryNote)
+
+        model.openTemplate(1)
+        assertEquals(ShellRoute.TemplateEditor("c-gas", 1, TemplateKind.MONTHLY), model.state.value.route)
+        model.removeTemplate()
+        assertEquals(ShellRoute.CategoryBudget("c-gas"), model.state.value.route)
+        assertEquals("fill up on fridays\n#template average 3 months", model.state.value.categoryNote)
+
+        model.refreshTemplateAmounts()
+        await { model.state.value.categoryTemplateAmounts.size == 1 }
+        await { library.readCategoryNote(model.state.value.settings.openBudgetId!!, "c-gas") == model.state.value.categoryNote }
+    }
+
+    @Test
+    fun lanesShowEveryChipWhatItGetsAndTheLineToFix() {
+        var opened: TemplateChip? = null
+        compose.setContent {
+            MetroTheme {
+                TemplatesScreen(
+                    TemplateSamples.october,
+                    TemplateResult.Invalid(emptyList()),
+                    false,
+                    null,
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    plan = TemplateSamples.plan,
+                    currency = TemplateSamples.shell.currency,
+                    onOpenChip = { opened = it },
+                )
+            }
+        }
+        compose.onNodeWithText("october 2026 · \$3,000.00 ${TemplateLanesCopy.START}").assertExists()
+        compose.onNodeWithText("priority 2").assertExists()
+        compose.onNodeWithText(TemplateLanesCopy.REMAINDER).assertExists()
+        compose.onNodeWithText("\$510.00 ${TemplateLanesCopy.LEFT}").assertExists()
+        compose.onNodeWithText(TemplateLanesCopy.FIX_FIRST).assertExists()
+        compose.onNodeWithTag("template-chip-c-gas-0").performClick()
+        assertEquals("c-gas", opened?.categoryId)
+        compose.onNodeWithTag("template-unreadable-0").performClick()
+        assertEquals("c-gym", opened?.categoryId)
+    }
+
+    @Test
+    fun applyShowsEachCategoryBeforeAndAfterFirst() {
+        var confirmed = false
+        var kept = false
+        compose.setContent {
+            MetroTheme {
+                TemplatesScreen(
+                    TemplateSamples.october,
+                    TemplateResult.Valid,
+                    false,
+                    null,
+                    {},
+                    {},
+                    {},
+                    {},
+                    {},
+                    plan = TemplateSamples.plan,
+                    currency = TemplateSamples.shell.currency,
+                    applyPreview = TemplateSamples.applyPreview,
+                    onConfirmPreview = { confirmed = true },
+                    onKeepPreview = { kept = true },
+                )
+            }
+        }
+        compose.onNodeWithTag("template-lanes").assertDoesNotExist()
+        compose.onNodeWithTag("template-apply-c-food").assertExists()
+        compose.onNodeWithText("\$2,200.00").assertExists()
+        compose.onNodeWithText("\$510.00").assertExists()
+        compose.onNodeWithTag("template-apply-confirm").performClick()
+        compose.onNodeWithTag("template-apply-keep").performClick()
+        assertTrue(confirmed && kept)
+    }
+
+    @Test
+    fun lanesMoveATemplateToAnotherPriorityAndApplyFillsEditModeAfterTheList() {
+        val (model, library) = household("template-lanes")
+        model.setExperimental(true)
+        model.setGoalTemplates(true)
+        await { model.state.value.formatPrefs.templatesOn }
+        val budgetId = model.state.value.settings.openBudgetId!!
+        library.saveCategoryNote(budgetId, "c-gas", "fill up on fridays\n#template 123")
+        await { model.state.value.shell != null }
+        // The flags reach the budget file a moment after the screen shows them.
+        await { library.templatePlan(budgetId, model.state.value.openMonth) != null }
+        model.startBudgetEdit()
+        model.openTemplates()
+        await {
+            model.state.value.templatePlan
+                ?.lanes
+                ?.any { lane -> lane.chips.any { it.categoryId == "c-gas" } } == true
+        }
+        val chip =
+            model.state.value.templatePlan!!
+                .lanes
+                .flatMap { it.chips }
+                .first { it.categoryId == "c-gas" }
+        assertEquals(0, chip.template?.priority)
+
+        model.moveTemplateToPriority(chip, 3)
+        await { library.readCategoryNote(budgetId, "c-gas") == "fill up on fridays\n#template-3 123" }
+        await {
+            model.state.value.templatePlan
+                ?.lanes
+                ?.firstOrNull { lane -> lane.chips.any { it.categoryId == "c-gas" } }
+                ?.priority == 3
+        }
+
+        val moved =
+            model.state.value.templatePlan!!
+                .lanes
+                .flatMap { it.chips }
+                .first { it.categoryId == "c-gas" }
+        model.openTemplateChip(moved)
+        await { model.state.value.route == ShellRoute.TemplateEditor("c-gas", 0, TemplateKind.MONTHLY) }
+        model.saveTemplate(Template.Simple(BigDecimal("150"), null, 3))
+        assertEquals(ShellRoute.Templates, model.state.value.route)
+        await { library.readCategoryNote(budgetId, "c-gas") == "fill up on fridays\n#template-3 150" }
+
+        model.previewApplyTemplates(overwrite = true)
+        await { model.state.value.templateApplyPreview != null }
+        val row =
+            model.state.value.templateApplyPreview!!
+                .rows
+                .first { it.categoryId == "c-gas" }
+        assertEquals(15_000L, row.after)
+        model.confirmApplyPreview()
+        await {
+            model.state.value.budgetEdit
+                ?.budgeted
+                ?.get("c-gas") == 15_000L
+        }
+        assertEquals(null, model.state.value.templateApplyPreview)
     }
 
     private fun MonthShell.category(id: String): CategoryRow? = groups.flatMap { it.categories }.firstOrNull { it.id == id }
