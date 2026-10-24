@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplateKind
+import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.design.theme.MetroStyle
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -19,7 +20,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.math.BigDecimal
 import java.time.YearMonth
 
-/** The template editor (option A, template tiles): tiles, the grid of kinds and a form, in every style, light and dark. */
+/** The template editor (option A, template tiles: tiles, the grid of kinds and a form; option D, the lanes), in every style, light and dark. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [33], qualifiers = "w411dp-h891dp-xxhdpi")
@@ -32,6 +33,30 @@ class TemplateEditorScreenshotTest {
 
     @Test
     fun byDateForm() = every("template_form_by") { Form() }
+
+    @Test
+    fun lanes() = every("template_lanes") { Lanes(null) }
+
+    @Test
+    fun applyList() = every("template_apply_list") { Lanes(TemplateSamples.applyPreview) }
+
+    @Composable
+    private fun Lanes(preview: TemplateApplyPreview?) {
+        TemplatesScreen(
+            TemplateSamples.october,
+            TemplateResult.Invalid(emptyList()),
+            false,
+            null,
+            {},
+            {},
+            {},
+            {},
+            {},
+            plan = TemplateSamples.plan,
+            currency = TemplateSamples.shell.currency,
+            applyPreview = preview,
+        )
+    }
 
     @Composable
     private fun Tiles() {

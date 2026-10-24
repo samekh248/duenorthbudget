@@ -303,6 +303,37 @@ object TemplateParser {
             ?.toBigDecimalOrNull()
 }
 
+/** The templates screen's lanes for one month ([TemplateEngine.plan]). */
+data class TemplatePlan(
+    /** To budget plus what the templated categories already hold: what an overwrite shares out. */
+    val start: Long,
+    val lanes: List<TemplateLane>,
+    /** Lines that do not read, each with its category. */
+    val unreadable: List<TemplateChip>,
+)
+
+data class TemplateLane(
+    val kind: Kind,
+    /** The lane's priority; null for the remainder and goal lanes. */
+    val priority: Int?,
+    val chips: List<TemplateChip>,
+    /** What is left to share after this lane; null for goals, which take nothing. */
+    val leftAfter: Long?,
+) {
+    enum class Kind { PRIORITY, REMAINDER, GOAL }
+}
+
+/** One template line in a lane: its category, its place in that category's note, and the money it asks for and gets. */
+data class TemplateChip(
+    val categoryId: String,
+    val categoryName: String,
+    val index: Int,
+    val template: Template?,
+    val line: String,
+    val asks: Long?,
+    val given: Long?,
+)
+
 sealed interface TemplateResult {
     data object Valid : TemplateResult
 
@@ -339,6 +370,8 @@ class TemplateEngine(
         val income: Boolean,
         val templates: List<Template>,
         val errors: List<String>,
+        /** The note's template lines in order, for pointing back at one line. */
+        val entries: List<TemplateNote.Entry> = emptyList(),
     )
 
     /** Lists bad lines; writes nothing. */
@@ -469,6 +502,85 @@ class TemplateEngine(
         }
     }
 
+    /**
+     * Every visible category's templates laid out the way an overwrite would run them (the templates screen's
+     * lanes): priorities lowest first, each template given what it asks while to budget lasts, then remainder lines
+     * by weight, then goals, which budget nothing. Lines that do not read are listed apart. Writes nothing.
+     */
+    fun plan(month: YearMonth): TemplatePlan {
+        val categories = categories().filter { it.visible && !it.income }
+        val detailed = ShellReader.loadDetailed(session, month)
+        val stats = detailed.categories
+        val templated = categories.filter { it.templates.isNotEmpty() }
+        val start = detailed.figures.headerMinor + templated.sumOf { stats[it.id]?.budgetedMinor ?: 0L }
+        var available = start
+
+        fun chips(predicate: (Template) -> Boolean): List<Pair<Category, Int>> =
+            categories.flatMap { category ->
+                category.entries.mapIndexedNotNull { index, entry -> entry.template?.takeIf(predicate)?.let { category to index } }
+            }
+
+        fun chip(
+            category: Category,
+            index: Int,
+            asks: Long?,
+            given: Long?,
+        ): TemplateChip {
+            val entry = category.entries[index]
+            return TemplateChip(category.id, category.name, index, entry.template, entry.line, asks, given)
+        }
+        val lanes = mutableListOf<TemplateLane>()
+        val priorities = chips { it.priority != null }.mapNotNull { (c, i) -> c.entries[i].template?.priority }.distinct().sorted()
+        for (priority in priorities) {
+            val laneChips =
+                chips { it.priority == priority }.map { (category, index) ->
+                    val asks = amountFor(category.entries[index].template!!, category, month, stats, detailed.figures.headerMinor)
+                    val given = asks.coerceAtMost(available.coerceAtLeast(0L)).coerceAtLeast(0L)
+                    available -= given
+                    chip(category, index, asks, given)
+                }
+            lanes += TemplateLane(TemplateLane.Kind.PRIORITY, priority, laneChips, available)
+        }
+        // As a run does, only a category's first remainder line takes a share.
+        val remainders = chips { it is Template.Remainder }.distinctBy { (category, _) -> category.id }
+        if (remainders.isNotEmpty()) {
+            val weights = remainders.map { (c, i) -> (c.entries[i].template as Template.Remainder).weight }
+            val total = weights.fold(BigDecimal.ZERO) { sum, w -> sum + w }
+            val pool = available.coerceAtLeast(0L)
+            var left = pool
+            val laneChips =
+                remainders.mapIndexed { n, (category, index) ->
+                    val share =
+                        if (n ==
+                            remainders.lastIndex
+                        ) {
+                            left
+                        } else {
+                            (pool.toDouble() * weights[n].toDouble() / total.toDouble()).roundToLong()
+                        }
+                    left -= share
+                    chip(category, index, null, share)
+                }
+            available -= pool
+            lanes += TemplateLane(TemplateLane.Kind.REMAINDER, null, laneChips, available)
+        }
+        val goals = chips { it is Template.Goal }
+        if (goals.isNotEmpty()) lanes += TemplateLane(TemplateLane.Kind.GOAL, null, goals.map { (c, i) -> chip(c, i, null, null) }, null)
+        val unreadable =
+            categories.flatMap { category ->
+                category.entries.mapIndexedNotNull { index, entry ->
+                    if (entry.template ==
+                        null
+                    ) {
+                        chip(category, index, null, null)
+                    } else {
+                        null
+                    }
+                }
+            }
+        return TemplatePlan(start, lanes, unreadable)
+    }
+
     private fun amountFor(
         template: Template,
         category: Category,
@@ -587,14 +699,15 @@ class TemplateEngine(
                 """.trimIndent(),
             ).map { row ->
                 val id = row.str("id").orEmpty()
-                val parsed = TemplateParser.parse(notes[id].orEmpty())
+                val entries = TemplateNote.parse(notes[id].orEmpty()).entries
                 Category(
                     id = id,
                     name = row.str("name").orEmpty(),
                     visible = !row.bool("hidden") && !row.bool("group_hidden"),
                     income = row.bool("is_income"),
-                    templates = parsed.mapNotNull { it.getOrNull() },
-                    errors = parsed.mapNotNull { it.exceptionOrNull()?.message },
+                    templates = entries.mapNotNull { it.template },
+                    errors = entries.filter { it.template == null }.map { it.line },
+                    entries = entries,
                 )
             }
     }

@@ -15,7 +15,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.CurrencySpec
+import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.core.TemplateChip
 import app.duenorth.budget.core.TemplateCopy
+import app.duenorth.budget.core.TemplatePlan
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroButton
@@ -42,6 +46,13 @@ fun TemplatesScreen(
     onConfirm: () -> Unit,
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
+    plan: TemplatePlan? = null,
+    currency: CurrencySpec? = null,
+    applyPreview: TemplateApplyPreview? = null,
+    onOpenChip: (TemplateChip) -> Unit = {},
+    onMoveChip: (TemplateChip, Int) -> Unit = { _, _ -> },
+    onConfirmPreview: () -> Unit = {},
+    onKeepPreview: () -> Unit = {},
 ) {
     Column(
         modifier
@@ -53,7 +64,18 @@ fun TemplatesScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         MetroText(TemplateCopy.TITLE, Metro.typography.header)
-        MetroText(monthLabel(month), Metro.typography.caption, color = Metro.colors.secondary)
+        val lanes = plan?.takeIf { currency != null && (it.lanes.isNotEmpty() || it.unreadable.isNotEmpty()) }
+        val caption =
+            if (lanes != null && currency != null) {
+                "${monthLabel(month)} · ${MoneyFormat.format(lanes.start, currency, formatOptions())} ${TemplateLanesCopy.START}"
+            } else {
+                monthLabel(month)
+            }
+        MetroText(caption, Metro.typography.caption, color = Metro.colors.secondary)
+        if (applyPreview != null && currency != null) {
+            TemplateApplyList(applyPreview, currency, onConfirmPreview, onKeepPreview)
+            return@Column
+        }
         if (confirm != null) {
             MetroText(confirm, Metro.typography.subheader, Modifier.testTag("templates-confirm"))
             MetroButtonGrid {
@@ -62,7 +84,22 @@ fun TemplatesScreen(
             }
             return@Column
         }
-        TemplateOutcome(result, busy)
+        if (lanes != null && currency != null) {
+            // The lanes list bad lines themselves, each with fix.
+            if (result is TemplateResult.Invalid) {
+                MetroText(
+                    TemplateLanesCopy.FIX_FIRST,
+                    Metro.typography.subheader,
+                    Modifier.testTag("templates-result"),
+                    color = Metro.accent.text,
+                )
+            } else if (result !is TemplateResult.Valid) {
+                TemplateOutcome(result, busy)
+            }
+            TemplateLanes(lanes, currency, onOpenChip, onMoveChip)
+        } else {
+            TemplateOutcome(result, busy)
+        }
         MetroButtonGrid {
             MetroButton(TemplateCopy.APPLY, Modifier.testTag("templates-apply"), onClick = onApply)
             MetroButton(TemplateCopy.OVERWRITE, Modifier.testTag("templates-overwrite"), onClick = onOverwrite)

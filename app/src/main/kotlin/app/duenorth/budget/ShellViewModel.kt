@@ -64,6 +64,7 @@ import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplateKind
+import app.duenorth.budget.core.TemplatePlan
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.UnlockResult
@@ -378,6 +379,10 @@ data class ShellUiState(
     val templatePreview: Pair<Template, Long?>? = null,
     /** Schedule names a schedule template can pay. */
     val templateSchedules: List<String> = emptyList(),
+    /** Every category's templates in priority lanes, for the templates screen; null until worked out. */
+    val templatePlan: TemplatePlan? = null,
+    /** What apply or overwrite would change, shown before it does. */
+    val templateApplyPreview: TemplateApplyPreview? = null,
     val bankLink: BankLinkUi? = null,
     /** First-run progress while the phone has no budget (spec 011); null otherwise. */
     val onboarding: OnboardingUi? = null,
@@ -1344,6 +1349,10 @@ class ShellViewModel(
         }
         if (current.templateConfirm != null) {
             _state.update { it.copy(templateConfirm = null) }
+            return true
+        }
+        if (current.templateApplyPreview != null && current.route == ShellRoute.Templates) {
+            _state.update { it.copy(templateApplyPreview = null) }
             return true
         }
         if (current.accountForceConfirm != null) {

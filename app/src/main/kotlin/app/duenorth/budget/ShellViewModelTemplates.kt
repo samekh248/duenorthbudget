@@ -2,9 +2,11 @@ package app.duenorth.budget
 
 import androidx.lifecycle.viewModelScope
 import app.duenorth.budget.core.Template
+import app.duenorth.budget.core.TemplateChip
 import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.core.TemplateNote
 import app.duenorth.budget.core.TemplateResult
+import app.duenorth.budget.core.withPriority
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
@@ -16,8 +18,9 @@ import kotlinx.coroutines.withContext
 fun ShellViewModel.openTemplates() {
     if (!state.value.formatPrefs.templatesOn) return
     push(ShellRoute.Templates)
-    mutate { it.copy(templateResult = null, templateConfirm = null) }
+    mutate { it.copy(templateResult = null, templateConfirm = null, templateApplyPreview = null) }
     checkTemplates()
+    refreshTemplatePlan()
 }
 
 fun ShellViewModel.checkTemplates() {
@@ -208,4 +211,102 @@ private fun ShellViewModel.loadTemplateSchedules() {
                 .distinct()
         mutate { it.copy(templateSchedules = names) }
     }
+}
+
+// The templates screen (option D, priority lanes): every category's templates by priority, and apply's before and after.
+
+/** The month the templates screen works on: edit mode's month, or the open one. */
+private fun ShellViewModel.templatesMonth() = state.value.budgetEdit?.month ?: editorMonth()
+
+/** Works out the lanes again from the saved notes. */
+fun ShellViewModel.refreshTemplatePlan() {
+    val budgetId = state.value.settings.openBudgetId ?: return
+    if (!state.value.formatPrefs.templatesOn) return
+    val month = templatesMonth()
+    viewModelScope.launch {
+        val plan = withContext(Dispatchers.IO) { library.templatePlan(budgetId, month) }
+        mutate { it.copy(templatePlan = plan) }
+    }
+}
+
+/** A chip tapped: its template's form, or the kinds grid for a line that does not read. Save and back land on the lanes. */
+fun ShellViewModel.openTemplateChip(chip: TemplateChip) {
+    val budgetId = state.value.settings.openBudgetId ?: return
+    viewModelScope.launch {
+        val note = withContext(Dispatchers.IO) { library.readCategoryNote(budgetId, chip.categoryId) }
+        val template =
+            TemplateNote
+                .parse(note)
+                .entries
+                .getOrNull(chip.index)
+                ?.template
+        mutate { it.copy(categoryNote = note, templatePreview = null) }
+        push(
+            if (template == null) {
+                ShellRoute.TemplateKinds(chip.categoryId, chip.index)
+            } else {
+                ShellRoute.TemplateEditor(chip.categoryId, chip.index, TemplateKind.of(template))
+            },
+        )
+        loadTemplateSchedules()
+    }
+}
+
+/** A chip dropped on another lane: its line takes that lane's [priority], as one undo step. */
+fun ShellViewModel.moveTemplateToPriority(
+    chip: TemplateChip,
+    priority: Int,
+) {
+    val budgetId = state.value.settings.openBudgetId ?: return
+    viewModelScope.launch {
+        noteWrites.withLock {
+            withContext(Dispatchers.IO) {
+                val split = TemplateNote.parse(library.readCategoryNote(budgetId, chip.categoryId))
+                val template = split.entries.getOrNull(chip.index)?.template ?: return@withContext
+                library.saveCategoryNote(budgetId, chip.categoryId, split.replace(chip.index, template.withPriority(priority)))
+            }
+        }
+        mutate { it.copy(undoLabel = library.undoLabel(budgetId)) }
+        refreshTemplatePlan()
+        withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }
+    }
+}
+
+/** Apply or overwrite: first the list of what would change, each category's amount now and after. */
+fun ShellViewModel.previewApplyTemplates(overwrite: Boolean) {
+    val current = state.value
+    val edit = current.budgetEdit
+    val budgetId = edit?.budgetId ?: return applyTemplates(overwrite)
+    val month = edit.month ?: return
+    mutate { it.copy(templateBusy = true, templateConfirm = null) }
+    viewModelScope.launch {
+        val (result, amounts) = withContext(Dispatchers.IO) { library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
+        mutate { now ->
+            if (result !is TemplateResult.Applied) return@mutate now.copy(templateResult = result, templateBusy = false)
+            val categories =
+                now
+                    .editingShell()
+                    ?.groups
+                    ?.flatMap { it.categories }
+                    .orEmpty()
+                    .associateBy { it.id }
+            val rows =
+                amounts.mapNotNull { (id, after) ->
+                    val category = categories[id] ?: return@mapNotNull null
+                    if (category.budgetedMinor == after) null else TemplateApplyRow(id, category.name, category.budgetedMinor, after)
+                }
+            now.copy(templateApplyPreview = TemplateApplyPreview(overwrite, rows), templateBusy = false)
+        }
+    }
+}
+
+/** The before and after list's apply: fills the boxes. */
+fun ShellViewModel.confirmApplyPreview() {
+    val preview = state.value.templateApplyPreview ?: return
+    mutate { it.copy(templateApplyPreview = null) }
+    applyTemplates(preview.overwrite, confirmed = true)
+}
+
+fun ShellViewModel.keepApplyPreview() {
+    mutate { it.copy(templateApplyPreview = null) }
 }

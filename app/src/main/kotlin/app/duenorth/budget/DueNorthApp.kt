@@ -1084,19 +1084,32 @@ fun DueNorthApp(model: ShellViewModel) {
                                 )
                             }
                         }
-                        ShellRoute.Templates ->
+                        ShellRoute.Templates -> {
+                            // A note saved from a chip's form (or a chip moved) changes the lanes.
+                            LaunchedEffect(state.undoLabel) { model.refreshTemplatePlan() }
                             TemplatesScreen(
-                                month = state.pinnedMonth ?: state.openMonth,
+                                month = state.budgetEdit?.month ?: state.pinnedMonth ?: state.openMonth,
                                 result = state.templateResult,
                                 busy = state.templateBusy,
                                 confirm = state.templateConfirm,
-                                onCheck = model::checkTemplates,
-                                onApply = { model.applyTemplates(overwrite = false) },
-                                onOverwrite = { model.applyTemplates(overwrite = true) },
+                                onCheck = {
+                                    model.checkTemplates()
+                                    model.refreshTemplatePlan()
+                                },
+                                onApply = { model.previewApplyTemplates(overwrite = false) },
+                                onOverwrite = { model.previewApplyTemplates(overwrite = true) },
                                 onConfirm = model::confirmTemplateOverwrite,
                                 onKeep = model::keepTemplates,
                                 modifier = fill,
+                                plan = state.templatePlan,
+                                currency = state.shell?.currency,
+                                applyPreview = state.templateApplyPreview,
+                                onOpenChip = model::openTemplateChip,
+                                onMoveChip = model::moveTemplateToPriority,
+                                onConfirmPreview = model::confirmApplyPreview,
+                                onKeepPreview = model::keepApplyPreview,
                             )
+                        }
                         is ShellRoute.RuleEditor -> {
                             val draft = state.ruleDraft
                             val shell = state.shell

@@ -812,6 +812,13 @@ class BudgetLibrary(
             open(budgetId) { TemplateEngine(it, clock.today()).preview(categoryId, month, templates) } ?: templates.map { null }
         }
 
+    /** Every visible category's templates in priority lanes for [month] (the templates screen); writes nothing. */
+    fun templatePlan(
+        budgetId: String,
+        month: YearMonth,
+    ): TemplatePlan? =
+        if (!readFormatPrefs(budgetId).templatesOn) null else open(budgetId) { TemplateEngine(it, clock.today()).plan(month) }
+
     fun readCategoryNote(
         budgetId: String,
         categoryId: String,
