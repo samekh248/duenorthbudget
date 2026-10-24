@@ -207,6 +207,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     Lifecycle.Event.ON_STOP -> {
                         (context.applicationContext as? DueNorthApplication)?.onScreen = false
                         model.onScreenLocked()
+                        runCatching { BackgroundSyncWorker.sendUnsent(context) }
                     }
                     else -> Unit
                 }

@@ -234,7 +234,7 @@ private fun ShellViewModel.afterAccountWrite(
     reloadAccounts()
     refresh()
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }
+        withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
         refresh()
     }
 }

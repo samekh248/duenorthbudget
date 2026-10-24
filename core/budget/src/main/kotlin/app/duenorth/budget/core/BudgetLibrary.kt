@@ -21,6 +21,13 @@ class BudgetLibrary(
     /** Undo steps for the open budget (spec 010). */
     val journal = EditJournal()
 
+    /**
+     * Told a budget's id after a call leaves that budget with changes the server has not stored,
+     * so the app can send them right away. It runs on the writing thread and must return quickly.
+     */
+    @Volatile
+    var onLocalChange: ((String) -> Unit)? = null
+
     private val json =
         Json {
             ignoreUnknownKeys = true
@@ -258,7 +265,18 @@ class BudgetLibrary(
     ): T? {
         val database = File(File(root, id), "db.sqlite")
         if (!database.isFile) return null
-        return sessions.use(database, block)
+        return watched(id) { sessions.use(database, block) }
+    }
+
+    /** Runs [block], then tells [onLocalChange] when it recorded a local change for [id]. */
+    private fun <T> watched(
+        id: String,
+        block: () -> T,
+    ): T {
+        val before = SyncSchema.localWritesOnThread()
+        val result = block()
+        if (SyncSchema.localWritesOnThread() != before) onLocalChange?.invoke(id)
+        return result
     }
 
     /**
@@ -965,9 +983,11 @@ class BudgetLibrary(
     ): T? {
         val database = File(root, id).resolve("db.sqlite")
         if (!database.isFile) return null
-        return sessions.use(database) { session ->
-            ActualSchema.ensure(session)
-            SyncSchema.withClock(session, syncClockFor(session)) { block(session) }
+        return watched(id) {
+            sessions.use(database) { session ->
+                ActualSchema.ensure(session)
+                SyncSchema.withClock(session, syncClockFor(session)) { block(session) }
+            }
         }
     }
 
