@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,7 +30,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
@@ -46,7 +46,6 @@ import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
-import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
@@ -220,36 +219,38 @@ fun OnboardingAddressScreen(
     modifier: Modifier = Modifier,
     /** False when adding a server from settings: a budget is already on the phone. */
     offerPhone: Boolean = true,
+    /** Opens with the http/https choices unfolded; for screenshots. */
+    schemeOpenAtStart: Boolean = false,
 ) {
     val parsed = ServerAddress.parse(address)
     OnboardingPage(OnboardingScreenCopy.SERVER_TITLE, "onboarding-address", modifier) {
         MetroText(OnboardingScreenCopy.WHERE_SERVER, Metro.typography.subheader)
         FieldLabel(OnboardingScreenCopy.ADDRESS)
         val entry = ServerAddress.entry(address)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MetroDimens.Row)) {
-            MetroSegmentedToggle(
-                first = OnboardingScreenCopy.HTTP,
-                second = OnboardingScreenCopy.HTTPS,
-                firstSelected = !entry.secure,
-                onSelect = { http -> onAddress(ServerAddress.join(!http, entry.text)) },
-                tag = "onboarding-scheme",
+        // The prefix is the toggle: it shows the scheme in use, and tapping it unfolds both under the box.
+        var schemeOpen by rememberSaveable { mutableStateOf(schemeOpenAtStart) }
+        // Enter checks the address and moves on, as next in the bar does.
+        CompositionLocalProvider(LocalFieldSubmit provides { if (!checking) onNext() }) {
+            MetroField(
+                entry.text,
+                { onAddress(ServerAddress.join(entry.secure, it)) },
+                "budget.example.com",
+                Modifier.testTag("onboarding-address-field"),
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Go,
+                    ),
+                prefix = entry.prefix,
+                onPrefixClick = { schemeOpen = !schemeOpen },
             )
-            // Enter checks the address and moves on, as next in the bar does.
-            CompositionLocalProvider(LocalFieldSubmit provides { if (!checking) onNext() }) {
-                MetroField(
-                    entry.text,
-                    { onAddress(ServerAddress.join(entry.secure, it)) },
-                    "example.com",
-                    Modifier.weight(1f).testTag("onboarding-address-field"),
-                    keyboardOptions =
-                        KeyboardOptions(
-                            capitalization = KeyboardCapitalization.None,
-                            autoCorrectEnabled = false,
-                            keyboardType = KeyboardType.Uri,
-                            imeAction = ImeAction.Go,
-                        ),
-                    prefix = entry.prefix,
-                )
+        }
+        if (schemeOpen) {
+            SchemeChoices(entry.secure) { secure ->
+                schemeOpen = false
+                if (secure != entry.secure) onAddress(ServerAddress.join(secure, entry.text))
             }
         }
         if (!entry.secure) {
@@ -289,6 +290,35 @@ fun OnboardingAddressScreen(
                     ButtonSpec(OnboardingScreenCopy.PHONE_ONLY, "onboarding-phone", onPhone).takeIf { offerPhone },
                 )
             }
+        }
+    }
+}
+
+/** The address prefix's choices, unfolded under the box as a Metro combo box unfolds; the one in use in the accent. */
+@Composable
+private fun SchemeChoices(
+    secure: Boolean,
+    onPick: (secure: Boolean) -> Unit,
+) {
+    Column(
+        Modifier
+            .padding(top = 4.dp)
+            .fillMaxWidth()
+            .border(MetroDimens.Stroke, Metro.accent.fill)
+            .testTag("onboarding-scheme"),
+    ) {
+        listOf(false to OnboardingScreenCopy.HTTP, true to OnboardingScreenCopy.HTTPS).forEach { (choice, label) ->
+            MetroText(
+                label,
+                Metro.typography.control,
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = MetroDimens.TouchTarget)
+                    .metroPress { onPick(choice) }
+                    .padding(horizontal = 10.dp, vertical = MetroDimens.Row)
+                    .testTag("onboarding-scheme-$label"),
+                color = if (choice == secure) Metro.accent.text else Metro.colors.foreground,
+            )
         }
     }
 }

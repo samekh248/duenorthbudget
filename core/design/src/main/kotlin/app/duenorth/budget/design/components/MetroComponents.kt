@@ -168,9 +168,11 @@ fun MetroField(
     lines: IntRange? = null,
     /** Fixed text before what is typed, such as `https://`: shown in the box, never editable. */
     prefix: String? = null,
+    /** Makes [prefix] a button with a chevron, for a page that lets the person pick it. */
+    onPrefixClick: (() -> Unit)? = null,
 ) {
     val submit = LocalFieldSubmit.current
-    MetroFieldFrame(value.isEmpty(), hint, modifier, fill, prefix) { style, cursor ->
+    MetroFieldFrame(value.isEmpty(), hint, modifier, fill, prefix, onPrefixClick) { style, cursor ->
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
@@ -222,6 +224,7 @@ private fun MetroFieldFrame(
     modifier: Modifier,
     fill: Boolean,
     prefix: String? = null,
+    onPrefixClick: (() -> Unit)? = null,
     field: @Composable (TextStyle, SolidColor) -> Unit,
 ) {
     val colors = Metro.colors
@@ -269,14 +272,26 @@ private fun MetroFieldFrame(
             // so an empty box still reads as prefix then hint.
             val prefixColor = if (relief) colors.secondary else Color(0xFF5A5A5A)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                MetroText(
-                    prefix,
-                    Metro.typography.control,
-                    Modifier.testTag("field-prefix"),
-                    color = prefixColor,
-                    maxLines = 1,
-                    softWrap = false,
-                )
+                Row(
+                    Modifier
+                        .heightIn(min = MetroDimens.TouchTarget)
+                        .then(if (onPrefixClick != null) Modifier.metroPress(onPrefixClick) else Modifier)
+                        .testTag("field-prefix"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    MetroText(prefix, Metro.typography.control, color = prefixColor, maxLines = 1, softWrap = false)
+                    if (onPrefixClick != null) {
+                        // A chevron and a rule set the pickable prefix apart from the typed text.
+                        AppGlyphIcon(AppGlyph.ChevronDown, prefixColor)
+                        Box(
+                            Modifier
+                                .padding(start = 4.dp, end = 8.dp)
+                                .width(MetroDimens.Stroke)
+                                .height(24.dp)
+                                .background(prefixColor),
+                        )
+                    }
+                }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     if (empty) {
                         MetroText(hint, Metro.typography.control, color = hintColor, maxLines = 1)

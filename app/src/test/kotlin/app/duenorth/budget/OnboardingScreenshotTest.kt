@@ -53,6 +53,18 @@ class OnboardingScreenshotTest {
         }
 
     @Test
+    fun addressChoicesLight() =
+        snap(ShellRoute.OnboardingAddress, "onboarding_address_choices_light", dark = false) {
+            address(checking = false, error = null, schemeOpen = true)
+        }
+
+    @Test
+    fun addressChoicesDark() =
+        snap(ShellRoute.OnboardingAddress, "onboarding_address_choices_dark", dark = true) {
+            address(checking = false, error = null, schemeOpen = true)
+        }
+
+    @Test
     fun addressEmptyLight() =
         snap(ShellRoute.OnboardingAddress, "onboarding_address_empty_light", dark = false) {
             address(checking = false, error = null, typed = "")
@@ -127,6 +139,7 @@ class OnboardingScreenshotTest {
         checking: Boolean,
         error: String?,
         typed: String = "https://budget.example.com",
+        schemeOpen: Boolean = false,
     ) = OnboardingAddressScreen(
         address = typed,
         checking = checking,
@@ -134,6 +147,7 @@ class OnboardingScreenshotTest {
         onAddress = {},
         onNext = {},
         onPhone = {},
+        schemeOpenAtStart = schemeOpen,
     )
 
     @Composable
