@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.testTag
@@ -45,6 +46,7 @@ import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
@@ -62,6 +64,8 @@ object OnboardingScreenCopy {
     const val SERVER_TITLE = "server"
     const val WHERE_SERVER = "where does Actual run?"
     const val ADDRESS = "address"
+    const val HTTP = "http"
+    const val HTTPS = "https"
     const val TRY_AGAIN = "try again"
     const val SIGN_IN = "sign in"
     const val LABEL = "name on this phone"
@@ -221,32 +225,46 @@ fun OnboardingAddressScreen(
     OnboardingPage(OnboardingScreenCopy.SERVER_TITLE, "onboarding-address", modifier) {
         MetroText(OnboardingScreenCopy.WHERE_SERVER, Metro.typography.subheader)
         FieldLabel(OnboardingScreenCopy.ADDRESS)
-        // Enter checks the address and moves on, as next in the bar does.
-        CompositionLocalProvider(LocalFieldSubmit provides { if (!checking) onNext() }) {
-            MetroField(
-                address,
-                onAddress,
-                "budget.example.com",
-                Modifier.testTag("onboarding-address-field"),
-                keyboardOptions =
-                    KeyboardOptions(
-                        capitalization = KeyboardCapitalization.None,
-                        autoCorrectEnabled = false,
-                        keyboardType = KeyboardType.Uri,
-                        imeAction = ImeAction.Go,
-                    ),
+        val entry = ServerAddress.entry(address)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(MetroDimens.Row)) {
+            MetroSegmentedToggle(
+                first = OnboardingScreenCopy.HTTP,
+                second = OnboardingScreenCopy.HTTPS,
+                firstSelected = !entry.secure,
+                onSelect = { http -> onAddress(ServerAddress.join(!http, entry.text)) },
+                tag = "onboarding-scheme",
             )
-        }
-        val hint =
-            when {
-                parsed == null -> null
-                parsed.candidates.size > 1 -> OnboardingCopy.TRIED_SECURE
-                !ServerAddress.isSecure(parsed.candidates.first()) -> OnboardingCopy.NOT_ENCRYPTED
-                else -> null
+            // Enter checks the address and moves on, as next in the bar does.
+            CompositionLocalProvider(LocalFieldSubmit provides { if (!checking) onNext() }) {
+                MetroField(
+                    entry.text,
+                    { onAddress(ServerAddress.join(entry.secure, it)) },
+                    "example.com",
+                    Modifier.weight(1f).testTag("onboarding-address-field"),
+                    keyboardOptions =
+                        KeyboardOptions(
+                            capitalization = KeyboardCapitalization.None,
+                            autoCorrectEnabled = false,
+                            keyboardType = KeyboardType.Uri,
+                            imeAction = ImeAction.Go,
+                        ),
+                    prefix = entry.prefix,
+                )
             }
-        if (hint != null) {
+        }
+        if (!entry.secure) {
             MetroText(
-                hint,
+                OnboardingCopy.HTTP_WARNING,
+                Metro.typography.body,
+                Modifier
+                    .padding(top = MetroDimens.Row)
+                    .testTag("onboarding-http-warning"),
+                color = Metro.colors.error,
+            )
+        } else if (parsed != null && parsed.candidates.size > 1) {
+            // An address saved before the toggle, with no scheme of its own.
+            MetroText(
+                OnboardingCopy.TRIED_SECURE,
                 Metro.typography.caption,
                 Modifier.padding(top = 4.dp),
                 color = Metro.colors.secondary,

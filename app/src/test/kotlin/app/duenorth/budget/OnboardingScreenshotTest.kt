@@ -41,6 +41,30 @@ class OnboardingScreenshotTest {
         snap(ShellRoute.OnboardingAddress, "onboarding_address_dark", dark = true) { address(checking = true, error = null) }
 
     @Test
+    fun addressHttpLight() =
+        snap(ShellRoute.OnboardingAddress, "onboarding_address_http_light", dark = false) {
+            address(checking = false, error = null, typed = "http://192.168.1.20:5006")
+        }
+
+    @Test
+    fun addressHttpDark() =
+        snap(ShellRoute.OnboardingAddress, "onboarding_address_http_dark", dark = true) {
+            address(checking = false, error = null, typed = "http://192.168.1.20:5006")
+        }
+
+    @Test
+    fun addressEmptyLight() =
+        snap(ShellRoute.OnboardingAddress, "onboarding_address_empty_light", dark = false) {
+            address(checking = false, error = null, typed = "")
+        }
+
+    @Test
+    fun addressEmptyDark() =
+        snap(ShellRoute.OnboardingAddress, "onboarding_address_empty_dark", dark = true) {
+            address(checking = false, error = null, typed = "")
+        }
+
+    @Test
     fun addressErrorLight() =
         snap(ShellRoute.OnboardingAddress, "onboarding_address_error_light", dark = false) {
             address(checking = false, error = OnboardingCopy.NOT_SET_UP)
@@ -102,8 +126,9 @@ class OnboardingScreenshotTest {
     private fun address(
         checking: Boolean,
         error: String?,
+        typed: String = "https://budget.example.com",
     ) = OnboardingAddressScreen(
-        address = "budget.example.com",
+        address = typed,
         checking = checking,
         error = error,
         onAddress = {},
