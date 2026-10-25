@@ -153,6 +153,8 @@ fun IncomeCategoryScreen(
     onSave: (String) -> Unit,
     onAutoHold: (AutoHoldChoice) -> Unit,
     modifier: Modifier = Modifier,
+    // Off where the page heads itself with the name over the month control.
+    showName: Boolean = true,
 ) {
     val prefs = LocalFormatPrefs.current
     var amount by remember(category, prefs) { mutableStateOf(prefs.editAmount(category.budgetedMinor, shell.currency.decimals)) }
@@ -164,8 +166,10 @@ fun IncomeCategoryScreen(
             .testTag("income-category-screen"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        MetroText(category.name, Metro.typography.header)
-        MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+        if (showName) {
+            MetroText(category.name, Metro.typography.header)
+            MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+        }
         MetroText(
             "${IncomeCopy.RECEIVED} ${MoneyFormat.format(category.receivedMinor, shell.currency, formatOptions())}",
             Metro.typography.subheader,

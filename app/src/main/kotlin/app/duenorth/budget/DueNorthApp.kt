@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -49,6 +50,7 @@ import app.duenorth.budget.core.TemplateNote
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.MotionPolicy
 import app.duenorth.budget.design.components.LocalFieldSubmit
+import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -793,13 +795,17 @@ fun DueNorthApp(model: ShellViewModel) {
                             if (shell == null) {
                                 Placeholder()
                             } else {
+                                val income = shell.incomeCategory(route.categoryId)
+                                val name =
+                                    income?.name
+                                        ?: shell.groups.flatMap { it.categories }.firstOrNull { it.id == route.categoryId }?.name
                                 EditorWithMonth(
                                     openMonth = state.openMonth,
                                     monthWindow = model.monthWindow(),
                                     onSelectMonth = model::selectOpenMonth,
                                     modifier = fill,
+                                    title = name,
                                 ) { inner ->
-                                    val income = shell.incomeCategory(route.categoryId)
                                     if (income != null) {
                                         IncomeCategoryScreen(
                                             shell = shell,
@@ -808,6 +814,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                             onSave = model::saveCategoryBudget,
                                             onAutoHold = model::chooseAutoHold,
                                             modifier = inner,
+                                            showName = false,
                                         )
                                         return@EditorWithMonth
                                     }
@@ -819,6 +826,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                         onMove = model::openMoveCategory,
                                         onToggleCarryover = model::toggleCategoryCarryover,
                                         modifier = inner,
+                                        showName = false,
                                         note = state.categoryNote.takeIf { state.formatPrefs.templatesOn },
                                         onSaveNote = model::saveCategoryNoteText,
                                         templateAmounts = state.categoryTemplateAmounts,
@@ -1216,15 +1224,26 @@ fun DueNorthApp(model: ShellViewModel) {
     }
 }
 
+/** An editor under the month control; a [title] (the category being edited) heads the page above it. */
 @Composable
-private fun EditorWithMonth(
+internal fun EditorWithMonth(
     openMonth: YearMonth,
     monthWindow: app.duenorth.budget.design.MonthWindow,
     onSelectMonth: (YearMonth) -> Unit,
     modifier: Modifier = Modifier,
+    title: String? = null,
     content: @Composable (Modifier) -> Unit,
 ) {
     Column(modifier.fillMaxSize().background(Metro.colors.background)) {
+        if (title != null) {
+            MetroText(
+                title,
+                Metro.typography.header,
+                Modifier
+                    .padding(start = MetroDimens.Gutter, end = MetroDimens.Gutter, top = MetroDimens.Gutter)
+                    .testTag("editor-title"),
+            )
+        }
         MonthControl(
             month = openMonth,
             window = monthWindow,
@@ -1233,7 +1252,7 @@ private fun EditorWithMonth(
                 Modifier.padding(
                     start = MetroDimens.Gutter,
                     end = MetroDimens.Gutter,
-                    top = MetroDimens.Gutter,
+                    top = if (title != null) MetroDimens.Grid else MetroDimens.Gutter,
                     bottom = MetroDimens.Grid,
                 ),
         )

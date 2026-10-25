@@ -62,6 +62,8 @@ fun CategoryBudgetScreen(
     onMove: () -> Unit,
     onToggleCarryover: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    // Off where the page heads itself with the name over the month control.
+    showName: Boolean = true,
     note: String? = null,
     onSaveNote: (String) -> Unit = {},
     templateAmounts: List<Long?> = emptyList(),
@@ -85,8 +87,10 @@ fun CategoryBudgetScreen(
             .padding(MetroDimens.Gutter),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        MetroText(category.name, Metro.typography.header)
-        MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+        if (showName) {
+            MetroText(category.name, Metro.typography.header)
+            MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+        }
         MetroText(
             "available ${MoneyFormat.format(category.availableMinor, shell.currency, formatOptions())}",
             Metro.typography.subheader,
