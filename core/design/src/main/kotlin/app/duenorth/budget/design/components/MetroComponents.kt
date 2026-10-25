@@ -272,24 +272,30 @@ private fun MetroFieldFrame(
             // so an empty box still reads as prefix then hint.
             val prefixColor = if (relief) colors.secondary else Color(0xFF5A5A5A)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(
-                    Modifier
-                        .heightIn(min = MetroDimens.TouchTarget)
-                        .then(if (onPrefixClick != null) Modifier.metroPress(onPrefixClick) else Modifier)
-                        .testTag("field-prefix"),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    MetroText(prefix, Metro.typography.control, color = prefixColor, maxLines = 1, softWrap = false)
-                    if (onPrefixClick != null) {
-                        // A chevron and a rule set the pickable prefix apart from the typed text.
-                        AppGlyphIcon(AppGlyph.ChevronDown, prefixColor)
-                        Box(
-                            Modifier
-                                .padding(start = 4.dp, end = 8.dp)
-                                .width(MetroDimens.Stroke)
-                                .height(24.dp)
-                                .background(prefixColor),
-                        )
+                if (onPrefixClick == null) {
+                    MetroText(
+                        prefix,
+                        Metro.typography.control,
+                        Modifier.testTag("field-prefix"),
+                        color = prefixColor,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                } else {
+                    // A pickable prefix is a small accent button with a chevron, apart from the typed text.
+                    val accent = Metro.accent
+                    Row(
+                        Modifier
+                            .padding(end = 8.dp)
+                            .heightIn(min = MetroDimens.TouchTarget - 12.dp)
+                            .background(accent.fill)
+                            .metroPress(onPrefixClick)
+                            .padding(start = 8.dp, end = 4.dp)
+                            .testTag("field-prefix"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MetroText(prefix, Metro.typography.control, color = accent.onFill, maxLines = 1, softWrap = false)
+                        AppGlyphIcon(AppGlyph.ChevronDown, accent.onFill)
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
