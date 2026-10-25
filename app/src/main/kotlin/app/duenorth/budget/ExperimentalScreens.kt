@@ -31,12 +31,15 @@ enum class ExperimentalFeature(
     val hint: String,
     val where: String,
     val tag: String,
+    /** The Actual budget preference that holds this feature's flag. */
+    val preference: String,
 ) {
     TEMPLATES(
         "budget templates",
         "fill each category from a goal you set on it, with a goal bar on every budget row",
         "a category's page → add template · budget edit ••• → templates",
         "templates",
+        "flags.goalTemplatesEnabled",
     ),
     ;
 
@@ -57,17 +60,10 @@ object ExperimentalCopy {
     const val WHAT_YOU_GET = "what you get"
     const val TURN_ON = "turn on"
     const val KEEP_OFF = "keep off"
-    const val LATER = "change this any time in settings → advanced → experimental features"
+    const val LATER = "change this any time in settings → experimental"
     const val NEEDS_MASTER = "turn on experimental features to use this"
     const val ON = "on"
     const val OFF = "off"
-
-    /** Settings → advanced: what the experimental row says it holds. */
-    fun summary(prefs: FormatPrefs): String {
-        if (!prefs.experimental) return OFF
-        val on = ExperimentalFeature.entries.filter { it.isOn(prefs) }
-        return if (on.isEmpty()) "on · no features picked" else "on · " + on.joinToString { it.label }
-    }
 }
 
 /** Shown once when a budget opens without a choice yet: try the experimental features, or keep them off. */
@@ -107,29 +103,20 @@ fun ExperimentalOfferScreen(
 }
 
 /**
- * Settings → advanced → experimental features: the master switch, then each feature with what
- * it does and where it shows up. Features stay listed while the switch is off, so the page
- * says what turning it on would bring.
+ * Settings → experimental: the master switch, then each feature with what it does and where it
+ * shows up. Features stay listed while the switch is off, so the item says what turning it on
+ * would bring.
  */
 @Composable
-fun ExperimentalScreen(
-    budgetName: String,
+internal fun ExperimentalItem(
     prefs: FormatPrefs,
     onExperimental: (Boolean) -> Unit,
     onFeature: (ExperimentalFeature, Boolean) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .verticalScroll(rememberScrollState())
-            .padding(MetroDimens.Gutter)
-            .testTag("experimental-screen"),
+        Modifier.testTag("experimental-screen"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        MetroText(ExperimentalCopy.TITLE, Metro.typography.header)
-        MetroText(budgetName, Metro.typography.subheader, color = Metro.colors.secondary)
         SwitchRow(
             label = ExperimentalCopy.TITLE,
             on = prefs.experimental,

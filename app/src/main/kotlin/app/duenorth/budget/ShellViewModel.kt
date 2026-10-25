@@ -173,11 +173,10 @@ sealed interface ShellRoute {
 
     data object Settings : ShellRoute
 
-    /** Settings → advanced → experimental features: the switch and each feature, for the open budget. */
-    data object Experimental : ShellRoute
-
     /** A budget just opened that has never had experimental features chosen: try them or keep them off. */
-    data object ExperimentalOffer : ShellRoute
+    data class ExperimentalOffer(
+        val budgetId: String,
+    ) : ShellRoute
 
     /** Settings → advanced → encryption: one page per password action (spec 012). */
     data class EncryptionPassword(
@@ -989,35 +988,34 @@ class ShellViewModel(
     fun setExperimentalFeature(
         feature: ExperimentalFeature,
         enabled: Boolean,
-    ) = when (feature) {
-        ExperimentalFeature.TEMPLATES -> setGoalTemplates(enabled)
-    }
+    ) = setOpenBudgetPreference(feature.preference, if (enabled) "true" else "false")
 
-    fun showExperimental() = openFromSettings(ShellRoute.Experimental, SettingsPage.ADVANCED)
+    /** `turn on` on the offer: the switch and every feature come on for the budget it asked about. */
+    fun acceptExperimentalOffer() = answerExperimentalOffer(on = true)
 
-    /** `turn on` on the offer: the switch and every feature come on for this budget. */
-    fun acceptExperimentalOffer() {
-        if (_state.value.route != ShellRoute.ExperimentalOffer) return
-        setExperimental(true)
-        ExperimentalFeature.entries.forEach { setExperimentalFeature(it, true) }
-        _state.update { it.copy(route = ShellRoute.Home) }
-    }
+    /** `keep off` on the offer: saved as off, so that budget is not asked again. Back asks next time. */
+    fun declineExperimentalOffer() = answerExperimentalOffer(on = false)
 
-    /** `keep off` on the offer: saved as off, so this budget is not asked again. Back asks next time. */
-    fun declineExperimentalOffer() {
-        if (_state.value.route != ShellRoute.ExperimentalOffer) return
-        setExperimental(false)
+    private fun answerExperimentalOffer(on: Boolean) {
+        val offer = _state.value.route as? ShellRoute.ExperimentalOffer ?: return
+        val value = if (on) "true" else "false"
+        setBudgetPreference(offer.budgetId, "flags.experimental", value)
+        if (on) ExperimentalFeature.entries.forEach { setBudgetPreference(offer.budgetId, it.preference, value) }
         _state.update { it.copy(route = ShellRoute.Home) }
     }
 
     /**
      * After a budget is opened, switched to, or made: one that has never had experimental
-     * features chosen asks before its home shows.
+     * features chosen asks before its home shows. The budget is read from the phone, not the
+     * screen, so the answer lands on the budget just opened.
      */
-    private fun offerExperimental() {
+    private suspend fun offerExperimental() {
+        val budgetId = withContext(Dispatchers.IO) { library.settings().openBudgetId } ?: return
+        val asked = withContext(Dispatchers.IO) { library.readFormatPrefs(budgetId).experimentalAsked }
+        if (asked) return
         _state.update {
-            val ask = it.route == ShellRoute.Home && it.shell != null && !it.locked && !it.formatPrefs.experimentalAsked
-            if (ask) it.copy(route = ShellRoute.ExperimentalOffer) else it
+            val ask = it.route == ShellRoute.Home && it.shell != null && !it.locked
+            if (ask) it.copy(route = ShellRoute.ExperimentalOffer(budgetId)) else it
         }
     }
 
@@ -2970,6 +2968,16 @@ class ShellViewModel(
         value: String,
     ) {
         val budgetId = _state.value.settings.openBudgetId ?: return
+        setBudgetPreference(budgetId, id, value)
+    }
+
+    /** Saves [id] on [budgetId]; the screen updates straight away when that budget is the open one. */
+    private fun setBudgetPreference(
+        budgetId: String,
+        id: String,
+        value: String,
+    ) {
+        val showing = budgetId == _state.value.settings.openBudgetId
         val optimistic =
             when (id) {
                 "dateFormat" -> _state.value.formatPrefs.copy(dateFormat = value)
@@ -2982,11 +2990,13 @@ class ShellViewModel(
                 "flags.goalTemplatesEnabled" -> _state.value.formatPrefs.copy(goalTemplates = value == "true")
                 else -> _state.value.formatPrefs
             }
-        _state.update {
-            it.copy(
-                formatPrefs = optimistic,
-                budgetMethod = optimistic.budgetType,
-            )
+        if (showing) {
+            _state.update {
+                it.copy(
+                    formatPrefs = optimistic,
+                    budgetMethod = optimistic.budgetType,
+                )
+            }
         }
         viewModelScope.launch(Dispatchers.IO) {
             preferenceWrites.withLock { library.setPreference(budgetId, id, value) }

@@ -259,34 +259,14 @@ internal fun AppearanceItem(
 
 @Composable
 internal fun AdvancedItem(
-    prefs: FormatPrefs,
     budgetId: String,
     cloudFileId: String?,
     encrypted: Boolean,
-    onExperimental: () -> Unit,
     onExport: () -> Unit,
     onEncryption: (EncryptionMode) -> Unit,
     onRequest: (AdvancedConfirm) -> Unit,
 ) {
-    // The experimental features have their own page; this row names what is on.
-    SettingsHeading("experimental", tag = "settings-experimental", first = true)
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress(onExperimental)
-            .padding(vertical = MetroDimens.Row)
-            .testTag("settings-experimental-open"),
-    ) {
-        MetroText(ExperimentalCopy.TITLE, Metro.typography.subheader)
-        MetroText(
-            ExperimentalCopy.summary(prefs),
-            Metro.typography.caption,
-            Modifier.testTag("settings-experimental-state"),
-            color = if (prefs.experimental) Metro.accent.text else Metro.colors.secondary,
-        )
-    }
-    SettingsHeading("export")
+    SettingsHeading("export", first = true)
     SettingsActionRow(SettingsCopy.EXPORT_HINT, "settings-export", onExport)
     SettingsHeading("ids", tag = "settings-ids")
     MetroText("budget $budgetId", Metro.typography.body, Modifier.testTag("settings-budget-id"))

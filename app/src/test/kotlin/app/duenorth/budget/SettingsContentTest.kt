@@ -45,9 +45,9 @@ class SettingsContentTest {
     private val budgets = listOf(BudgetSummary("a", "Alpha", "USD"), BudgetSummary("b", "Beta", "USD"))
 
     @Test
-    fun headerRowHasFiveItemsWithABudgetOpen() {
+    fun headerRowHasSixItemsWithABudgetOpen() {
         show(SettingsPage.BUDGET)
-        listOf("budget", "server", "format", "appearance", "advanced").forEach {
+        listOf("budget", "server", "format", "appearance", "advanced", "experimental").forEach {
             compose.onNodeWithText(it).assertExists()
         }
         compose.onNodeWithTag("settings-item-budget").assertIsDisplayed()
@@ -58,6 +58,7 @@ class SettingsContentTest {
         show(SettingsPage.ADVANCED, openBudgetId = null)
         compose.onNodeWithText("format").assertDoesNotExist()
         compose.onNodeWithText("advanced").assertDoesNotExist()
+        compose.onNodeWithText("experimental").assertDoesNotExist()
         // The stored advanced item is not shown, so settings falls back to budget.
         compose.onNodeWithTag("settings-item-budget").assertIsDisplayed()
         compose.onNodeWithTag("settings-open-budget").assertTextEquals("no budget open")

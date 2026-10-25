@@ -82,9 +82,8 @@ object SectionTitle {
                 ShellRoute.ConfirmReplace,
                 is ShellRoute.EncryptionPassword,
                 is ShellRoute.ConfirmRemoveInstance,
-                ShellRoute.ExperimentalOffer,
+                is ShellRoute.ExperimentalOffer,
                 -> return SectionTitleCopy.APP
-                ShellRoute.Experimental -> return SectionTitleCopy.SETTINGS
                 // Transactions open from several areas: name the one showing.
                 else -> HomeSections.headers.getOrNull(state.homeSection) ?: return SectionTitleCopy.APP
             }

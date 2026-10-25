@@ -16,7 +16,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Experimental features: asked once per budget on opening, and switched on their own page. */
+/** Experimental features: asked once per budget on opening, and switched in their own settings item. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33], qualifiers = "w411dp-h891dp")
 class ExperimentalContentTest {
@@ -27,24 +27,32 @@ class ExperimentalContentTest {
     fun openingABudgetAsksOnceAndRemembersPerBudget() {
         val (model, library) = household("experimental-offer")
         val householdId = model.state.value.settings.openBudgetId!!
+        // Let the launch's own loads finish, so none lands after the new budget opens.
+        repeat(40) {
+            ParityTestSupport.drain()
+            Thread.sleep(25)
+        }
 
         model.createFromSettings("Trip", "USD")
-        await { model.state.value.route == ShellRoute.ExperimentalOffer }
-        val tripId = model.state.value.settings.openBudgetId!!
+        await { model.state.value.route is ShellRoute.ExperimentalOffer }
+        val tripId = (model.state.value.route as ShellRoute.ExperimentalOffer).budgetId
+        assertTrue(tripId != householdId)
         model.declineExperimentalOffer()
         assertEquals(ShellRoute.Home, model.state.value.route)
         await { library.readFormatPrefs(tripId).experimentalAsked }
         assertFalse(library.readFormatPrefs(tripId).experimental)
 
         // The household budget has its own choice, so switching to it asks again.
+        await { model.state.value.settings.openBudgetId == tripId }
         model.requestSwitch(householdId)
         model.confirmSwitch()
-        await { model.state.value.route == ShellRoute.ExperimentalOffer }
+        await { model.state.value.route is ShellRoute.ExperimentalOffer }
         model.acceptExperimentalOffer()
         assertEquals(ShellRoute.Home, model.state.value.route)
         await { library.readFormatPrefs(householdId).templatesOn }
 
         // Back on the trip budget, the earlier answer stands.
+        await { model.state.value.settings.openBudgetId == householdId }
         model.requestSwitch(tripId)
         model.confirmSwitch()
         await { model.state.value.settings.openBudgetId == tripId && !model.state.value.formatPrefs.templatesOn }
@@ -52,24 +60,22 @@ class ExperimentalContentTest {
     }
 
     @Test
-    fun settingsOpensTheExperimentalPageAndBackReturnsToAdvanced() {
+    fun experimentalIsItsOwnSettingsItemWhileABudgetIsOpen() {
+        assertTrue(SettingsPage.EXPERIMENTAL in SettingsPage.shown(budgetOpen = true))
+        assertFalse(SettingsPage.EXPERIMENTAL in SettingsPage.shown(budgetOpen = false))
         val (model, _) = household("experimental-page")
         model.showSettings()
-        model.showExperimental()
-        assertEquals(ShellRoute.Experimental, model.state.value.route)
-        assertEquals("SETTINGS", SectionTitle.of(model.state.value))
+        model.selectSettingsPage(SettingsPage.EXPERIMENTAL)
         model.setExperimental(true)
         model.setExperimentalFeature(ExperimentalFeature.TEMPLATES, true)
         assertTrue(model.state.value.formatPrefs.templatesOn)
-        assertTrue(model.back())
         assertEquals(ShellRoute.Settings, model.state.value.route)
-        assertEquals(SettingsPage.ADVANCED, model.state.value.settingsPage)
     }
 
     @Test
     fun featuresWaitForTheMasterSwitch() {
         compose.setContent {
-            MetroTheme { ExperimentalScreen("Home", FormatPrefs(), {}, { _, _ -> }) }
+            MetroTheme { ExperimentalItem(FormatPrefs(), {}, { _, _ -> }) }
         }
         compose.onNodeWithTag("experimental-templates-switch").assertDoesNotExist()
         compose.onNodeWithText(ExperimentalCopy.NEEDS_MASTER).assertExists()
@@ -80,17 +86,10 @@ class ExperimentalContentTest {
         var flipped: Pair<ExperimentalFeature, Boolean>? = null
         compose.setContent {
             MetroTheme {
-                ExperimentalScreen("Home", FormatPrefs(experimental = true), {}, { feature, on -> flipped = feature to on })
+                ExperimentalItem(FormatPrefs(experimental = true), {}, { feature, on -> flipped = feature to on })
             }
         }
         compose.onNodeWithTag("experimental-templates-switch-on", useUnmergedTree = true).performClick()
         assertEquals(ExperimentalFeature.TEMPLATES to true, flipped)
-    }
-
-    @Test
-    fun advancedSummarySaysWhatIsOn() {
-        assertEquals("off", ExperimentalCopy.summary(FormatPrefs()))
-        assertEquals("on · no features picked", ExperimentalCopy.summary(FormatPrefs(experimental = true)))
-        assertEquals("on · budget templates", ExperimentalCopy.summary(FormatPrefs(experimental = true, goalTemplates = true)))
     }
 }

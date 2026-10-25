@@ -240,6 +240,7 @@ class ScreenBarTest {
         assertTrue(ids(SettingsPage.FORMAT).isEmpty())
         assertTrue(ids(SettingsPage.APPEARANCE).isEmpty())
         assertEquals(listOf("export"), ids(SettingsPage.ADVANCED))
+        assertTrue(ids(SettingsPage.EXPERIMENTAL).isEmpty())
         assertEquals(
             listOf("save", "cancel"),
             ScreenBar

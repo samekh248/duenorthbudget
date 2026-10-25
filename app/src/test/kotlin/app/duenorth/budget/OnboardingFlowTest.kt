@@ -363,7 +363,7 @@ class OnboardingFlowTest {
                 ?.budgetName == "Household"
         }
         // A budget with no experimental choice yet asks first, then shows its home.
-        await { model.state.value.route == ShellRoute.ExperimentalOffer }
+        await { model.state.value.route is ShellRoute.ExperimentalOffer }
         model.declineExperimentalOffer()
         assertEquals(ShellRoute.Home, model.state.value.route)
         assertEquals(listOf("Household"), library(root).list().map { it.name })
