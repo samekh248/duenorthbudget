@@ -176,6 +176,8 @@ sealed interface ShellRoute {
     /** A budget just opened that has never had experimental features chosen: try them or keep them off. */
     data class ExperimentalOffer(
         val budgetId: String,
+        /** What the budget already has, when it was chosen before (asked again at onboarding); null if never. */
+        val current: Boolean? = null,
     ) : ShellRoute
 
     /** Settings → advanced → encryption: one page per password action (spec 012). */
@@ -998,24 +1000,29 @@ class ShellViewModel(
 
     private fun answerExperimentalOffer(on: Boolean) {
         val offer = _state.value.route as? ShellRoute.ExperimentalOffer ?: return
-        val value = if (on) "true" else "false"
-        setBudgetPreference(offer.budgetId, "flags.experimental", value)
-        if (on) ExperimentalFeature.entries.forEach { setBudgetPreference(offer.budgetId, it.preference, value) }
+        // Keeping what a budget already has leaves its features as they are.
+        if (offer.current != on) {
+            val value = if (on) "true" else "false"
+            setBudgetPreference(offer.budgetId, "flags.experimental", value)
+            if (on) ExperimentalFeature.entries.forEach { setBudgetPreference(offer.budgetId, it.preference, value) }
+        }
         _state.update { it.copy(route = ShellRoute.Home) }
     }
 
     /**
      * After a budget is opened, switched to, or made: one that has never had experimental
-     * features chosen asks before its home shows. The budget is read from the phone, not the
+     * features chosen asks before its home shows. With [always] (the budget picked or made while
+     * setting up the phone) it asks even when the budget already has a choice, saying what it is. The budget is read from the phone, not the
      * screen, so the answer lands on the budget just opened.
      */
-    private suspend fun offerExperimental() {
+    private suspend fun offerExperimental(always: Boolean = false) {
         val budgetId = withContext(Dispatchers.IO) { library.settings().openBudgetId } ?: return
-        val asked = withContext(Dispatchers.IO) { library.readFormatPrefs(budgetId).experimentalAsked }
-        if (asked) return
+        val prefs = withContext(Dispatchers.IO) { library.readFormatPrefs(budgetId) }
+        if (prefs.experimentalAsked && !always) return
+        val current = prefs.experimental.takeIf { prefs.experimentalAsked }
         _state.update {
             val ask = it.route == ShellRoute.Home && it.shell != null && !it.locked
-            if (ask) it.copy(route = ShellRoute.ExperimentalOffer(budgetId)) else it
+            if (ask) it.copy(route = ShellRoute.ExperimentalOffer(budgetId, current)) else it
         }
     }
 
@@ -2166,6 +2173,7 @@ class ShellViewModel(
                         _state.value.onboarding
                             ?.progress
                             ?.path == OnboardingPath.SERVER && sync.signedIn()
+                    val settingUp = _state.value.onboarding != null
                     finishOnboarding()
                     val toSettings = _state.value.settingsReturn
                     _state.update {
@@ -2177,7 +2185,7 @@ class ShellViewModel(
                         )
                     }
                     reload()
-                    offerExperimental()
+                    offerExperimental(always = settingUp)
                     if (toSettings) refreshSettingsSections()
                     if (send) uploadNew()
                 }
@@ -2202,10 +2210,11 @@ class ShellViewModel(
             when (val result = withContext(Dispatchers.IO) { library.createFromMock(datasetId) }) {
                 is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
                 is CreateResult.Created -> {
+                    val settingUp = _state.value.onboarding != null
                     finishOnboarding()
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
-                    offerExperimental()
+                    offerExperimental(always = settingUp)
                 }
             }
         }
@@ -2474,6 +2483,7 @@ class ShellViewModel(
                 }
             when (result) {
                 OpenResult.Opened -> {
+                    val settingUp = _state.value.onboarding != null
                     finishOnboarding()
                     _state.update {
                         it.copy(
@@ -2487,7 +2497,7 @@ class ShellViewModel(
                         )
                     }
                     reload()
-                    offerExperimental()
+                    offerExperimental(always = settingUp)
                 }
                 OpenResult.NeedsPassword ->
                     _state.update {

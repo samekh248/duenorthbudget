@@ -36,6 +36,28 @@ class FieldSubmitContentTest {
     @get:Rule
     val compose = createHostComposeRule()
 
+    // Enter in the server address moves on, as next does; while the address is being checked it waits.
+    @Test
+    fun enterInTheServerAddressGoesToTheNextStep() {
+        var next = 0
+        var checking by mutableStateOf(false)
+        compose.setContent {
+            MetroTheme {
+                OnboardingAddressScreen("budget.example.com", checking, null, {}, { next++ }, {})
+            }
+        }
+        val box = compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("onboarding-address-field")))
+        box.assert(SemanticsMatcher.expectValue(SemanticsProperties.ImeAction, ImeAction.Go))
+        box.performImeAction()
+        compose.waitForIdle()
+        assertEquals(1, next)
+        checking = true
+        compose.waitForIdle()
+        box.performImeAction()
+        compose.waitForIdle()
+        assertEquals(1, next)
+    }
+
     // Enter in a one-line box submits the page; a multi-line box keeps Enter for a new line.
     @Test
     fun enterSubmitsOneLineBoxesOnly() {

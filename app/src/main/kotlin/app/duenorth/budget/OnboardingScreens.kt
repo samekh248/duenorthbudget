@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,7 @@ import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.ServerAddress
 import app.duenorth.budget.core.SignInMethod
 import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
@@ -219,19 +221,22 @@ fun OnboardingAddressScreen(
     OnboardingPage(OnboardingScreenCopy.SERVER_TITLE, "onboarding-address", modifier) {
         MetroText(OnboardingScreenCopy.WHERE_SERVER, Metro.typography.subheader)
         FieldLabel(OnboardingScreenCopy.ADDRESS)
-        MetroField(
-            address,
-            onAddress,
-            "budget.example.com",
-            Modifier.testTag("onboarding-address-field"),
-            keyboardOptions =
-                KeyboardOptions(
-                    capitalization = KeyboardCapitalization.None,
-                    autoCorrectEnabled = false,
-                    keyboardType = KeyboardType.Uri,
-                    imeAction = ImeAction.Next,
-                ),
-        )
+        // Enter checks the address and moves on, as next in the bar does.
+        CompositionLocalProvider(LocalFieldSubmit provides { if (!checking) onNext() }) {
+            MetroField(
+                address,
+                onAddress,
+                "budget.example.com",
+                Modifier.testTag("onboarding-address-field"),
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Go,
+                    ),
+            )
+        }
         val hint =
             when {
                 parsed == null -> null

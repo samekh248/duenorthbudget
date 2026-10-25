@@ -462,6 +462,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 budgetName = state.budgets.find { it.id == route.budgetId }?.name ?: openName,
                                 onTurnOn = model::acceptExperimentalOffer,
                                 onKeepOff = model::declineExperimentalOffer,
+                                current = route.current,
                                 modifier = fill,
                             )
                         is ShellRoute.EncryptionPassword ->

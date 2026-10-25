@@ -92,6 +92,10 @@ class SettingsScreenshotTest {
     fun experimentalOfferLight() = page("experimental_offer_light", dark = false) { ExperimentalOfferScreen("Home", {}, {}) }
 
     @Test
+    fun experimentalOfferChosenLight() =
+        page("experimental_offer_chosen_light", dark = false) { ExperimentalOfferScreen("Home", {}, {}, current = true) }
+
+    @Test
     fun experimentalOfferDark() = page("experimental_offer_dark", dark = true) { ExperimentalOfferScreen("Home", {}, {}) }
 
     private val home = SavedInstance("i1", "http://192.168.1.20:5006", "home server")

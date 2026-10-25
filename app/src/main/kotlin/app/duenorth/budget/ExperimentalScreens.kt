@@ -60,6 +60,10 @@ object ExperimentalCopy {
     const val WHAT_YOU_GET = "what you get"
     const val TURN_ON = "turn on"
     const val KEEP_OFF = "keep off"
+    const val KEEP_ON = "keep on"
+    const val TURN_OFF = "turn off"
+    const val NOW_ON = "This budget already has them on."
+    const val NOW_OFF = "This budget has them off."
     const val LATER = "change this any time in settings → experimental"
     const val NEEDS_MASTER = "turn on experimental features to use this"
     const val ON = "on"
@@ -73,6 +77,8 @@ fun ExperimentalOfferScreen(
     onTurnOn: () -> Unit,
     onKeepOff: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The budget's choice from before, when it has one; the buttons then say keep or change it. */
+    current: Boolean? = null,
 ) {
     Column(
         modifier
@@ -87,6 +93,14 @@ fun ExperimentalOfferScreen(
         MetroText(budgetName, Metro.typography.subheader, color = Metro.colors.secondary)
         MetroText(ExperimentalCopy.ABOUT, Metro.typography.body)
         MetroText(ExperimentalCopy.PER_BUDGET, Metro.typography.body)
+        if (current != null) {
+            MetroText(
+                if (current) ExperimentalCopy.NOW_ON else ExperimentalCopy.NOW_OFF,
+                Metro.typography.body,
+                Modifier.testTag("experimental-offer-current"),
+                color = Metro.accent.text,
+            )
+        }
         Heading(ExperimentalCopy.WHAT_YOU_GET)
         ExperimentalFeature.entries.forEach { feature ->
             Column(Modifier.testTag("experimental-offer-${feature.tag}")) {
@@ -95,8 +109,10 @@ fun ExperimentalOfferScreen(
             }
         }
         MetroButtonGrid(Modifier.padding(top = MetroDimens.Row)) {
-            MetroButton(ExperimentalCopy.TURN_ON, Modifier.testTag("experimental-offer-on"), onClick = onTurnOn)
-            MetroButton(ExperimentalCopy.KEEP_OFF, Modifier.testTag("experimental-offer-off"), onClick = onKeepOff)
+            val on = if (current == true) ExperimentalCopy.KEEP_ON else ExperimentalCopy.TURN_ON
+            val off = if (current == true) ExperimentalCopy.TURN_OFF else ExperimentalCopy.KEEP_OFF
+            MetroButton(on, Modifier.testTag("experimental-offer-on"), onClick = onTurnOn)
+            MetroButton(off, Modifier.testTag("experimental-offer-off"), onClick = onKeepOff)
         }
         MetroText(ExperimentalCopy.LATER, Metro.typography.caption, color = Metro.colors.secondary)
     }
