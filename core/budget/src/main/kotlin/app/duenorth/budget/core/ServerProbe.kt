@@ -60,6 +60,9 @@ object OnboardingCopy {
     const val NOT_SET_UP = "this server is not set up yet. finish setting it up in Actual, then try again"
     const val NOT_ENCRYPTED = "this connection is not encrypted"
     const val TRIED_SECURE = "tried as https:// first"
+    const val HTTP_WARNING =
+        "http is not encrypted. your password and budget cross the network where others can read them. " +
+            "choose https unless the server only runs on your home network"
     const val HTTP_ONLY = "https:// did not answer. next again connects over http://, which is not encrypted"
     const val PASSWORD_IN_THE_CLEAR = "this connection is not encrypted, so your password is sent as plain text"
     const val ENTER_NAME = "enter a name"

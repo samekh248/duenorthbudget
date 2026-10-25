@@ -166,9 +166,13 @@ fun MetroField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     fill: Boolean = true,
     lines: IntRange? = null,
+    /** Fixed text before what is typed, such as `https://`: shown in the box, never editable. */
+    prefix: String? = null,
+    /** Makes [prefix] an accent button, for a page that lets the person pick it. */
+    onPrefixClick: (() -> Unit)? = null,
 ) {
     val submit = LocalFieldSubmit.current
-    MetroFieldFrame(value.isEmpty(), hint, modifier, fill) { style, cursor ->
+    MetroFieldFrame(value.isEmpty(), hint, modifier, fill, prefix, onPrefixClick) { style, cursor ->
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
@@ -219,6 +223,8 @@ private fun MetroFieldFrame(
     hint: String,
     modifier: Modifier,
     fill: Boolean,
+    prefix: String? = null,
+    onPrefixClick: (() -> Unit)? = null,
     field: @Composable (TextStyle, SolidColor) -> Unit,
 ) {
     val colors = Metro.colors
@@ -255,10 +261,50 @@ private fun MetroFieldFrame(
             .padding(horizontal = if (relief) 14.dp else 8.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        if (empty) {
-            MetroText(hint, Metro.typography.control, color = hintColor)
+        val ink = Metro.typography.control.copy(color = if (relief) colors.foreground else Color.Black)
+        if (prefix == null) {
+            if (empty) {
+                MetroText(hint, Metro.typography.control, color = hintColor)
+            }
+            field(ink, SolidColor(Metro.accent.fill))
+        } else {
+            // The prefix is part of the value but cannot be typed over: a darker grey than the hint,
+            // so an empty box still reads as prefix then hint.
+            val prefixColor = if (relief) colors.secondary else Color(0xFF5A5A5A)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (onPrefixClick == null) {
+                    MetroText(
+                        prefix,
+                        Metro.typography.control,
+                        Modifier.testTag("field-prefix"),
+                        color = prefixColor,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                } else {
+                    // A pickable prefix is a small accent button, apart from the typed text.
+                    val accent = Metro.accent
+                    Row(
+                        Modifier
+                            .padding(end = 8.dp)
+                            .heightIn(min = MetroDimens.TouchTarget - 12.dp)
+                            .background(accent.fill)
+                            .metroPress(onPrefixClick)
+                            .padding(horizontal = 8.dp)
+                            .testTag("field-prefix"),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MetroText(prefix, Metro.typography.control, color = accent.onFill, maxLines = 1, softWrap = false)
+                    }
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    if (empty) {
+                        MetroText(hint, Metro.typography.control, color = hintColor, maxLines = 1)
+                    }
+                    field(ink, SolidColor(Metro.accent.fill))
+                }
+            }
         }
-        field(Metro.typography.control.copy(color = if (relief) colors.foreground else Color.Black), SolidColor(Metro.accent.fill))
     }
 }
 

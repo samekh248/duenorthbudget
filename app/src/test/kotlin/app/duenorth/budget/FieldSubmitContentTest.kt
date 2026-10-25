@@ -14,11 +14,14 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.input.ImeAction
 import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.components.MetroField
@@ -56,6 +59,36 @@ class FieldSubmitContentTest {
         box.performImeAction()
         compose.waitForIdle()
         assertEquals(1, next)
+    }
+
+    // The http/https toggle sets the read-only prefix; a pasted scheme moves the toggle and leaves the box.
+    @Test
+    fun schemeToggleSetsThePrefix() {
+        var address by mutableStateOf("")
+        compose.setContent {
+            MetroTheme {
+                OnboardingAddressScreen(address, false, null, { address = it }, {}, {})
+            }
+        }
+        compose.onNode(hasText("https://") and hasAnyAncestor(hasTestTag("field-prefix")), useUnmergedTree = true).assertExists()
+        compose.onNode(hasTestTag("onboarding-http-warning")).assertDoesNotExist()
+        val box = compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("onboarding-address-field")))
+        box.performTextReplacement("budget.lan:5006")
+        assertEquals("https://budget.lan:5006", address)
+        // The choices stay folded until the prefix is tapped, and fold again once one is picked.
+        compose.onNode(hasTestTag("onboarding-scheme")).assertDoesNotExist()
+        compose.onNode(hasTestTag("field-prefix")).performClick()
+        compose.onNode(hasTestTag("onboarding-scheme-http")).performClick()
+        compose.waitForIdle()
+        assertEquals("http://budget.lan:5006", address)
+        compose.onNode(hasTestTag("onboarding-scheme")).assertDoesNotExist()
+        compose.onNode(hasText("http://") and hasAnyAncestor(hasTestTag("field-prefix")), useUnmergedTree = true).assertExists()
+        compose.onNode(hasTestTag("onboarding-http-warning")).assertExists()
+        box.performTextReplacement("https://budget.example.com")
+        compose.waitForIdle()
+        assertEquals("https://budget.example.com", address)
+        box.assertTextEquals("budget.example.com")
+        compose.onNode(hasTestTag("onboarding-http-warning")).assertDoesNotExist()
     }
 
     // Enter in a one-line box submits the page; a multi-line box keeps Enter for a new line.

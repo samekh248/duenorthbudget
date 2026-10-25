@@ -11,6 +11,14 @@ data class ServerAddress(
     val candidates: List<String>,
     val host: String,
 ) {
+    /** What the address box shows: the toggle's choice and the read-only prefix's tail. */
+    data class Entry(
+        val secure: Boolean,
+        val text: String,
+    ) {
+        val prefix: String get() = if (secure) HTTPS else HTTP
+    }
+
     /** The instance name the sign-in page offers before the person edits it. */
     val defaultLabel: String get() = host.removePrefix("www.")
 
@@ -36,5 +44,36 @@ data class ServerAddress(
         }
 
         fun isSecure(address: String): Boolean = address.lowercase().startsWith("https://")
+
+        /**
+         * The address box's http/https toggle and the text typed after its prefix. A bare address
+         * (saved before the toggle) shows as https, the scheme tried first.
+         */
+        fun entry(address: String): Entry {
+            val lower = address.lowercase()
+            return when {
+                lower.startsWith(HTTPS) -> Entry(true, address.substring(HTTPS.length))
+                lower.startsWith(HTTP) -> Entry(false, address.substring(HTTP.length))
+                else -> Entry(true, address)
+            }
+        }
+
+        /**
+         * The stored address for the toggle plus what is typed after the prefix. A pasted address that
+         * already has a scheme moves the toggle to it. Nothing typed under https stores nothing, so the
+         * empty box asks for an address.
+         */
+        fun join(
+            secure: Boolean,
+            typed: String,
+        ): String {
+            val pasted = entry(typed.trimStart())
+            val keep = typed.trimStart().lowercase().let { it.startsWith(HTTPS) || it.startsWith(HTTP) }
+            val (useSecure, text) = if (keep) pasted.secure to pasted.text else secure to typed
+            return if (useSecure && text.isEmpty()) "" else (if (useSecure) HTTPS else HTTP) + text
+        }
+
+        const val HTTPS = "https://"
+        const val HTTP = "http://"
     }
 }
