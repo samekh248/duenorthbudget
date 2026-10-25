@@ -259,32 +259,14 @@ internal fun AppearanceItem(
 
 @Composable
 internal fun AdvancedItem(
-    experimental: Boolean,
-    goalTemplates: Boolean,
     budgetId: String,
     cloudFileId: String?,
     encrypted: Boolean,
-    onExperimental: (Boolean) -> Unit,
-    onGoalTemplates: (Boolean) -> Unit,
     onExport: () -> Unit,
     onEncryption: (EncryptionMode) -> Unit,
     onRequest: (AdvancedConfirm) -> Unit,
 ) {
-    SettingsHeading("experimental", tag = "settings-experimental", first = true)
-    ChoiceRow(
-        if (experimental) "experimental features  on" else "experimental features",
-        experimental,
-        "settings-experimental-toggle",
-    ) { onExperimental(!experimental) }
-    // Actual's goal templates feature flag; it only counts while experimental features are on.
-    if (experimental) {
-        ChoiceRow(
-            if (goalTemplates) "budget templates  on" else "budget templates",
-            goalTemplates,
-            "settings-templates",
-        ) { onGoalTemplates(!goalTemplates) }
-    }
-    SettingsHeading("export")
+    SettingsHeading("export", first = true)
     SettingsActionRow(SettingsCopy.EXPORT_HINT, "settings-export", onExport)
     SettingsHeading("ids", tag = "settings-ids")
     MetroText("budget $budgetId", Metro.typography.body, Modifier.testTag("settings-budget-id"))

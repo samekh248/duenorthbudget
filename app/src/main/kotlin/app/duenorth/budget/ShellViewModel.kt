@@ -87,6 +87,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.YearMonth
 
@@ -171,6 +172,11 @@ sealed interface ShellRoute {
     data object Payees : ShellRoute
 
     data object Settings : ShellRoute
+
+    /** A budget just opened that has never had experimental features chosen: try them or keep them off. */
+    data class ExperimentalOffer(
+        val budgetId: String,
+    ) : ShellRoute
 
     /** Settings → advanced → encryption: one page per password action (spec 012). */
     data class EncryptionPassword(
@@ -424,6 +430,9 @@ class ShellViewModel(
 
     /** Category note saves, written in the order they were made. */
     internal val noteWrites = Mutex()
+
+    /** Budget preference saves, in the order they were made, so two flipped together both land. */
+    private val preferenceWrites = Mutex()
     private val _state =
         MutableStateFlow(
             ShellUiState(
@@ -976,6 +985,40 @@ class ShellViewModel(
 
     fun setGoalTemplates(enabled: Boolean) = setOpenBudgetPreference("flags.goalTemplatesEnabled", if (enabled) "true" else "false")
 
+    fun setExperimentalFeature(
+        feature: ExperimentalFeature,
+        enabled: Boolean,
+    ) = setOpenBudgetPreference(feature.preference, if (enabled) "true" else "false")
+
+    /** `turn on` on the offer: the switch and every feature come on for the budget it asked about. */
+    fun acceptExperimentalOffer() = answerExperimentalOffer(on = true)
+
+    /** `keep off` on the offer: saved as off, so that budget is not asked again. Back asks next time. */
+    fun declineExperimentalOffer() = answerExperimentalOffer(on = false)
+
+    private fun answerExperimentalOffer(on: Boolean) {
+        val offer = _state.value.route as? ShellRoute.ExperimentalOffer ?: return
+        val value = if (on) "true" else "false"
+        setBudgetPreference(offer.budgetId, "flags.experimental", value)
+        if (on) ExperimentalFeature.entries.forEach { setBudgetPreference(offer.budgetId, it.preference, value) }
+        _state.update { it.copy(route = ShellRoute.Home) }
+    }
+
+    /**
+     * After a budget is opened, switched to, or made: one that has never had experimental
+     * features chosen asks before its home shows. The budget is read from the phone, not the
+     * screen, so the answer lands on the budget just opened.
+     */
+    private suspend fun offerExperimental() {
+        val budgetId = withContext(Dispatchers.IO) { library.settings().openBudgetId } ?: return
+        val asked = withContext(Dispatchers.IO) { library.readFormatPrefs(budgetId).experimentalAsked }
+        if (asked) return
+        _state.update {
+            val ask = it.route == ShellRoute.Home && it.shell != null && !it.locked
+            if (ask) it.copy(route = ShellRoute.ExperimentalOffer(budgetId)) else it
+        }
+    }
+
     fun exportBudget() {
         val budgetId = _state.value.settings.openBudgetId ?: return
         val name =
@@ -1060,6 +1103,7 @@ class ShellViewModel(
                 is CreateResult.Created -> {
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
+                    offerExperimental()
                 }
                 is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
             }
@@ -2133,6 +2177,7 @@ class ShellViewModel(
                         )
                     }
                     reload()
+                    offerExperimental()
                     if (toSettings) refreshSettingsSections()
                     if (send) uploadNew()
                 }
@@ -2160,6 +2205,7 @@ class ShellViewModel(
                     finishOnboarding()
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
+                    offerExperimental()
                 }
             }
         }
@@ -2202,6 +2248,7 @@ class ShellViewModel(
             withContext(Dispatchers.IO) { library.switchTo(target.id) }
             _state.update { it.copy(route = ShellRoute.Home, switchTarget = null) }
             reload()
+            offerExperimental()
         }
     }
 
@@ -2440,6 +2487,7 @@ class ShellViewModel(
                         )
                     }
                     reload()
+                    offerExperimental()
                 }
                 OpenResult.NeedsPassword ->
                     _state.update {
@@ -2920,6 +2968,16 @@ class ShellViewModel(
         value: String,
     ) {
         val budgetId = _state.value.settings.openBudgetId ?: return
+        setBudgetPreference(budgetId, id, value)
+    }
+
+    /** Saves [id] on [budgetId]; the screen updates straight away when that budget is the open one. */
+    private fun setBudgetPreference(
+        budgetId: String,
+        id: String,
+        value: String,
+    ) {
+        val showing = budgetId == _state.value.settings.openBudgetId
         val optimistic =
             when (id) {
                 "dateFormat" -> _state.value.formatPrefs.copy(dateFormat = value)
@@ -2927,19 +2985,21 @@ class ShellViewModel(
                 "firstDayOfWeekIdx" ->
                     _state.value.formatPrefs.copy(firstDayOfWeekIdx = value.toIntOrNull() ?: 0)
                 "hideFraction" -> _state.value.formatPrefs.copy(hideFraction = value == "true")
-                "flags.experimental" -> _state.value.formatPrefs.copy(experimental = value == "true")
+                "flags.experimental" -> _state.value.formatPrefs.copy(experimental = value == "true", experimentalAsked = true)
                 "learn-categories" -> _state.value.formatPrefs.copy(learnCategories = value == "true")
                 "flags.goalTemplatesEnabled" -> _state.value.formatPrefs.copy(goalTemplates = value == "true")
                 else -> _state.value.formatPrefs
             }
-        _state.update {
-            it.copy(
-                formatPrefs = optimistic,
-                budgetMethod = optimistic.budgetType,
-            )
+        if (showing) {
+            _state.update {
+                it.copy(
+                    formatPrefs = optimistic,
+                    budgetMethod = optimistic.budgetType,
+                )
+            }
         }
         viewModelScope.launch(Dispatchers.IO) {
-            library.setPreference(budgetId, id, value)
+            preferenceWrites.withLock { library.setPreference(budgetId, id, value) }
         }
     }
 

@@ -19,6 +19,7 @@ class BudgetPreferencesTest {
         assertFalse(defaults.hideFraction)
         assertEquals(0, defaults.firstDayOfWeekIdx)
         assertFalse(defaults.experimental)
+        assertFalse(defaults.experimentalAsked)
         assertEquals("envelope", defaults.budgetType)
 
         assertTrue(library.setPreference(id, "dateFormat", "dd/MM/yyyy"))
@@ -34,8 +35,20 @@ class BudgetPreferencesTest {
         assertTrue(prefs.hideFraction)
         assertEquals(1, prefs.firstDayOfWeekIdx)
         assertTrue(prefs.experimental)
+        assertTrue(prefs.experimentalAsked)
         assertEquals("envelope", prefs.budgetType)
         assertEquals("envelope", library.preference(id, "budgetType"))
+    }
+
+    @Test
+    fun experimentalSwitchedOffStillCountsAsAsked() {
+        val root = tempRoot()
+        val library = BudgetLibrary(root, JdbcSessionOpener(), BudgetClock { LocalDate.of(2026, 10, 7) })
+        val id = (library.create("Home", "USD") as CreateResult.Created).id
+        assertTrue(library.setPreference(id, "flags.experimental", "false"))
+        val prefs = library.readFormatPrefs(id)
+        assertFalse(prefs.experimental)
+        assertTrue(prefs.experimentalAsked)
     }
 
     @Test

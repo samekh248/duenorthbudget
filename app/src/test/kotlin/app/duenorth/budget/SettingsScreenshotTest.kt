@@ -74,6 +74,26 @@ class SettingsScreenshotTest {
     @Test
     fun removeServerDark() = page("settings_remove_server_dark", dark = true) { RemoveScreen() }
 
+    @Test
+    fun experimentalLight() =
+        snap("experimental_light", SettingsPage.EXPERIMENTAL, dark = false, prefs = FormatPrefs(experimental = true, goalTemplates = true))
+
+    @Test
+    fun experimentalDark() =
+        snap("experimental_dark", SettingsPage.EXPERIMENTAL, dark = true, prefs = FormatPrefs(experimental = true, goalTemplates = true))
+
+    @Test
+    fun experimentalOffLight() = snap("experimental_off_light", SettingsPage.EXPERIMENTAL, dark = false)
+
+    @Test
+    fun experimentalOffDark() = snap("experimental_off_dark", SettingsPage.EXPERIMENTAL, dark = true)
+
+    @Test
+    fun experimentalOfferLight() = page("experimental_offer_light", dark = false) { ExperimentalOfferScreen("Home", {}, {}) }
+
+    @Test
+    fun experimentalOfferDark() = page("experimental_offer_dark", dark = true) { ExperimentalOfferScreen("Home", {}, {}) }
+
     private val home = SavedInstance("i1", "http://192.168.1.20:5006", "home server")
     private val office = SavedInstance("i2", "https://budget.example.com", "office")
 
@@ -82,6 +102,7 @@ class SettingsScreenshotTest {
         settingsPage: SettingsPage,
         dark: Boolean,
         budgetOpen: Boolean = true,
+        prefs: FormatPrefs = FormatPrefs(),
     ) = page(name, dark) {
         SettingsScreen(
             page = settingsPage,
@@ -97,7 +118,7 @@ class SettingsScreenshotTest {
             openBudgetId = if (budgetOpen) "home" else null,
             themeMode = if (dark) "dark" else "light",
             accentId = "magenta",
-            formatPrefs = FormatPrefs(),
+            formatPrefs = prefs,
             cloudFileId = "cloud-1",
             encrypted = false,
             onPage = {},

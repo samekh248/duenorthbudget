@@ -43,6 +43,7 @@ enum class SettingsPage(
     FORMAT("format", true),
     APPEARANCE("appearance", false),
     ADVANCED("advanced", true),
+    EXPERIMENTAL("experimental", true),
     ;
 
     companion object {
@@ -134,8 +135,8 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     launcherIcon: LauncherIcon = LauncherIcon.TILE,
     onLauncherIcon: (LauncherIcon) -> Unit = {},
-    onGoalTemplates: (Boolean) -> Unit = {},
     onLearning: (Boolean) -> Unit = {},
+    onExperimentalFeature: (ExperimentalFeature, Boolean) -> Unit = { _, _ -> },
     scroll: Map<SettingsPage, Int> = emptyMap(),
     onScroll: (SettingsPage, Int) -> Unit = { _, _ -> },
 ) {
@@ -187,16 +188,18 @@ fun SettingsScreen(
                             )
                         SettingsPage.ADVANCED ->
                             AdvancedItem(
-                                experimental = formatPrefs.experimental,
-                                goalTemplates = formatPrefs.goalTemplates,
                                 budgetId = openBudgetId.orEmpty(),
                                 cloudFileId = cloudFileId,
                                 encrypted = encrypted,
-                                onExperimental = onExperimental,
-                                onGoalTemplates = onGoalTemplates,
                                 onExport = onExport,
                                 onEncryption = onEncryption,
                                 onRequest = onRequestAdvanced,
+                            )
+                        SettingsPage.EXPERIMENTAL ->
+                            ExperimentalItem(
+                                prefs = formatPrefs,
+                                onExperimental = onExperimental,
+                                onFeature = onExperimentalFeature,
                             )
                     }
                 }

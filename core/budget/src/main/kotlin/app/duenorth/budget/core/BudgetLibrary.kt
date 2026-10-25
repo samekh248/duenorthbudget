@@ -137,6 +137,7 @@ class BudgetLibrary(
                 hideFraction = value("hideFraction") == "true",
                 firstDayOfWeekIdx = value("firstDayOfWeekIdx")?.toIntOrNull()?.coerceIn(0, 6) ?: 0,
                 experimental = value("flags.experimental") == "true",
+                experimentalAsked = value("flags.experimental") != null,
                 budgetType = value("budgetType") ?: "envelope",
                 learnCategories = value("learn-categories") != "false",
                 goalTemplates = value("flags.goalTemplatesEnabled") == "true",

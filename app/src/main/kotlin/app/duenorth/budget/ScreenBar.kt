@@ -80,7 +80,7 @@ object ScreenBar {
                             if (settings.serverActive) add(menu("sign-out", AppGlyph.Cancel, SettingsCopy.SIGN_OUT))
                         }
                     SettingsPage.ADVANCED -> listOf(spec("export", AppGlyph.Save, SettingsCopy.EXPORT))
-                    SettingsPage.FORMAT, SettingsPage.APPEARANCE -> emptyList()
+                    SettingsPage.FORMAT, SettingsPage.APPEARANCE, SettingsPage.EXPERIMENTAL -> emptyList()
                 }
             is ShellRoute.EncryptionPassword -> saveCancel()
             // Spec 011: one primary action per onboarding page, in the bar where the thumb is.
