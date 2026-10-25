@@ -1,6 +1,7 @@
 package app.duenorth.budget
 
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.ShellCopy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -183,9 +184,20 @@ class ScreenBarTest {
     @Test
     fun envelopeIncomeCategoryHasNoSave() {
         val income = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, incomeCategory = true)
-        assertTrue(income.isEmpty())
+        assertEquals(listOf("auto-hold-on", "auto-hold-off-month", "auto-hold-off"), income.map { it.id })
+        assertTrue(income.none { it.primary })
         val tracking = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.TRACKING, incomeCategory = true)
         assertEquals(listOf("save", "cancel"), tracking.map { it.id })
+    }
+
+    @Test
+    fun categoryBudgetPutsItsButtonsOnTheBar() {
+        val specs = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE)
+        assertEquals(listOf("save", "cancel", "move"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("to-budget", "rollover"), specs.filterNot { it.primary }.map { it.id })
+        assertEquals(EnvelopeCopy.ROLLOVER, specs.single { it.id == "rollover" }.label)
+        val on = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, rollover = true)
+        assertEquals("stop ${EnvelopeCopy.ROLLOVER}", on.single { it.id == "rollover" }.label)
     }
 
     @Test
@@ -213,7 +225,7 @@ class ScreenBarTest {
         routes.forEach { route ->
             val ids = ScreenBar.specsFor(route, hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
             assertEquals(route.toString(), listOf("save", "cancel"), ids.take(2))
-            assertTrue(route.toString(), ids.drop(2).all { it == "to-budget" })
+            assertTrue(route.toString(), ids.drop(2).all { it in setOf("to-budget", "move", "rollover") })
             assertFalse(ids.contains("hold"))
             assertFalse(ids.contains("settings"))
         }

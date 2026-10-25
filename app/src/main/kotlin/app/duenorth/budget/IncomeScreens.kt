@@ -190,12 +190,15 @@ fun IncomeCategoryScreen(
                 Modifier.testTag("auto-hold-state"),
                 color = if (category.autoHold) Metro.accent.text else Metro.colors.secondary,
             )
-            MetroButtonGrid {
-                MetroButton(IncomeCopy.HOLD_ON, Modifier.testTag("auto-hold-on")) { onAutoHold(AutoHoldChoice.ON) }
-                MetroButton(IncomeCopy.HOLD_OFF_MONTH, Modifier.testTag("auto-hold-off-month")) {
-                    onAutoHold(AutoHoldChoice.OFF_THIS_MONTH)
+            // In the app the bar's menu carries the choices.
+            if (!formSaveOnBar()) {
+                MetroButtonGrid {
+                    MetroButton(IncomeCopy.HOLD_ON, Modifier.testTag("auto-hold-on")) { onAutoHold(AutoHoldChoice.ON) }
+                    MetroButton(IncomeCopy.HOLD_OFF_MONTH, Modifier.testTag("auto-hold-off-month")) {
+                        onAutoHold(AutoHoldChoice.OFF_THIS_MONTH)
+                    }
+                    MetroButton(IncomeCopy.HOLD_OFF, Modifier.testTag("auto-hold-off")) { onAutoHold(AutoHoldChoice.OFF) }
                 }
-                MetroButton(IncomeCopy.HOLD_OFF, Modifier.testTag("auto-hold-off")) { onAutoHold(AutoHoldChoice.OFF) }
             }
             if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
             MetroText(IncomeCopy.HOLD_NOTE, Metro.typography.caption, color = Metro.colors.secondary)

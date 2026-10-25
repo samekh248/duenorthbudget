@@ -1,7 +1,9 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.AutoHoldChoice
 import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.RegisterCopy
@@ -65,6 +67,7 @@ object ScreenBar {
         transaction: TransactionMenu = TransactionMenu.NEW,
         budgetEditing: Boolean = false,
         schedules: SchedulesBar = SchedulesBar(),
+        rollover: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -212,14 +215,17 @@ object ScreenBar {
             is ShellRoute.RuleEditor ->
                 saveCancel() +
                     if (route.ruleId == null) emptyList() else listOf(menu("delete-rule", AppGlyph.Cancel, RuleScreenCopy.DELETE))
+            // The page itself carries no buttons: move sits with save, the rest in the menu.
             is ShellRoute.CategoryBudget ->
-                if (mode == BudgetMode.TRACKING) {
-                    saveCancel()
-                } else if (incomeCategory) {
-                    // Auto-hold choices apply at once; there is nothing to save.
-                    emptyList()
+                if (incomeCategory) {
+                    if (mode == BudgetMode.TRACKING) saveCancel() else autoHold()
                 } else {
-                    saveCancel() + menu("to-budget", AppGlyph.Transfer, MonthActionCopy.TRANSFER)
+                    buildList {
+                        addAll(saveCancel())
+                        add(spec("move", AppGlyph.Transfer, EnvelopeCopy.MOVE))
+                        if (mode != BudgetMode.TRACKING) add(menu("to-budget", AppGlyph.Transfer, MonthActionCopy.TRANSFER))
+                        add(menu("rollover", AppGlyph.Sync, if (rollover) "stop ${EnvelopeCopy.ROLLOVER}" else EnvelopeCopy.ROLLOVER))
+                    }
                 }
             ShellRoute.Create,
             ShellRoute.Assign,
@@ -293,6 +299,7 @@ object ScreenBar {
                 calendar = state.schedulesCalendar,
                 open = state.scheduleDetails?.summary?.completed != true,
             ),
+            rolloverOn(state),
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -302,6 +309,16 @@ object ScreenBar {
                 run = handlers.bind(spec.id, state),
             )
         }
+    }
+
+    /** Whether the category budget page's category rolls overspending over. */
+    fun rolloverOn(state: ShellUiState): Boolean {
+        val id = (state.route as? ShellRoute.CategoryBudget)?.categoryId ?: return false
+        return state.shell
+            ?.groups
+            ?.flatMap { it.categories }
+            ?.firstOrNull { it.id == id }
+            ?.carryover == true
     }
 
     private fun transactionMenu(state: ShellUiState): TransactionMenu {
@@ -318,6 +335,14 @@ object ScreenBar {
         listOf(
             spec("save", AppGlyph.Save, "save"),
             spec("cancel", AppGlyph.Cancel, "cancel"),
+        )
+
+    /** An envelope income category's auto-hold choices, which apply at once; there is nothing to save. */
+    private fun autoHold() =
+        listOf(
+            menu("auto-hold-on", AppGlyph.Hold, "${MonthFillCopy.AUTO_HOLD} ${IncomeCopy.HOLD_ON}"),
+            menu("auto-hold-off-month", AppGlyph.Hold, "${MonthFillCopy.AUTO_HOLD} ${IncomeCopy.HOLD_OFF_MONTH}"),
+            menu("auto-hold-off", AppGlyph.Hold, "${MonthFillCopy.AUTO_HOLD} ${IncomeCopy.HOLD_OFF}"),
         )
 
     /** Home `•••` → edit budget heads the budget's menu. */
@@ -418,6 +443,9 @@ class ScreenBarHandlers(
     val onCancelBudgetEdit: () -> Unit = {},
     val onSearch: () -> Unit = {},
     val onRemoveTemplate: () -> Unit = {},
+    val onMoveCategory: () -> Unit = {},
+    val onRollover: (Boolean) -> Unit = {},
+    val onAutoHold: (AutoHoldChoice) -> Unit = {},
 ) {
     fun bind(
         id: String,
@@ -483,6 +511,11 @@ class ScreenBarHandlers(
             "end-budget-edit" -> onEndBudgetEdit
             "cancel-budget-edit" -> onCancelBudgetEdit
             "remove-template" -> onRemoveTemplate
+            "move" -> onMoveCategory
+            "rollover" -> ({ onRollover(!ScreenBar.rolloverOn(state)) })
+            "auto-hold-on" -> ({ onAutoHold(AutoHoldChoice.ON) })
+            "auto-hold-off-month" -> ({ onAutoHold(AutoHoldChoice.OFF_THIS_MONTH) })
+            "auto-hold-off" -> ({ onAutoHold(AutoHoldChoice.OFF) })
             else -> ({})
         }
 }
