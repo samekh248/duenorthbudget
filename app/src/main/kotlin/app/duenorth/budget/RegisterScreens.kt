@@ -453,8 +453,10 @@ internal fun RegisterLine(
                         if (row.cleared) accentFill else ground,
                         small = true,
                     )
+                    // Centred on the letter's x-height, not its line box, which leaves room above a lowercase c.
                     val c = measurer.measure(RegisterCopy.CLEARED_MARK, keyMark)
-                    drawText(c, topLeft = Offset(topLeft.x + (side - c.size.width) / 2, topLeft.y + (side - c.size.height) / 2))
+                    val middle = c.firstBaseline - keyMark.fontSize.toPx() * SELAWIK_X_HEIGHT / 2
+                    drawText(c, topLeft = Offset(topLeft.x + (side - c.size.width) / 2, topLeft.y + side / 2 - middle))
                     return@drawBehind
                 }
                 // The bar sits at the right edge, past the screen gutter.
@@ -570,6 +572,10 @@ private val CLEARED_BAR = 16.dp
 
 /** The cleared key of a relief style: a touch smaller than the payee's two lines. */
 private val CLEARED_KEY = 28.dp
+
+/** Selawik's x-height, as a fraction of its em: the cleared key centres its c on half of it. */
+private const val SELAWIK_X_HEIGHT = 0.5f
+
 private val CLEARED_BAR_INSET = 2.dp
 private val CLEARED_BAR_GAP = 6.dp
 private val SELECT_BOX = 32.dp
