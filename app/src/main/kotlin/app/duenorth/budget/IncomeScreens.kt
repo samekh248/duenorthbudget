@@ -153,6 +153,8 @@ fun IncomeCategoryScreen(
     onSave: (String) -> Unit,
     onAutoHold: (AutoHoldChoice) -> Unit,
     modifier: Modifier = Modifier,
+    // Off where the page heads itself with the name over the month control.
+    showName: Boolean = true,
 ) {
     val prefs = LocalFormatPrefs.current
     var amount by remember(category, prefs) { mutableStateOf(prefs.editAmount(category.budgetedMinor, shell.currency.decimals)) }
@@ -164,8 +166,10 @@ fun IncomeCategoryScreen(
             .testTag("income-category-screen"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        MetroText(category.name, Metro.typography.header)
-        MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+        if (showName) {
+            MetroText(category.name, Metro.typography.header)
+            MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+        }
         MetroText(
             "${IncomeCopy.RECEIVED} ${MoneyFormat.format(category.receivedMinor, shell.currency, formatOptions())}",
             Metro.typography.subheader,
@@ -186,12 +190,15 @@ fun IncomeCategoryScreen(
                 Modifier.testTag("auto-hold-state"),
                 color = if (category.autoHold) Metro.accent.text else Metro.colors.secondary,
             )
-            MetroButtonGrid {
-                MetroButton(IncomeCopy.HOLD_ON, Modifier.testTag("auto-hold-on")) { onAutoHold(AutoHoldChoice.ON) }
-                MetroButton(IncomeCopy.HOLD_OFF_MONTH, Modifier.testTag("auto-hold-off-month")) {
-                    onAutoHold(AutoHoldChoice.OFF_THIS_MONTH)
+            // In the app the bar's menu carries the choices.
+            if (!formSaveOnBar()) {
+                MetroButtonGrid {
+                    MetroButton(IncomeCopy.HOLD_ON, Modifier.testTag("auto-hold-on")) { onAutoHold(AutoHoldChoice.ON) }
+                    MetroButton(IncomeCopy.HOLD_OFF_MONTH, Modifier.testTag("auto-hold-off-month")) {
+                        onAutoHold(AutoHoldChoice.OFF_THIS_MONTH)
+                    }
+                    MetroButton(IncomeCopy.HOLD_OFF, Modifier.testTag("auto-hold-off")) { onAutoHold(AutoHoldChoice.OFF) }
                 }
-                MetroButton(IncomeCopy.HOLD_OFF, Modifier.testTag("auto-hold-off")) { onAutoHold(AutoHoldChoice.OFF) }
             }
             if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
             MetroText(IncomeCopy.HOLD_NOTE, Metro.typography.caption, color = Metro.colors.secondary)

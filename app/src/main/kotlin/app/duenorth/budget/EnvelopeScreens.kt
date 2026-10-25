@@ -62,6 +62,8 @@ fun CategoryBudgetScreen(
     onMove: () -> Unit,
     onToggleCarryover: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    // Off where the page heads itself with the name over the month control.
+    showName: Boolean = true,
     note: String? = null,
     onSaveNote: (String) -> Unit = {},
     templateAmounts: List<Long?> = emptyList(),
@@ -85,8 +87,10 @@ fun CategoryBudgetScreen(
             .padding(MetroDimens.Gutter),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        MetroText(category.name, Metro.typography.header)
-        MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+        if (showName) {
+            MetroText(category.name, Metro.typography.header)
+            MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+        }
         MetroText(
             "available ${MoneyFormat.format(category.availableMinor, shell.currency, formatOptions())}",
             Metro.typography.subheader,
@@ -94,15 +98,16 @@ fun CategoryBudgetScreen(
         MetroField(amount, { amount = it }, "budgeted", Modifier.testTag("category-budget-amount"))
         if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
         RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals, base = base)) }
-        MetroButtonGrid {
-            if (!formSaveOnBar()) {
+        // In the app the bar carries save, move and rollover; the buttons are for the page on its own.
+        if (!formSaveOnBar()) {
+            MetroButtonGrid {
                 MetroButton("save") { onSave(prefs.readAmount(amount, shell.currency.decimals, base = base)) }
-            }
-            MetroButton(EnvelopeCopy.MOVE, onClick = onMove)
-            MetroButton(
-                if (category.carryover) "stop ${EnvelopeCopy.ROLLOVER}" else EnvelopeCopy.ROLLOVER,
-            ) {
-                onToggleCarryover(!category.carryover)
+                MetroButton(EnvelopeCopy.MOVE, onClick = onMove)
+                MetroButton(
+                    if (category.carryover) "stop ${EnvelopeCopy.ROLLOVER}" else EnvelopeCopy.ROLLOVER,
+                ) {
+                    onToggleCarryover(!category.carryover)
+                }
             }
         }
         // Only while budget templates are on (spec 010 US5): the note's template lines as tiles, then its own text.

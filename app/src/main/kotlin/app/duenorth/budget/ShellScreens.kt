@@ -226,27 +226,28 @@ fun MonthControl(
     val next = window.next(month)
     val calendar = YearMonth.now()
     Column(modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (previous != null) {
-                MonthIconButton(AppGlyph.ChevronLeft, "month-previous") { onSelect(previous) }
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            // The arrows hug the month, centered together; their touch targets are the only gap.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (previous != null) {
+                    MonthIconButton(AppGlyph.ChevronLeft, "month-previous") { onSelect(previous) }
+                }
+                MetroText(
+                    monthLabel(month),
+                    Metro.typography.subheader,
+                    Modifier
+                        .metroPress { expanded = !expanded }
+                        .testTag("month-label"),
+                )
+                if (next != null) {
+                    MonthIconButton(AppGlyph.ChevronRight, "month-next") { onSelect(next) }
+                }
             }
-            MetroText(
-                monthLabel(month),
-                Metro.typography.subheader,
-                Modifier
-                    .weight(1f)
-                    .metroPress { expanded = !expanded }
-                    .testTag("month-label"),
-            )
+            // Off to the side, so the centered group doesn't shift when it comes and goes.
             if (month != calendar) {
-                MonthIconButton(AppGlyph.Calendar, "month-current") { onSelect(calendar) }
-            }
-            if (next != null) {
-                MonthIconButton(AppGlyph.ChevronRight, "month-next") { onSelect(next) }
+                Box(Modifier.align(Alignment.CenterEnd)) {
+                    MonthIconButton(AppGlyph.Calendar, "month-current") { onSelect(calendar) }
+                }
             }
         }
         if (expanded) {
