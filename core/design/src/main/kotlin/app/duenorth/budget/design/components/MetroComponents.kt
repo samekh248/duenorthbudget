@@ -70,6 +70,8 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -144,14 +146,15 @@ fun Modifier.metroPress(
 
 /**
  * What Enter does in a one-line [MetroField]: the app provides its form's save, so pressing Enter (or the
- * keyboard's done key) submits the page the way the bar's save does. Null leaves Enter closing the keyboard.
+ * keyboard's done key) submits the page the way the bar's save does. Either way the box lets go of focus and
+ * the keyboard closes, so the rest of the page shows; null does only that.
  */
 val LocalFieldSubmit = staticCompositionLocalOf<(() -> Unit)?> { null }
 
 /**
  * A text box. One line unless [lines] is given: Enter in a one-line box submits the form through
- * [LocalFieldSubmit] (a box asking for [ImeAction.Next] moves on instead), and only a multi-line box takes
- * Enter as a new line.
+ * [LocalFieldSubmit] and closes the keyboard (a box asking for [ImeAction.Next] moves on instead), and only
+ * a multi-line box takes Enter as a new line.
  */
 @Composable
 fun MetroField(
@@ -269,23 +272,27 @@ private fun fieldKeyboard(
         options
     }
 
+@Composable
 private fun fieldActions(
     lines: IntRange?,
     submit: (() -> Unit)?,
-): KeyboardActions =
-    if (lines == null) {
-        KeyboardActions(
-            onDone = {
-                defaultKeyboardAction(ImeAction.Done)
-                submit?.invoke()
-            },
-            onGo = { submit?.invoke() },
-            onSend = { submit?.invoke() },
-            onSearch = { submit?.invoke() },
-        )
-    } else {
-        KeyboardActions.Default
+): KeyboardActions {
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    if (lines != null) return KeyboardActions.Default
+    // Letting go of the box, not only hiding the keyboard, so nothing is left waiting for typing.
+    val enter = {
+        submit?.invoke()
+        focus.clearFocus()
+        keyboard?.hide()
     }
+    return KeyboardActions(
+        onDone = { enter() },
+        onGo = { enter() },
+        onSend = { enter() },
+        onSearch = { enter() },
+    )
+}
 
 /**
  * A body button, laid out the Windows Phone way: every button is one cell of a two-column
