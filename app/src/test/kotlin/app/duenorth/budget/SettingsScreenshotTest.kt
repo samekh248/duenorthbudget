@@ -75,7 +75,8 @@ class SettingsScreenshotTest {
     fun removeServerDark() = page("settings_remove_server_dark", dark = true) { RemoveScreen() }
 
     @Test
-    fun experimentalLight() = page("experimental_light", dark = false) { Experimental(FormatPrefs(experimental = true, goalTemplates = true)) }
+    fun experimentalLight() =
+        page("experimental_light", dark = false) { Experimental(FormatPrefs(experimental = true, goalTemplates = true)) }
 
     @Test
     fun experimentalDark() = page("experimental_dark", dark = true) { Experimental(FormatPrefs(experimental = true, goalTemplates = true)) }
@@ -94,7 +95,12 @@ class SettingsScreenshotTest {
 
     @Test
     fun advancedExperimentalOnLight() =
-        snap("settings_advanced_experimental_light", SettingsPage.ADVANCED, dark = false, prefs = FormatPrefs(experimental = true, goalTemplates = true))
+        snap(
+            "settings_advanced_experimental_light",
+            SettingsPage.ADVANCED,
+            dark = false,
+            prefs = FormatPrefs(experimental = true, goalTemplates = true),
+        )
 
     @androidx.compose.runtime.Composable
     private fun Experimental(prefs: FormatPrefs) = ExperimentalScreen("Home", prefs, {}, { _, _ -> })
