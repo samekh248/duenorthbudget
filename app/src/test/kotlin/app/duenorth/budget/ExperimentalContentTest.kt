@@ -1,7 +1,8 @@
 package app.duenorth.budget
 
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import app.duenorth.budget.ParityTestSupport.await
 import app.duenorth.budget.ParityTestSupport.household
@@ -73,12 +74,29 @@ class ExperimentalContentTest {
     }
 
     @Test
+    fun freeAfterPlansStaysOnThisPhone() {
+        val (model, library) = household("experimental-free-after-plans")
+        val budgetId = model.state.value.settings.openBudgetId!!
+        model.setExperimental(true)
+        assertFalse(model.state.value.freeAfterPlansOn)
+        model.setExperimentalFeature(ExperimentalFeature.FREE_AFTER_PLANS, true)
+        assertTrue(model.state.value.settings.freeAfterPlans)
+        assertTrue(model.state.value.freeAfterPlansOn)
+        // Nothing for it goes into the budget file, so nothing syncs.
+        await { library.readFormatPrefs(budgetId).experimental }
+        assertFalse(library.readFormatPrefs(budgetId).goalTemplates)
+        model.setExperimental(false)
+        await { !model.state.value.formatPrefs.experimental }
+        assertFalse(model.state.value.freeAfterPlansOn)
+    }
+
+    @Test
     fun featuresWaitForTheMasterSwitch() {
         compose.setContent {
             MetroTheme { ExperimentalItem(FormatPrefs(), {}, { _, _ -> }) }
         }
         compose.onNodeWithTag("experimental-templates-switch").assertDoesNotExist()
-        compose.onNodeWithText(ExperimentalCopy.NEEDS_MASTER).assertExists()
+        compose.onAllNodesWithText(ExperimentalCopy.NEEDS_MASTER).assertCountEquals(ExperimentalFeature.entries.size)
     }
 
     @Test

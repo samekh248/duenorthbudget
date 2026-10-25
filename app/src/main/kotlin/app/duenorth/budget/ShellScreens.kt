@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
+import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatOptions
@@ -115,6 +116,8 @@ fun HomePivot(
     budgetEdit: BudgetEdit? = null,
     budgetEditActions: BudgetEditActions = BudgetEditActions(),
     editError: String? = null,
+    /** Experimental: the free-after-later-plans line under to budget. */
+    showAhead: Boolean = false,
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
@@ -178,6 +181,7 @@ fun HomePivot(
                                 formatOptions = formatOptions,
                                 onToBudget = onToBudget,
                                 notice = notice,
+                                showAhead = showAhead,
                             )
                         }
                     }
@@ -404,6 +408,7 @@ fun BudgetSection(
     formatOptions: FormatOptions = formatOptions(),
     onToBudget: (() -> Unit)? = null,
     notice: String? = null,
+    showAhead: Boolean = false,
 ) {
     val list = rememberLazyListState()
     val arrivals = remember { RowArrivals() }
@@ -467,6 +472,19 @@ fun BudgetSection(
                     modifier = if (tiles) Modifier.weight(1f).relief(Relief.Raised, small = true).then(tile) else Modifier,
                 )
             }
+        }
+        val ahead = shell.ahead
+        if (showAhead && ahead != null && shell.mode == BudgetMode.ENVELOPE) {
+            MetroText(
+                FreeAfterPlansCopy.line(
+                    MoneyFormat.format(ahead.freeMinor, shell.currency, formatOptions),
+                    shell.month,
+                    ahead.throughMonth,
+                ),
+                Metro.typography.caption,
+                Modifier.padding(top = MetroDimens.Row).testTag("free-after-plans"),
+                color = if (ahead.freeMinor < 0) Metro.colors.error else Metro.colors.secondary,
+            )
         }
         if (notice != null) MonthNotice(notice, Modifier.padding(top = MetroDimens.Row))
         if (shell.groups.isEmpty() && shell.incomeGroups.isEmpty()) {

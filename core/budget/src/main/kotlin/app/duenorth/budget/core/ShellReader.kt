@@ -103,6 +103,7 @@ object ShellReader {
             headerLabel = figures.headerLabel,
             headerMinor = figures.headerMinor,
             bufferedMinor = detailed.bufferedMinor,
+            ahead = detailed.ahead,
             groups =
                 groups
                     .filter { !it.bool("is_income") }
@@ -212,6 +213,7 @@ object ShellReader {
         val categoryRows: List<LoadedCategoryRow>,
         val breakdown: ActualMonthMath.MonthBreakdown? = null,
         val incomeRows: List<LoadedIncomeRow> = emptyList(),
+        val ahead: ActualMonthMath.FuturePlans? = null,
     )
 
     fun loadDetailed(
@@ -362,6 +364,7 @@ object ShellReader {
             groups = groups,
             categoryRows = categoryRows,
             breakdown = detailed.breakdown,
+            ahead = detailed.ahead,
         )
     }
 

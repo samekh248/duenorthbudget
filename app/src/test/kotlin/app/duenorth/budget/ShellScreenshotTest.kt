@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
+import app.duenorth.budget.core.ActualMonthMath
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.Currencies
@@ -70,6 +71,15 @@ class ShellScreenshotTest {
     fun homeGoalsDark() = snap("home_goals_dark", dark = true, shell = withGoals(), prefs = templatesOn)
 
     private val templatesOn = FormatPrefs(experimental = true, goalTemplates = true)
+
+    // Experimental: what to budget leaves once later months' budgeting comes out.
+    @Test
+    fun homeFreeAfterPlansLight() = snap("home_free_after_plans_light", dark = false, shell = withPlans(), showAhead = true)
+
+    @Test
+    fun homeFreeAfterPlansDark() = snap("home_free_after_plans_dark", dark = true, shell = withPlans(), showAhead = true)
+
+    private fun withPlans(): MonthShell = sample().let { it.copy(ahead = ActualMonthMath.FuturePlans(it.headerMinor - 40_000, 202612)) }
 
     /** Rent and Rainy day are on target, Power and Gas are short, Rainy day saves toward a #goal. */
     private fun withGoals(): MonthShell =
@@ -226,6 +236,7 @@ class ShellScreenshotTest {
         prefs: FormatPrefs = FormatPrefs(),
         style: MetroStyle = MetroStyle.Metro,
         onAdd: (() -> Unit)? = null,
+        showAhead: Boolean = false,
     ) {
         val inbox = section == HomeSections.headers.indexOf(HomeSections.INBOX)
         val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
@@ -246,6 +257,7 @@ class ShellScreenshotTest {
                             inboxSelection = selection,
                             netWorth = netWorth,
                             onAddTransaction = onAdd,
+                            showAhead = showAhead,
                         )
                         MetroAppBar(
                             actions =

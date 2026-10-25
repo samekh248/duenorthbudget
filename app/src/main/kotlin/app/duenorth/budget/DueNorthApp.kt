@@ -394,6 +394,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
                                 // Tapping to budget opens edit mode; in edit mode it opens the breakdown.
                                 onToBudget = if (state.shell == null) null else model::startBudgetEdit,
+                                showAhead = state.freeAfterPlansOn,
                                 budgetEdit = state.budgetEdit,
                                 budgetEditActions =
                                     remember(model) {
@@ -457,6 +458,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onExport = model::exportBudget,
                                 onEncryption = model::showEncryption,
                                 onRequestAdvanced = model::requestAdvanced,
+                                phoneSettings = state.settings,
                                 scroll = state.settingsScroll,
                                 onScroll = model::saveSettingsScroll,
                                 modifier = fill,
@@ -902,6 +904,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                     breakdown = breakdown,
                                     currency = shell.currency,
                                     modifier = fill,
+                                    showAhead = state.freeAfterPlansOn,
                                 )
                             }
                         }

@@ -351,6 +351,8 @@ data class PhoneSettings(
     val showHiddenCategories: Boolean = false,
     /** The inbox's swipe preview has played; it plays once ever, on the first visit. */
     val inboxSwipeShown: Boolean = false,
+    /** Experimental: show to budget less later months' budgeting. This phone only, never synced. */
+    val freeAfterPlans: Boolean = false,
 )
 
 @Serializable
@@ -449,6 +451,8 @@ data class MonthShell(
     val headerLabel: String,
     val headerMinor: Long,
     val bufferedMinor: Long = 0L,
+    /** To budget less later months' budgeting; null when nothing later lowers it. Envelope only. */
+    val ahead: ActualMonthMath.FuturePlans? = null,
     val groups: List<GroupRow>,
     val accounts: List<AccountRow>,
     val inbox: List<InboxRow>,
