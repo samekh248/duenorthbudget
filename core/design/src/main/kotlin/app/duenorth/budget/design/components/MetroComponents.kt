@@ -168,7 +168,7 @@ fun MetroField(
     lines: IntRange? = null,
     /** Fixed text before what is typed, such as `https://`: shown in the box, never editable. */
     prefix: String? = null,
-    /** Makes [prefix] a button with a chevron, for a page that lets the person pick it. */
+    /** Makes [prefix] an accent button, for a page that lets the person pick it. */
     onPrefixClick: (() -> Unit)? = null,
 ) {
     val submit = LocalFieldSubmit.current
@@ -282,7 +282,7 @@ private fun MetroFieldFrame(
                         softWrap = false,
                     )
                 } else {
-                    // A pickable prefix is a small accent button with a chevron, apart from the typed text.
+                    // A pickable prefix is a small accent button, apart from the typed text.
                     val accent = Metro.accent
                     Row(
                         Modifier
@@ -290,12 +290,11 @@ private fun MetroFieldFrame(
                             .heightIn(min = MetroDimens.TouchTarget - 12.dp)
                             .background(accent.fill)
                             .metroPress(onPrefixClick)
-                            .padding(start = 8.dp, end = 4.dp)
+                            .padding(horizontal = 8.dp)
                             .testTag("field-prefix"),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         MetroText(prefix, Metro.typography.control, color = accent.onFill, maxLines = 1, softWrap = false)
-                        AppGlyphIcon(AppGlyph.ChevronDown, accent.onFill)
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {

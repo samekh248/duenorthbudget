@@ -18,7 +18,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.onChildAt
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextReplacement
@@ -70,7 +70,7 @@ class FieldSubmitContentTest {
                 OnboardingAddressScreen(address, false, null, { address = it }, {}, {})
             }
         }
-        compose.onNode(hasTestTag("field-prefix"), useUnmergedTree = true).onChildAt(0).assertTextEquals("https://")
+        compose.onNode(hasText("https://") and hasAnyAncestor(hasTestTag("field-prefix")), useUnmergedTree = true).assertExists()
         compose.onNode(hasTestTag("onboarding-http-warning")).assertDoesNotExist()
         val box = compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("onboarding-address-field")))
         box.performTextReplacement("budget.lan:5006")
@@ -82,7 +82,7 @@ class FieldSubmitContentTest {
         compose.waitForIdle()
         assertEquals("http://budget.lan:5006", address)
         compose.onNode(hasTestTag("onboarding-scheme")).assertDoesNotExist()
-        compose.onNode(hasTestTag("field-prefix"), useUnmergedTree = true).onChildAt(0).assertTextEquals("http://")
+        compose.onNode(hasText("http://") and hasAnyAncestor(hasTestTag("field-prefix")), useUnmergedTree = true).assertExists()
         compose.onNode(hasTestTag("onboarding-http-warning")).assertExists()
         box.performTextReplacement("https://budget.example.com")
         compose.waitForIdle()
