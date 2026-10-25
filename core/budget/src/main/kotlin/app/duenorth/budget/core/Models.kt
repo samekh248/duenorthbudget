@@ -83,6 +83,8 @@ data class FormatPrefs(
     val hideFraction: Boolean = false,
     val firstDayOfWeekIdx: Int = 0,
     val experimental: Boolean = false,
+    /** True once `flags.experimental` holds a choice, on or off; opening the budget asks until then. */
+    val experimentalAsked: Boolean = false,
     val budgetType: String = "envelope",
     /** Actual's `learn-categories`; absent means on (spec 010 US3). */
     val learnCategories: Boolean = true,

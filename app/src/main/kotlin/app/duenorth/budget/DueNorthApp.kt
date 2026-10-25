@@ -446,8 +446,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onNumberFormat = model::setNumberFormat,
                                 onFirstDay = model::setFirstDay,
                                 onHideFraction = model::setHideFraction,
-                                onExperimental = model::setExperimental,
-                                onGoalTemplates = model::setGoalTemplates,
+                                onExperimental = model::showExperimental,
                                 onLearning = model::setLearning,
                                 onExport = model::exportBudget,
                                 onEncryption = model::showEncryption,
@@ -457,6 +456,21 @@ fun DueNorthApp(model: ShellViewModel) {
                                 modifier = fill,
                             )
                         }
+                        ShellRoute.Experimental ->
+                            ExperimentalScreen(
+                                budgetName = openName,
+                                prefs = state.formatPrefs,
+                                onExperimental = model::setExperimental,
+                                onFeature = model::setExperimentalFeature,
+                                modifier = fill,
+                            )
+                        ShellRoute.ExperimentalOffer ->
+                            ExperimentalOfferScreen(
+                                budgetName = openName,
+                                onTurnOn = model::acceptExperimentalOffer,
+                                onKeepOff = model::declineExperimentalOffer,
+                                modifier = fill,
+                            )
                         is ShellRoute.EncryptionPassword ->
                             EncryptionPasswordScreen(
                                 mode = route.mode,

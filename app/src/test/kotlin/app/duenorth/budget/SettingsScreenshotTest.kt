@@ -74,6 +74,31 @@ class SettingsScreenshotTest {
     @Test
     fun removeServerDark() = page("settings_remove_server_dark", dark = true) { RemoveScreen() }
 
+    @Test
+    fun experimentalLight() = page("experimental_light", dark = false) { Experimental(FormatPrefs(experimental = true, goalTemplates = true)) }
+
+    @Test
+    fun experimentalDark() = page("experimental_dark", dark = true) { Experimental(FormatPrefs(experimental = true, goalTemplates = true)) }
+
+    @Test
+    fun experimentalOffLight() = page("experimental_off_light", dark = false) { Experimental(FormatPrefs()) }
+
+    @Test
+    fun experimentalOffDark() = page("experimental_off_dark", dark = true) { Experimental(FormatPrefs()) }
+
+    @Test
+    fun experimentalOfferLight() = page("experimental_offer_light", dark = false) { ExperimentalOfferScreen("Home", {}, {}) }
+
+    @Test
+    fun experimentalOfferDark() = page("experimental_offer_dark", dark = true) { ExperimentalOfferScreen("Home", {}, {}) }
+
+    @Test
+    fun advancedExperimentalOnLight() =
+        snap("settings_advanced_experimental_light", SettingsPage.ADVANCED, dark = false, prefs = FormatPrefs(experimental = true, goalTemplates = true))
+
+    @androidx.compose.runtime.Composable
+    private fun Experimental(prefs: FormatPrefs) = ExperimentalScreen("Home", prefs, {}, { _, _ -> })
+
     private val home = SavedInstance("i1", "http://192.168.1.20:5006", "home server")
     private val office = SavedInstance("i2", "https://budget.example.com", "office")
 
@@ -82,6 +107,7 @@ class SettingsScreenshotTest {
         settingsPage: SettingsPage,
         dark: Boolean,
         budgetOpen: Boolean = true,
+        prefs: FormatPrefs = FormatPrefs(),
     ) = page(name, dark) {
         SettingsScreen(
             page = settingsPage,
@@ -97,7 +123,7 @@ class SettingsScreenshotTest {
             openBudgetId = if (budgetOpen) "home" else null,
             themeMode = if (dark) "dark" else "light",
             accentId = "magenta",
-            formatPrefs = FormatPrefs(),
+            formatPrefs = prefs,
             cloudFileId = "cloud-1",
             encrypted = false,
             onPage = {},

@@ -87,6 +87,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.time.YearMonth
 
@@ -171,6 +172,12 @@ sealed interface ShellRoute {
     data object Payees : ShellRoute
 
     data object Settings : ShellRoute
+
+    /** Settings → advanced → experimental features: the switch and each feature, for the open budget. */
+    data object Experimental : ShellRoute
+
+    /** A budget just opened that has never had experimental features chosen: try them or keep them off. */
+    data object ExperimentalOffer : ShellRoute
 
     /** Settings → advanced → encryption: one page per password action (spec 012). */
     data class EncryptionPassword(
@@ -424,6 +431,9 @@ class ShellViewModel(
 
     /** Category note saves, written in the order they were made. */
     internal val noteWrites = Mutex()
+
+    /** Budget preference saves, in the order they were made, so two flipped together both land. */
+    private val preferenceWrites = Mutex()
     private val _state =
         MutableStateFlow(
             ShellUiState(
@@ -976,6 +986,41 @@ class ShellViewModel(
 
     fun setGoalTemplates(enabled: Boolean) = setOpenBudgetPreference("flags.goalTemplatesEnabled", if (enabled) "true" else "false")
 
+    fun setExperimentalFeature(
+        feature: ExperimentalFeature,
+        enabled: Boolean,
+    ) = when (feature) {
+        ExperimentalFeature.TEMPLATES -> setGoalTemplates(enabled)
+    }
+
+    fun showExperimental() = openFromSettings(ShellRoute.Experimental, SettingsPage.ADVANCED)
+
+    /** `turn on` on the offer: the switch and every feature come on for this budget. */
+    fun acceptExperimentalOffer() {
+        if (_state.value.route != ShellRoute.ExperimentalOffer) return
+        setExperimental(true)
+        ExperimentalFeature.entries.forEach { setExperimentalFeature(it, true) }
+        _state.update { it.copy(route = ShellRoute.Home) }
+    }
+
+    /** `keep off` on the offer: saved as off, so this budget is not asked again. Back asks next time. */
+    fun declineExperimentalOffer() {
+        if (_state.value.route != ShellRoute.ExperimentalOffer) return
+        setExperimental(false)
+        _state.update { it.copy(route = ShellRoute.Home) }
+    }
+
+    /**
+     * After a budget is opened, switched to, or made: one that has never had experimental
+     * features chosen asks before its home shows.
+     */
+    private fun offerExperimental() {
+        _state.update {
+            val ask = it.route == ShellRoute.Home && it.shell != null && !it.locked && !it.formatPrefs.experimentalAsked
+            if (ask) it.copy(route = ShellRoute.ExperimentalOffer) else it
+        }
+    }
+
     fun exportBudget() {
         val budgetId = _state.value.settings.openBudgetId ?: return
         val name =
@@ -1060,6 +1105,7 @@ class ShellViewModel(
                 is CreateResult.Created -> {
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
+                    offerExperimental()
                 }
                 is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
             }
@@ -2133,6 +2179,7 @@ class ShellViewModel(
                         )
                     }
                     reload()
+                    offerExperimental()
                     if (toSettings) refreshSettingsSections()
                     if (send) uploadNew()
                 }
@@ -2160,6 +2207,7 @@ class ShellViewModel(
                     finishOnboarding()
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
+                    offerExperimental()
                 }
             }
         }
@@ -2202,6 +2250,7 @@ class ShellViewModel(
             withContext(Dispatchers.IO) { library.switchTo(target.id) }
             _state.update { it.copy(route = ShellRoute.Home, switchTarget = null) }
             reload()
+            offerExperimental()
         }
     }
 
@@ -2440,6 +2489,7 @@ class ShellViewModel(
                         )
                     }
                     reload()
+                    offerExperimental()
                 }
                 OpenResult.NeedsPassword ->
                     _state.update {
@@ -2927,7 +2977,7 @@ class ShellViewModel(
                 "firstDayOfWeekIdx" ->
                     _state.value.formatPrefs.copy(firstDayOfWeekIdx = value.toIntOrNull() ?: 0)
                 "hideFraction" -> _state.value.formatPrefs.copy(hideFraction = value == "true")
-                "flags.experimental" -> _state.value.formatPrefs.copy(experimental = value == "true")
+                "flags.experimental" -> _state.value.formatPrefs.copy(experimental = value == "true", experimentalAsked = true)
                 "learn-categories" -> _state.value.formatPrefs.copy(learnCategories = value == "true")
                 "flags.goalTemplatesEnabled" -> _state.value.formatPrefs.copy(goalTemplates = value == "true")
                 else -> _state.value.formatPrefs
@@ -2939,7 +2989,7 @@ class ShellViewModel(
             )
         }
         viewModelScope.launch(Dispatchers.IO) {
-            library.setPreference(budgetId, id, value)
+            preferenceWrites.withLock { library.setPreference(budgetId, id, value) }
         }
     }
 

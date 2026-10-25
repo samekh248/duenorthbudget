@@ -127,14 +127,14 @@ fun SettingsScreen(
     onNumberFormat: (String) -> Unit,
     onFirstDay: (Int) -> Unit,
     onHideFraction: (Boolean) -> Unit,
-    onExperimental: (Boolean) -> Unit,
+    /** Advanced → experimental features: opens that page. */
+    onExperimental: () -> Unit,
     onExport: () -> Unit,
     onEncryption: (EncryptionMode) -> Unit,
     onRequestAdvanced: (AdvancedConfirm) -> Unit,
     modifier: Modifier = Modifier,
     launcherIcon: LauncherIcon = LauncherIcon.TILE,
     onLauncherIcon: (LauncherIcon) -> Unit = {},
-    onGoalTemplates: (Boolean) -> Unit = {},
     onLearning: (Boolean) -> Unit = {},
     scroll: Map<SettingsPage, Int> = emptyMap(),
     onScroll: (SettingsPage, Int) -> Unit = { _, _ -> },
@@ -187,13 +187,11 @@ fun SettingsScreen(
                             )
                         SettingsPage.ADVANCED ->
                             AdvancedItem(
-                                experimental = formatPrefs.experimental,
-                                goalTemplates = formatPrefs.goalTemplates,
+                                prefs = formatPrefs,
                                 budgetId = openBudgetId.orEmpty(),
                                 cloudFileId = cloudFileId,
                                 encrypted = encrypted,
                                 onExperimental = onExperimental,
-                                onGoalTemplates = onGoalTemplates,
                                 onExport = onExport,
                                 onEncryption = onEncryption,
                                 onRequest = onRequestAdvanced,

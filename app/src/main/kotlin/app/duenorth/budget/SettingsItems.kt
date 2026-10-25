@@ -259,30 +259,32 @@ internal fun AppearanceItem(
 
 @Composable
 internal fun AdvancedItem(
-    experimental: Boolean,
-    goalTemplates: Boolean,
+    prefs: FormatPrefs,
     budgetId: String,
     cloudFileId: String?,
     encrypted: Boolean,
-    onExperimental: (Boolean) -> Unit,
-    onGoalTemplates: (Boolean) -> Unit,
+    onExperimental: () -> Unit,
     onExport: () -> Unit,
     onEncryption: (EncryptionMode) -> Unit,
     onRequest: (AdvancedConfirm) -> Unit,
 ) {
+    // The experimental features have their own page; this row names what is on.
     SettingsHeading("experimental", tag = "settings-experimental", first = true)
-    ChoiceRow(
-        if (experimental) "experimental features  on" else "experimental features",
-        experimental,
-        "settings-experimental-toggle",
-    ) { onExperimental(!experimental) }
-    // Actual's goal templates feature flag; it only counts while experimental features are on.
-    if (experimental) {
-        ChoiceRow(
-            if (goalTemplates) "budget templates  on" else "budget templates",
-            goalTemplates,
-            "settings-templates",
-        ) { onGoalTemplates(!goalTemplates) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress(onExperimental)
+            .padding(vertical = MetroDimens.Row)
+            .testTag("settings-experimental-open"),
+    ) {
+        MetroText(ExperimentalCopy.TITLE, Metro.typography.subheader)
+        MetroText(
+            ExperimentalCopy.summary(prefs),
+            Metro.typography.caption,
+            Modifier.testTag("settings-experimental-state"),
+            color = if (prefs.experimental) Metro.accent.text else Metro.colors.secondary,
+        )
     }
     SettingsHeading("export")
     SettingsActionRow(SettingsCopy.EXPORT_HINT, "settings-export", onExport)
