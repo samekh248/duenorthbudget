@@ -269,7 +269,14 @@ private fun MetroFieldFrame(
             // so an empty box still reads as prefix then hint.
             val prefixColor = if (relief) colors.secondary else Color(0xFF5A5A5A)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                MetroText(prefix, Metro.typography.control, Modifier.testTag("field-prefix"), color = prefixColor, maxLines = 1, softWrap = false)
+                MetroText(
+                    prefix,
+                    Metro.typography.control,
+                    Modifier.testTag("field-prefix"),
+                    color = prefixColor,
+                    maxLines = 1,
+                    softWrap = false,
+                )
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     if (empty) {
                         MetroText(hint, Metro.typography.control, color = hintColor, maxLines = 1)
