@@ -376,8 +376,11 @@ internal fun ShellViewModel.onboardingBack(): Boolean? {
 
 /** A budget is open: onboarding is over and its file is removed. */
 internal fun ShellViewModel.finishOnboarding() {
-    if (state.value.onboarding == null) return
-    cancelOnboardingJob()
-    mutate { it.copy(onboarding = null) }
+    // The saved progress goes even when the screen's copy is already gone: a load that lands
+    // mid-download can drop that copy, and the file would bring the steps back on the next launch.
+    if (state.value.onboarding != null) {
+        cancelOnboardingJob()
+        mutate { it.copy(onboarding = null) }
+    }
     viewModelScope.launch(onboardingWrites) { library.onboarding().clear() }
 }

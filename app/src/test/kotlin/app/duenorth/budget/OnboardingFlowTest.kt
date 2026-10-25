@@ -416,6 +416,34 @@ class OnboardingFlowTest {
                 ?.budgetName == "Household"
         }
         assertEquals(listOf("Household"), library.list().map { it.name })
+        // The budget just picked offers its experimental features before its home.
+        await { model.state.value.route is ShellRoute.ExperimentalOffer }
+        assertNull((model.state.value.route as ShellRoute.ExperimentalOffer).current)
+    }
+
+    @Test
+    fun settingUpAsksEvenWhenTheBudgetAlreadyChose() {
+        // The choice syncs with the file, so a budget answered on another phone still asks while setting up.
+        transport.files += RemoteFile(fileId = "server-household", groupId = "g-1", name = "Household", encryptKeyId = null)
+        transport.downloads["server-household"] =
+            budgetBytes("Household") { source, id -> source.setPreference(id, "flags.experimental", "true") }
+        val (library, model) = model("first-pick-chosen")
+        model.onboardingChooseServer()
+        model.onboardingAddress("budget.example.com")
+        model.onboardingCheck()
+        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        model.onboardingSignIn(FakeTransport.PASSWORD)
+        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        model.onboardingOpen(
+            model.state.value.remoteFiles
+                .single(),
+        )
+        await { model.state.value.route is ShellRoute.ExperimentalOffer }
+        assertEquals(true, (model.state.value.route as ShellRoute.ExperimentalOffer).current)
+        // Turning them off here saves off on the budget.
+        model.declineExperimentalOffer()
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        await { !library.readFormatPrefs("server-household").experimental }
     }
 
     @Test
@@ -450,9 +478,13 @@ class OnboardingFlowTest {
     }
 
     /** An Actual file made on another "phone", as the server would hand it back. */
-    private fun budgetBytes(name: String): ByteArray {
+    private fun budgetBytes(
+        name: String,
+        prepare: (BudgetLibrary, String) -> Unit = { _, _ -> },
+    ): ByteArray {
         val source = root("source-$name")
         val made = library(source).create(name, "USD") as app.duenorth.budget.core.CreateResult.Created
+        prepare(library(source), made.id)
         return File(source, "${made.id}/db.sqlite").readBytes()
     }
 
