@@ -187,6 +187,11 @@ object SyncSchema {
     private val tableColumns: MutableMap<SqlSession, MutableMap<String, Map<String, String>>> =
         Collections.synchronizedMap(WeakHashMap())
 
+    /** Local changes recorded on this thread, so a library call can tell whether it left any to send. */
+    private val localWrites = ThreadLocal.withInitial { 0L }
+
+    fun localWritesOnThread(): Long = localWrites.get()
+
     fun ensure(session: SqlSession) {
         session.transaction {
             statements.forEach(session::exec)
@@ -330,6 +335,7 @@ object SyncSchema {
             )
             writeState(session, "clock", stamp)
         }
+        localWrites.set(localWrites.get() + 1)
     }
 
     internal fun beginCapture(session: SqlSession): MutableList<JournalCell>? {
@@ -468,6 +474,11 @@ object SyncSchema {
                 remoteStamp,
             ),
         )
+    }
+
+    fun hasPending(session: SqlSession): Boolean {
+        ensure(session)
+        return session.query("SELECT 1 AS n FROM messages WHERE pending = 1 LIMIT 1").isNotEmpty()
     }
 
     /** Messages the server has not stored yet, oldest first. */

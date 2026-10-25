@@ -77,8 +77,10 @@ import app.duenorth.budget.core.withHold
 import app.duenorth.budget.core.withMoveAvailable
 import app.duenorth.budget.core.withReleaseHold
 import app.duenorth.budget.design.MonthWindow
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -446,7 +448,21 @@ class ShellViewModel(
     /** When the last sync the screen started without being asked began, in epoch millis; launch syncs at start. */
     private var lastScreenSync = System.currentTimeMillis()
 
+    /** Counts returns to the screen, so a send started on leaving can tell the person came back. */
+    private var screenVisits = 0
+
+    private var sendingWrites = false
+    private var sendAgain = false
+
+    /** Outlives this view model, so a send started as the app closes still finishes. */
+    private val leaving = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    private val localChange: (String) -> Unit = { id ->
+        viewModelScope.launch { if (_state.value.settings.openBudgetId == id) sendWrites(id) }
+    }
+
     init {
+        library.onLocalChange = localChange
         viewModelScope.launch {
             restoreOnboarding()
             reload()
@@ -463,6 +479,7 @@ class ShellViewModel(
      * most once a minute. Edit mode and a locked budget wait, since a sync would change what they show.
      */
     fun onScreenReturned() {
+        screenVisits++
         val current = _state.value
         val id = current.settings.openBudgetId ?: return
         if (current.locked || current.syncing || current.budgetEdit != null) return
@@ -1406,15 +1423,57 @@ class ShellViewModel(
         return true
     }
 
+    /**
+     * The app left the screen: send what the server has not stored, then forget an ask-each-time
+     * key. The screen locks at once; the key stays until the send is done, unless the person is
+     * back by then and has the password screen in front of them anyway.
+     */
     fun onScreenLocked() {
         val id = _state.value.settings.openBudgetId ?: return
-        sync.lock(id)
-        if (sync.needsPassword(id)) {
+        val visit = screenVisits
+        if (sync.locksWhenAway(id) || sync.needsPassword(id)) {
             history.clear()
             _state.update {
                 it.copy(locked = true, shell = null, register = null, route = ShellRoute.BudgetPassword, passwordError = null)
             }
         }
+        leaving.launch {
+            withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(id) } }
+            if (screenVisits == visit) sync.lock(id)
+        }
+    }
+
+    /**
+     * Sends a write as soon as it lands. Writes made while a send is out go together in one more
+     * send when it returns, so a quick run of edits does not queue a sync each.
+     */
+    private fun sendWrites(budgetId: String) {
+        if (sendingWrites) {
+            sendAgain = true
+            return
+        }
+        sendingWrites = true
+        viewModelScope.launch {
+            try {
+                do {
+                    sendAgain = false
+                    val sent = withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) }.getOrNull() }
+                    // A send also brings back what other devices changed; budget edit mode repaints itself.
+                    val current = _state.value
+                    if (sent != null && current.settings.openBudgetId == budgetId && !current.locked && current.budgetEdit == null) {
+                        months.invalidate()
+                        val accountId = (current.route as? ShellRoute.Register)?.accountId
+                        apply(load(accountId), accountId)
+                    }
+                } while (sendAgain)
+            } finally {
+                sendingWrites = false
+            }
+        }
+    }
+
+    override fun onCleared() {
+        if (library.onLocalChange === localChange) library.onLocalChange = null
     }
 
     fun openAccount(accountId: String) {
@@ -2314,7 +2373,7 @@ class ShellViewModel(
                 EditResult.Saved -> {
                     _state.update { it.copy(editError = null, route = ShellRoute.Home) }
                     reload()
-                    withContext(Dispatchers.IO) { runCatching { sync.sync(shell.budgetId) } }
+                    withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(shell.budgetId) } }
                     reload()
                 }
             }
@@ -2799,7 +2858,7 @@ class ShellViewModel(
                         _state.update { it.copy(categoryManage = manage) }
                     }
                     if (!stayOnRoute) back()
-                    withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }
+                    withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
                     val refreshed = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
                     if (refreshed != null) {
                         shellGate.offer(refreshed)

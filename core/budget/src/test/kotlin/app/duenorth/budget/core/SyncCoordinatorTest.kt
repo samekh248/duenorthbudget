@@ -178,6 +178,48 @@ class SyncCoordinatorTest {
     }
 
     @Test
+    fun aLocalChangeTellsTheAppAndIsSentOnce() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            val told = mutableListOf<String>()
+            library.onLocalChange = { told.add(it) }
+            val opened = server.syncRequests.size
+            assertNull(sync.sendUnsent(remote.fileId))
+            assertEquals(opened, server.syncRequests.size)
+            assigned(remote.fileId)
+            assertEquals(emptyList<String>(), told)
+            library.saveCategoryNote(remote.fileId, "c-food", "#template 50")
+            assertEquals(listOf(remote.fileId), told)
+            assertEquals("synced 3:04 pm", sync.sendUnsent(remote.fileId)?.status)
+            val sent = server.syncRequests.size
+            assertTrue(sent > opened)
+            assertEquals(0, pendingCount(remote.fileId))
+            assertNull(sync.sendUnsent(remote.fileId))
+            assertEquals(sent, server.syncRequests.size)
+        }
+    }
+
+    @Test
+    fun sendUnsentLeavesPhoneOnlyAndLockedBudgetsAlone() {
+        scenario {
+            val kept = (library.create("Trip", "JPY") as CreateResult.Created).id
+            library.saveCategoryNote(kept, "c-food", "#template 50")
+            assertNull(sync.sendUnsent(kept))
+            val remote = server.addEncrypted("Secret", budgetBytes(), "violet-quartz-991")
+            assertNull(sync.connect(server.baseUrl, "server-secret").error)
+            assertTrue(sync.unlock(remote, "violet-quartz-991", askEachTime = true) is UnlockResult.Unlocked)
+            assertEquals(OpenResult.Opened, sync.open(remote))
+            assertTrue(sync.locksWhenAway(remote.fileId))
+            assertTrue(sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") is EditResult.Saved)
+            val before = server.syncRequests.size
+            sync.lock(remote.fileId)
+            assertNull(sync.sendUnsent(remote.fileId))
+            assertEquals(before, server.syncRequests.size)
+        }
+    }
+
+    @Test
     fun changeAnOfflineDeviceSendsLateStillArrives() {
         scenario {
             val remote = server.addFile("Home", budgetBytes())

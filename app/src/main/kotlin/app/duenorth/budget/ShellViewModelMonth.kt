@@ -174,7 +174,7 @@ fun ShellViewModel.undo() {
  */
 internal suspend fun ShellViewModel.afterMonthWrite(budgetId: String) {
     repaintMonth(budgetId)
-    withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }
+    withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
     repaintMonth(budgetId)
 }
 

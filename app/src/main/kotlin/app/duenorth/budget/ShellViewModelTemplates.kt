@@ -93,7 +93,7 @@ fun ShellViewModel.saveCategoryNote(note: String) {
         // Tiles can change faster than a write lands (drag, then remove); the last change must win.
         noteWrites.withLock { withContext(Dispatchers.IO) { library.saveCategoryNote(budgetId, categoryId, note) } }
         mutate { it.copy(undoLabel = library.undoLabel(budgetId)) }
-        withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }
+        withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
     }
 }
 
@@ -268,7 +268,7 @@ fun ShellViewModel.moveTemplateToPriority(
         }
         mutate { it.copy(undoLabel = library.undoLabel(budgetId)) }
         refreshTemplatePlan()
-        withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }
+        withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
     }
 }
 

@@ -130,7 +130,7 @@ private suspend fun ShellViewModel.afterBankLinkWrite(
 ) {
     mutate { it.copy(undoLabel = library.undoLabel(budgetId)) }
     if (leave) back() else refreshBankLink()
-    withContext(Dispatchers.IO) { runCatching { sync.sync(budgetId) } }
+    withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
 }
 
 private fun ShellViewModel.updateBankLink(transform: (BankLinkUi) -> BankLinkUi) {

@@ -411,6 +411,21 @@ class SyncCoordinator(
         return sync(id)
     }
 
+    /**
+     * [sync] only when the budget holds changes the server has not stored and can send them
+     * now: after an edit, and as the app leaves the screen. Null, with nothing sent, otherwise.
+     * Two calls in a row send once, since the second finds nothing left.
+     */
+    fun sendUnsent(budgetId: String): SyncResult? =
+        synchronized(syncLock) {
+            if (!canSyncUnattended(budgetId)) return null
+            if (library.useDatabase(budgetId) { SyncSchema.hasPending(it) } != true) return null
+            sync(budgetId)
+        }
+
+    /** Whether leaving the screen forgets this budget's key, so the next look asks for its password. */
+    fun locksWhenAway(budgetId: String): Boolean = state(budgetId, "encrypted") == "1" && asksEachTime(budgetId)
+
     private fun canSyncUnattended(budgetId: String): Boolean =
         signedIn() &&
             activeAddress() != null &&
