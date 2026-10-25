@@ -796,9 +796,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                 Placeholder()
                             } else {
                                 val income = shell.incomeCategory(route.categoryId)
-                                val name =
-                                    income?.name
-                                        ?: shell.groups.flatMap { it.categories }.firstOrNull { it.id == route.categoryId }?.name
+                                val categories = shell.groups.flatMap { it.categories }
+                                val name = income?.name ?: categories.firstOrNull { it.id == route.categoryId }?.name
                                 EditorWithMonth(
                                     openMonth = state.openMonth,
                                     monthWindow = model.monthWindow(),
