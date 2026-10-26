@@ -433,14 +433,38 @@ class RegisterBookTest {
     fun saveSetsClearedAndMovesBetweenAccounts() {
         db { _, book ->
             book.save(draft("cafe").copy(cleared = false))
-            assertFalse(book.read("checking")!!.rows.single().cleared)
+            assertFalse(
+                book
+                    .read("checking")!!
+                    .rows
+                    .single()
+                    .cleared,
+            )
             book.save(draft("cafe", amount = -1_200))
-            assertFalse(book.read("checking")!!.rows.single().cleared)
+            assertFalse(
+                book
+                    .read("checking")!!
+                    .rows
+                    .single()
+                    .cleared,
+            )
             book.save(draft("cafe", account = "savings").copy(cleared = true))
             assertTrue(book.read("checking")!!.rows.isEmpty())
-            assertTrue(book.read("savings")!!.rows.single().cleared)
+            assertTrue(
+                book
+                    .read("savings")!!
+                    .rows
+                    .single()
+                    .cleared,
+            )
             book.save(transfer("move", "cash", -500).copy(cleared = false))
-            assertFalse(book.read("checking")!!.rows.single { it.id == "move" }.cleared)
+            assertFalse(
+                book
+                    .read("checking")!!
+                    .rows
+                    .single { it.id == "move" }
+                    .cleared,
+            )
         }
     }
 

@@ -121,12 +121,10 @@ class OnboardingScreenshotTest {
         snap(ShellRoute.OnboardingFiles, "budget_picker_replacing_dark", dark = true) { files(replacing = listOf("Home")) }
 
     @Test
-    fun confirmReplaceLight() =
-        snap(ShellRoute.ConfirmReplaceBudget, "budget_picker_confirm_light", dark = false) { confirmReplace() }
+    fun confirmReplaceLight() = snap(ShellRoute.ConfirmReplaceBudget, "budget_picker_confirm_light", dark = false) { confirmReplace() }
 
     @Test
-    fun confirmReplaceDark() =
-        snap(ShellRoute.ConfirmReplaceBudget, "budget_picker_confirm_dark", dark = true) { confirmReplace() }
+    fun confirmReplaceDark() = snap(ShellRoute.ConfirmReplaceBudget, "budget_picker_confirm_dark", dark = true) { confirmReplace() }
 
     @Composable
     private fun welcome() = WelcomeScreen(onServer = {}, onPhone = {})

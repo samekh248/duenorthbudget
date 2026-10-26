@@ -142,28 +142,29 @@ object ReviewReader {
                 ?: return null
         val target = month.toActualMonth()
         val rows =
-            session.query(
-                """
-                SELECT t.id AS id, t.date AS date, t.amount AS amount, COALESCE(p.name, '') AS payee
-                FROM transactions t
-                JOIN accounts a ON a.id = t.acct AND IFNULL(a.tombstone, 0) = 0
-                LEFT JOIN payees p ON p.id = t.description AND IFNULL(p.tombstone, 0) = 0
-                WHERE $alive
-                    AND t.category = ?
-                    AND t.date / 100 = ?
-                    AND IFNULL(a.offbudget, 0) = 0
-                    AND $NOT_ON_BUDGET_TRANSFER
-                ORDER BY t.date DESC, t.sort_order DESC, t.id DESC
-                """.trimIndent(),
-                listOf(categoryId, target),
-            ).map { row ->
-                ReviewTransactionRow(
-                    id = row.str("id").orEmpty(),
-                    date = row.long("date").toInt(),
-                    payee = row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE },
-                    amountMinor = row.long("amount"),
-                )
-            }
+            session
+                .query(
+                    """
+                    SELECT t.id AS id, t.date AS date, t.amount AS amount, COALESCE(p.name, '') AS payee
+                    FROM transactions t
+                    JOIN accounts a ON a.id = t.acct AND IFNULL(a.tombstone, 0) = 0
+                    LEFT JOIN payees p ON p.id = t.description AND IFNULL(p.tombstone, 0) = 0
+                    WHERE $alive
+                        AND t.category = ?
+                        AND t.date / 100 = ?
+                        AND IFNULL(a.offbudget, 0) = 0
+                        AND $NOT_ON_BUDGET_TRANSFER
+                    ORDER BY t.date DESC, t.sort_order DESC, t.id DESC
+                    """.trimIndent(),
+                    listOf(categoryId, target),
+                ).map { row ->
+                    ReviewTransactionRow(
+                        id = row.str("id").orEmpty(),
+                        date = row.long("date").toInt(),
+                        payee = row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE },
+                        amountMinor = row.long("amount"),
+                    )
+                }
         val total = rows.sumOf { it.amountMinor }
         return CategoryMonthPage(
             categoryId = categoryId,

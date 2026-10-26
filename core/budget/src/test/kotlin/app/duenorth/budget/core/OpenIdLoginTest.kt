@@ -74,7 +74,11 @@ class OpenIdLoginTest {
         connection.readTimeout = 5_000
         return try {
             val body = connection.inputStream.readBytes().toString(Charsets.UTF_8)
-            Json.parseToJsonElement(body).jsonObject["data"]!!.jsonObject["token"]!!.jsonPrimitive.content
+            Json
+                .parseToJsonElement(body)
+                .jsonObject["data"]!!
+                .jsonObject["token"]!!
+                .jsonPrimitive.content
         } finally {
             connection.disconnect()
         }

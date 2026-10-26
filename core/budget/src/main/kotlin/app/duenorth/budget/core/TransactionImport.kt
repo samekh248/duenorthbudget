@@ -158,7 +158,10 @@ class ImportBook(
         return ImportConfirmResult(batchId, added, skipped)
     }
 
-    fun confirmPreview(preview: ImportPreview, candidates: List<ParsedImportRow>): ImportConfirmResult {
+    fun confirmPreview(
+        preview: ImportPreview,
+        candidates: List<ParsedImportRow>,
+    ): ImportConfirmResult {
         val toAdd =
             preview.rows
                 .filter { it.status == PreviewRowStatus.New }

@@ -345,17 +345,31 @@ class OnboardingFlowTest {
         await { model.state.value.route == ShellRoute.OnboardingSignIn }
         model.onboardingSignIn(FakeTransport.PASSWORD)
         await { model.state.value.route == ShellRoute.OnboardingFiles }
-        assertEquals(listOf("Household"), model.state.value.remoteFiles.map { it.name })
+        assertEquals(
+            listOf("Household"),
+            model.state.value.remoteFiles
+                .map { it.name },
+        )
 
         // The confirmation names the budget being cleared; keep leaves it.
-        model.onboardingOpen(model.state.value.remoteFiles.single())
+        model.onboardingOpen(
+            model.state.value.remoteFiles
+                .single(),
+        )
         await { model.state.value.route == ShellRoute.ConfirmReplaceBudget }
-        assertEquals(listOf("Home"), model.state.value.replaceBudgets.map { it.name })
+        assertEquals(
+            listOf("Home"),
+            model.state.value.replaceBudgets
+                .map { it.name },
+        )
         assertTrue(model.back())
         assertEquals(ShellRoute.OnboardingFiles, model.state.value.route)
         assertEquals(listOf("Home"), library(root).list().map { it.name })
 
-        model.onboardingOpen(model.state.value.remoteFiles.single())
+        model.onboardingOpen(
+            model.state.value.remoteFiles
+                .single(),
+        )
         await { model.state.value.route == ShellRoute.ConfirmReplaceBudget }
         model.confirmReplaceBudget()
         await {
@@ -410,7 +424,10 @@ class OnboardingFlowTest {
         await { model.state.value.route == ShellRoute.OnboardingSignIn }
         model.onboardingSignIn(FakeTransport.PASSWORD)
         await { model.state.value.route == ShellRoute.OnboardingFiles }
-        model.onboardingOpen(model.state.value.remoteFiles.single())
+        model.onboardingOpen(
+            model.state.value.remoteFiles
+                .single(),
+        )
         await {
             model.state.value.shell
                 ?.budgetName == "Household"
