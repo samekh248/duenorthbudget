@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.RuleDraft
+import app.duenorth.budget.core.RuleFields
 import app.duenorth.budget.core.RuleNames
 import app.duenorth.budget.core.RuleSummary
 import app.duenorth.budget.core.RuleValues
@@ -58,6 +59,18 @@ class RuleScreenshotTest {
 
     @Test
     fun ruleEditorDark() = snap("rule_editor_dark", dark = true) { Editor() }
+
+    @Test
+    fun rulePartLight() = snap("rule_part_light", dark = false) { Part() }
+
+    @Test
+    fun rulePartDark() = snap("rule_part_dark", dark = true) { Part() }
+
+    @Composable
+    private fun Part() {
+        PartPage(RuleFields.conditionOps, names, 2, action = false, tag = "rule-add-condition", onAdd = {
+        }, onCancel = {}, initialText = "Corner Shop")
+    }
 
     @Composable
     private fun Schedule() {

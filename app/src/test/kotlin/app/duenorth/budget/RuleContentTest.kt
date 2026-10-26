@@ -1,8 +1,10 @@
 package app.duenorth.budget
 
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -73,16 +75,49 @@ class RuleContentTest {
         compose.setContent { MetroTheme { RuleEditorScreen(draft, names, 2, null, { saved = it }) } }
         compose.onNodeWithTag("rule-condition-0-kept", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("rule-condition-0-remove").assertDoesNotExist()
-        compose.onNodeWithTag("rule-add-action-field-category").performScrollTo().performClick()
+        compose.onNodeWithTag("rule-add-action-open").performScrollTo().performClick()
+        compose.onNodeWithTag("rule-editor").assertDoesNotExist()
+        compose.onNodeWithTag("rule-add-action-field-value").performClick()
+        compose.onNodeWithTag("rule-add-action-field-category").performClick()
         field("rule-add-action-value").performTextInput("food")
+        compose.onNodeWithTag("rule-add-action-preview").assertExists()
         compose.onNodeWithTag("rule-add-action-button").performScrollTo().performClick()
-        compose.onNodeWithTag("rule-stage-post").performClick()
+        compose.onNodeWithTag("rule-action-0").assertExists()
+        compose.onNodeWithTag("rule-stage-last").performClick()
         compose.onNodeWithTag("rule-save").performScrollTo().performClick()
         val result = saved!!
         assertEquals("post", result.stage)
         assertEquals(1, result.conditions.size)
         assertEquals("category", result.actions.single().field)
         assertEquals("category set Food", RuleValues.describe(result.actions.single(), names, 2))
+    }
+
+    @Test
+    fun ruleEditorRemovesAPartAndCancelsAnAdd() {
+        var saved: RuleDraft? = null
+        val condition = RuleValues.part("payee", "is", "Cafe", names, 2, action = false)!!
+        val action = RuleValues.part("category", "set", "Food", names, 2, action = true)!!
+        val draft = RuleDraft("r1", null, "and", listOf(condition), listOf(action))
+        compose.setContent { MetroTheme { RuleEditorScreen(draft, names, 2, null, { saved = it }) } }
+        compose.onNodeWithTag("rule-add-condition-open").performScrollTo().performClick()
+        compose.onNodeWithTag("rule-add-condition-op-value").performClick()
+        compose.onNodeWithTag("rule-add-condition-op-isNot").performClick()
+        field("rule-add-condition-value").performTextInput("Nobody")
+        compose.onNodeWithTag("rule-add-condition-button").performScrollTo().performClick()
+        compose.onNodeWithTag("rule-add-condition-problem").assertExists()
+        @Suppress("UNCHECKED_CAST")
+        val rule = compose as AndroidComposeTestRule<*, ComponentActivity>
+        compose.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithTag("rule-editor").assertExists()
+        compose.onNodeWithTag("rule-action-0-remove").performScrollTo().performClick()
+        compose.onNodeWithTag("rule-op-any").performClick()
+        compose.onNodeWithTag("rule-enabled-off").performClick()
+        compose.onNodeWithTag("rule-save").performScrollTo().performClick()
+        val result = saved!!
+        assertEquals(listOf(condition), result.conditions)
+        assertTrue(result.actions.isEmpty())
+        assertEquals("or", result.conditionsOp)
+        assertEquals(false, result.enabled)
     }
 
     @Test
