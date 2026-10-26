@@ -353,7 +353,23 @@ data class PhoneSettings(
     val inboxSwipeShown: Boolean = false,
     /** Experimental: show to budget less later months' budgeting. This phone only, never synced. */
     val freeAfterPlans: Boolean = false,
+    /** Hours between background bank and budget syncs; 0 turns the background job off. */
+    val backgroundSyncHours: Int = BackgroundSync.DEFAULT_HOURS,
 )
+
+/** The background sync's choices (settings → server). */
+object BackgroundSync {
+    const val DEFAULT_HOURS = 3
+    val CHOICES = listOf(1, 3, 6, 12, 24, 0)
+
+    fun label(hours: Int): String =
+        when (hours) {
+            0 -> "off"
+            1 -> "every hour"
+            24 -> "once a day"
+            else -> "every $hours hours"
+        }
+}
 
 @Serializable
 data class BudgetMetadata(

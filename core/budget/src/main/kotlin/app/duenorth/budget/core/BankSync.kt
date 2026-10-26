@@ -198,7 +198,56 @@ class BankSyncBook(
         val preview = import.previewCandidates(accountId, currency, rows)
         return ImportPreviewBundle(preview, rows) to null
     }
+
+    /**
+     * Bank sync with nobody watching: every open account linked through SimpleFIN fetches the
+     * last 90 days and adds what it does not already hold, as Actual's bank sync does, with no
+     * preview. Duplicates are skipped by the same checks as a fetch; a failed account is counted
+     * and the rest still run.
+     */
+    fun syncAll(
+        serverAddress: String,
+        token: String,
+        today: LocalDate,
+        nowMillis: Long,
+        ids: () -> String,
+    ): BankSyncSummary {
+        val linked =
+            session
+                .query(
+                    """
+                    SELECT id FROM accounts
+                    WHERE account_sync_source = ? AND IFNULL(account_id, '') != ''
+                        AND IFNULL(tombstone, 0) = 0 AND IFNULL(closed, 0) = 0
+                    ORDER BY sort_order, id
+                    """.trimIndent(),
+                    listOf("simpleFin"),
+                ).mapNotNull { row -> row.str("id")?.let { linkedAccount(it) } }
+        val start = today.minusDays(89)
+        val startIso = String.format("%04d-%02d-%02d", start.year, start.monthValue, start.dayOfMonth)
+        var added = 0
+        var failed = 0
+        linked.forEach { account ->
+            val rows =
+                try {
+                    transport.fetchTransactions(serverAddress, token, account.bankAccountId, startIso)
+                } catch (_: BankSyncException) {
+                    failed++
+                    return@forEach
+                }
+            added += ImportBook(session, ids).confirm(account.accountId, rows, review = false).addedIds.size
+            SyncSchema.write(session, "accounts", account.accountId, "last_sync", nowMillis.toString())
+        }
+        return BankSyncSummary(accounts = linked.size, added = added, failed = failed)
+    }
 }
+
+/** How one unattended bank sync went: linked accounts tried, transactions added, accounts that failed. */
+data class BankSyncSummary(
+    val accounts: Int,
+    val added: Int,
+    val failed: Int,
+)
 
 class FakeBankSyncTransport(
     private val rows: List<ParsedImportRow>,

@@ -132,9 +132,11 @@ class ImportBook(
         return ImportPreview(accountId, currency, rows, adding, rows.size - adding)
     }
 
+    /** Adds the rows that are not duplicates; [review] keeps them as the batch the review page shows. */
     fun confirm(
         accountId: String,
         candidates: List<ParsedImportRow>,
+        review: Boolean = true,
     ): ImportConfirmResult {
         val batchId = ids()
         val added = mutableListOf<String>()
@@ -148,7 +150,7 @@ class ImportBook(
                 val id = insertImported(accountId, row)
                 added += id
             }
-            if (added.isNotEmpty()) {
+            if (review && added.isNotEmpty()) {
                 ImportBatch.write(
                     session,
                     ImportBatchState(accountId, batchId, added),

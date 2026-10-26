@@ -154,11 +154,60 @@ class SyncCoordinatorTest {
     }
 
     @Test
+    fun backgroundSyncFetchesLinkedBanksThenSendsThemToTheServer() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            library.useDatabase(remote.fileId) { session ->
+                session.exec(
+                    "UPDATE accounts SET account_sync_source = ?, account_id = ? WHERE id = ?",
+                    listOf("simpleFin", "bank-checking", "checking"),
+                )
+            }
+            opened.bank.rows =
+                listOf(
+                    ParsedImportRow(20261005, "Corner Shop", -1_250L, financialId = "sf-1"),
+                    ParsedImportRow(20261006, "Bakery", -800L, financialId = "sf-2"),
+                )
+            assertEquals("synced 3:04 pm", sync.syncUnattended()?.status)
+            assertEquals(listOf("bank-checking"), opened.bank.asked)
+            assertEquals(setOf("sf-1", "sf-2"), financialIds(remote.fileId))
+            val sent = server.plainMessages(remote.fileId)
+            assertTrue(sent.any { it.dataset == "transactions" && it.column == "financial_id" && it.value == "S:sf-1" })
+            assertEquals(0, pendingCount(remote.fileId))
+            // The next run finds both already there and adds nothing.
+            sync.syncUnattended()
+            assertEquals(setOf("sf-1", "sf-2"), financialIds(remote.fileId))
+            assertEquals(2, opened.bank.asked.size)
+        }
+    }
+
+    @Test
+    fun aFailedBankFetchStillSyncsTheBudget() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            library.useDatabase(remote.fileId) { session ->
+                session.exec(
+                    "UPDATE accounts SET account_sync_source = ?, account_id = ? WHERE id = ?",
+                    listOf("simpleFin", "bank-checking", "checking"),
+                )
+            }
+            opened.bank.fails = true
+            server.appendChange(remote.fileId, "zero_budgets", "202610-c-food", "amount", "N:1234")
+            assertEquals("synced 3:04 pm", sync.syncUnattended()?.status)
+            assertEquals(1_234L, assigned(remote.fileId))
+        }
+    }
+
+    @Test
     fun backgroundSyncLeavesAPhoneOnlyBudgetAlone() {
         scenario {
             val kept = (library.create("Trip", "JPY") as CreateResult.Created).id
             assertNull(sync.syncUnattended())
+            assertNull(sync.syncBanksThenBudget(kept))
             assertTrue(server.syncRequests.isEmpty())
+            assertTrue(opened.bank.asked.isEmpty())
             assertEquals("", sync.status(kept))
         }
     }
@@ -630,6 +679,15 @@ class SyncCoordinatorTest {
 
     private fun header(id: String): Long = library.readShell(id)!!.headerMinor
 
+    private fun financialIds(id: String): Set<String> =
+        library
+            .useDatabase(id) { session ->
+                session
+                    .query("SELECT financial_id FROM transactions WHERE financial_id IS NOT NULL AND IFNULL(tombstone, 0) = 0")
+                    .mapNotNull { it.str("financial_id") }
+                    .toSet()
+            }.orEmpty()
+
     private fun assigned(id: String): Long =
         library.useDatabase(id) { session ->
             session
@@ -760,7 +818,11 @@ class SyncCoordinatorTest {
                 ZoneOffset.UTC,
                 now = { now },
                 pause = { pauses.add(it) },
+                bankTransport = bank,
             )
+
+        /** What the bank provider returns to the unattended bank sync. */
+        val bank = RecordingBankTransport()
 
         val sync: SyncCoordinator by lazy { coordinator() }
 
@@ -770,6 +832,24 @@ class SyncCoordinatorTest {
             if (ownsServer) server.close()
             root.deleteRecursively()
         }
+    }
+}
+
+/** A bank provider that hands back [rows], or fails, and remembers which bank accounts it was asked for. */
+private class RecordingBankTransport : BankSyncTransport {
+    var rows: List<ParsedImportRow> = emptyList()
+    var fails = false
+    val asked = mutableListOf<String>()
+
+    override fun fetchTransactions(
+        serverAddress: String,
+        token: String,
+        bankAccountId: String,
+        startDateIso: String,
+    ): List<ParsedImportRow> {
+        asked.add(bankAccountId)
+        if (fails) throw BankSyncException(ImportCopy.FETCH_FAILED)
+        return rows
     }
 }
 

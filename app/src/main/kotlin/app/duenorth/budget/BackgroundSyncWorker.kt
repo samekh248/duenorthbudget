@@ -16,8 +16,9 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * Syncs the open budget about once an hour while the app is away, with a network, so desktop
- * changes are already on the phone when it opens. The screen syncs on its own while shown.
+ * While the app is away, with a network, fetches the open budget's linked banks and then syncs
+ * it, every few hours as settings → server says (three by default), so bank transactions and
+ * desktop changes are already on the phone when it opens. The screen syncs on its own while shown.
  * A one-off run as the app closes sends changes the phone could not send then, once there is a network.
  */
 class BackgroundSyncWorker(
@@ -43,17 +44,27 @@ class BackgroundSyncWorker(
 
     companion object {
         private const val NAME = "background-sync"
-        private const val EVERY_MINUTES = 60L
         private const val UNSENT = "send-unsent"
         private const val UNSENT_ONLY = "unsentOnly"
 
-        /** Keeps one hourly job; scheduling again on each launch leaves the running schedule as it is. */
-        fun schedule(context: Context) {
+        /**
+         * Keeps one job every [hours]; 0 cancels it. Scheduling again on each launch updates the
+         * job in place, so a run already counting down keeps its time unless the interval changed.
+         */
+        fun schedule(
+            context: Context,
+            hours: Int,
+        ) {
+            val work = WorkManager.getInstance(context)
+            if (hours <= 0) {
+                work.cancelUniqueWork(NAME)
+                return
+            }
             val request =
-                PeriodicWorkRequestBuilder<BackgroundSyncWorker>(EVERY_MINUTES, TimeUnit.MINUTES)
+                PeriodicWorkRequestBuilder<BackgroundSyncWorker>(hours.toLong(), TimeUnit.HOURS)
                     .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                     .build()
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+            work.enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
         }
 
         /**

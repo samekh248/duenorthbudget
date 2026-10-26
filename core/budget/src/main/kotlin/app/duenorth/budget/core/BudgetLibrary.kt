@@ -945,6 +945,16 @@ class BudgetLibrary(
         open(budgetId) { BankSyncBook(it, transport).previewFetch(accountId, serverAddress, token, today) }
             ?: (null to ShellCopy.NO_ACCOUNTS)
 
+    /** Unattended bank sync of every SimpleFIN account (see [BankSyncBook.syncAll]); null when the budget is gone. */
+    fun syncBankAccounts(
+        budgetId: String,
+        serverAddress: String,
+        token: String,
+        transport: BankSyncTransport,
+        today: java.time.LocalDate,
+        nowMillis: Long,
+    ): BankSyncSummary? = serial { open(budgetId) { BankSyncBook(it, transport).syncAll(serverAddress, token, today, nowMillis, ids) } }
+
     /**
      * Clears one budget from the phone: its folder, the open-budget pointer when it is the open
      * one, and its ask-each-time entry. The server copy is not touched (budget picker).

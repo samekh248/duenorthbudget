@@ -424,6 +424,8 @@ class ShellViewModel(
     private val bankSyncTransport: BankSyncTransport = HttpBankSyncTransport(),
     private val developerMode: Boolean = false,
     internal val probe: ServerProbe = ServerProbe(),
+    /** Reschedules the background job when its interval changes in settings. */
+    private val onBackgroundSyncHours: (Int) -> Unit = {},
 ) : ViewModel() {
     internal val shellGate = RefreshGate<MonthShell>()
     private val registerGate = RefreshGate<RegisterPage>()
@@ -480,7 +482,8 @@ class ShellViewModel(
             resumeOnboarding()
             val id = _state.value.settings.openBudgetId ?: return@launch
             if (_state.value.locked) return@launch
-            withContext(Dispatchers.IO) { runCatching { sync.sync(id) } }
+            // Launch fetches the banks first, so the sync after sends what they brought to the server.
+            withContext(Dispatchers.IO) { runCatching { sync.syncBanksThenBudget(id) ?: sync.sync(id) } }
             reload()
         }
     }
@@ -2493,6 +2496,13 @@ class ShellViewModel(
         saveSettings(_state.value.settings.copy(style = id))
     }
 
+    /** Settings → server → background sync; the app reschedules the job when this changes. */
+    fun setBackgroundSyncHours(hours: Int) {
+        if (hours == _state.value.settings.backgroundSyncHours) return
+        saveSettings(_state.value.settings.copy(backgroundSyncHours = hours))
+        onBackgroundSyncHours(hours)
+    }
+
     /**
      * A server budget replaces whatever is on the phone. When other budgets are there, the
      * person sees which ones get cleared first; otherwise it opens straight away.
@@ -3139,11 +3149,17 @@ class ShellViewModel(
             library: BudgetLibrary,
             sync: SyncCoordinator,
             developerMode: Boolean = false,
+            onBackgroundSyncHours: (Int) -> Unit = {},
         ): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>): T {
                     @Suppress("UNCHECKED_CAST")
-                    return ShellViewModel(library, sync, developerMode = developerMode) as T
+                    return ShellViewModel(
+                        library,
+                        sync,
+                        developerMode = developerMode,
+                        onBackgroundSyncHours = onBackgroundSyncHours,
+                    ) as T
                 }
             }
     }

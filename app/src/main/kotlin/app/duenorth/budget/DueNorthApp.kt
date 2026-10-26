@@ -88,8 +88,8 @@ open class DueNorthApplication : Application() {
                 AndroidSecretStore(this),
                 BudgetClock.System,
             )
-        // Robolectric hosts have no work manager; the app still runs without the hourly sync.
-        runCatching { BackgroundSyncWorker.schedule(this) }
+        // Robolectric hosts have no work manager; the app still runs without the background sync.
+        runCatching { BackgroundSyncWorker.schedule(this, library.settings().backgroundSyncHours) }
     }
 
     lateinit var sync: SyncCoordinator
@@ -113,6 +113,7 @@ class MainActivity : ComponentActivity() {
                             application.library,
                             application.sync,
                             developerMode = application.developerMode,
+                            onBackgroundSyncHours = { hours -> runCatching { BackgroundSyncWorker.schedule(application, hours) } },
                         ),
                 )
             shellModel = model
@@ -463,6 +464,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onEncryption = model::showEncryption,
                                 onRequestAdvanced = model::requestAdvanced,
                                 phoneSettings = state.settings,
+                                onBackgroundSyncHours = model::setBackgroundSyncHours,
                                 scroll = state.settingsScroll,
                                 onScroll = model::saveSettingsScroll,
                                 modifier = fill,
