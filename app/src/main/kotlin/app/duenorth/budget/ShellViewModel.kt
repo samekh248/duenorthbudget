@@ -21,6 +21,7 @@ import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
 import app.duenorth.budget.core.InboxRow
+import app.duenorth.budget.core.ManageGroupRow
 import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MockBudgets
@@ -1351,6 +1352,7 @@ class ShellViewModel(
         name: String,
     ) {
         val budgetId = _state.value.settings.openBudgetId ?: return
+        if (name.isNotBlank()) renameOnPage { group -> if (group.id == groupId) group.copy(name = name.trim()) else group }
         applyEnvelopeEdit { sync.renameCategoryGroup(budgetId, groupId, name) }
     }
 
@@ -1359,7 +1361,23 @@ class ShellViewModel(
         name: String,
     ) {
         val budgetId = _state.value.settings.openBudgetId ?: return
+        if (name.isNotBlank()) {
+            renameOnPage { group ->
+                group.copy(categories = group.categories.map { if (it.id == categoryId) it.copy(name = name.trim()) else it })
+            }
+        }
         applyEnvelopeEdit { sync.renameEnvelopeCategory(budgetId, categoryId, name) }
+    }
+
+    /**
+     * A rename shows on the categories page as soon as it is saved: the write and the month read after it can
+     * wait behind a sync, and the row would show its old name until then. A blank name is refused, so it never shows.
+     */
+    private fun renameOnPage(rename: (ManageGroupRow) -> ManageGroupRow) {
+        _state.update { current ->
+            val manage = current.categoryManage ?: return@update current
+            current.copy(categoryManage = manage.copy(groups = manage.groups.map(rename)))
+        }
     }
 
     fun hideEnvelopeCategory(
@@ -2991,6 +3009,8 @@ class ShellViewModel(
             _state.update { it.copy(undoLabel = library.undoLabel(budgetId)) }
             when (result) {
                 is EditResult.Rejected -> {
+                    // Puts back anything the page showed before the write was refused, such as a rename.
+                    refreshCategoryManage(budgetId)
                     val month = editorMonth()
                     val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
                     _state.update { current ->
@@ -3007,6 +3027,8 @@ class ShellViewModel(
                 }
                 EditResult.Saved -> {
                     _state.update { it.copy(editError = null) }
+                    // The categories page first: it reads in a moment, while the month can take a while.
+                    refreshCategoryManage(budgetId)
                     val month = editorMonth()
                     val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
                     if (shell != null) {
@@ -3014,10 +3036,6 @@ class ShellViewModel(
                         _state.update { current ->
                             current.copy(shell = if (shellGate.gestureActive) current.shell else shell)
                         }
-                    }
-                    if (_state.value.route is ShellRoute.ManageCategories) {
-                        val manage = withContext(Dispatchers.IO) { sync.readCategoryManage(budgetId) }
-                        _state.update { it.copy(categoryManage = manage) }
                     }
                     if (!stayOnRoute) back()
                     withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
@@ -3031,6 +3049,12 @@ class ShellViewModel(
                 }
             }
         }
+    }
+
+    private suspend fun refreshCategoryManage(budgetId: String) {
+        if (_state.value.route !is ShellRoute.ManageCategories) return
+        val manage = withContext(Dispatchers.IO) { sync.readCategoryManage(budgetId) }
+        _state.update { it.copy(categoryManage = manage) }
     }
 
     private fun refreshSettingsSections() {
