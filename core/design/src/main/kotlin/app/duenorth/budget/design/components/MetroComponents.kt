@@ -2,6 +2,7 @@ package app.duenorth.budget.design.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -123,7 +124,10 @@ fun MetroText(
 @Composable
 fun Modifier.metroPress(onClick: () -> Unit): Modifier = metroPress(onClick, onLongClick = null)
 
-/** [metroPress] that also answers a long press, as list items do to start select mode. */
+/**
+ * [metroPress] that also answers a long press, as list items do to start select mode. The pressed item sinks
+ * in a little under a soft band, staying level, as Windows 10 Mobile's lists do.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Modifier.metroPress(
@@ -131,9 +135,14 @@ fun Modifier.metroPress(
     onLongClick: (() -> Unit)?,
 ): Modifier {
     val animations = Metro.animations
-    val pressedColor = if (Metro.colors.isDark) Color(0x73FFFFFF) else Color(0x40000000)
+    val pressedColor = if (Metro.colors.isDark) Color(0x29FFFFFF) else Color(0x1F000000)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val sink by animateFloatAsState(
+        if (pressed && animations) PRESSED_SINK else 1f,
+        if (animations) tween(PRESS_MS) else snap(),
+        label = "press",
+    )
     return this
         .combinedClickable(
             interactionSource = interaction,
@@ -142,9 +151,14 @@ fun Modifier.metroPress(
             onLongClick = onLongClick,
             onClick = onClick,
         ).graphicsLayer {
-            rotationZ = if (pressed && animations) 2.5f else 0f
+            scaleX = sink
+            scaleY = sink
         }.background(if (pressed) pressedColor else Color.Transparent)
 }
+
+/** How far a pressed item sinks: 3% smaller, so a full-width row pulls in from both screen edges. */
+private const val PRESSED_SINK = 0.97f
+private const val PRESS_MS = 100
 
 /**
  * What Enter does in a one-line [MetroField]: the app provides its form's save, so pressing Enter (or the
