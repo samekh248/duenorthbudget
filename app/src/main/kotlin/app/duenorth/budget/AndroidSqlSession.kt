@@ -1,7 +1,9 @@
 package app.duenorth.budget
 
 import android.database.Cursor
+import android.database.sqlite.SQLiteCursor
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteProgram
 import app.duenorth.budget.core.SessionOpener
 import app.duenorth.budget.core.SqlRow
 import app.duenorth.budget.core.SqlSession
@@ -20,18 +22,7 @@ class AndroidSqlSession(
     ) {
         val statement = database.compileStatement(sql)
         statement.use {
-            args.forEachIndexed { index, arg ->
-                val column = index + 1
-                when (arg) {
-                    null -> statement.bindNull(column)
-                    is Int -> statement.bindLong(column, arg.toLong())
-                    is Long -> statement.bindLong(column, arg)
-                    is Double -> statement.bindDouble(column, arg)
-                    is Float -> statement.bindDouble(column, arg.toDouble())
-                    is Boolean -> statement.bindLong(column, if (arg) 1 else 0)
-                    else -> statement.bindString(column, arg.toString())
-                }
-            }
+            statement.bind(args)
             val verb = sql.trimStart().take(6).uppercase()
             if (verb.startsWith("INSERT")) statement.executeInsert() else statement.executeUpdateDelete()
         }
@@ -41,8 +32,18 @@ class AndroidSqlSession(
         sql: String,
         args: List<Any?>,
     ): List<SqlRow> {
-        val bound = if (args.isEmpty()) null else args.map { it.toString() }.toTypedArray()
-        val cursor = database.rawQuery(sql, bound)
+        // Typed binds, as for exec: rawQuery's string arguments never equal a number worked out in SQL,
+        // so "t.date / 100 = ?" matched no rows.
+        val cursor =
+            database.rawQueryWithFactory(
+                { _, driver, table, query ->
+                    query.bind(args)
+                    SQLiteCursor(driver, table, query)
+                },
+                sql,
+                null,
+                "",
+            )
         cursor.use {
             val names = it.columnNames
             val rows = mutableListOf<SqlRow>()
@@ -70,6 +71,21 @@ class AndroidSqlSession(
             database.setTransactionSuccessful()
         } finally {
             database.endTransaction()
+        }
+    }
+}
+
+private fun SQLiteProgram.bind(args: List<Any?>) {
+    args.forEachIndexed { index, arg ->
+        val column = index + 1
+        when (arg) {
+            null -> bindNull(column)
+            is Int -> bindLong(column, arg.toLong())
+            is Long -> bindLong(column, arg)
+            is Double -> bindDouble(column, arg)
+            is Float -> bindDouble(column, arg.toDouble())
+            is Boolean -> bindLong(column, if (arg) 1 else 0)
+            else -> bindString(column, arg.toString())
         }
     }
 }
