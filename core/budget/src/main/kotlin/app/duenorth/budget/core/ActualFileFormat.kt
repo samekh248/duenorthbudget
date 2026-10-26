@@ -54,7 +54,14 @@ object ActualFileFormat {
             zip.write(database)
             zip.closeEntry()
             zip.putNextEntry(ZipEntry(METADATA))
-            zip.write(Json.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), metadata).toByteArray())
+            zip.write(
+                Json
+                    .encodeToString(
+                        kotlinx.serialization.json.JsonObject
+                            .serializer(),
+                        metadata,
+                    ).toByteArray(),
+            )
             zip.closeEntry()
         }
         return output.toByteArray()

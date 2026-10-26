@@ -294,7 +294,10 @@ class EnvelopeBook(
         return ShellReader.loadDetailed(session, monthView).categories[categoryId]?.availableMinor
     }
 
-    private fun newId(): String = java.util.UUID.randomUUID().toString()
+    private fun newId(): String =
+        java.util.UUID
+            .randomUUID()
+            .toString()
 
     private fun nextGroupOrder(): Double {
         val max =

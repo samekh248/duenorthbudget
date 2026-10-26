@@ -44,7 +44,10 @@ class MonthActionScreenshotTest {
 
     @Test
     fun breakdownPlansLight() =
-        snap("breakdown_plans_light", dark = false) { SectionTitled("BUDGET") { BreakdownScreen(october, withPlans, usd, showAhead = true) } }
+        snap(
+            "breakdown_plans_light",
+            dark = false,
+        ) { SectionTitled("BUDGET") { BreakdownScreen(october, withPlans, usd, showAhead = true) } }
 
     @Test
     fun breakdownPlansDark() =

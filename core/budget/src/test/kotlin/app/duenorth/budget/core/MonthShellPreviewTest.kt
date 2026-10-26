@@ -34,19 +34,62 @@ class MonthShellPreviewTest {
     fun assignPreviewMovesHeaderAndAvailable() {
         val next = shell.withBudgetedAssignment("a", 8_000L)
         assertEquals(47_000L, next.headerMinor)
-        assertEquals(8_000L, next.groups.first().categories.first { it.id == "a" }.availableMinor)
+        assertEquals(
+            8_000L,
+            next.groups
+                .first()
+                .categories
+                .first { it.id == "a" }
+                .availableMinor,
+        )
     }
 
     @Test
     fun movePreviewKeepsHeader() {
         val next = shell.withMoveAvailable("a", "b", 1_000L)
         assertEquals(shell.headerMinor, next.headerMinor)
-        assertEquals(4_000L, next.groups.first().categories.first { it.id == "a" }.availableMinor)
-        assertEquals(6_000L, next.groups.first().categories.first { it.id == "b" }.availableMinor)
+        assertEquals(
+            4_000L,
+            next.groups
+                .first()
+                .categories
+                .first { it.id == "a" }
+                .availableMinor,
+        )
+        assertEquals(
+            6_000L,
+            next.groups
+                .first()
+                .categories
+                .first { it.id == "b" }
+                .availableMinor,
+        )
         // Budgeted follows the move too, so the budget's budgeted column is right before the repaint.
-        val a = shell.groups.first().categories.first { it.id == "a" }
-        val b = shell.groups.first().categories.first { it.id == "b" }
-        assertEquals(a.budgetedMinor - 1_000L, next.groups.first().categories.first { it.id == "a" }.budgetedMinor)
-        assertEquals(b.budgetedMinor + 1_000L, next.groups.first().categories.first { it.id == "b" }.budgetedMinor)
+        val a =
+            shell.groups
+                .first()
+                .categories
+                .first { it.id == "a" }
+        val b =
+            shell.groups
+                .first()
+                .categories
+                .first { it.id == "b" }
+        assertEquals(
+            a.budgetedMinor - 1_000L,
+            next.groups
+                .first()
+                .categories
+                .first { it.id == "a" }
+                .budgetedMinor,
+        )
+        assertEquals(
+            b.budgetedMinor + 1_000L,
+            next.groups
+                .first()
+                .categories
+                .first { it.id == "b" }
+                .budgetedMinor,
+        )
     }
 }

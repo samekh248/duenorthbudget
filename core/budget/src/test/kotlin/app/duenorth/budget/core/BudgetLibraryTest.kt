@@ -105,7 +105,12 @@ class BudgetLibraryTest {
     fun aHundredRuleSaveIsQuickAndHeldDuringAGesture() {
         val library = library(tempRoot())
         val id = (library.createFromMock(MockBudgets.HOUSEHOLD) as CreateResult.Created).id
-        val account = library.readShell(id)!!.accounts.first().id
+        val account =
+            library
+                .readShell(id)!!
+                .accounts
+                .first()
+                .id
         repeat(100) {
             val condition = RulePart.condition("notes", "contains", kotlinx.serialization.json.JsonPrimitive("tag-$it"))
             val action = RulePart.action("category", "set", kotlinx.serialization.json.JsonPrimitive("c-food"))
@@ -132,7 +137,12 @@ class BudgetLibraryTest {
     fun undoOnThePanoramaIsQuickAndHeldDuringAGesture() {
         val library = library(tempRoot())
         val id = (library.createFromMock(MockBudgets.HOUSEHOLD) as CreateResult.Created).id
-        val account = library.readShell(id)!!.accounts.first().id
+        val account =
+            library
+                .readShell(id)!!
+                .accounts
+                .first()
+                .id
         repeat(11) { library.saveTransaction(id, TransactionDraft("u$it", account, 20261007, "Cafe", -1_000L * (it + 1), "c-food", null)) }
         library.undo(id)
         val gate = RefreshGate<MonthShell>()

@@ -15,7 +15,11 @@ class EnvelopeMonthTest {
             book.assignBudgeted(202610, "c-food", 12_000L)
             val shell = ShellReader.read(session, BudgetMetadata("home", "Home"), LocalDate.of(2026, 10, 7))
             assertEquals(38_000L, shell.headerMinor)
-            val food = shell.groups.first().categories.first { it.id == "c-food" }
+            val food =
+                shell.groups
+                    .first()
+                    .categories
+                    .first { it.id == "c-food" }
             assertEquals(12_000L, food.availableMinor)
         }
     }
@@ -30,8 +34,22 @@ class EnvelopeMonthTest {
             assertEquals(EnvelopeEditResult.Saved, book.moveAvailable(202610, "c-food", "c-fun", 1_500L))
             val after = ShellReader.read(session, BudgetMetadata("h", "H"), LocalDate.of(2026, 10, 7))
             assertEquals(before.headerMinor, after.headerMinor)
-            assertEquals(6_500L, after.groups.first().categories.first { it.id == "c-food" }.availableMinor)
-            assertEquals(3_500L, after.groups.first().categories.first { it.id == "c-fun" }.availableMinor)
+            assertEquals(
+                6_500L,
+                after.groups
+                    .first()
+                    .categories
+                    .first { it.id == "c-food" }
+                    .availableMinor,
+            )
+            assertEquals(
+                3_500L,
+                after.groups
+                    .first()
+                    .categories
+                    .first { it.id == "c-fun" }
+                    .availableMinor,
+            )
         }
     }
 
@@ -55,10 +73,28 @@ class EnvelopeMonthTest {
             val shell =
                 ShellReader.read(session, BudgetMetadata("h", "H"), LocalDate.of(2026, 10, 7))
             assertEquals("Spending", shell.groups.first().name)
-            assertTrue(shell.groups.first().categories.none { it.id == "c-fun" })
+            assertTrue(
+                shell.groups
+                    .first()
+                    .categories
+                    .none { it.id == "c-fun" },
+            )
             val manage = ShellReader.loadCategoryManage(session)
-            assertEquals("Food", manage.groups.first().categories.first { it.id == "c-food" }.name)
-            assertTrue(manage.groups.first().categories.first { it.id == "c-fun" }.hidden)
+            assertEquals(
+                "Food",
+                manage.groups
+                    .first()
+                    .categories
+                    .first { it.id == "c-food" }
+                    .name,
+            )
+            assertTrue(
+                manage.groups
+                    .first()
+                    .categories
+                    .first { it.id == "c-fun" }
+                    .hidden,
+            )
             assertEquals(EnvelopeEditResult.Saved, book.moveCategoryLater("c-food"))
             assertEquals(EnvelopeEditResult.Saved, book.moveGroupEarlier("g-exp"))
             session.exec(
@@ -79,11 +115,21 @@ class EnvelopeMonthTest {
             EnvelopeBook(session, clock).hideCategory("c-food", true)
             val shell =
                 ShellReader.read(session, BudgetMetadata("h", "H"), LocalDate.of(2026, 10, 7))
-            assertTrue(shell.groups.first().categories.none { it.id == "c-food" })
+            assertTrue(
+                shell.groups
+                    .first()
+                    .categories
+                    .none { it.id == "c-food" },
+            )
             EnvelopeBook(session, clock).hideCategory("c-food", false)
             val restored =
                 ShellReader.read(session, BudgetMetadata("h", "H"), LocalDate.of(2026, 10, 7))
-            assertTrue(restored.groups.first().categories.any { it.id == "c-food" })
+            assertTrue(
+                restored.groups
+                    .first()
+                    .categories
+                    .any { it.id == "c-food" },
+            )
         }
     }
 

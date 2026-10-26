@@ -51,6 +51,7 @@ object ImportFileParser {
         var amount: Long? = null
         var payee: String? = null
         var note: String? = null
+
         fun flush() {
             val d = date
             val a = amount
@@ -148,7 +149,11 @@ object ImportFileParser {
         tag: String,
     ): String? {
         val pattern = Regex("""<$tag>([^<\r\n]+)""", RegexOption.IGNORE_CASE)
-        return pattern.find(block)?.groupValues?.get(1)?.trim()
+        return pattern
+            .find(block)
+            ?.groupValues
+            ?.get(1)
+            ?.trim()
     }
 
     private fun parseOfxDate(raw: String): Int? {
@@ -164,7 +169,12 @@ object ImportFileParser {
         text: String,
         decimals: Int,
     ): ParseFileResult {
-        val lines = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+        val lines =
+            text
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toList()
         if (lines.isEmpty()) return ParseFileResult.Unreadable
         val header = lines.first().split(',').map { it.trim().lowercase() }
         val dateIdx = header.indexOfFirst { it == "date" }
