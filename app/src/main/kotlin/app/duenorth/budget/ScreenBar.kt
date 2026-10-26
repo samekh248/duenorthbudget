@@ -141,17 +141,13 @@ object ScreenBar {
                                 if (showClosed) AccountScreenCopy.HIDE_CLOSED else AccountScreenCopy.SHOW_CLOSED,
                             ),
                         ) + undo(undoLabel) + settings()
+                    // Add a transaction is the budget's one button; hold and categories follow edit budget in the menu.
                     mode == BudgetMode.TRACKING ->
-                        listOf(
-                            spec("categories", AppGlyph.Categories, "categories"),
-                            addTransaction(),
-                        ) + editBudget() + hidden(showHidden) + rules() + undo(undoLabel) + settings()
+                        listOf(addTransaction()) + editBudget() + categories() + hidden(showHidden) + rules() +
+                            undo(undoLabel) + settings()
                     else ->
-                        listOf(
-                            spec("hold", AppGlyph.Hold, "hold"),
-                            addTransaction(),
-                            spec("categories", AppGlyph.Categories, "categories"),
-                        ) + editBudget() + hidden(showHidden) + rules() + undo(undoLabel) + settings()
+                        listOf(addTransaction()) + editBudget() + hold() + categories() + hidden(showHidden) + rules() +
+                            undo(undoLabel) + settings()
                 }
             // Select mode swaps the register's bar for what can be done to the picked transactions.
             is ShellRoute.Register ->
@@ -349,6 +345,12 @@ object ScreenBar {
 
     /** Home `•••` → edit budget heads the budget's menu. */
     private fun editBudget() = listOf(menu("edit-budget", AppGlyph.Categories, BudgetEditCopy.EDIT))
+
+    /** Home `•••` → hold money for next month, envelope budgets only. */
+    private fun hold() = listOf(menu("hold", AppGlyph.Hold, "hold"))
+
+    /** Home `•••` → the categories page. */
+    private fun categories() = listOf(menu("categories", AppGlyph.Categories, "categories"))
 
     /** Home `•••` → bring hidden groups and categories back into the month, or leave them out again. */
     private fun hidden(shown: Boolean) =
