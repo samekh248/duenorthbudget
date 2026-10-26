@@ -135,7 +135,6 @@ class ShellScreenshotTest {
                     sample().copy(inbox = emptyList()),
                     section = HomeSections.headers.indexOf(HomeSections.INBOX),
                     style = style,
-                    onAdd = {},
                 )
             }
         }
@@ -256,7 +255,6 @@ class ShellScreenshotTest {
         netWorth: NetWorthPage? = null,
         prefs: FormatPrefs = FormatPrefs(),
         style: MetroStyle = MetroStyle.Metro,
-        onAdd: (() -> Unit)? = null,
         showAhead: Boolean = false,
         accountsReorder: Boolean = false,
     ) {
@@ -279,7 +277,6 @@ class ShellScreenshotTest {
                             inboxFiled = justFiled,
                             inboxSelection = selection,
                             netWorth = netWorth,
-                            onAddTransaction = onAdd,
                             showAhead = showAhead,
                             accountsReorder = accountsReorder,
                         )
@@ -294,7 +291,6 @@ class ShellScreenshotTest {
                                         )
                                     inbox ->
                                         listOf(
-                                            AppBarButton(AppGlyph.Add, "add", onClick = {}),
                                             AppBarButton(AppGlyph.Select, InboxCopy.SELECT, onClick = {}),
                                         )
                                     style.relief ->

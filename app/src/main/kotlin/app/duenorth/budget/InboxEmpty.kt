@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.relief
 import app.duenorth.budget.design.theme.Metro
@@ -37,7 +36,6 @@ import app.duenorth.budget.design.theme.Relief
 object InboxEmptyCopy {
     const val TITLE = "all caught up"
     const val BODY = "new and imported transactions wait here until you give them a category."
-    const val ADD = "add transaction"
 }
 
 /**
@@ -47,10 +45,7 @@ object InboxEmptyCopy {
  * sparkles take the accent.
  */
 @Composable
-fun InboxEmpty(
-    modifier: Modifier = Modifier,
-    onAdd: (() -> Unit)? = null,
-) {
+fun InboxEmpty(modifier: Modifier = Modifier) {
     Column(
         modifier.fillMaxSize().padding(MetroDimens.Gutter).testTag("inbox-empty"),
         verticalArrangement = Arrangement.Center,
@@ -66,10 +61,6 @@ fun InboxEmpty(
             color = Metro.colors.secondary,
             modifier = Modifier.padding(top = 8.dp).widthIn(max = 290.dp),
         )
-        if (onAdd != null) {
-            Spacer(Modifier.height(24.dp))
-            MetroButton(InboxEmptyCopy.ADD, onClick = onAdd)
-        }
     }
 }
 

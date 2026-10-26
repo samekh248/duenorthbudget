@@ -135,7 +135,6 @@ fun InboxSection(
     onListGesture: (Boolean) -> Unit,
     onInbox: (String) -> Unit = {},
     modifier: Modifier = Modifier,
-    onAdd: (() -> Unit)? = null,
     formatOptions: FormatOptions = formatOptions(),
     onAccept: (String) -> Unit = onInbox,
     filed: List<InboxFiled> = emptyList(),
@@ -156,7 +155,7 @@ fun InboxSection(
     if (entries.isEmpty() && pair == null) {
         Column(modifier.fillMaxSize()) {
             if (notice != null) MonthNotice(notice, Modifier.padding(horizontal = MetroDimens.Gutter))
-            InboxEmpty(Modifier.weight(1f), onAdd)
+            InboxEmpty(Modifier.weight(1f))
         }
         return
     }

@@ -612,6 +612,8 @@ fun TransactionForm(
     payees: List<String> = emptyList(),
     /** A new transaction's starting amount, signed: a reconcile's "add it" fills in what balances it. */
     initialAmountMinor: Long? = null,
+    /** A new transaction from home: no account until one is picked, rather than the first in the list. */
+    chooseAccount: Boolean = false,
 ) {
     val draftId = remember(row?.id, page.account.id) { row?.id ?: UUID.randomUUID().toString() }
     var date by remember(row?.id) {
@@ -632,9 +634,12 @@ fun TransactionForm(
     var expense by remember(row?.id) { mutableStateOf(startAmount?.let { it <= 0L } ?: true) }
     var note by remember(row?.id) { mutableStateOf(row?.note.orEmpty()) }
     var categoryId by remember(row?.id) { mutableStateOf(row?.categoryId ?: row?.partnerCategoryId) }
-    // The account the transaction sits in: the register's, or the one picked here (a new one from home starts on the first).
-    var accountId by remember(row?.id, page.account.id) { mutableStateOf(page.account.id) }
-    var cleared by remember(row?.id) { mutableStateOf(row?.cleared ?: true) }
+    // The account the transaction sits in: the register's, or the one picked here (a new one from home starts on none).
+    var accountId by remember(row?.id, page.account.id) {
+        mutableStateOf(if (chooseAccount && row == null) null else page.account.id)
+    }
+    // A new transaction starts uncleared, unless a reconcile's "add it" fills in one the statement already shows.
+    var cleared by remember(row?.id) { mutableStateOf(row?.cleared ?: (initialAmountMinor != null)) }
     val accountChoices =
         remember(page.accounts, page.account, accountId) {
             val open = page.accounts.filter { !it.closed || it.id == accountId }
@@ -642,7 +647,7 @@ fun TransactionForm(
             if (open.any { it.id == own.id } || accountId != own.id) open else listOf(own) + open
         }
     val account = page.accounts.firstOrNull { it.id == accountId }
-    val accountName = account?.name ?: page.account.name
+    val accountName = account?.name ?: if (accountId == null) TransactionFormCopy.NEW else page.account.name
     val offBudget = account?.offBudget ?: page.account.offBudget
     // The account this transaction transfers to or from, picked from the payee box (option C, #76).
     var transferTo by remember(row?.id) { mutableStateOf(row?.transferAccountId) }
@@ -681,12 +686,17 @@ fun TransactionForm(
             }
         return if (parts.sumOf { it.amountMinor } == total) parts to null else null to RegisterCopy.SPLIT_MUST_ADD
     }
-    val commit = {
+    val commit = commit@{
+        val target =
+            accountId ?: run {
+                fieldError = TransactionField.ACCOUNT to TransactionFormCopy.CHOOSE_ACCOUNT
+                return@commit
+            }
         when (
             val parsed =
                 RegisterEntry.transaction(
                     id = draftId,
-                    accountId = accountId,
+                    accountId = target,
                     date = date,
                     payee = transferAccount?.name ?: payee,
                     amountText = amount,
@@ -731,13 +741,18 @@ fun TransactionForm(
                 maxLines = 1,
                 softWrap = false,
             )
-            LabeledField(TransactionFormCopy.ACCOUNT, null, Modifier.padding(top = MetroDimens.FieldGroupGap)) {
-                MetroComboBox(
+            LabeledField(
+                TransactionFormCopy.ACCOUNT,
+                errorFor(TransactionField.ACCOUNT),
+                Modifier.padding(top = MetroDimens.FieldGroupGap),
+            ) {
+                MetroComboBox<String?>(
                     choices = accountChoices.map { it.id },
                     selected = accountId,
                     label = { id -> accountChoices.firstOrNull { it.id == id }?.name.orEmpty() },
                     onPick = { picked ->
                         accountId = picked
+                        if (fieldError?.first == TransactionField.ACCOUNT) fieldError = null
                         // A transfer can't go to the account it comes from.
                         if (transferTo == picked) {
                             transferTo = null
@@ -843,10 +858,10 @@ fun TransactionForm(
             }
             LabeledField(TransactionFormCopy.CLEARED, null, Modifier.padding(top = MetroDimens.FieldGroupGap)) {
                 MetroSegmentedToggle(
-                    first = TransactionFormCopy.CLEARED,
-                    second = TransactionFormCopy.UNCLEARED,
-                    firstSelected = cleared,
-                    onSelect = { cleared = it },
+                    first = TransactionFormCopy.UNCLEARED,
+                    second = TransactionFormCopy.CLEARED,
+                    firstSelected = !cleared,
+                    onSelect = { cleared = !it },
                     tag = "transaction-cleared",
                 )
             }
@@ -1086,10 +1101,13 @@ object TransactionFormCopy {
     const val ALSO_ADDS = "also adds to"
     const val ALSO_CHANGES = "also changes in"
     const val CLEAR_TRANSFER = "not a transfer"
+    const val NEW = "new transaction"
+    const val CHOOSE_ACCOUNT = "choose an account"
 }
 
 /** Which field a save refusal belongs to, so its message sits under that field (FR-022). */
 enum class TransactionField {
+    ACCOUNT,
     DATE,
     PAYEE,
     AMOUNT,

@@ -17,6 +17,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasParent
 import androidx.compose.ui.test.hasSetTextAction
@@ -391,10 +392,46 @@ class RegisterContentTest {
         compose.onNodeWithTag("transaction-account", useUnmergedTree = true).assertTextEquals("Cash")
         compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("Cafe")
         compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("5")
-        compose.onNodeWithTag("transaction-cleared-${TransactionFormCopy.UNCLEARED}").performScrollTo().performClick()
+        compose.onNodeWithTag("transaction-cleared-${TransactionFormCopy.CLEARED}").performScrollTo().performClick()
         compose.runOnIdle { host.save() }
         assertEquals("cash", saved?.accountId)
+        assertEquals(true, saved?.cleared)
+    }
+
+    // A new transaction starts uncleared, and uncleared is the first of the two.
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun aNewTransactionStartsUncleared() {
+        var saved: TransactionDraft? = null
+        val host = form(row = null, onSave = { saved = it })
+        compose.onNodeWithTag("transaction-cleared-${TransactionFormCopy.UNCLEARED}").performScrollTo().assertIsSelected()
+        compose.onNodeWithTag("transaction-cleared-${TransactionFormCopy.CLEARED}").assertIsNotSelected()
+        val left = { label: String -> compose.onNodeWithTag("transaction-cleared-$label").getUnclippedBoundsInRoot().left }
+        assertTrue(left(TransactionFormCopy.UNCLEARED) < left(TransactionFormCopy.CLEARED))
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("Cafe")
+        compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("5")
+        compose.runOnIdle { host.save() }
         assertEquals(false, saved?.cleared)
+    }
+
+    // From home the form has no account until one is picked, and saving without one asks for it.
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun aNewTransactionFromHomeWaitsForAnAccount() {
+        var saved: TransactionDraft? = null
+        val host = form(row = null, onSave = { saved = it }, chooseAccount = true)
+        compose.onNodeWithTag("transaction-account-picker-value").assertTextEquals("")
+        compose.onNodeWithTag("transaction-account", useUnmergedTree = true).assertTextEquals(TransactionFormCopy.NEW)
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("Cafe")
+        compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("5")
+        compose.runOnIdle { host.save() }
+        assertEquals(null, saved)
+        compose.onNodeWithText(TransactionFormCopy.CHOOSE_ACCOUNT).assertIsDisplayed()
+        compose.onNodeWithTag("transaction-account-picker-value").performClick()
+        compose.onNodeWithText("Cash").performClick()
+        compose.onNodeWithText(TransactionFormCopy.CHOOSE_ACCOUNT).assertDoesNotExist()
+        compose.runOnIdle { host.save() }
+        assertEquals("cash", saved?.accountId)
     }
 
     // Option A with no split assumed: the form has one category until add split adds lines, one per tap.
@@ -604,6 +641,7 @@ class RegisterContentTest {
         numberFormat: String = FormatOptions.NUMBER_COMMA_DOT,
         hideFraction: Boolean = false,
         onSave: (TransactionDraft) -> Unit = {},
+        chooseAccount: Boolean = false,
     ): FormSaveHost {
         val host = FormSaveHost()
         compose.setContent {
@@ -619,6 +657,7 @@ class RegisterContentTest {
                             dateFormat = dateFormat,
                             numberFormat = numberFormat,
                             hideFraction = hideFraction,
+                            chooseAccount = chooseAccount,
                         )
                     }
                 }

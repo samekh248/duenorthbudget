@@ -396,7 +396,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                 modifier = fill,
                                 onSelectMonth = model::selectOpenMonth,
                                 onBudgetCategory = if (state.shell == null) null else model::openCategoryBudget,
-                                onAddTransaction = if (state.shell == null) null else model::showAddTransaction,
                                 // Tapping to budget opens edit mode; in edit mode it opens the breakdown.
                                 onToBudget = if (state.shell == null) null else model::startBudgetEdit,
                                 showAhead = state.freeAfterPlansOn,
@@ -728,6 +727,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                     row = page.rows.firstOrNull { it.id == route.transactionId },
                                     initialDate = prefill?.dateIso ?: state.today,
                                     initialAmountMinor = prefill?.amountMinor,
+                                    chooseAccount = state.editFromHome,
                                     error = state.writeError,
                                     onSave = model::submitTransaction,
                                     modifier = fill,
