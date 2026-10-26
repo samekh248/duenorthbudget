@@ -63,6 +63,8 @@ object ScreenBar {
         showHidden: Boolean = false,
         selecting: Boolean = false,
         inboxSelecting: Boolean = false,
+        /** The open budget lives on a server this phone is signed in to, so the inbox menu can sync it. */
+        inboxSync: Boolean = false,
         bankLinked: Boolean = false,
         transaction: TransactionMenu = TransactionMenu.NEW,
         budgetEditing: Boolean = false,
@@ -122,7 +124,7 @@ object ScreenBar {
                         listOf(
                             spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT),
                             addTransaction(),
-                        ) + undo(undoLabel) + settings()
+                        ) + serverSync(inboxSync) + undo(undoLabel) + settings()
                     // Reorder happens in place on the accounts list; done is the only way on.
                     homeSection == HOME_ACCOUNTS && accountsReorder ->
                         listOf(spec("reorder", AppGlyph.Save, AccountScreenCopy.DONE))
@@ -295,6 +297,7 @@ object ScreenBar {
             state.settings.showHiddenCategories,
             state.registerSelection != null,
             state.inboxSelection != null,
+            state.signedIn && !state.cloudFileId.isNullOrBlank(),
             state.registerBankLinked,
             transactionMenu(state),
             state.budgetEdit != null,
@@ -373,6 +376,9 @@ object ScreenBar {
 
     /** Home `•••` → templates, only while experimental features and budget templates are both on (spec 010 US5). */
     private fun templates(on: Boolean) = if (on) listOf(menu("templates", AppGlyph.Average, TemplateCopy.TITLE)) else emptyList()
+
+    /** Inbox `•••` → sync: pulls in what other devices sent without waiting for the background job. */
+    private fun serverSync(on: Boolean) = if (on) listOf(menu("sync-server", AppGlyph.Sync, InboxCopy.SYNC)) else emptyList()
 
     /** Every home `•••` ends with settings, as WP8.1 apps put it last in the menu. */
     private fun settings() = listOf(menu("settings", AppGlyph.Settings, "settings"))
@@ -454,6 +460,7 @@ class ScreenBarHandlers(
     val onAcceptSelected: () -> Unit = {},
     val onCategorizeSelected: () -> Unit = {},
     val onEndInboxSelecting: () -> Unit = {},
+    val onSyncServer: () -> Unit = {},
     val onAddSplit: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
@@ -520,6 +527,7 @@ class ScreenBarHandlers(
             "unclear-selected" -> onUnclearSelected
             "end-selecting" -> onEndSelecting
             "select-inbox" -> onSelectInbox
+            "sync-server" -> onSyncServer
             "accept-selected" -> onAcceptSelected
             "categorize-selected" -> onCategorizeSelected
             "end-inbox-selecting" -> onEndInboxSelecting

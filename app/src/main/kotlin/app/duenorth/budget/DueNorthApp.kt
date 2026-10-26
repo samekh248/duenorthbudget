@@ -289,6 +289,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onAcceptSelected = model::acceptSelectedInbox,
                     onCategorizeSelected = model::categorizeSelectedInbox,
                     onEndInboxSelecting = model::endInboxSelecting,
+                    onSyncServer = model::syncInbox,
                     onCancel = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.cancelImport()
@@ -374,6 +375,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 inboxSelection = state.inboxSelection,
                                 onInboxToggle = model::toggleInboxSelected,
                                 inboxLead = state.inboxLead,
+                                inboxNotice = state.inboxSyncNotice,
                                 inboxActions =
                                     remember(model) {
                                         InboxActions(

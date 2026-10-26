@@ -109,6 +109,7 @@ object InboxCopy {
     const val SCHEDULE = "schedule"
     const val DELETE = "delete"
     const val GO_TO = "go to"
+    const val SYNC = "sync"
 }
 
 /** What a row's tap and long-press menu can do, beyond accept and categorize. */
@@ -143,6 +144,8 @@ fun InboxSection(
     selection: Set<String>? = null,
     onToggle: (String) -> Unit = {},
     lead: String? = null,
+    /** How the menu's sync went; one line under the totals. */
+    notice: String? = null,
 ) {
     // Both sides of a possible match wait in the pair panel, not in the queue.
     val paired = shell.matches.flatMapTo(mutableSetOf()) { it.ids }
@@ -151,7 +154,10 @@ fun InboxSection(
     val entries = inboxEntries(inbox, filed)
     var menu by remember { mutableStateOf<Pair<InboxRow, Rect>?>(null) }
     if (entries.isEmpty() && pair == null) {
-        InboxEmpty(modifier, onAdd)
+        Column(modifier.fillMaxSize()) {
+            if (notice != null) MonthNotice(notice, Modifier.padding(horizontal = MetroDimens.Gutter))
+            InboxEmpty(Modifier.weight(1f), onAdd)
+        }
         return
     }
     val list = rememberLazyListState()
@@ -207,6 +213,7 @@ fun InboxSection(
                 }
             }
         }
+        if (notice != null) MonthNotice(notice, Modifier.padding(bottom = 4.dp))
         // Select mode fades through: the panel and queue fade out, then the checked list fades in.
         AnimatedContent(
             selection,
