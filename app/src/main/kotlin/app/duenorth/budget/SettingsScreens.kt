@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.FormatPrefs
+import app.duenorth.budget.core.PhoneSettings
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
@@ -137,6 +138,7 @@ fun SettingsScreen(
     onLauncherIcon: (LauncherIcon) -> Unit = {},
     onLearning: (Boolean) -> Unit = {},
     onExperimentalFeature: (ExperimentalFeature, Boolean) -> Unit = { _, _ -> },
+    phoneSettings: PhoneSettings = PhoneSettings(),
     scroll: Map<SettingsPage, Int> = emptyMap(),
     onScroll: (SettingsPage, Int) -> Unit = { _, _ -> },
 ) {
@@ -200,6 +202,7 @@ fun SettingsScreen(
                                 prefs = formatPrefs,
                                 onExperimental = onExperimental,
                                 onFeature = onExperimentalFeature,
+                                phone = phoneSettings,
                             )
                     }
                 }

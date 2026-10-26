@@ -990,7 +990,21 @@ class ShellViewModel(
     fun setExperimentalFeature(
         feature: ExperimentalFeature,
         enabled: Boolean,
-    ) = setOpenBudgetPreference(feature.preference, if (enabled) "true" else "false")
+    ) {
+        val preference = feature.preference
+        if (preference == null) setPhoneFeature(feature, enabled) else setOpenBudgetPreference(preference, if (enabled) "true" else "false")
+    }
+
+    /** A feature with no Actual flag is this phone's setting; nothing goes into the budget file. */
+    private fun setPhoneFeature(
+        feature: ExperimentalFeature,
+        enabled: Boolean,
+    ) {
+        when (feature) {
+            ExperimentalFeature.FREE_AFTER_PLANS -> saveSettings(_state.value.settings.copy(freeAfterPlans = enabled))
+            ExperimentalFeature.TEMPLATES -> Unit
+        }
+    }
 
     /** `turn on` on the offer: the switch and every feature come on for the budget it asked about. */
     fun acceptExperimentalOffer() = answerExperimentalOffer(on = true)
@@ -1004,7 +1018,12 @@ class ShellViewModel(
         if (offer.current != on) {
             val value = if (on) "true" else "false"
             setBudgetPreference(offer.budgetId, "flags.experimental", value)
-            if (on) ExperimentalFeature.entries.forEach { setBudgetPreference(offer.budgetId, it.preference, value) }
+            if (on) {
+                ExperimentalFeature.entries.forEach { feature ->
+                    val preference = feature.preference
+                    if (preference == null) setPhoneFeature(feature, true) else setBudgetPreference(offer.budgetId, preference, value)
+                }
+            }
         }
         _state.update { it.copy(route = ShellRoute.Home) }
     }

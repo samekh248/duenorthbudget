@@ -15,24 +15,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.FormatPrefs
+import app.duenorth.budget.core.PhoneSettings
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import java.time.YearMonth
 
 /**
- * The features behind `flags.experimental`, each with its own Actual flag. All of them are
- * per budget: the flags are budget preferences, so they follow the file to every device.
+ * The features behind `flags.experimental`. Most have their own Actual flag, so they are per
+ * budget and follow the file to every device; one with no [preference] lives on this phone only.
  */
 enum class ExperimentalFeature(
     val label: String,
     val hint: String,
     val where: String,
     val tag: String,
-    /** The Actual budget preference that holds this feature's flag. */
-    val preference: String,
+    /** The Actual budget preference that holds this feature's flag; null when it is this phone's setting. */
+    val preference: String?,
 ) {
     TEMPLATES(
         "budget templates",
@@ -41,11 +43,22 @@ enum class ExperimentalFeature(
         "templates",
         "flags.goalTemplatesEnabled",
     ),
+    FREE_AFTER_PLANS(
+        "free after later plans",
+        "under to budget, how much is left once money already budgeted in later months comes out",
+        "budget → under to budget · the to budget breakdown · this phone only, nothing is saved to the budget",
+        "free-after-plans",
+        null,
+    ),
     ;
 
-    fun isOn(prefs: FormatPrefs): Boolean =
+    fun isOn(
+        prefs: FormatPrefs,
+        phone: PhoneSettings,
+    ): Boolean =
         when (this) {
             TEMPLATES -> prefs.goalTemplates
+            FREE_AFTER_PLANS -> phone.freeAfterPlans
         }
 }
 
@@ -128,6 +141,7 @@ internal fun ExperimentalItem(
     prefs: FormatPrefs,
     onExperimental: (Boolean) -> Unit,
     onFeature: (ExperimentalFeature, Boolean) -> Unit,
+    phone: PhoneSettings = PhoneSettings(),
 ) {
     Column(
         Modifier.testTag("experimental-screen"),
@@ -143,7 +157,7 @@ internal fun ExperimentalItem(
         MetroText(ExperimentalCopy.PER_BUDGET, Metro.typography.body)
         Heading(ExperimentalCopy.FEATURES)
         ExperimentalFeature.entries.forEach { feature ->
-            FeatureRow(feature, prefs, onFeature)
+            FeatureRow(feature, prefs, phone, onFeature)
         }
     }
 }
@@ -152,6 +166,7 @@ internal fun ExperimentalItem(
 private fun FeatureRow(
     feature: ExperimentalFeature,
     prefs: FormatPrefs,
+    phone: PhoneSettings,
     onFeature: (ExperimentalFeature, Boolean) -> Unit,
 ) {
     val usable = prefs.experimental
@@ -161,7 +176,7 @@ private fun FeatureRow(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (usable) {
-            SwitchRow(feature.label, feature.isOn(prefs), "experimental-${feature.tag}-switch") { onFeature(feature, it) }
+            SwitchRow(feature.label, feature.isOn(prefs, phone), "experimental-${feature.tag}-switch") { onFeature(feature, it) }
         } else {
             MetroText(feature.label, Metro.typography.subheader, color = ink)
         }
@@ -204,3 +219,25 @@ private fun Heading(text: String) {
         color = Metro.colors.secondary,
     )
 }
+
+/** Words for [ExperimentalFeature.FREE_AFTER_PLANS]: to budget less what later months already hold. */
+object FreeAfterPlansCopy {
+    const val PLANNED = "spoken for by later months"
+    const val FREE = "free after later plans"
+
+    /** `120.00 free after plans through december`, with the year once it differs from [open]'s. */
+    fun line(
+        amount: String,
+        open: YearMonth,
+        throughMonth: Int,
+    ): String {
+        val through = YearMonth.of(throughMonth / 100, throughMonth % 100)
+        val name = through.month.name.lowercase()
+        val label = if (through.year == open.year) name else "$name ${through.year}"
+        return "$amount free after plans through $label"
+    }
+}
+
+/** Experimental free-after-later-plans: on only with the master switch and this phone's setting. */
+val ShellUiState.freeAfterPlansOn: Boolean
+    get() = formatPrefs.experimental && settings.freeAfterPlans

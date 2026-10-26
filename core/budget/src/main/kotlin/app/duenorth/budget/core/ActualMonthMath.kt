@@ -52,6 +52,18 @@ object ActualMonthMath {
         val budgetedMinor: Long,
         val heldMinor: Long,
         val totalMinor: Long,
+        /** What later months' budgeting leaves of [totalMinor]; null when nothing later lowers it. */
+        val ahead: FuturePlans? = null,
+    )
+
+    /**
+     * To budget less what later months already spoken for: the lowest to-budget from the open
+     * month through the last month with data. App-only arithmetic, never written anywhere.
+     */
+    data class FuturePlans(
+        val freeMinor: Long,
+        /** The later month where to-budget bottoms out. */
+        val throughMonth: Int,
     )
 
     data class DetailedFigures(
@@ -59,6 +71,7 @@ object ActualMonthMath {
         val categories: Map<String, CategoryMonthStat>,
         val bufferedMinor: Long,
         val breakdown: MonthBreakdown? = null,
+        val ahead: FuturePlans? = null,
     )
 
     fun projectDetailed(
@@ -162,7 +175,9 @@ object ActualMonthMath {
         dataMonths.addAll(spent.keys.map { it.first })
         dataMonths.addAll(assignments.map { it.month })
         dataMonths.addAll(buffers.keys)
-        val months = monthsThrough(dataMonths.minOrNull()?.let { minOf(it, target) } ?: target, target)
+        // Runs on past the open month to the last month with data, so later budgeting shows as [FuturePlans].
+        val last = maxOf(target, dataMonths.maxOrNull() ?: target)
+        val months = monthsThrough(dataMonths.minOrNull()?.let { minOf(it, target) } ?: target, last)
 
         var previousLeft = HashMap<String, Long>()
         var previousCarry = HashMap<String, Boolean>()
@@ -173,6 +188,8 @@ object ActualMonthMath {
         var currentCarry = HashMap<String, Boolean>()
         var bufferedForTarget = 0L
         var breakdown: MonthBreakdown? = null
+        var toBudgetForTarget = 0L
+        var lowest: FuturePlans? = null
 
         for (month in months) {
             val incomeSum = income.sumOf { spent[month to it.id] ?: 0L }
@@ -200,6 +217,9 @@ object ActualMonthMath {
             toBudget = incomeSum + fromLast + lastOver + (-budgetedSum) - buffered
             if (month == target) {
                 breakdown = MonthBreakdown(incomeSum, fromLast, lastOver, -budgetedSum, -buffered, toBudget)
+                toBudgetForTarget = toBudget
+            } else if (month > target && toBudget < (lowest?.freeMinor ?: toBudgetForTarget)) {
+                lowest = FuturePlans(toBudget, month)
             }
 
             val left = HashMap<String, Long>()
@@ -215,8 +235,10 @@ object ActualMonthMath {
             previousCarry = carry
             previousToBudget = toBudget
             previousBuffered = buffered
-            currentLeft = left
-            currentCarry = carry
+            if (month == target) {
+                currentLeft = left
+                currentCarry = carry
+            }
         }
 
         val available = HashMap<String, Long>()
@@ -238,10 +260,11 @@ object ActualMonthMath {
         }
         val shown = groups.filter { !it.isIncome }.map { it.id }.toSet()
         return DetailedFigures(
-            figures = Figures(ShellCopy.TO_BUDGET, toBudget, available.filterKeys { it in shown }),
+            figures = Figures(ShellCopy.TO_BUDGET, toBudgetForTarget, available.filterKeys { it in shown }),
             categories = stats,
             bufferedMinor = bufferedForTarget,
-            breakdown = breakdown,
+            breakdown = breakdown?.copy(ahead = lowest),
+            ahead = lowest,
         )
     }
 

@@ -73,6 +73,8 @@ fun BreakdownScreen(
     breakdown: ActualMonthMath.MonthBreakdown,
     currency: CurrencySpec,
     modifier: Modifier = Modifier,
+    /** Experimental: what later months already budgeted, and what that leaves. */
+    showAhead: Boolean = false,
 ) {
     Column(
         modifier
@@ -103,6 +105,17 @@ fun BreakdownScreen(
             "breakdown-total",
             emphasis = true,
         )
+        val ahead = breakdown.ahead
+        if (showAhead && ahead != null) {
+            Spacer(Modifier.height(MetroDimens.Grid))
+            BreakdownLine(
+                FreeAfterPlansCopy.PLANNED,
+                ahead.freeMinor - breakdown.totalMinor,
+                currency,
+                "breakdown-planned",
+            )
+            BreakdownLine(FreeAfterPlansCopy.FREE, ahead.freeMinor, currency, "breakdown-free", emphasis = true)
+        }
     }
 }
 

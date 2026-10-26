@@ -40,6 +40,16 @@ class MonthActionScreenshotTest {
     @Test
     fun breakdownDark() = snap("breakdown_dark", dark = true) { SectionTitled("BUDGET") { BreakdownScreen(october, parts, usd) } }
 
+    private val withPlans = parts.copy(ahead = ActualMonthMath.FuturePlans(15_200, 202612))
+
+    @Test
+    fun breakdownPlansLight() =
+        snap("breakdown_plans_light", dark = false) { SectionTitled("BUDGET") { BreakdownScreen(october, withPlans, usd, showAhead = true) } }
+
+    @Test
+    fun breakdownPlansDark() =
+        snap("breakdown_plans_dark", dark = true) { SectionTitled("BUDGET") { BreakdownScreen(october, withPlans, usd, showAhead = true) } }
+
     @Test
     fun fillConfirmLight() = snap("fill_confirm_light", dark = false) { FillConfirm() }
 
