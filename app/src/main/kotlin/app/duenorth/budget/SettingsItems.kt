@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.BackgroundSync
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.DateFormats
 import app.duenorth.budget.core.FormatOptions
@@ -120,6 +121,8 @@ internal fun ServerItem(
     signedIn: Boolean,
     onMakeActive: (String) -> Unit,
     onRemove: (String) -> Unit,
+    backgroundSyncHours: Int = BackgroundSync.DEFAULT_HOURS,
+    onBackgroundSyncHours: (Int) -> Unit = {},
 ) {
     SettingsHeading("this phone syncs with", first = true)
     MetroText(
@@ -169,6 +172,18 @@ internal fun ServerItem(
                 }
             }
         }
+    }
+    // Only a server can be synced with, so the interval shows once one is active.
+    if (activeInstance != null) {
+        SettingsHeading("background sync", tag = "settings-background-sync")
+        ListPicker(
+            BackgroundSync.CHOICES,
+            backgroundSyncHours.takeIf { it in BackgroundSync.CHOICES } ?: BackgroundSync.DEFAULT_HOURS,
+            "settings-background-sync-picker",
+            BackgroundSync::label,
+            onBackgroundSyncHours,
+        )
+        MetroText(SettingsCopy.BACKGROUND_SYNC_HINT, Metro.typography.body, color = Metro.colors.secondary)
     }
 }
 

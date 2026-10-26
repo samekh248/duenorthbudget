@@ -76,6 +76,7 @@ object SettingsCopy {
     const val SIGNED_IN = "signed in"
     const val SIGNED_OUT = "signed out"
     const val NO_SERVER_HINT = "add the Actual server you run to sync this phone's budgets"
+    const val BACKGROUND_SYNC_HINT = "fetches linked banks, then syncs the open budget, while the app is closed"
     const val NO_BUDGET = "no budget open"
     const val EXPORT_HINT = "save a copy of this budget as a zip file"
     const val ENCRYPTED = "encrypted"
@@ -139,6 +140,7 @@ fun SettingsScreen(
     onLearning: (Boolean) -> Unit = {},
     onExperimentalFeature: (ExperimentalFeature, Boolean) -> Unit = { _, _ -> },
     phoneSettings: PhoneSettings = PhoneSettings(),
+    onBackgroundSyncHours: (Int) -> Unit = {},
     scroll: Map<SettingsPage, Int> = emptyMap(),
     onScroll: (SettingsPage, Int) -> Unit = { _, _ -> },
 ) {
@@ -168,6 +170,8 @@ fun SettingsScreen(
                                 signedIn = signedIn,
                                 onMakeActive = onMakeActive,
                                 onRemove = onRemoveInstance,
+                                backgroundSyncHours = phoneSettings.backgroundSyncHours,
+                                onBackgroundSyncHours = onBackgroundSyncHours,
                             )
                         SettingsPage.FORMAT ->
                             FormatItem(

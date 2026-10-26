@@ -128,6 +128,7 @@ class SyncCoordinator(
     /** Waits before each retry of a sync whose connection dropped; one entry per retry. */
     private val retryDelays: List<Long> = listOf(1_000L, 3_000L),
     private val pause: (Long) -> Unit = { Thread.sleep(it) },
+    private val bankTransport: BankSyncTransport = HttpBankSyncTransport(),
 ) {
     private val syncClock: SyncClock
     private val syncLock = Any()
@@ -407,8 +408,26 @@ class SyncCoordinator(
      */
     fun syncUnattended(): SyncResult? {
         val id = library.settings().openBudgetId ?: return null
-        if (!canSyncUnattended(id)) return null
-        return sync(id)
+        return syncBanksThenBudget(id)
+    }
+
+    /**
+     * Bank sync, then [sync], so what the banks sent goes to the server in the same run: at
+     * launch and from the background job. Null, with nothing fetched or sent, when the budget is
+     * kept only on the phone, the phone is signed out, or the file is locked.
+     */
+    fun syncBanksThenBudget(budgetId: String): SyncResult? {
+        if (!canSyncUnattended(budgetId)) return null
+        runCatching { syncBanks(budgetId) }
+        return sync(budgetId)
+    }
+
+    /** Fetches every bank-linked account of [budgetId] into the budget; null when it was left alone. */
+    fun syncBanks(budgetId: String): BankSyncSummary? {
+        if (!canSyncUnattended(budgetId)) return null
+        val token = syncToken() ?: return null
+        val address = activeAddress() ?: return null
+        return library.syncBankAccounts(budgetId, address, token, bankTransport, dates.today(), now())
     }
 
     /**

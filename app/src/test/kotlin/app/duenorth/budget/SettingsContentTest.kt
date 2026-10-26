@@ -77,6 +77,42 @@ class SettingsContentTest {
     }
 
     @Test
+    fun serverItemPicksTheBackgroundSyncInterval() {
+        var picked: Int? = null
+        compose.setContent {
+            MetroTheme {
+                androidx.compose.foundation.layout.Column {
+                    ServerItem(
+                        instances = listOf(home),
+                        activeInstance = home,
+                        instanceReachable = true,
+                        signedIn = true,
+                        onMakeActive = {},
+                        onRemove = {},
+                        onBackgroundSyncHours = { picked = it },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("every 3 hours").assertIsDisplayed()
+        compose.onNodeWithTag("settings-background-sync-picker").performClick()
+        compose.onNodeWithTag("settings-background-sync-picker-6").performClick()
+        assertEquals(6, picked)
+    }
+
+    @Test
+    fun serverItemHidesBackgroundSyncWithNoServer() {
+        compose.setContent {
+            MetroTheme {
+                androidx.compose.foundation.layout.Column {
+                    ServerItem(emptyList(), null, null, signedIn = false, onMakeActive = {}, onRemove = {})
+                }
+            }
+        }
+        compose.onNodeWithTag("settings-background-sync").assertDoesNotExist()
+    }
+
+    @Test
     fun headerTapOpensItsItemAndReportsIt() {
         var page: SettingsPage? = null
         show(SettingsPage.BUDGET, onPage = { page = it })
