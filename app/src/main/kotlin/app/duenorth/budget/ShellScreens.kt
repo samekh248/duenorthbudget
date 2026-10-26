@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,15 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetMode
@@ -79,7 +71,6 @@ import app.duenorth.budget.design.components.relief
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.Relief
-import kotlinx.coroutines.flow.first
 import java.time.YearMonth
 
 @Composable
@@ -162,7 +153,7 @@ fun HomePivot(
                         )
                     } else {
                         Column(Modifier.fillMaxSize()) {
-                            BudgetMonthTitle(
+                            MonthControl(
                                 month = openMonth,
                                 window = monthWindow,
                                 onSelect = onSelectMonth,
@@ -218,6 +209,10 @@ fun HomePivot(
     )
 }
 
+/**
+ * The open month, as on every screen that has one: the month between its arrows, centered as a group.
+ * Tapping the month opens a year of months to jump to.
+ */
 @Composable
 fun MonthControl(
     month: YearMonth,
@@ -236,13 +231,27 @@ fun MonthControl(
                 if (previous != null) {
                     MonthIconButton(AppGlyph.ChevronLeft, "month-previous") { onSelect(previous) }
                 }
-                MetroText(
-                    monthLabel(month),
-                    Metro.typography.subheader,
+                Row(
                     Modifier
+                        .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress { expanded = !expanded }
                         .testTag("month-label"),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    MetroText(monthLabel(month), Metro.typography.subheader, maxLines = 1, softWrap = false)
+                    // Says the month opens; turns over while it is open.
+                    Box(
+                        Modifier
+                            .graphicsLayer {
+                                scaleX = 0.7f
+                                scaleY = 0.7f
+                                rotationZ = if (expanded) 180f else 0f
+                            }.testTag("month-dropdown"),
+                    ) {
+                        AppGlyphIcon(AppGlyph.ChevronDown, color = Metro.colors.secondary)
+                    }
+                }
                 if (next != null) {
                     MonthIconButton(AppGlyph.ChevronRight, "month-next") { onSelect(next) }
                 }
@@ -255,7 +264,7 @@ fun MonthControl(
             }
         }
         if (expanded) {
-            MonthOptions(month, window) {
+            MonthGrid(month, window, calendar) {
                 onSelect(it)
                 expanded = false
             }
@@ -263,123 +272,86 @@ fun MonthControl(
     }
 }
 
-/** View title for the budget section: "october 2026 budget", opened as the month list. */
+/**
+ * A year of months on one panel, four to a row, with the year stepped by its own arrows.
+ * The open month is filled with the accent and this calendar month is in accent text; months
+ * outside the window are dimmed and can't be picked.
+ */
 @Composable
-private fun BudgetMonthTitle(
+private fun MonthGrid(
     month: YearMonth,
     window: MonthWindow,
+    calendar: YearMonth,
+    onSelect: (YearMonth) -> Unit,
+) {
+    var year by remember(month) { mutableIntStateOf(month.year) }
+    val earliest = window.oldest.year
+    val latest = window.newest.year
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = MetroDimens.Row)
+            .background(Metro.colors.chrome)
+            .padding(MetroDimens.Row)
+            .testTag("month-list"),
+    ) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(MetroDimens.TouchTarget)) {
+                    if (year > earliest) MonthIconButton(AppGlyph.ChevronLeft, "month-year-previous") { year -= 1 }
+                }
+                Box(Modifier.widthIn(min = 64.dp), contentAlignment = Alignment.Center) {
+                    MetroText(year.toString(), Metro.typography.body, Modifier.testTag("month-year"), color = Metro.colors.secondary)
+                }
+                Box(Modifier.size(MetroDimens.TouchTarget)) {
+                    if (year < latest) MonthIconButton(AppGlyph.ChevronRight, "month-year-next") { year += 1 }
+                }
+            }
+        }
+        (1..12).chunked(4).forEach { row ->
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                row.forEach { number ->
+                    val option = YearMonth.of(year, number)
+                    MonthCell(
+                        option = option,
+                        selected = option == month,
+                        current = option == calendar,
+                        enabled = window.contains(option),
+                        onSelect = onSelect,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MonthCell(
+    option: YearMonth,
+    selected: Boolean,
+    current: Boolean,
+    enabled: Boolean,
     onSelect: (YearMonth) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val phrase = monthLabel(month)
-    val style = Metro.typography.subheader
-    Column(modifier.fillMaxWidth()) {
-        SubcomposeLayout(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = MetroDimens.TouchTarget)
-                .semantics { heading() }
-                .metroPress { expanded = !expanded }
-                .testTag("month-label"),
-        ) { constraints ->
-            // Widths near Constraints.Infinity make this text measure about one pixel per character.
-            val loose = constraints.copy(minWidth = 0, minHeight = 0, maxWidth = 2_048)
-            val iconPx = 22.dp.roundToPx()
-            val gap = MetroDimens.Gutter.roundToPx()
-            val safety = 1.dp.roundToPx()
-            val maxW = constraints.maxWidth
-            val textAvail = (maxW - gap - iconPx - safety).coerceAtLeast(0)
-
-            fun textWidth(
-                id: String,
-                text: String,
-                textStyle: TextStyle,
-            ): Int =
-                subcompose(id) {
-                    MetroText(text, textStyle, Modifier.clearAndSetSemantics {}, maxLines = 1, softWrap = false)
-                }.first().measure(loose).width
-
-            val natural = textWidth("title-natural", phrase, style)
-            var scale = if (natural <= textAvail || natural == 0) 1f else textAvail.toFloat() / natural
-            val sized = textWidth("title-sized", phrase, style.at(scale))
-            if (sized > textAvail && sized > 0) {
-                scale *= (textAvail - safety).coerceAtLeast(0).toFloat() / sized
-            }
-            val title =
-                subcompose("title") {
-                    MetroText(phrase, style.at(scale), maxLines = 1, softWrap = false)
-                }.first().measure(loose)
-            val chevron =
-                subcompose("chevron") {
-                    Box(
-                        Modifier.graphicsLayer { rotationZ = if (expanded) 180f else 0f }.testTag("month-dropdown"),
-                    ) {
-                        AppGlyphIcon(AppGlyph.ChevronDown)
-                    }
-                }.first().measure(loose)
-            val height = maxOf(constraints.minHeight, title.height, chevron.height)
-            val width = if (maxW == Constraints.Infinity) title.width + gap + chevron.width + safety else maxW
-            layout(width, height) {
-                title.placeRelative(0, ((height - title.height) / 2).coerceAtLeast(0))
-                val iconX = (title.width + gap).coerceAtMost((width - chevron.width).coerceAtLeast(0))
-                chevron.placeRelative(iconX, ((height - chevron.height) / 2).coerceAtLeast(0))
-            }
+    val color =
+        when {
+            selected -> Metro.accent.onFill
+            !enabled -> Metro.colors.secondary.copy(alpha = 0.4f)
+            current -> Metro.accent.text
+            else -> Metro.colors.foreground
         }
-        if (expanded) {
-            MonthOptions(month, window) {
-                onSelect(it)
-                expanded = false
-            }
-        }
-    }
-}
-
-@Composable
-private fun MonthOptions(
-    month: YearMonth,
-    window: MonthWindow,
-    onSelect: (YearMonth) -> Unit,
-) {
-    // Open on the selected month with earlier months above it and later ones below.
-    val selected = window.months.indexOf(month).coerceAtLeast(0)
-    val list = rememberLazyListState(initialFirstVisibleItemIndex = selected)
-    LaunchedEffect(list) {
-        val info = snapshotFlow { list.layoutInfo }.first { it.visibleItemsInfo.isNotEmpty() }
-        val row = info.visibleItemsInfo.firstOrNull { it.index == selected } ?: return@LaunchedEffect
-        val viewport = info.viewportEndOffset - info.viewportStartOffset
-        list.scrollBy((row.offset + row.size / 2 - viewport / 2).toFloat())
-    }
-    LazyColumn(
-        Modifier
-            .fillMaxWidth()
-            .padding(top = MetroDimens.Gutter)
-            .heightIn(max = 288.dp)
-            .testTag("month-list"),
-        state = list,
+    Box(
+        modifier
+            .height(MetroDimens.TouchTarget)
+            .then(if (selected) Modifier.background(Metro.accent.fill) else Modifier)
+            .then(if (enabled) Modifier.metroPress { onSelect(option) } else Modifier)
+            .testTag("month-option-$option"),
+        contentAlignment = Alignment.Center,
     ) {
-        items(window.months, key = { it.toString() }) { option ->
-            MetroText(
-                monthLabel(option),
-                Metro.typography.body,
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = MetroDimens.TouchTarget)
-                    .metroPress { onSelect(option) }
-                    .padding(vertical = MetroDimens.Row)
-                    .testTag("month-option-$option"),
-                color = if (option == month) Metro.accent.text else Metro.colors.foreground,
-            )
-        }
+        MetroText(monthLabel(option).take(3), Metro.typography.body, color = color)
     }
-}
-
-private fun TextStyle.at(scale: Float): TextStyle {
-    if (scale >= 0.999f) return this
-    var next = copy(fontSize = fontSize * scale)
-    if (lineHeight != TextUnit.Unspecified) next = next.copy(lineHeight = lineHeight * scale)
-    if (letterSpacing != TextUnit.Unspecified) next = next.copy(letterSpacing = letterSpacing * scale)
-    return next
 }
 
 @Composable
