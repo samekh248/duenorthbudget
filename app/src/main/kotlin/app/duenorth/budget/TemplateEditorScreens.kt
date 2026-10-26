@@ -72,12 +72,13 @@ import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 // The template editor, option A of the design (template tiles): each template line in a category's note is a tile on
-// the category page; add picks a kind from a grid, and one form adds or edits a template with a live preview. Lines
+// the category page; add template, in the page's `•••` menu, picks a kind from a grid, and one form adds or edits a template with a live preview. Lines
 // are still written to the note, so Actual desktop reads them as before.
 
 object TemplateEditorCopy {
     const val SECTION = "templates"
     const val ADD = "add template"
+    const val EMPTY = "no templates yet. add one from the ••• menu."
     const val KINDS = "add template"
     const val KINDS_HINT = "what should this category get?"
     const val ASKS = "this month"
@@ -194,7 +195,6 @@ fun TemplateTiles(
     amounts: List<Long?>,
     currency: CurrencySpec,
     onOpen: (Int) -> Unit,
-    onAdd: () -> Unit,
     onMove: (Int, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -270,19 +270,8 @@ fun TemplateTiles(
                 onClick = { onOpen(index) },
             )
         }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .border(
-                    MetroDimens.Stroke,
-                    Metro.colors.secondary.copy(alpha = 0.5f),
-                    if (Metro.style.layers) RoundedCornerShape(8.dp) else RoundedCornerShape(0.dp),
-                ).metroPress(onAdd)
-                .testTag("template-add"),
-            contentAlignment = Alignment.Center,
-        ) {
-            MetroText("+  ${TemplateEditorCopy.ADD}", Metro.typography.control, color = Metro.colors.secondary)
+        if (split.entries.isEmpty()) {
+            MetroText(TemplateEditorCopy.EMPTY, Metro.typography.caption, color = Metro.colors.secondary)
         }
         if (split.entries.size > 1) {
             MetroText(TemplateEditorCopy.DRAG_HINT, Metro.typography.caption, color = Metro.colors.secondary)

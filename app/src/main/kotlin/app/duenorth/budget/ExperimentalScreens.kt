@@ -39,7 +39,7 @@ enum class ExperimentalFeature(
     TEMPLATES(
         "budget templates",
         "fill each category from a goal you set on it, with a goal bar on every budget row",
-        "a category's page → add template · budget edit ••• → templates",
+        "a category's page ••• → add template · budget edit ••• → templates",
         "templates",
         "flags.goalTemplatesEnabled",
     ),

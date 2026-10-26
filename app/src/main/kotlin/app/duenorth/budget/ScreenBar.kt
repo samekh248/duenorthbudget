@@ -220,7 +220,7 @@ object ScreenBar {
             is ShellRoute.RuleEditor ->
                 saveCancel() +
                     if (route.ruleId == null) emptyList() else listOf(menu("delete-rule", AppGlyph.Cancel, RuleScreenCopy.DELETE))
-            // The page itself carries no buttons: move sits with save, the rest in the menu.
+            // The page itself carries no buttons: move sits with save, the rest in the menu, add template first.
             is ShellRoute.CategoryBudget ->
                 if (incomeCategory) {
                     if (mode == BudgetMode.TRACKING) saveCancel() else autoHold()
@@ -228,6 +228,7 @@ object ScreenBar {
                     buildList {
                         addAll(saveCancel())
                         add(spec("move", AppGlyph.Transfer, EnvelopeCopy.MOVE))
+                        if (templates) add(menu("add-template", AppGlyph.Add, TemplateEditorCopy.ADD))
                         if (mode != BudgetMode.TRACKING) add(menu("to-budget", AppGlyph.Transfer, MonthActionCopy.TRANSFER))
                         add(menu("rollover", AppGlyph.Sync, if (rollover) "stop ${EnvelopeCopy.ROLLOVER}" else EnvelopeCopy.ROLLOVER))
                     }
@@ -468,6 +469,7 @@ class ScreenBarHandlers(
     val onCancelBudgetEdit: () -> Unit = {},
     val onSearch: () -> Unit = {},
     val onRemoveTemplate: () -> Unit = {},
+    val onAddTemplate: () -> Unit = {},
     val onMoveCategory: () -> Unit = {},
     val onRollover: (Boolean) -> Unit = {},
     val onAutoHold: (AutoHoldChoice) -> Unit = {},
@@ -537,6 +539,7 @@ class ScreenBarHandlers(
             "end-budget-edit" -> onEndBudgetEdit
             "cancel-budget-edit" -> onCancelBudgetEdit
             "remove-template" -> onRemoveTemplate
+            "add-template" -> onAddTemplate
             "move" -> onMoveCategory
             "rollover" -> ({ onRollover(!ScreenBar.rolloverOn(state)) })
             "auto-hold-on" -> ({ onAutoHold(AutoHoldChoice.ON) })
