@@ -155,25 +155,20 @@ class ShellContentTest {
         }
         compose.onNodeWithTag("budget-name").assertDoesNotExist()
         compose.onNodeWithText("Home").assertDoesNotExist()
-        // The same control as a category's budget page: arrows either side of the month, centered together.
-        compose.onNodeWithTag("month-previous").assertIsDisplayed()
-        compose.onNodeWithTag("month-next").assertIsDisplayed()
+        // The same control as a category's budget page: the month centered, with no step arrows.
+        compose.onNodeWithTag("month-previous").assertDoesNotExist()
+        compose.onNodeWithTag("month-next").assertDoesNotExist()
         compose.onNodeWithText("october 2026").assertIsDisplayed()
         val density = compose.density.density
         val title = compose.onNodeWithText("october 2026", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val previous = compose.onNodeWithTag("month-previous").fetchSemanticsNode().boundsInRoot
-        val next = compose.onNodeWithTag("month-next").fetchSemanticsNode().boundsInRoot
+        val label = compose.onNodeWithTag("month-label").fetchSemanticsNode().boundsInRoot
         val root = compose.onNodeWithTag("pivot").fetchSemanticsNode().boundsInRoot
         val header = compose.onNodeWithTag("pivot-header-1").fetchSemanticsNode().boundsInRoot
         val titleDp = title.height / density
         assertTrue("month reads as a subheader under the pivot header, ${titleDp}dp", titleDp >= 24f)
         assertTrue("month sits under the header row", title.top >= header.bottom)
-        val group = (previous.left + next.right) / 2
-        assertTrue("arrows and month are centered: $group vs ${root.center.x}", abs(group - root.center.x) <= 2f * density)
+        assertTrue("month is centered: $label vs ${root.center.x}", abs(label.center.x - root.center.x) <= 2f * density)
         compose.onNodeWithTag("to-budget").assertIsDisplayed()
-        compose.onNodeWithTag("month-next").performClick()
-        compose.onNodeWithText("november 2026").assertIsDisplayed()
-        compose.onNodeWithTag("month-previous").performClick()
         compose.onNodeWithTag("month-label").performClick()
         // A year of months on one panel, opened on the open month's year.
         compose.onNodeWithTag("month-list").assertIsDisplayed()
