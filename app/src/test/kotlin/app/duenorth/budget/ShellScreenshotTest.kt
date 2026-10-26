@@ -291,7 +291,11 @@ class ShellScreenshotTest {
                                         )
                                     inbox ->
                                         listOfNotNull(
-                                            AppBarButton(AppGlyph.Select, InboxCopy.SELECT, onClick = {}).takeIf { shown.inbox.isNotEmpty() },
+                                            AppBarButton(
+                                                AppGlyph.Select,
+                                                InboxCopy.SELECT,
+                                                onClick = {},
+                                            ).takeIf { shown.inbox.isNotEmpty() },
                                             AppBarButton(AppGlyph.Add, "add", onClick = {}),
                                         )
                                     style.relief ->
