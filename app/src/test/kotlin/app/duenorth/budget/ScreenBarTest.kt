@@ -24,7 +24,7 @@ class ScreenBarTest {
     @Test
     fun accountsBarOpensSchedules() {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_ACCOUNTS)
-        assertEquals(listOf("accounts", "add", "schedules"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add", "schedules"), specs.filter { it.primary }.map { it.id })
         assertEquals("schedules", specs.single { it.id == "schedules" }.label)
     }
 
@@ -108,8 +108,8 @@ class ScreenBarTest {
                 mode = BudgetMode.ENVELOPE,
                 homeSection = ScreenBar.HOME_ACCOUNTS,
             )
-        assertEquals(listOf("accounts", "add", "schedules"), specs.filter { it.primary }.map { it.id })
-        assertEquals(listOf("add-account", "settings"), specs.filter { !it.primary }.map { it.id })
+        assertEquals(listOf("add", "schedules"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add-account", "reorder", "show-closed", "settings"), specs.filter { !it.primary }.map { it.id })
     }
 
     @Test
@@ -306,7 +306,6 @@ class ScreenBarTest {
             listOf(
                 ShellRoute.Welcome,
                 ShellRoute.Register("a"),
-                ShellRoute.Accounts,
                 ShellRoute.Rules,
                 ShellRoute.Schedules,
                 ShellRoute.ScheduleDetails("s1"),

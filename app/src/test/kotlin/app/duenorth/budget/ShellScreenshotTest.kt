@@ -27,6 +27,7 @@ import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.asScreenActions
 import app.duenorth.budget.design.theme.MetroStyle
 import app.duenorth.budget.design.theme.MetroTheme
@@ -179,6 +180,26 @@ class ShellScreenshotTest {
         )
 
     @Test
+    fun accountsReorderLight() =
+        snap(
+            "accounts_reorder_light",
+            dark = false,
+            shell = sample().copy(accounts = manyAccounts()),
+            section = HomeSections.headers.indexOf(HomeSections.ACCOUNTS),
+            accountsReorder = true,
+        )
+
+    @Test
+    fun accountsReorderDark() =
+        snap(
+            "accounts_reorder_dark",
+            dark = true,
+            shell = sample().copy(accounts = manyAccounts()),
+            section = HomeSections.headers.indexOf(HomeSections.ACCOUNTS),
+            accountsReorder = true,
+        )
+
+    @Test
     fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX))
 
     @Test
@@ -237,8 +258,10 @@ class ShellScreenshotTest {
         style: MetroStyle = MetroStyle.Metro,
         onAdd: (() -> Unit)? = null,
         showAhead: Boolean = false,
+        accountsReorder: Boolean = false,
     ) {
         val inbox = section == HomeSections.headers.indexOf(HomeSections.INBOX)
+        val accounts = section == ScreenBar.HOME_ACCOUNTS
         val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
         val justFiled = if (filed) listOf(InboxFiled(shell.inbox.first(), 0, "Dining")) else emptyList()
         captureRoboImage("src/test/snapshots/$name.png") {
@@ -258,6 +281,7 @@ class ShellScreenshotTest {
                             netWorth = netWorth,
                             onAddTransaction = onAdd,
                             showAhead = showAhead,
+                            accountsReorder = accountsReorder,
                         )
                         MetroAppBar(
                             actions =
@@ -285,7 +309,20 @@ class ShellScreenshotTest {
                                             AppBarButton(AppGlyph.Sync, "sync", onClick = {}),
                                             AppBarButton(AppGlyph.Appearance, "appearance", onClick = {}),
                                         )
-                                }.asScreenActions(),
+                                }.asScreenActions().let { fake ->
+                                    if (!accounts) {
+                                        fake
+                                    } else {
+                                        ScreenBar
+                                            .specsFor(
+                                                ShellRoute.Home,
+                                                hasBudget = true,
+                                                mode = BudgetMode.ENVELOPE,
+                                                homeSection = ScreenBar.HOME_ACCOUNTS,
+                                                accountsReorder = accountsReorder,
+                                            ).map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} }
+                                    }
+                                },
                             expanded = false,
                             onExpandedChange = {},
                         )

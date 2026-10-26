@@ -23,7 +23,6 @@ class SectionTitleTest {
 
     @Test
     fun topLevelViewsGetNone() {
-        assertNull(title(ShellRoute.Accounts, homeSection = section(HomeSections.ACCOUNTS)))
         assertNull(title(ShellRoute.Rules))
         assertNull(title(ShellRoute.Payees, settingsReturn = true))
         assertNull(title(ShellRoute.Templates))

@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
@@ -134,7 +135,7 @@ class ShellContentTest {
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     @Config(sdk = [33], qualifiers = "w411dp-h891dp")
-    fun budgetTitleIsTheMonthDropdown() {
+    fun budgetMonthIsTheSharedMonthControl() {
         val shell = sample().copy(budgetName = "Home")
         val openMonth = mutableStateOf(shell.month)
         compose.setContent {
@@ -154,35 +155,40 @@ class ShellContentTest {
         }
         compose.onNodeWithTag("budget-name").assertDoesNotExist()
         compose.onNodeWithText("Home").assertDoesNotExist()
-        compose.onNodeWithTag("month-previous").assertDoesNotExist()
-        compose.onNodeWithTag("month-next").assertDoesNotExist()
+        // The same control as a category's budget page: arrows either side of the month, centered together.
+        compose.onNodeWithTag("month-previous").assertIsDisplayed()
+        compose.onNodeWithTag("month-next").assertIsDisplayed()
         compose.onNodeWithText("october 2026").assertIsDisplayed()
         val density = compose.density.density
         val title = compose.onNodeWithText("october 2026", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val dropdown = compose.onNodeWithTag("month-dropdown", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val previous = compose.onNodeWithTag("month-previous").fetchSemanticsNode().boundsInRoot
+        val next = compose.onNodeWithTag("month-next").fetchSemanticsNode().boundsInRoot
         val root = compose.onNodeWithTag("pivot").fetchSemanticsNode().boundsInRoot
         val header = compose.onNodeWithTag("pivot-header-1").fetchSemanticsNode().boundsInRoot
         val titleDp = title.height / density
         assertTrue("month reads as a subheader under the pivot header, ${titleDp}dp", titleDp >= 24f)
         assertTrue("month sits under the header row", title.top >= header.bottom)
-        assertTrue("dropdown follows the title: $title vs $dropdown", dropdown.left + 1f >= title.right)
-        assertTrue(
-            "dropdown shares the title row: $title vs $dropdown",
-            dropdown.top < title.bottom && title.top < dropdown.bottom,
-        )
-        assertTrue("dropdown stays inside the page", dropdown.right <= root.right - 12f * density + 1f)
+        val group = (previous.left + next.right) / 2
+        assertTrue("arrows and month are centered: $group vs ${root.center.x}", abs(group - root.center.x) <= 2f * density)
         compose.onNodeWithTag("to-budget").assertIsDisplayed()
+        compose.onNodeWithTag("month-next").performClick()
+        compose.onNodeWithText("november 2026").assertIsDisplayed()
+        compose.onNodeWithTag("month-previous").performClick()
         compose.onNodeWithTag("month-label").performClick()
+        // A year of months on one panel, opened on the open month's year.
         compose.onNodeWithTag("month-list").assertIsDisplayed()
-        // The list opens on the open month, with earlier months above and later months below.
-        val list = compose.onNodeWithTag("month-list").fetchSemanticsNode().boundsInRoot
-        val currentNode = compose.onNodeWithTag("month-option-2026-10")
-        currentNode.assertIsDisplayed()
-        val current = currentNode.fetchSemanticsNode().boundsInRoot
-        assertTrue("open month is centered: $current in $list", abs(current.center.y - list.center.y) <= current.height)
-        compose.onNodeWithTag("month-option-2026-09").assertIsDisplayed()
-        compose.onNodeWithTag("month-option-2026-11").assertIsDisplayed()
-        compose.onNodeWithTag("month-option-2024-10").assertDoesNotExist()
+        compose.onNodeWithTag("month-year", useUnmergedTree = true).assertTextEquals("2026")
+        for (number in 1..12) compose.onNodeWithTag("month-option-2026-%02d".format(number)).assertIsDisplayed()
+        compose.onNodeWithTag("month-year-next").performClick()
+        compose.onNodeWithTag("month-option-2027-03").assertIsDisplayed()
+        compose.onNodeWithTag("month-year-previous").performClick()
+        compose.onNodeWithTag("month-year-previous").performClick()
+        compose.onNodeWithTag("month-year-previous").performClick()
+        // The window starts at october 2024: no earlier year, and its earlier months can't be picked.
+        compose.onNodeWithTag("month-year-previous").assertDoesNotExist()
+        compose.onNodeWithTag("month-option-2024-09").assertHasNoClickAction()
+        compose.onNodeWithTag("month-year-next").performClick()
+        compose.onNodeWithTag("month-year-next").performClick()
         compose.onNodeWithTag("month-option-2026-08").performClick()
         compose.onNodeWithText("august 2026").assertIsDisplayed()
         compose.onNodeWithTag("month-list").assertDoesNotExist()

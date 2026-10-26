@@ -202,8 +202,6 @@ sealed interface ShellRoute {
     data object OnboardingFiles : ShellRoute
 
     // Spec 010 US2: account management.
-    data object Accounts : ShellRoute, StackRoute
-
     data object AddAccount : ShellRoute, StackRoute
 
     data class EditAccount(
@@ -734,7 +732,8 @@ class ShellViewModel(
     fun selectHomeSection(index: Int) {
         // Edit mode belongs to the budget item and holds the pivot still; leaving it anyway drops the changes.
         if (index != ScreenBar.HOME_BUDGET && _state.value.budgetEdit != null) cancelBudgetEdit()
-        _state.update { it.copy(homeSection = index) }
+        // Reorder mode belongs to the accounts item, so leaving it ends reorder too.
+        _state.update { it.copy(homeSection = index, accountsReorder = it.accountsReorder && index == ScreenBar.HOME_ACCOUNTS) }
     }
 
     fun selectSettingsPage(page: SettingsPage) {
@@ -1421,6 +1420,10 @@ class ShellViewModel(
         }
         if (current.inboxSelection != null && current.route == ShellRoute.Home && current.confirm == null) {
             endInboxSelecting()
+            return true
+        }
+        if (current.accountsReorder && current.route == ShellRoute.Home && current.confirm == null) {
+            _state.update { it.copy(accountsReorder = false) }
             return true
         }
         // Back is edit mode's cancel: it leaves without saving anything changed there.
