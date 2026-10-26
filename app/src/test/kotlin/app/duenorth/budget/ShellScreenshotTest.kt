@@ -295,11 +295,7 @@ class ShellScreenshotTest {
                                             AppBarButton(AppGlyph.Add, "add", onClick = {}),
                                         )
                                     style.relief ->
-                                        listOf(
-                                            AppBarButton(AppGlyph.Hold, "hold", onClick = {}),
-                                            AppBarButton(AppGlyph.Add, "add", onClick = {}),
-                                            AppBarButton(AppGlyph.Categories, "categories", onClick = {}),
-                                        )
+                                        listOf(AppBarButton(AppGlyph.Add, "add", onClick = {}))
                                     else ->
                                         listOf(
                                             AppBarButton(AppGlyph.Budgets, "budgets", onClick = {}),
