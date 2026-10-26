@@ -5,16 +5,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.ParityTestSupport.USD
 import app.duenorth.budget.ParityTestSupport.await
 import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.AccountDetail
+import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.AccountsCopy
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryChoice
+import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,6 +29,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.time.YearMonth
 
 /** Spec 010 T036: account screens, their bar entries, and the close gate. */
 @RunWith(RobolectricTestRunner::class)
@@ -41,62 +46,87 @@ class AccountContentTest {
     @Test
     fun barEntriesForAccountsAndRegister() {
         val home = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE).map { it.id }
-        assertFalse("accounts" in home)
-        val accountsSection =
-            ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_ACCOUNTS).map { it.id }
-        assertTrue("accounts" in accountsSection && "add-account" in accountsSection)
-        val accounts = ScreenBar.specsFor(ShellRoute.Accounts, true, BudgetMode.ENVELOPE)
-        assertEquals(listOf("add-account", "show-closed", "reorder"), accounts.map { it.id })
-        assertTrue(accounts.first().primary)
+        assertFalse("add-account" in home)
+        val accounts = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_ACCOUNTS)
+        assertEquals(listOf("add", "schedules", "add-account", "reorder", "show-closed", "settings"), accounts.map { it.id })
+        assertTrue(accounts.filter { it.id in listOf("add-account", "reorder", "show-closed") }.none { it.primary })
         assertEquals(
             AccountScreenCopy.HIDE_CLOSED,
-            ScreenBar.specsFor(ShellRoute.Accounts, true, BudgetMode.ENVELOPE, showClosed = true)[1].label,
+            ScreenBar
+                .specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, showClosed = true, homeSection = ScreenBar.HOME_ACCOUNTS)
+                .single { it.id == "show-closed" }
+                .label,
         )
+        val reordering =
+            ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_ACCOUNTS, accountsReorder = true)
+        assertEquals(listOf("reorder"), reordering.map { it.id })
+        assertEquals(AccountScreenCopy.DONE, reordering.single().label)
         val register = ScreenBar.specsFor(ShellRoute.Register("a1"), true, BudgetMode.ENVELOPE).map { it.id }
-        assertTrue("edit-account" in register && "close" in register)
+        assertTrue("edit-account" in register && "close" in register && "reopen" !in register)
+        val closedRegister = ScreenBar.specsFor(ShellRoute.Register("a1"), true, BudgetMode.ENVELOPE, accountClosed = true).map { it.id }
+        assertTrue("reopen" in closedRegister && "close" !in closedRegister)
     }
 
     @Test
-    fun closedAccountsShowOnlyWhenAskedAndOfferReopen() {
-        var reopened: String? = null
-        val showClosed = mutableStateOf(false)
+    fun reorderShowsHandlesAndADragMovesTheAccount() {
+        val rows =
+            listOf(
+                AccountRow("a1", "Checking", false, false, 120_000),
+                AccountRow("a2", "Savings", false, false, 50_000),
+                AccountRow("a3", "Visa", false, false, -2_500),
+            )
+        val shell =
+            MonthShell(
+                "b",
+                "Home",
+                BudgetMode.ENVELOPE,
+                USD,
+                YearMonth.of(2026, 10),
+                "to budget",
+                0,
+                groups = emptyList(),
+                accounts = rows,
+                inbox = emptyList(),
+            )
+        var opened: String? = null
+        var moved: Pair<String, String?>? = null
+        val reorder = mutableStateOf(false)
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(900.dp)) {
-                    AccountsScreen(
-                        accounts = listOf(checking, savings, house, old),
-                        currency = USD,
-                        showClosed = showClosed.value,
-                        reorder = false,
-                        onAccount = {},
-                        onMoveUp = {},
-                        onReopen = { reopened = it },
-                        onDoneReorder = {},
+                    AccountsSection(
+                        rows,
+                        shell,
+                        onListGesture = {},
+                        onAccount = { opened = it },
+                        reorder = reorder.value,
+                        onMove = { id, target -> moved = id to target },
                     )
                 }
             }
         }
-        compose.onNodeWithTag("accounts-screen").assertExists()
-        compose.onNodeWithTag("accounts-line-a4").assertDoesNotExist()
-        showClosed.value = true
+        compose.onNodeWithTag("account-handle-a1", useUnmergedTree = true).assertDoesNotExist()
+        reorder.value = true
         compose.waitForIdle()
-        compose.onNodeWithTag("account-reopen-a4").performClick()
-        assertEquals("a4", reopened)
-    }
-
-    @Test
-    fun reorderModeMovesInsteadOfOpening() {
-        var opened: String? = null
-        var moved: String? = null
-        compose.setContent {
-            MetroTheme {
-                AccountsScreen(listOf(checking, savings), USD, false, true, { opened = it }, { moved = it }, {}, {})
-            }
-        }
         compose.onNodeWithTag("accounts-reorder-hint", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("accounts-line-a2").performClick()
-        assertEquals("a2", moved)
+        compose.onNodeWithTag("account-a2").performClick()
         assertNull(opened)
+        compose.onNodeWithTag("account-handle-a1", useUnmergedTree = true).performTouchInput {
+            down(center)
+            moveBy(Offset(0f, 30f))
+            moveBy(Offset(0f, height * 2.4f))
+            up()
+        }
+        compose.waitForIdle()
+        assertEquals("a1" to null, moved)
+        compose.onNodeWithTag("account-handle-a3", useUnmergedTree = true).performTouchInput {
+            down(center)
+            moveBy(Offset(0f, -30f))
+            moveBy(Offset(0f, -height * 2.4f))
+            up()
+        }
+        compose.waitForIdle()
+        assertEquals("a3" to "a1", moved)
     }
 
     @Test
@@ -133,7 +163,7 @@ class AccountContentTest {
     fun addCloseAndReopenThroughTheModel() {
         val (model, library) = household("accounts")
         val budgetId = model.state.value.settings.openBudgetId!!
-        model.openAccounts()
+        model.reloadAccounts()
         await {
             model.state.value.accountsList
                 .isNotEmpty()
@@ -145,7 +175,7 @@ class AccountContentTest {
         await { model.state.value.editError != null }
         assertEquals(AccountsCopy.ENTER_NAME, model.state.value.editError)
         model.submitAddAccount("Wallet", offBudget = false, balanceText = "25")
-        await { model.state.value.route == ShellRoute.Accounts && model.state.value.accountsList.size == before + 1 }
+        await { model.state.value.route == ShellRoute.Home && model.state.value.accountsList.size == before + 1 }
         val wallet =
             model.state.value.accountsList
                 .single { it.name == "Wallet" }
@@ -174,7 +204,6 @@ class AccountContentTest {
                     .none { it.id == wallet.id }
         }
 
-        model.openAccounts()
         model.toggleShowClosedAccounts()
         await {
             model.state.value.settings.showClosedAccounts &&

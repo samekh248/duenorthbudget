@@ -367,7 +367,7 @@ private fun PriorityBadge(
 
 /** Two columns of dots: the tile can be held and dragged. */
 @Composable
-private fun Grip(modifier: Modifier = Modifier) {
+internal fun Grip(modifier: Modifier = Modifier) {
     val color = Metro.colors.secondary
     Canvas(modifier.size(width = 14.dp, height = 22.dp)) {
         val r = 1.5.dp.toPx()

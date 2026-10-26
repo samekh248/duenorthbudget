@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,9 +38,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.BudgetSummary
@@ -72,6 +77,7 @@ import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.Relief
 import java.time.YearMonth
+import kotlin.math.roundToInt
 
 @Composable
 fun HomePivot(
@@ -109,6 +115,9 @@ fun HomePivot(
     editError: String? = null,
     /** Experimental: the free-after-later-plans line under to budget. */
     showAhead: Boolean = false,
+    /** The accounts item's reorder mode: drag handles on its rows, and a drop moves the account. */
+    accountsReorder: Boolean = false,
+    onMoveAccount: (String, String?) -> Unit = { _, _ -> },
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
@@ -187,6 +196,8 @@ fun HomePivot(
                             onListGesture = { listGesture = it },
                             onAccount = onAccount,
                             formatOptions = formatOptions,
+                            reorder = accountsReorder,
+                            onMove = onMoveAccount,
                         )
                     }
                 },
@@ -202,8 +213,8 @@ fun HomePivot(
             ),
         modifier = modifier,
         initialItem = initialSection,
-        // Edit mode holds the pivot on the budget, so a stray swipe cannot leave it.
-        locked = budgetEdit != null,
+        // Edit mode holds the pivot on the budget, and reorder on the accounts, so a stray swipe cannot leave them.
+        locked = budgetEdit != null || accountsReorder,
         onGesture = { pagerGesture = it },
         onSelected = onSection,
     )
@@ -666,6 +677,8 @@ internal fun GroupHeading(
 /**
  * Accounts on the same ledger as the budget: a total up top, then on-budget and off-budget
  * groups with their totals, and closed accounts folded away at the bottom, as Actual does.
+ * In [reorder] mode each open account carries a handle on its left: drag it within its group, and the drop
+ * hands [onMove] the account and the one it now sits before (null when it lands last).
  */
 @Composable
 fun AccountsSection(
@@ -675,6 +688,8 @@ fun AccountsSection(
     onAccount: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     formatOptions: FormatOptions = formatOptions(),
+    reorder: Boolean = false,
+    onMove: (String, String?) -> Unit = { _, _ -> },
 ) {
     if (accounts.isEmpty()) {
         MetroText(
@@ -701,6 +716,20 @@ fun AccountsSection(
     val position = (groups.flatMap { it.third } + closed).withIndex().associate { it.value.id to it.index }
     var showClosed by rememberSaveable { mutableStateOf(false) }
     val money = { minor: Long -> MoneyFormat.format(minor, shell.currency, formatOptions) }
+    val drag = remember { AccountDrag() }
+    if (!reorder) drag.drop()
+    // A row while reorder is on: lifted and shifted by the drag, opened by nothing.
+    val line: @Composable (AccountRow, List<AccountRow>, Boolean) -> Unit = { account, rows, banded ->
+        AccountLine(
+            account,
+            money(account.balanceMinor),
+            if (reorder) ({}) else onAccount,
+            arrivalModifier(account.id, arrivals).then(if (reorder) drag.follow(account.id, rows) else Modifier),
+            banded = banded,
+            lifted = drag.dragging == account.id,
+            handle = if (reorder) drag.handle(account.id, rows, onMove) else null,
+        )
+    }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         BudgetTotal(
             label = ShellCopy.ALL_ACCOUNTS,
@@ -708,6 +737,14 @@ fun AccountsSection(
             amountColor = Metro.accent.text,
             amountTag = "accounts-total",
         )
+        if (reorder) {
+            MetroText(
+                AccountScreenCopy.REORDER_HINT,
+                Metro.typography.caption,
+                Modifier.padding(top = 4.dp).testTag("accounts-reorder-hint"),
+                color = Metro.colors.secondary,
+            )
+        }
         val cards = ledgerBlocks
         LazyColumn(
             Modifier
@@ -726,7 +763,7 @@ fun AccountsSection(
                                 MetroText(money(rows.sumOf { a -> a.balanceMinor }), Metro.typography.groupHeader, it)
                             }
                         }) {
-                            rows.forEach { AccountLine(it, money(it.balanceMinor), onAccount, arrivalModifier(it.id, arrivals)) }
+                            rows.forEach { line(it, rows, false) }
                         }
                         GroupGap()
                     }
@@ -739,15 +776,7 @@ fun AccountsSection(
                             MetroText(money(rows.sumOf { a -> a.balanceMinor }), Metro.typography.groupHeader, it)
                         }
                     }
-                    items(rows, key = { it.id }) {
-                        AccountLine(
-                            it,
-                            money(it.balanceMinor),
-                            onAccount,
-                            arrivalModifier(it.id, arrivals),
-                            banded = ledgerBanded(position.getValue(it.id)),
-                        )
-                    }
+                    items(rows, key = { it.id }) { line(it, rows, ledgerBanded(position.getValue(it.id))) }
                     item(key = "account-gap-$id") { GroupGap() }
                 }
             }
@@ -769,7 +798,7 @@ fun AccountsSection(
                         AccountLine(
                             it,
                             money(it.balanceMinor),
-                            onAccount,
+                            if (reorder) ({}) else onAccount,
                             arrivalModifier(it.id, arrivals),
                             dim = true,
                             banded = ledgerBanded(position.getValue(it.id)),
@@ -781,7 +810,73 @@ fun AccountsSection(
     }
 }
 
-/** One account under its group, in the category rows' body type, on a band when [banded]. */
+/** The account a reorder drag holds, how far it has travelled, and the row height that turns distance into places. */
+private class AccountDrag {
+    var dragging by mutableStateOf<String?>(null)
+    var offset by mutableFloatStateOf(0f)
+    var step by mutableFloatStateOf(1f)
+
+    fun drop() {
+        dragging = null
+        offset = 0f
+    }
+
+    /** Where the held account would land among [rows] if let go now. */
+    fun target(rows: List<AccountRow>): Int? {
+        val from = rows.indexOfFirst { it.id == dragging }.takeIf { it >= 0 } ?: return null
+        return (from + (offset / step).roundToInt()).coerceIn(0, rows.lastIndex)
+    }
+
+    /** The held row follows the finger; the rows it passes slide a place the other way. */
+    fun follow(
+        id: String,
+        rows: List<AccountRow>,
+    ): Modifier {
+        val from = rows.indexOfFirst { it.id == dragging }
+        val index = rows.indexOfFirst { it.id == id }
+        val to = target(rows)
+        val lifted = dragging == id
+        val shift =
+            when {
+                from < 0 || to == null || lifted -> 0f
+                index in (from + 1)..to -> -step
+                index in to until from -> step
+                else -> 0f
+            }
+        return Modifier
+            .then(if (lifted) Modifier else Modifier.onSizeChanged { step = it.height.toFloat() })
+            .zIndex(if (lifted) 1f else 0f)
+            .graphicsLayer { translationY = if (lifted) offset else shift }
+    }
+
+    /** The grip's own gesture: a drag straight away, no hold first, so the list keeps its scroll elsewhere. */
+    fun handle(
+        id: String,
+        rows: List<AccountRow>,
+        onMove: (String, String?) -> Unit,
+    ): Modifier =
+        Modifier.pointerInput(id, rows) {
+            detectDragGestures(
+                onDragStart = {
+                    dragging = id
+                    offset = 0f
+                },
+                onDrag = { change, amount ->
+                    change.consume()
+                    offset += amount.y
+                },
+                onDragEnd = {
+                    val from = rows.indexOfFirst { it.id == id }
+                    val to = target(rows) ?: from
+                    drop()
+                    if (from >= 0 && to != from) onMove(id, if (to < from) rows[to].id else rows.getOrNull(to + 1)?.id)
+                },
+                onDragCancel = { drop() },
+            )
+        }
+}
+
+/** One account under its group, in the category rows' body type, on a band when [banded]; [handle] adds a grip. */
 @Composable
 private fun AccountLine(
     account: AccountRow,
@@ -790,19 +885,35 @@ private fun AccountLine(
     modifier: Modifier = Modifier,
     dim: Boolean = false,
     banded: Boolean = false,
+    lifted: Boolean = false,
+    handle: Modifier? = null,
 ) {
     Box(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .ledgerFill(if (banded) ledgerBand else Color.Transparent)
-            .metroPress { onAccount(account.id) }
+            .ledgerFill(
+                when {
+                    lifted -> Metro.colors.chrome
+                    banded -> ledgerBand
+                    else -> Color.Transparent
+                },
+            ).metroPress { onAccount(account.id) }
             .testTag("account-${account.id}"),
     ) {
         Row(
             Modifier.fillMaxWidth().align(Alignment.CenterStart),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (handle != null) {
+                Box(
+                    handle
+                        .heightIn(min = MetroDimens.TouchTarget)
+                        .padding(end = 12.dp)
+                        .testTag("account-handle-${account.id}"),
+                    contentAlignment = Alignment.Center,
+                ) { Grip() }
+            }
             MetroText(
                 account.name,
                 Metro.typography.body,

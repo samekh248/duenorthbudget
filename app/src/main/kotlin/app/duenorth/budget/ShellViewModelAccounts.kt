@@ -10,13 +10,6 @@ import kotlinx.coroutines.withContext
 
 // Spec 010 US2 (T034): account management, as extensions of ShellViewModel. See contracts/accounts.md.
 
-/** Home `•••` → accounts. */
-fun ShellViewModel.openAccounts() {
-    push(ShellRoute.Accounts)
-    mutate { it.copy(accountsReorder = false, editError = null) }
-    reloadAccounts()
-}
-
 fun ShellViewModel.toggleShowClosedAccounts() {
     val settings = state.value.settings.let { it.copy(showClosedAccounts = !it.showClosedAccounts) }
     mutate { it.copy(settings = settings) }
@@ -27,6 +20,7 @@ fun ShellViewModel.toggleShowClosedAccounts() {
     }
 }
 
+/** Accounts `•••` → reorder, and its done: the home accounts list shows drag handles in between. */
 fun ShellViewModel.toggleReorderAccounts() {
     mutate { it.copy(accountsReorder = !it.accountsReorder) }
 }
@@ -169,24 +163,40 @@ fun ShellViewModel.reopenAccount(accountId: String) {
     }
 }
 
-/** In reorder mode a tap moves the account above the one before it on the same side of the budget. */
-fun ShellViewModel.moveAccountUp(accountId: String) {
-    val budgetId = state.value.settings.openBudgetId ?: return
-    val list = state.value.accountsList.filter { !it.closed }
-    val account = list.firstOrNull { it.id == accountId } ?: return
-    val side = list.filter { it.offBudget == account.offBudget }
-    val index = side.indexOfFirst { it.id == accountId }
-    if (index <= 0) return
-    val target = side[index - 1]
+/** Register `•••` → reopen, for a closed account's register. */
+fun ShellViewModel.reopenOpenAccount() {
+    val accountId = currentAccountId() ?: return
     mutate { current ->
-        val moved = current.accountsList.toMutableList()
-        val from = moved.indexOfFirst { it.id == accountId }
-        val to = moved.indexOfFirst { it.id == target.id }
-        if (from >= 0 && to >= 0) moved.add(to, moved.removeAt(from))
-        current.copy(accountsList = moved)
+        val register = current.register?.takeIf { it.account.id == accountId } ?: return@mutate current
+        current.copy(register = register.copy(account = register.account.copy(closed = false)))
     }
+    reopenAccount(accountId)
+}
+
+/**
+ * A drop from reorder mode: the account goes just before [targetId], or last on its side of the budget when
+ * [targetId] is null. The list moves before the write lands.
+ */
+fun ShellViewModel.moveAccount(
+    accountId: String,
+    targetId: String?,
+) {
+    val budgetId = state.value.settings.openBudgetId ?: return
+    val shell = state.value.shell ?: return
+    val account = shell.accounts.firstOrNull { it.id == accountId && !it.closed } ?: return
+    if (targetId == accountId) return
+    val moved = shell.accounts.toMutableList()
+    moved.removeAll { it.id == accountId }
+    val to =
+        if (targetId == null) {
+            moved.indexOfLast { !it.closed && it.offBudget == account.offBudget } + 1
+        } else {
+            moved.indexOfFirst { it.id == targetId }.takeIf { it >= 0 } ?: return
+        }
+    moved.add(to, account)
+    mutate { it.copy(shell = shell.copy(accounts = moved)) }
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { library.moveAccount(budgetId, accountId, target.id) }
+        withContext(Dispatchers.IO) { library.moveAccount(budgetId, accountId, targetId) }
         afterAccountWrite(budgetId, leave = false)
     }
 }

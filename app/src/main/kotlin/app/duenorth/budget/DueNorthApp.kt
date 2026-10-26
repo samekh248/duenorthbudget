@@ -299,13 +299,13 @@ fun DueNorthApp(model: ShellViewModel) {
                     onFill = { kind -> model.fillMonth(kind) },
                     onToBudget = model::openToBudget,
                     onUndo = model::undo,
-                    onAccounts = model::openAccounts,
                     onAddAccount = model::openAddAccount,
                     onShowClosed = model::toggleShowClosedAccounts,
                     onShowHidden = model::toggleShowHiddenCategories,
                     onReorder = model::toggleReorderAccounts,
                     onEditAccount = model::openEditAccount,
                     onCloseAccount = model::openCloseAccount,
+                    onReopenAccount = model::reopenOpenAccount,
                     onAddSchedule = model::openNewSchedule,
                     onRules = model::openRules,
                     onAddRule = model::openNewRule,
@@ -365,6 +365,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onGesture = model::setGesture,
                                 onSection = model::selectHomeSection,
                                 onAccount = model::openAccount,
+                                accountsReorder = state.accountsReorder,
+                                onMoveAccount = model::moveAccount,
                                 onInbox = model::openInbox,
                                 onAcceptInbox = model::acceptInbox,
                                 inboxFiled = state.inboxFiled,
@@ -905,24 +907,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                     currency = shell.currency,
                                     modifier = fill,
                                     showAhead = state.freeAfterPlansOn,
-                                )
-                            }
-                        }
-                        ShellRoute.Accounts -> {
-                            val shell = state.shell
-                            if (shell == null) {
-                                Placeholder()
-                            } else {
-                                AccountsScreen(
-                                    accounts = state.accountsList,
-                                    currency = shell.currency,
-                                    showClosed = state.settings.showClosedAccounts,
-                                    reorder = state.accountsReorder,
-                                    onAccount = model::openAccount,
-                                    onMoveUp = model::moveAccountUp,
-                                    onReopen = model::reopenAccount,
-                                    onDoneReorder = model::toggleReorderAccounts,
-                                    modifier = fill,
                                 )
                             }
                         }
