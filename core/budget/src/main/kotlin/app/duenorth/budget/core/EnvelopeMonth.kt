@@ -22,6 +22,24 @@ object EnvelopeCopy {
     const val MOVE_UP = "move up"
     const val MOVE_DOWN = "move down"
     const val ENTER_NAME = "enter a name"
+
+    // The category page: what is available, recent spending, and the month's budget.
+    const val AVAILABLE = "available"
+    const val SPENT = "spent"
+    const val LEFT = "left"
+    const val OVER = "over"
+    const val TEMPLATE = "template"
+    const val BUDGETED = "budgeted this month"
+    const val CARRIED_IN = "carried in"
+    const val FILLS_TEMPLATE = "fills template"
+    const val FILL_TEMPLATE = "fill to template"
+    const val RECENT = "recent"
+    const val THIS_MONTH = "this month"
+    const val NO_RECENT = "no transactions this month"
+    const val SEE_ALL = "see all"
+
+    /** Under the rollover switch: where a negative balance goes, named by the month after [month]. */
+    fun rolloverHint(month: YearMonth): String = "a negative balance carries into ${month.plusMonths(1).month.name.lowercase()}"
 }
 
 data class ManageCategoryRow(

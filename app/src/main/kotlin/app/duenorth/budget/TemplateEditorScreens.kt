@@ -92,7 +92,7 @@ object TemplateEditorCopy {
     const val PREVIEW = "this month"
     const val NEEDS = "fill in the amount"
     const val NO_SCHEDULES = "no schedules yet. add one under accounts, schedules."
-    const val NOTE = "note"
+    const val NOTE = "description"
 }
 
 /** A tile's two lines: what the template does, and how. */
