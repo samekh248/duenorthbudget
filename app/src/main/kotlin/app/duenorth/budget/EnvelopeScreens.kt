@@ -68,7 +68,6 @@ fun CategoryBudgetScreen(
     onSaveNote: (String) -> Unit = {},
     templateAmounts: List<Long?> = emptyList(),
     onOpenTemplate: (Int) -> Unit = {},
-    onAddTemplate: () -> Unit = {},
     onMoveTemplate: (Int, Int) -> Unit = { _, _ -> },
 ) {
     val category = shell.groups.flatMap { it.categories }.first { it.id == categoryId }
@@ -117,7 +116,6 @@ fun CategoryBudgetScreen(
                 templateAmounts,
                 shell.currency,
                 onOpenTemplate,
-                onAddTemplate,
                 onMoveTemplate,
                 Modifier.padding(top = 12.dp),
             )

@@ -226,6 +226,9 @@ class ScreenBarTest {
         assertEquals(EnvelopeCopy.ROLLOVER, specs.single { it.id == "rollover" }.label)
         val on = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, rollover = true)
         assertEquals("stop ${EnvelopeCopy.ROLLOVER}", on.single { it.id == "rollover" }.label)
+        // With templates on, add template heads the menu; the page itself has no add button.
+        val templates = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, templates = true)
+        assertEquals(listOf("add-template", "to-budget", "rollover", "settings"), templates.filterNot { it.primary }.map { it.id })
     }
 
     @Test

@@ -283,6 +283,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onEndSelecting = model::endSelecting,
                     onSearch = model::toggleRegisterSearch,
                     onRemoveTemplate = model::removeTemplate,
+                    onAddTemplate = { model.openTemplateKinds() },
                     onMoveCategory = model::openMoveCategory,
                     onRollover = model::toggleCategoryCarryover,
                     onAutoHold = model::chooseAutoHold,
@@ -841,7 +842,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                         onSaveNote = model::saveCategoryNoteText,
                                         templateAmounts = state.categoryTemplateAmounts,
                                         onOpenTemplate = model::openTemplate,
-                                        onAddTemplate = { model.openTemplateKinds() },
                                         onMoveTemplate = model::moveTemplate,
                                     )
                                     LaunchedEffect(state.categoryNote, shell.month) { model.refreshTemplateAmounts() }
