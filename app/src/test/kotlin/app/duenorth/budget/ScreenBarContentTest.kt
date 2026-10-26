@@ -120,4 +120,14 @@ class ScreenBarContentTest {
         compose.onNodeWithTag("behind").performClick()
         assertEquals(1, behind)
     }
+
+    @Test
+    fun aPageWithNoActionsShowsNoBar() {
+        compose.setContent {
+            MetroTheme {
+                Column { MetroAppBar(actions = emptyList(), expanded = false, onExpandedChange = {}) }
+            }
+        }
+        compose.onAllNodesWithTag("app-bar-ellipsis").assertCountEquals(0)
+    }
 }

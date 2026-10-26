@@ -1,6 +1,7 @@
 package app.duenorth.budget
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
@@ -8,6 +9,7 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.SavedInstance
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -37,6 +39,13 @@ class SettingsScreenshotTest {
 
     @Test
     fun formatDark() = snap("settings_format_dark", SettingsPage.FORMAT, dark = true)
+
+    // Format has no buttons and no menu, so the whole screen shows no app bar.
+    @Test
+    fun formatScreenLight() = screen("settings_format_screen_light", SettingsPage.FORMAT, dark = false)
+
+    @Test
+    fun formatScreenDark() = screen("settings_format_screen_dark", SettingsPage.FORMAT, dark = true)
 
     @Test
     fun appearanceLight() = snap("settings_appearance_light", SettingsPage.APPEARANCE, dark = false)
@@ -107,7 +116,15 @@ class SettingsScreenshotTest {
         dark: Boolean,
         budgetOpen: Boolean = true,
         prefs: FormatPrefs = FormatPrefs(),
-    ) = page(name, dark) {
+    ) = page(name, dark) { settingsScreen(settingsPage, dark, budgetOpen, prefs) }
+
+    @androidx.compose.runtime.Composable
+    private fun settingsScreen(
+        settingsPage: SettingsPage,
+        dark: Boolean,
+        budgetOpen: Boolean = true,
+        prefs: FormatPrefs = FormatPrefs(),
+    ) {
         SettingsScreen(
             page = settingsPage,
             instances = listOf(home, office),
@@ -141,6 +158,24 @@ class SettingsScreenshotTest {
             onEncryption = {},
             onRequestAdvanced = {},
         )
+    }
+
+    private fun screen(
+        name: String,
+        settingsPage: SettingsPage,
+        dark: Boolean,
+    ) {
+        val actions = ScreenBar.specsFor(ShellRoute.Settings, hasBudget = true, mode = null, settings = SettingsBar(page = settingsPage))
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Box(Modifier.width(390.dp).height(780.dp)) {
+                    ShellChrome(
+                        actions.map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                        statusBar = WindowInsets(0),
+                    ) { modifier -> Box(modifier) { settingsScreen(settingsPage, dark) } }
+                }
+            }
+        }
     }
 
     @androidx.compose.runtime.Composable

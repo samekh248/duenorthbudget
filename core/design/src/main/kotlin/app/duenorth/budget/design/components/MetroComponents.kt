@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.pager.HorizontalPager
@@ -514,6 +516,12 @@ fun MetroAppBar(
     /** The bar's chrome runs down behind these, and its buttons stay above them. */
     windowInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
+    // A page with no buttons and no menu shows no bar at all, only keeping its content clear of
+    // the system navigation bar.
+    if (actions.isEmpty()) {
+        Spacer(modifier.fillMaxWidth().windowInsetsBottomHeight(windowInsets).testTag("app-bar-none"))
+        return
+    }
     val colors = Metro.colors
     val primary = actions.filter { it.primary }
     val secondary = actions.filter { !it.primary }
