@@ -100,6 +100,22 @@ class AccountsBookTest {
         }
     }
 
+    // Accounts that arrive with no sort order all tie; a move must still land where it was dropped.
+    @Test
+    fun moveLandsWhenSortOrdersTie() =
+        withBook { book, session ->
+            book.create("Wallet", offBudget = false, balanceMinor = 0L)
+            book.create("Jar", offBudget = false, balanceMinor = 0L)
+            session.query("SELECT id FROM accounts").forEach { SyncSchema.write(session, "accounts", it.str("id")!!, "sort_order", 0.0) }
+            val onBudget = { book.list(includeClosed = false).filter { !it.offBudget }.map { it.id } }
+            val before = onBudget()
+            assertTrue(before.size >= 3)
+            // Down past a tied neighbour whose name sorts after it: the old midpoint tied again and the name put it back.
+            val mover = before.first()
+            assertEquals(AccountWriteResult.Saved(mover), book.move(mover, before.last()))
+            assertEquals(before.drop(1).dropLast(1) + mover + before.last(), onBudget())
+        }
+
     private fun messages(session: SqlSession): Int = session.query("SELECT timestamp FROM messages").size
 
     private fun withBook(block: (AccountsBook, SqlSession) -> Unit) {

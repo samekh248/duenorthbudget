@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -77,7 +78,6 @@ import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.Relief
 import java.time.YearMonth
-import kotlin.math.roundToInt
 
 @Composable
 fun HomePivot(
@@ -799,24 +799,38 @@ fun AccountsSection(
     }
 }
 
-/** The account a reorder drag holds, how far it has travelled, and the row height that turns distance into places. */
+/** The account a reorder drag holds, how far it has travelled, and each row's height, which turns distance into places. */
 private class AccountDrag {
     var dragging by mutableStateOf<String?>(null)
     var offset by mutableFloatStateOf(0f)
-    var step by mutableFloatStateOf(1f)
+    private val heights = mutableStateMapOf<String, Int>()
+
+    /** The group the held row was picked up in, as it was then: a repaint mid-drag must not cancel the gesture. */
+    private var held: List<AccountRow> = emptyList()
+
+    /** Each row's group as last drawn, read when a drag starts; the gesture itself is keyed by the row alone. */
+    private val groups = HashMap<String, List<AccountRow>>()
 
     fun drop() {
         dragging = null
         offset = 0f
+        held = emptyList()
     }
 
-    /** Where the held account would land among [rows] if let go now. */
+    /**
+     * Where the held account would land among [rows] if let go now: past every row whose middle its own middle
+     * has crossed. Rows differ in height (a long name wraps), so each is measured rather than assumed.
+     */
     fun target(rows: List<AccountRow>): Int? {
         val from = rows.indexOfFirst { it.id == dragging }.takeIf { it >= 0 } ?: return null
-        return (from + (offset / step).roundToInt()).coerceIn(0, rows.lastIndex)
+        val tops = rows.runningFold(0f) { top, row -> top + height(row.id) }
+        val middle = tops[from] + offset + height(rows[from].id) / 2f
+        return rows.indices.count { it != from && tops[it] + height(rows[it].id) / 2f < middle }
     }
 
-    /** The held row follows the finger; the rows it passes slide a place the other way. */
+    private fun height(id: String): Float = (heights[id] ?: heights.values.firstOrNull() ?: 1).toFloat()
+
+    /** The held row follows the finger; the rows it passes slide out of its way by its height. */
     fun follow(
         id: String,
         rows: List<AccountRow>,
@@ -825,15 +839,16 @@ private class AccountDrag {
         val index = rows.indexOfFirst { it.id == id }
         val to = target(rows)
         val lifted = dragging == id
+        val gap = if (from < 0) 0f else height(rows[from].id)
         val shift =
             when {
                 from < 0 || to == null || lifted -> 0f
-                index in (from + 1)..to -> -step
-                index in to until from -> step
+                index in (from + 1)..to -> -gap
+                index in to until from -> gap
                 else -> 0f
             }
         return Modifier
-            .then(if (lifted) Modifier else Modifier.onSizeChanged { step = it.height.toFloat() })
+            .onSizeChanged { heights[id] = it.height }
             .zIndex(if (lifted) 1f else 0f)
             .graphicsLayer { translationY = if (lifted) offset else shift }
     }
@@ -843,10 +858,12 @@ private class AccountDrag {
         id: String,
         rows: List<AccountRow>,
         onMove: (String, String?) -> Unit,
-    ): Modifier =
-        Modifier.pointerInput(id, rows) {
+    ): Modifier {
+        groups[id] = rows
+        return Modifier.pointerInput(id) {
             detectDragGestures(
                 onDragStart = {
+                    held = groups[id].orEmpty()
                     dragging = id
                     offset = 0f
                 },
@@ -855,14 +872,16 @@ private class AccountDrag {
                     offset += amount.y
                 },
                 onDragEnd = {
-                    val from = rows.indexOfFirst { it.id == id }
-                    val to = target(rows) ?: from
+                    val group = held
+                    val from = group.indexOfFirst { it.id == id }
+                    val to = target(group) ?: from
                     drop()
-                    if (from >= 0 && to != from) onMove(id, if (to < from) rows[to].id else rows.getOrNull(to + 1)?.id)
+                    if (from >= 0 && to != from) onMove(id, if (to < from) group[to].id else group.getOrNull(to + 1)?.id)
                 },
                 onDragCancel = { drop() },
             )
         }
+    }
 }
 
 /** One account under its group, in the category rows' body type, on a band when [banded]; [handle] adds a grip. */
