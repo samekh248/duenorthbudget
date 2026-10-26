@@ -80,6 +80,9 @@ data class RulePart(
 ) {
     fun toJson(): JsonObject = raw
 
+    /** The field as the file names it, such as `imported_description`. */
+    val storedField: String get() = (raw["field"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+
     companion object {
         fun condition(
             field: String,
@@ -443,6 +446,14 @@ object RuleValues {
             .filter { it.isNotEmpty() }
             .joinToString(" ")
     }
+
+    /** The value alone, as [describe] shows it: "Cafe", "-12.00", "10.00 and 20.00". */
+    fun valueText(
+        part: RulePart,
+        names: RuleNames,
+        decimals: Int,
+        format: FormatPrefs? = null,
+    ): String = shown(part.field, part.value, names, decimals, format)
 
     private fun shown(
         field: String,

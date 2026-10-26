@@ -40,15 +40,28 @@ fun MetroSegmentedToggle(
     tag: String,
     modifier: Modifier = Modifier,
 ) {
-    // Mica: the two options share a track on a layer card. Tile relief stands them up side by side.
+    MetroSegmentedToggle(listOf(first, second), if (firstSelected) 0 else 1, { onSelect(it == 0) }, tag, modifier)
+}
+
+/** The same joined buttons for three or more named options, such as a rule's first, normal and last. */
+@Composable
+fun MetroSegmentedToggle(
+    options: List<String>,
+    selected: Int,
+    onSelect: (index: Int) -> Unit,
+    tag: String,
+    modifier: Modifier = Modifier,
+) {
+    // Mica: the options share a track on a layer card. Tile relief stands them up side by side.
     val style = Metro.style
     val track = if (style.layers) Modifier.relief(Relief.Raised).padding(3.dp) else Modifier
     Row(
         modifier.height(IntrinsicSize.Min).then(track).testTag(tag),
         horizontalArrangement = Arrangement.spacedBy(if (style.relief && !style.layers) 10.dp else 0.dp),
     ) {
-        Segment(first, firstSelected, "$tag-$first") { onSelect(true) }
-        Segment(second, !firstSelected, "$tag-$second") { onSelect(false) }
+        options.forEachIndexed { index, label ->
+            Segment(label, index == selected, "$tag-$label") { onSelect(index) }
+        }
     }
 }
 
