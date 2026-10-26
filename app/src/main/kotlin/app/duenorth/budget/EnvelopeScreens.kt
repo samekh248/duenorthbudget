@@ -1,6 +1,7 @@
 package app.duenorth.budget
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -35,20 +38,25 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.CategoryMonthPage
 import app.duenorth.budget.core.CategoryRow
+import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MoneyMath
 import app.duenorth.budget.core.MonthShell
+import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import java.time.YearMonth
 
 @Composable
 fun CategoryBudgetScreen(
@@ -66,6 +74,9 @@ fun CategoryBudgetScreen(
     templateAmounts: List<Long?> = emptyList(),
     onOpenTemplate: (Int) -> Unit = {},
     onMoveTemplate: (Int, Int) -> Unit = { _, _ -> },
+    // The category's transactions this month, newest first; recent shows the top few once they are read.
+    recent: CategoryMonthPage? = null,
+    onSeeAll: () -> Unit = {},
 ) {
     val category = shell.groups.flatMap { it.categories }.first { it.id == categoryId }
     val prefs = LocalFormatPrefs.current
@@ -75,38 +86,46 @@ fun CategoryBudgetScreen(
     // "+500" typed over the amount adds to it. This box starts filled in, so a leading minus is a negative
     // amount ("-150"), not "take 150 off".
     val base = if (amount.trimStart().startsWith("-")) null else category.budgetedMinor
+    // What the templates ask this month, else the goal they last wrote; a #goal targets the balance, not the budget.
+    val template = templateAmounts.filterNotNull().takeIf { it.isNotEmpty() }?.sum() ?: category.goalMinor?.takeUnless { category.longGoal }
     Column(
         modifier
             .fillMaxSize()
             .background(Metro.colors.background)
             .verticalScroll(rememberScrollState())
             .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (showName) {
             MetroText(category.name, Metro.typography.header)
             MetroText(monthLabel(shell.month), Metro.typography.caption, color = Metro.colors.secondary)
+            Spacer(Modifier.height(MetroDimens.Grid))
         }
-        MetroText(
-            "available ${MoneyFormat.format(category.availableMinor, shell.currency, formatOptions())}",
-            Metro.typography.subheader,
+        // Only while budget templates are on (spec 010 US5): the note's own text heads the page, its template lines
+        // show as tiles with the budget.
+        if (note != null) {
+            CategoryNoteText(note, onSaveNote)
+            Spacer(Modifier.height(SECTION_GAP))
+        }
+        AvailableBar(category, template, shell.currency)
+        Spacer(Modifier.height(SECTION_GAP))
+        RecentSpending(recent?.takeIf { it.categoryId == categoryId && it.month == shell.month }, onSeeAll)
+        Spacer(Modifier.height(SECTION_GAP))
+        BudgetedField(
+            amount = amount,
+            onAmount = { amount = it },
+            carriedMinor = category.availableMinor - category.budgetedMinor - category.spentMinor,
+            template = template?.let { prefs.editSignedAmount(it, shell.currency.decimals) },
+            currency = shell.currency,
         )
-        MetroField(amount, { amount = it }, "budgeted", Modifier.testTag("category-budget-amount"))
-        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+        if (error != null) MetroText(error, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
         RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals, base = base)) }
-        // In the app the bar carries save, move and rollover; the buttons are for the page on its own.
+        // In the app the bar carries save and move; the buttons are for the page on its own.
         if (!formSaveOnBar()) {
-            MetroButtonGrid {
+            MetroButtonGrid(Modifier.padding(top = MetroDimens.Gutter)) {
                 MetroButton("save") { onSave(prefs.readAmount(amount, shell.currency.decimals, base = base)) }
                 MetroButton(EnvelopeCopy.MOVE, onClick = onMove)
-                MetroButton(
-                    if (category.carryover) "stop ${EnvelopeCopy.ROLLOVER}" else EnvelopeCopy.ROLLOVER,
-                ) {
-                    onToggleCarryover(!category.carryover)
-                }
             }
         }
-        // Only while budget templates are on (spec 010 US5): the note's template lines as tiles, then its own text.
         if (note != null) {
             TemplateTiles(
                 note,
@@ -116,8 +135,216 @@ fun CategoryBudgetScreen(
                 onMoveTemplate,
                 Modifier.padding(top = 12.dp),
             )
-            CategoryNoteText(note, onSaveNote, Modifier.padding(top = 12.dp))
         }
+        Spacer(Modifier.height(SECTION_GAP))
+        RolloverSwitch(category.carryover, shell.month, onToggleCarryover)
+    }
+}
+
+/** Air after each of the category page's sections; the budget and its templates sit closer, as one. */
+private val SECTION_GAP = 48.dp
+
+/**
+ * What is available, with a bar of the month's money: spent in the foreground, what is left in the accent, and a tick
+ * where the template's amount falls. Overspent, the over part is red and the legend names how far over.
+ */
+@Composable
+private fun AvailableBar(
+    category: CategoryRow,
+    template: Long?,
+    currency: CurrencySpec,
+) {
+    val options = formatOptions()
+    val spent = (-category.spentMinor).coerceAtLeast(0)
+    val left = category.availableMinor.coerceAtLeast(0)
+    val over = (-category.availableMinor).coerceAtLeast(0)
+    val total = (spent + left + over).coerceAtLeast(1)
+    val scale = maxOf(total, template ?: 0)
+    val track = Metro.colors.secondary.copy(alpha = 0.25f)
+    Column(Modifier.fillMaxWidth().testTag("category-available")) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+            MetroText(EnvelopeCopy.AVAILABLE, Metro.typography.caption, Modifier.weight(1f), color = Metro.colors.secondary)
+            MetroText(
+                MoneyFormat.format(category.availableMinor, currency, options),
+                Metro.typography.subheader,
+                Modifier.testTag("category-available-amount"),
+                color = if (category.availableMinor < 0) Metro.colors.error else Metro.colors.foreground,
+            )
+        }
+        Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(BAR_HEIGHT + 8.dp), contentAlignment = Alignment.CenterStart) {
+            Row(Modifier.fillMaxWidth().height(BAR_HEIGHT).background(track)) {
+                if (spent + left + over == 0L) return@Row
+                if (spent > 0) Box(Modifier.weight(spent.toFloat() / scale).fillMaxHeight().background(Metro.colors.foreground))
+                if (left > 0) Box(Modifier.weight(left.toFloat() / scale).fillMaxHeight().background(Metro.accent.fill))
+                if (over > 0) Box(Modifier.weight(over.toFloat() / scale).fillMaxHeight().background(Metro.colors.error))
+                if (scale > total) Spacer(Modifier.weight((scale - total).toFloat() / scale))
+            }
+            if (template != null && template > 0) {
+                val at = (template.toFloat() / scale).coerceIn(0f, 1f)
+                Row(Modifier.fillMaxSize()) {
+                    if (at > 0f) Spacer(Modifier.weight(at))
+                    Box(Modifier.width(2.dp).fillMaxHeight().background(Metro.accent.text))
+                    if (at < 1f) Spacer(Modifier.weight(1f - at))
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            LegendKey(Metro.colors.foreground, "${EnvelopeCopy.SPENT} ${MoneyFormat.format(spent, currency, options)}")
+            if (category.availableMinor < 0) {
+                LegendKey(Metro.colors.error, "${EnvelopeCopy.OVER} ${MoneyFormat.format(over, currency, options)}")
+            } else {
+                LegendKey(Metro.accent.fill, "${EnvelopeCopy.LEFT} ${MoneyFormat.format(left, currency, options)}")
+            }
+            if (template != null && template > 0) {
+                LegendKey(Metro.accent.text, "${EnvelopeCopy.TEMPLATE} ${MoneyFormat.format(template, currency, options)}", tick = true)
+            }
+        }
+    }
+}
+
+private val BAR_HEIGHT = 8.dp
+
+@Composable
+private fun LegendKey(
+    color: Color,
+    text: String,
+    tick: Boolean = false,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(if (tick) 2.dp else 10.dp).height(10.dp).background(color))
+        MetroText(text, Metro.typography.caption, Modifier.padding(start = 5.dp), color = Metro.colors.secondary, maxLines = 1)
+    }
+}
+
+/** The category's last few transactions this month, and a way to the whole month's list. */
+@Composable
+private fun RecentSpending(
+    page: CategoryMonthPage?,
+    onSeeAll: () -> Unit,
+) {
+    val options = formatOptions()
+    val dates = dateFormat()
+    Column(Modifier.fillMaxWidth().testTag("category-recent")) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+            MetroText(EnvelopeCopy.RECENT, Metro.typography.subheader, Modifier.weight(1f))
+            if (page != null && page.rows.isNotEmpty()) {
+                MetroText("${page.rows.size} ${EnvelopeCopy.THIS_MONTH}", Metro.typography.caption, color = Metro.colors.secondary)
+            }
+        }
+        if (page == null) return@Column
+        if (page.rows.isEmpty()) {
+            MetroText(EnvelopeCopy.NO_RECENT, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.colors.secondary)
+            return@Column
+        }
+        page.rows.take(RECENT_ROWS).forEach { row ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 40.dp)
+                    .testTag("category-recent-${row.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MetroText(
+                    RegisterEntry.registerDateLabel(row.date, dates),
+                    Metro.typography.caption,
+                    Modifier.widthIn(min = 56.dp).padding(end = 12.dp),
+                    color = Metro.colors.secondary,
+                    maxLines = 1,
+                )
+                MetroText(row.payee, Metro.typography.body, Modifier.weight(1f).padding(end = 12.dp), maxLines = 1)
+                MetroText(MoneyFormat.format(row.amountMinor, page.currency, options), Metro.typography.body, maxLines = 1)
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Metro.colors.secondary.copy(alpha = 0.25f)))
+        }
+        MetroText(
+            "${EnvelopeCopy.SEE_ALL} ›",
+            Metro.typography.body,
+            Modifier
+                .padding(top = 4.dp)
+                .heightIn(min = 40.dp)
+                .metroPress(onSeeAll)
+                .padding(vertical = 9.dp)
+                .testTag("category-see-all"),
+            color = Metro.accent.text,
+        )
+    }
+}
+
+private const val RECENT_ROWS = 3
+
+/**
+ * The month's budget, with what carried in from last month beside its label, and a key that fills the box with
+ * what the templates ask; once the box holds that amount the key stays lit to say so.
+ */
+@Composable
+private fun BudgetedField(
+    amount: String,
+    onAmount: (String) -> Unit,
+    carriedMinor: Long,
+    template: String?,
+    currency: CurrencySpec,
+) {
+    val label =
+        if (carriedMinor == 0L) {
+            EnvelopeCopy.BUDGETED
+        } else {
+            "${EnvelopeCopy.BUDGETED} · ${MoneyFormat.format(carriedMinor, currency, formatOptions())} ${EnvelopeCopy.CARRIED_IN}"
+        }
+    Column(Modifier.fillMaxWidth()) {
+        MetroText(label, Metro.typography.caption, Modifier.padding(bottom = MetroDimens.FieldLabelGap), color = Metro.colors.secondary)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            MetroField(amount, onAmount, "budgeted", Modifier.weight(1f).testTag("category-budget-amount"))
+            if (template != null) {
+                val filled = amount.trim() == template
+                Box(
+                    Modifier
+                        .heightIn(min = MetroDimens.TouchTarget)
+                        .then(
+                            if (filled) {
+                                Modifier.background(Metro.accent.fill)
+                            } else {
+                                Modifier.border(2.dp, Metro.colors.foreground)
+                            },
+                        ).metroPress { onAmount(template) }
+                        .padding(horizontal = 12.dp)
+                        .testTag("category-fill-template"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    MetroText(
+                        if (filled) "✓ ${EnvelopeCopy.FILLS_TEMPLATE}" else EnvelopeCopy.FILL_TEMPLATE,
+                        Metro.typography.body,
+                        color = if (filled) Metro.accent.onFill else Metro.colors.foreground,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Rollover overspending as an off/on pair, with a line on what it does. */
+@Composable
+private fun RolloverSwitch(
+    on: Boolean,
+    month: YearMonth,
+    onChange: (Boolean) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Metro.colors.secondary.copy(alpha = 0.25f)))
+        Row(Modifier.fillMaxWidth().padding(vertical = MetroDimens.Row), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                MetroText(EnvelopeCopy.ROLLOVER, Metro.typography.body)
+                MetroText(EnvelopeCopy.rolloverHint(month), Metro.typography.caption, color = Metro.colors.secondary)
+            }
+            MetroSegmentedToggle(
+                first = ExperimentalCopy.OFF,
+                second = ExperimentalCopy.ON,
+                firstSelected = !on,
+                onSelect = { first -> if (first == on) onChange(!first) },
+                tag = "category-rollover",
+            )
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Metro.colors.secondary.copy(alpha = 0.25f)))
     }
 }
 

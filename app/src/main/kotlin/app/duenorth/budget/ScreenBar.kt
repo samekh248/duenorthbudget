@@ -71,7 +71,6 @@ object ScreenBar {
         transaction: TransactionMenu = TransactionMenu.NEW,
         budgetEditing: Boolean = false,
         schedules: SchedulesBar = SchedulesBar(),
-        rollover: Boolean = false,
         accountsReorder: Boolean = false,
         accountClosed: Boolean = false,
     ): List<ScreenBarSpec> =
@@ -142,17 +141,13 @@ object ScreenBar {
                                 if (showClosed) AccountScreenCopy.HIDE_CLOSED else AccountScreenCopy.SHOW_CLOSED,
                             ),
                         ) + undo(undoLabel) + settings()
+                    // Add a transaction is the budget's one button; hold and categories follow edit budget in the menu.
                     mode == BudgetMode.TRACKING ->
-                        listOf(
-                            spec("categories", AppGlyph.Categories, "categories"),
-                            addTransaction(),
-                        ) + editBudget() + hidden(showHidden) + rules() + undo(undoLabel) + settings()
+                        listOf(addTransaction()) + editBudget() + categories() + hidden(showHidden) + rules() +
+                            undo(undoLabel) + settings()
                     else ->
-                        listOf(
-                            spec("hold", AppGlyph.Hold, "hold"),
-                            addTransaction(),
-                            spec("categories", AppGlyph.Categories, "categories"),
-                        ) + editBudget() + hidden(showHidden) + rules() + undo(undoLabel) + settings()
+                        listOf(addTransaction()) + editBudget() + hold() + categories() + hidden(showHidden) + rules() +
+                            undo(undoLabel) + settings()
                 }
             // Select mode swaps the register's bar for what can be done to the picked transactions.
             is ShellRoute.Register ->
@@ -223,7 +218,7 @@ object ScreenBar {
             is ShellRoute.RuleEditor ->
                 saveCancel() +
                     if (route.ruleId == null) emptyList() else listOf(menu("delete-rule", AppGlyph.Cancel, RuleScreenCopy.DELETE))
-            // The page itself carries no buttons: move sits with save, the rest in the menu, add template first.
+            // Move sits with save, the rest in the menu, add template first; rollover is a switch on the page.
             is ShellRoute.CategoryBudget ->
                 if (incomeCategory) {
                     if (mode == BudgetMode.TRACKING) saveCancel() else autoHold()
@@ -233,7 +228,6 @@ object ScreenBar {
                         add(spec("move", AppGlyph.Transfer, EnvelopeCopy.MOVE))
                         if (templates) add(menu("add-template", AppGlyph.Add, TemplateEditorCopy.ADD))
                         if (mode != BudgetMode.TRACKING) add(menu("to-budget", AppGlyph.Transfer, MonthActionCopy.TRANSFER))
-                        add(menu("rollover", AppGlyph.Sync, if (rollover) "stop ${EnvelopeCopy.ROLLOVER}" else EnvelopeCopy.ROLLOVER))
                     }
                 }
             ShellRoute.Create,
@@ -310,7 +304,6 @@ object ScreenBar {
                 calendar = state.schedulesCalendar,
                 open = state.scheduleDetails?.summary?.completed != true,
             ),
-            rolloverOn(state),
             state.accountsReorder,
             state.register
                 ?.account
@@ -324,16 +317,6 @@ object ScreenBar {
                 run = handlers.bind(spec.id, state),
             )
         }
-    }
-
-    /** Whether the category budget page's category rolls overspending over. */
-    fun rolloverOn(state: ShellUiState): Boolean {
-        val id = (state.route as? ShellRoute.CategoryBudget)?.categoryId ?: return false
-        return state.shell
-            ?.groups
-            ?.flatMap { it.categories }
-            ?.firstOrNull { it.id == id }
-            ?.carryover == true
     }
 
     private fun transactionMenu(state: ShellUiState): TransactionMenu {
@@ -362,6 +345,12 @@ object ScreenBar {
 
     /** Home `•••` → edit budget heads the budget's menu. */
     private fun editBudget() = listOf(menu("edit-budget", AppGlyph.Categories, BudgetEditCopy.EDIT))
+
+    /** Home `•••` → hold money for next month, envelope budgets only. */
+    private fun hold() = listOf(menu("hold", AppGlyph.Hold, "hold"))
+
+    /** Home `•••` → the categories page. */
+    private fun categories() = listOf(menu("categories", AppGlyph.Categories, "categories"))
 
     /** Home `•••` → bring hidden groups and categories back into the month, or leave them out again. */
     private fun hidden(shown: Boolean) =
@@ -475,7 +464,6 @@ class ScreenBarHandlers(
     val onRemoveTemplate: () -> Unit = {},
     val onAddTemplate: () -> Unit = {},
     val onMoveCategory: () -> Unit = {},
-    val onRollover: (Boolean) -> Unit = {},
     val onAutoHold: (AutoHoldChoice) -> Unit = {},
 ) {
     fun bind(
@@ -545,7 +533,6 @@ class ScreenBarHandlers(
             "remove-template" -> onRemoveTemplate
             "add-template" -> onAddTemplate
             "move" -> onMoveCategory
-            "rollover" -> ({ onRollover(!ScreenBar.rolloverOn(state)) })
             "auto-hold-on" -> ({ onAutoHold(AutoHoldChoice.ON) })
             "auto-hold-off-month" -> ({ onAutoHold(AutoHoldChoice.OFF_THIS_MONTH) })
             "auto-hold-off" -> ({ onAutoHold(AutoHoldChoice.OFF) })
