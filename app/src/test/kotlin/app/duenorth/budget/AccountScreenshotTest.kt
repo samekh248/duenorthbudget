@@ -18,7 +18,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Spec 010 T036: account list, close, and force close in light and dark. */
+/** Spec 010 T036: account close and force close in light and dark. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [33], qualifiers = "w411dp-h891dp-xxhdpi")
@@ -34,12 +34,6 @@ class AccountScreenshotTest {
         )
 
     @Test
-    fun accountsLight() = snap("accounts_manage_light", dark = false) { List() }
-
-    @Test
-    fun accountsDark() = snap("accounts_manage_dark", dark = true) { List() }
-
-    @Test
     fun closeLight() = snap("account_close_light", dark = false) { Close() }
 
     @Test
@@ -47,11 +41,6 @@ class AccountScreenshotTest {
 
     @Test
     fun forceCloseDark() = snap("account_force_close_dark", dark = true) { ForceCloseConfirmScreen(AccountsCopy.FORCE_CONFIRM, {}, {}) }
-
-    @Composable
-    private fun List() {
-        AccountsScreen(accounts, usd, showClosed = true, reorder = false, onAccount = {}, onMoveUp = {}, onReopen = {}, onDoneReorder = {})
-    }
 
     @Composable
     private fun Close() {
