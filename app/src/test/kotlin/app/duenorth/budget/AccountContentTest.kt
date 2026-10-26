@@ -46,7 +46,7 @@ class AccountContentTest {
             ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_ACCOUNTS).map { it.id }
         assertTrue("accounts" in accountsSection && "add-account" in accountsSection)
         val accounts = ScreenBar.specsFor(ShellRoute.Accounts, true, BudgetMode.ENVELOPE)
-        assertEquals(listOf("add-account", "show-closed", "reorder"), accounts.map { it.id })
+        assertEquals(listOf("add-account", "show-closed", "reorder", "settings"), accounts.map { it.id })
         assertTrue(accounts.first().primary)
         assertEquals(
             AccountScreenCopy.HIDE_CLOSED,

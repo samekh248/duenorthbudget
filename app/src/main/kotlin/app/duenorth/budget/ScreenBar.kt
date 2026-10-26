@@ -259,7 +259,7 @@ object ScreenBar {
             ShellRoute.BudgetPassword,
             -> saveCancel()
             else -> emptyList()
-        }
+        }.let { specs -> settingsLast(route, specs) }
 
     fun forState(
         state: ShellUiState,
@@ -368,6 +368,17 @@ object ScreenBar {
 
     /** Every home `•••` ends with settings, as WP8.1 apps put it last in the menu. */
     private fun settings() = listOf(menu("settings", AppGlyph.Settings, "settings"))
+
+    /** Every other page with a `•••` menu ends it with settings too; settings' own pages need no way to themselves. */
+    private fun settingsLast(
+        route: ShellRoute,
+        specs: List<ScreenBarSpec>,
+    ): List<ScreenBarSpec> =
+        if (route == ShellRoute.Settings || specs.all { it.primary }) {
+            specs
+        } else {
+            specs.filter { it.id != "settings" } + settings()
+        }
 
     /** Present only while there is a step to undo; the label names it. */
     private fun undo(label: String?) =

@@ -714,6 +714,8 @@ class ShellViewModel(
     }
 
     fun showSettings() {
+        // Edit mode's menu offers settings too; leaving for it drops the changes, as leaving the pivot item does.
+        if (_state.value.budgetEdit != null) cancelBudgetEdit()
         history.clear()
         _state.update {
             it.copy(
