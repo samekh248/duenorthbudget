@@ -2028,6 +2028,11 @@ class ShellViewModel(
 
     fun openReviewCategory(categoryId: String) {
         push(ShellRoute.ReviewCategory(categoryId))
+        loadCategoryMonth(categoryId)
+    }
+
+    /** Reads [categoryId]'s transactions in the open month: the review list, and the category page's recent. */
+    fun loadCategoryMonth(categoryId: String) {
         val budgetId = _state.value.settings.openBudgetId ?: return
         val month = _state.value.openMonth
         viewModelScope.launch {

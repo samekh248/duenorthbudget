@@ -285,7 +285,6 @@ fun DueNorthApp(model: ShellViewModel) {
                     onRemoveTemplate = model::removeTemplate,
                     onAddTemplate = { model.openTemplateKinds() },
                     onMoveCategory = model::openMoveCategory,
-                    onRollover = model::toggleCategoryCarryover,
                     onAutoHold = model::chooseAutoHold,
                     onSelectInbox = model::startInboxSelecting,
                     onAcceptSelected = model::acceptSelectedInbox,
@@ -843,8 +842,12 @@ fun DueNorthApp(model: ShellViewModel) {
                                         templateAmounts = state.categoryTemplateAmounts,
                                         onOpenTemplate = model::openTemplate,
                                         onMoveTemplate = model::moveTemplate,
+                                        recent = state.categoryMonth,
+                                        onSeeAll = { model.openReviewCategory(route.categoryId) },
                                     )
                                     LaunchedEffect(state.categoryNote, shell.month) { model.refreshTemplateAmounts() }
+                                    // Read again whenever the month's figures change, so a saved transaction shows.
+                                    LaunchedEffect(route.categoryId, shell) { model.loadCategoryMonth(route.categoryId) }
                                 }
                             }
                         }

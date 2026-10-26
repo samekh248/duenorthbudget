@@ -1,7 +1,6 @@
 package app.duenorth.budget
 
 import app.duenorth.budget.core.BudgetMode
-import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.TemplateKind
 import org.junit.Assert.assertEquals
@@ -231,13 +230,11 @@ class ScreenBarTest {
     fun categoryBudgetPutsItsButtonsOnTheBar() {
         val specs = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE)
         assertEquals(listOf("save", "cancel", "move"), specs.filter { it.primary }.map { it.id })
-        assertEquals(listOf("to-budget", "rollover", "settings"), specs.filterNot { it.primary }.map { it.id })
-        assertEquals(EnvelopeCopy.ROLLOVER, specs.single { it.id == "rollover" }.label)
-        val on = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, rollover = true)
-        assertEquals("stop ${EnvelopeCopy.ROLLOVER}", on.single { it.id == "rollover" }.label)
+        // Rollover is a switch on the page now, not a menu item.
+        assertEquals(listOf("to-budget", "settings"), specs.filterNot { it.primary }.map { it.id })
         // With templates on, add template heads the menu; the page itself has no add button.
         val templates = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, templates = true)
-        assertEquals(listOf("add-template", "to-budget", "rollover", "settings"), templates.filterNot { it.primary }.map { it.id })
+        assertEquals(listOf("add-template", "to-budget", "settings"), templates.filterNot { it.primary }.map { it.id })
     }
 
     @Test
@@ -265,7 +262,7 @@ class ScreenBarTest {
         routes.forEach { route ->
             val ids = ScreenBar.specsFor(route, hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
             assertEquals(route.toString(), listOf("save", "cancel"), ids.take(2))
-            assertTrue(route.toString(), ids.drop(2).all { it in setOf("to-budget", "move", "rollover", "settings") })
+            assertTrue(route.toString(), ids.drop(2).all { it in setOf("to-budget", "move", "settings") })
             assertFalse(ids.contains("hold"))
             // A form with a menu ends it with settings, like every menu; one without a menu gains none.
             assertEquals(route.toString(), ids.size > 3, ids.contains("settings"))
