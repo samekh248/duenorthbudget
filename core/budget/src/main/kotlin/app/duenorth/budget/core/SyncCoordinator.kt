@@ -787,23 +787,36 @@ class SyncCoordinator(
         groupId: String,
     ): EditResult = envelopeEdit(budgetId) { deleteGroup(groupId) }
 
-    fun moveCategoryGroupOrder(
+    fun hideCategoryGroup(
         budgetId: String,
         groupId: String,
-        earlier: Boolean,
-    ): EditResult =
-        envelopeEdit(budgetId) {
-            if (earlier) moveGroupEarlier(groupId) else moveGroupLater(groupId)
-        }
+        hidden: Boolean,
+    ): EditResult {
+        journaled(budgetId, UndoCopy.CATEGORY) { session ->
+            EnvelopeBook(session, syncClock).hideGroup(groupId, hidden)
+        } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
+        return EditResult.Saved
+    }
 
-    fun moveEnvelopeCategoryOrder(
+    fun moveCategoryToGroup(
         budgetId: String,
         categoryId: String,
-        earlier: Boolean,
-    ): EditResult =
-        envelopeEdit(budgetId) {
-            if (earlier) moveCategoryEarlier(categoryId) else moveCategoryLater(categoryId)
-        }
+        groupId: String,
+    ): EditResult = envelopeEdit(budgetId) { moveCategoryToGroup(categoryId, groupId) }
+
+    /** A drop from reorder: [groupId] goes before [targetId], or last when null. */
+    fun placeCategoryGroup(
+        budgetId: String,
+        groupId: String,
+        targetId: String?,
+    ): EditResult = envelopeEdit(budgetId) { placeGroup(groupId, targetId) }
+
+    /** A drop from reorder: [categoryId] goes before [targetId] in its group, or last when null. */
+    fun placeEnvelopeCategory(
+        budgetId: String,
+        categoryId: String,
+        targetId: String?,
+    ): EditResult = envelopeEdit(budgetId) { placeCategory(categoryId, targetId) }
 
     fun readCategoryManage(budgetId: String): CategoryManagePage? = library.readCategoryManage(budgetId)
 

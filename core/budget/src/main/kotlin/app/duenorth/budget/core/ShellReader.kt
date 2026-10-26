@@ -451,11 +451,22 @@ object ShellReader {
         val groups =
             session.query(
                 """
-                SELECT id, name, sort_order FROM category_groups
+                SELECT id, name, hidden, sort_order FROM category_groups
                 WHERE IFNULL(tombstone, 0) = 0 AND IFNULL(is_income, 0) = 0
                 ORDER BY sort_order, id
                 """.trimIndent(),
             )
+        // The same test as deleting one: any money budgeted, in either budget type, or any transaction.
+        val inUse =
+            session
+                .query(
+                    """
+                    SELECT category AS id FROM zero_budgets WHERE amount != 0
+                    UNION SELECT category FROM reflect_budgets WHERE amount != 0
+                    UNION SELECT category FROM transactions WHERE IFNULL(tombstone, 0) = 0 AND category IS NOT NULL
+                    """.trimIndent(),
+                ).mapNotNull { it.str("id") }
+                .toSet()
         val categories =
             session.query(
                 """
@@ -474,12 +485,15 @@ object ShellReader {
                         name = group.str("name").orEmpty(),
                         categories =
                             (byGroup[groupId] ?: emptyList()).map { row ->
+                                val id = row.str("id").orEmpty()
                                 ManageCategoryRow(
-                                    id = row.str("id").orEmpty(),
+                                    id = id,
                                     name = row.str("name").orEmpty(),
                                     hidden = row.bool("hidden"),
+                                    inUse = id in inUse,
                                 )
                             },
+                        hidden = group.bool("hidden"),
                     )
                 },
         )

@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,9 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -39,12 +36,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.BudgetSummary
@@ -705,7 +699,7 @@ fun AccountsSection(
     val position = (groups.flatMap { it.third } + closed).withIndex().associate { it.value.id to it.index }
     var showClosed by rememberSaveable { mutableStateOf(false) }
     val money = { minor: Long -> MoneyFormat.format(minor, shell.currency, formatOptions) }
-    val drag = remember { AccountDrag() }
+    val drag = remember { RowDrag() }
     if (!reorder) drag.drop()
     // A row while reorder is on: lifted and shifted by the drag, opened by nothing.
     val line: @Composable (AccountRow, List<AccountRow>, Boolean) -> Unit = { account, rows, banded ->
@@ -713,10 +707,10 @@ fun AccountsSection(
             account,
             money(account.balanceMinor),
             if (reorder) ({}) else onAccount,
-            arrivalModifier(account.id, arrivals).then(if (reorder) drag.follow(account.id, rows) else Modifier),
+            arrivalModifier(account.id, arrivals).then(if (reorder) drag.follow(account.id, rows.map { it.id }) else Modifier),
             banded = banded,
             lifted = drag.dragging == account.id,
-            handle = if (reorder) drag.handle(account.id, rows, onMove) else null,
+            handle = if (reorder) drag.handle(account.id, rows.map { it.id }, onMove) else null,
         )
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
@@ -795,91 +789,6 @@ fun AccountsSection(
                     }
                 }
             }
-        }
-    }
-}
-
-/** The account a reorder drag holds, how far it has travelled, and each row's height, which turns distance into places. */
-private class AccountDrag {
-    var dragging by mutableStateOf<String?>(null)
-    var offset by mutableFloatStateOf(0f)
-    private val heights = mutableStateMapOf<String, Int>()
-
-    /** The group the held row was picked up in, as it was then: a repaint mid-drag must not cancel the gesture. */
-    private var held: List<AccountRow> = emptyList()
-
-    /** Each row's group as last drawn, read when a drag starts; the gesture itself is keyed by the row alone. */
-    private val groups = HashMap<String, List<AccountRow>>()
-
-    fun drop() {
-        dragging = null
-        offset = 0f
-        held = emptyList()
-    }
-
-    /**
-     * Where the held account would land among [rows] if let go now: past every row whose middle its own middle
-     * has crossed. Rows differ in height (a long name wraps), so each is measured rather than assumed.
-     */
-    fun target(rows: List<AccountRow>): Int? {
-        val from = rows.indexOfFirst { it.id == dragging }.takeIf { it >= 0 } ?: return null
-        val tops = rows.runningFold(0f) { top, row -> top + height(row.id) }
-        val middle = tops[from] + offset + height(rows[from].id) / 2f
-        return rows.indices.count { it != from && tops[it] + height(rows[it].id) / 2f < middle }
-    }
-
-    private fun height(id: String): Float = (heights[id] ?: heights.values.firstOrNull() ?: 1).toFloat()
-
-    /** The held row follows the finger; the rows it passes slide out of its way by its height. */
-    fun follow(
-        id: String,
-        rows: List<AccountRow>,
-    ): Modifier {
-        val from = rows.indexOfFirst { it.id == dragging }
-        val index = rows.indexOfFirst { it.id == id }
-        val to = target(rows)
-        val lifted = dragging == id
-        val gap = if (from < 0) 0f else height(rows[from].id)
-        val shift =
-            when {
-                from < 0 || to == null || lifted -> 0f
-                index in (from + 1)..to -> -gap
-                index in to until from -> gap
-                else -> 0f
-            }
-        return Modifier
-            .onSizeChanged { heights[id] = it.height }
-            .zIndex(if (lifted) 1f else 0f)
-            .graphicsLayer { translationY = if (lifted) offset else shift }
-    }
-
-    /** The grip's own gesture: a drag straight away, no hold first, so the list keeps its scroll elsewhere. */
-    fun handle(
-        id: String,
-        rows: List<AccountRow>,
-        onMove: (String, String?) -> Unit,
-    ): Modifier {
-        groups[id] = rows
-        return Modifier.pointerInput(id) {
-            detectDragGestures(
-                onDragStart = {
-                    held = groups[id].orEmpty()
-                    dragging = id
-                    offset = 0f
-                },
-                onDrag = { change, amount ->
-                    change.consume()
-                    offset += amount.y
-                },
-                onDragEnd = {
-                    val group = held
-                    val from = group.indexOfFirst { it.id == id }
-                    val to = target(group) ?: from
-                    drop()
-                    if (from >= 0 && to != from) onMove(id, if (to < from) group[to].id else group.getOrNull(to + 1)?.id)
-                },
-                onDragCancel = { drop() },
-            )
         }
     }
 }
