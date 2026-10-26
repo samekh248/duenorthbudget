@@ -453,7 +453,9 @@ class AccountsBook(
                     order += SORT_INCREMENT
                 }
             }
-            val midpoint = if (before == null) target.second / 2 else (before.second + target.second) / 2
+            // Halve toward where the target now sits: Actual uses its old order, which a tie leaves equal to before's.
+            val shoved = updates.firstOrNull { it.first == target.first }?.second ?: target.second
+            val midpoint = if (before == null) shoved / 2 else (before.second + shoved) / 2
             return updates to midpoint
         }
 
