@@ -221,8 +221,8 @@ fun HomePivot(
 }
 
 /**
- * The open month, as on every screen that has one: the month between its arrows, centered as a group.
- * Tapping the month opens a year of months to jump to.
+ * The open month, as on every screen that has one: the month centered on its own.
+ * Tapping it opens a year of months to jump to; there are no step arrows beside it.
  */
 @Composable
 fun MonthControl(
@@ -232,42 +232,31 @@ fun MonthControl(
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val previous = window.previous(month)
-    val next = window.next(month)
     val calendar = YearMonth.now()
     Column(modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            // The arrows hug the month, centered together; their touch targets are the only gap.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (previous != null) {
-                    MonthIconButton(AppGlyph.ChevronLeft, "month-previous") { onSelect(previous) }
-                }
-                Row(
+            Row(
+                Modifier
+                    .heightIn(min = MetroDimens.TouchTarget)
+                    .metroPress { expanded = !expanded }
+                    .testTag("month-label"),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MetroText(monthLabel(month), Metro.typography.subheader, maxLines = 1, softWrap = false)
+                // Says the month opens; turns over while it is open.
+                Box(
                     Modifier
-                        .heightIn(min = MetroDimens.TouchTarget)
-                        .metroPress { expanded = !expanded }
-                        .testTag("month-label"),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .graphicsLayer {
+                            scaleX = 0.7f
+                            scaleY = 0.7f
+                            rotationZ = if (expanded) 180f else 0f
+                        }.testTag("month-dropdown"),
                 ) {
-                    MetroText(monthLabel(month), Metro.typography.subheader, maxLines = 1, softWrap = false)
-                    // Says the month opens; turns over while it is open.
-                    Box(
-                        Modifier
-                            .graphicsLayer {
-                                scaleX = 0.7f
-                                scaleY = 0.7f
-                                rotationZ = if (expanded) 180f else 0f
-                            }.testTag("month-dropdown"),
-                    ) {
-                        AppGlyphIcon(AppGlyph.ChevronDown, color = Metro.colors.secondary)
-                    }
-                }
-                if (next != null) {
-                    MonthIconButton(AppGlyph.ChevronRight, "month-next") { onSelect(next) }
+                    AppGlyphIcon(AppGlyph.ChevronDown, color = Metro.colors.secondary)
                 }
             }
-            // Off to the side, so the centered group doesn't shift when it comes and goes.
+            // Off to the side, so the centered month doesn't shift when it comes and goes.
             if (month != calendar) {
                 Box(Modifier.align(Alignment.CenterEnd)) {
                     MonthIconButton(AppGlyph.Calendar, "month-current") { onSelect(calendar) }
