@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -36,6 +37,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -1046,6 +1049,8 @@ fun ShellChrome(
     LaunchedEffect(actions.map { it.id }) { expanded = false }
     // Composed after the app's back handler, so back closes an open bar before it leaves the screen.
     BackHandler(enabled = expanded) { expanded = false }
+    val keyboard = WindowInsets.ime
+    var barHeight by remember { mutableIntStateOf(0) }
     MetroAppBarHost(Modifier.fillMaxSize()) {
         // The background runs up behind the status bar; titles start below it.
         Column(
@@ -1055,11 +1060,32 @@ fun ShellChrome(
                 .windowInsetsPadding(statusBar),
         ) {
             if (syncing) SyncProgressBar(progress)
-            content(Modifier.weight(1f))
-            if (bar) MetroAppBar(actions, expanded, { expanded = it })
+            content(Modifier.weight(1f).aboveKeyboard(keyboard) { if (bar) barHeight else 0 })
+            if (bar) MetroAppBar(actions, expanded, { expanded = it }, Modifier.onSizeChanged { barHeight = it.height })
         }
     }
 }
+
+/**
+ * Ends the page at the top of the keyboard, so a scrolling page can bring the box being typed in
+ * into view. The keyboard opens over the app bar, so only the part of it above [under] (the bar's
+ * height) takes room from the page.
+ */
+internal fun Modifier.aboveKeyboard(
+    keyboard: WindowInsets,
+    under: () -> Int,
+): Modifier =
+    layout { measurable, constraints ->
+        // Read while measuring, so the keyboard's slide relays out the page without recomposing it.
+        val lift = (keyboard.getBottom(this) - under()).coerceAtLeast(0)
+        if (!constraints.hasBoundedHeight || lift == 0) {
+            val placeable = measurable.measure(constraints)
+            return@layout layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+        }
+        val height = (constraints.maxHeight - lift).coerceAtLeast(0)
+        val placeable = measurable.measure(constraints.copy(minHeight = minOf(constraints.minHeight, height), maxHeight = height))
+        layout(placeable.width, constraints.maxHeight) { placeable.place(0, 0) }
+    }
 
 private class RowArrivals {
     private var primed = false
