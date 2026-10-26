@@ -79,7 +79,7 @@ object PayeeTypeAhead {
      */
     fun transfers(
         accounts: List<AccountChoice>,
-        accountId: String,
+        accountId: String?,
         query: String,
         limit: Int = LIMIT,
     ): List<AccountChoice> {

@@ -1397,8 +1397,9 @@ class ShellViewModel(
     }
 
     /**
-     * Home's add: the full transaction form, starting on the first open budget account (or any open
-     * account); saving comes back home. With no account yet, adding one comes first.
+     * Home's add: the full transaction form, with no account picked until the owner picks one (the first open
+     * budget account's page, or any open account's, supplies the categories); saving comes back home. With no
+     * account yet, adding one comes first.
      */
     fun showAddTransaction() {
         val open =

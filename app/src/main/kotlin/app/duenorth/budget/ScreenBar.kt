@@ -119,11 +119,10 @@ object ScreenBar {
                             spec("categorize-selected", AppGlyph.Categories, InboxCopy.CATEGORIZE),
                             spec("end-inbox-selecting", AppGlyph.Cancel, InboxCopy.CANCEL),
                         )
-                    // Add a transaction sits second on every home bar: the middle of three, where the thumb lands.
+                    // The inbox only sorts what arrives; adding a transaction lives on the other home bars.
                     homeSection == HOME_INBOX ->
                         listOf(
                             spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT),
-                            addTransaction(),
                         ) + serverSync(inboxSync) + undo(undoLabel) + settings()
                     // Reorder happens in place on the accounts list; done is the only way on.
                     homeSection == HOME_ACCOUNTS && accountsReorder ->
