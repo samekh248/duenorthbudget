@@ -363,6 +363,8 @@ data class ShellUiState(
     val breakdown: ActualMonthMath.MonthBreakdown? = null,
     val fillConfirm: FillConfirm? = null,
     val monthNotice: String? = null,
+    /** How the inbox's own sync went, shown under its totals until the pivot moves on. */
+    val inboxSyncNotice: String? = null,
     val undoLabel: String? = null,
     val accountsList: List<AccountDetail> = emptyList(),
     val accountDetail: AccountDetail? = null,
@@ -733,7 +735,13 @@ class ShellViewModel(
         // Edit mode belongs to the budget item and holds the pivot still; leaving it anyway drops the changes.
         if (index != ScreenBar.HOME_BUDGET && _state.value.budgetEdit != null) cancelBudgetEdit()
         // Reorder mode belongs to the accounts item, so leaving it ends reorder too.
-        _state.update { it.copy(homeSection = index, accountsReorder = it.accountsReorder && index == ScreenBar.HOME_ACCOUNTS) }
+        _state.update {
+            it.copy(
+                homeSection = index,
+                accountsReorder = it.accountsReorder && index == ScreenBar.HOME_ACCOUNTS,
+                inboxSyncNotice = it.inboxSyncNotice.takeIf { index == ScreenBar.HOME_INBOX },
+            )
+        }
     }
 
     fun selectSettingsPage(page: SettingsPage) {
@@ -2395,6 +2403,19 @@ class ShellViewModel(
             _state.update { it.copy(syncing = true, syncProgress = 0.08f) }
             withContext(Dispatchers.IO) { runCatching { sync.sync(id) } }
             _state.update { it.copy(syncing = false, syncProgress = null) }
+            reload()
+        }
+    }
+
+    /** The inbox `•••` → sync: the same sync, then one line under the inbox's totals says how it went. */
+    fun syncInbox() {
+        val id = _state.value.settings.openBudgetId ?: return
+        if (_state.value.syncing) return
+        viewModelScope.launch {
+            _state.update { it.copy(syncing = true, syncProgress = 0.08f, inboxSyncNotice = null) }
+            val result = withContext(Dispatchers.IO) { runCatching { sync.sync(id) }.getOrNull() }
+            val notice = result?.status?.takeIf { it.isNotBlank() } ?: SyncCopy.LAST_FAILED
+            _state.update { it.copy(syncing = false, syncProgress = null, inboxSyncNotice = notice) }
             reload()
         }
     }

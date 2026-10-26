@@ -105,6 +105,7 @@ fun HomePivot(
     inboxSelection: Set<String>? = null,
     onInboxToggle: (String) -> Unit = {},
     inboxLead: String? = null,
+    inboxNotice: String? = null,
     netWorth: NetWorthPage? = null,
     onNetWorth: () -> Unit = {},
     onMonthReview: () -> Unit = {},
@@ -145,6 +146,7 @@ fun HomePivot(
                             selection = inboxSelection,
                             onToggle = onInboxToggle,
                             lead = inboxLead,
+                            notice = inboxNotice,
                         )
                     }
                 },

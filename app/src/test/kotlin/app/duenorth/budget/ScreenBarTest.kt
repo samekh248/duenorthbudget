@@ -129,6 +129,33 @@ class ScreenBarTest {
     }
 
     @Test
+    fun inboxMenuSyncsOnlyABudgetOnTheServerAndKeepsSettingsLast() {
+        val local = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX)
+        assertFalse(local.any { it.id == "sync-server" })
+        val synced =
+            ScreenBar.specsFor(
+                ShellRoute.Home,
+                hasBudget = true,
+                mode = BudgetMode.ENVELOPE,
+                undoLabel = "accept",
+                homeSection = ScreenBar.HOME_INBOX,
+                inboxSync = true,
+            )
+        assertEquals(listOf("sync-server", "undo", "settings"), synced.filter { !it.primary }.map { it.id })
+        assertEquals(InboxCopy.SYNC, synced.first { it.id == "sync-server" }.label)
+        val selecting =
+            ScreenBar.specsFor(
+                ShellRoute.Home,
+                hasBudget = true,
+                mode = BudgetMode.ENVELOPE,
+                homeSection = ScreenBar.HOME_INBOX,
+                inboxSelecting = true,
+                inboxSync = true,
+            )
+        assertFalse(selecting.any { it.id == "sync-server" })
+    }
+
+    @Test
     fun homeTrackingOmitsHold() {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.TRACKING)
         val ids = specs.map { it.id }
