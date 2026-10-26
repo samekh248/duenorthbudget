@@ -38,14 +38,11 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetMode
-import app.duenorth.budget.core.CategoryManagePage
 import app.duenorth.budget.core.CategoryMonthPage
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.FormatOptions
-import app.duenorth.budget.core.ManageCategoryRow
-import app.duenorth.budget.core.ManageGroupRow
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MoneyMath
 import app.duenorth.budget.core.MonthShell
@@ -546,166 +543,6 @@ fun HoldMonthScreen(
             }
             if (shell.bufferedMinor != 0L) {
                 MetroButton(EnvelopeCopy.RELEASE, onClick = onRelease)
-            }
-        }
-    }
-}
-
-@Composable
-fun ManageCategoriesScreen(
-    manage: CategoryManagePage,
-    error: String?,
-    onAddGroup: (String) -> Unit,
-    onAddCategory: (String, String) -> Unit,
-    onRenameGroup: (String, String) -> Unit,
-    onRenameCategory: (String, String) -> Unit,
-    onHideCategory: (String, Boolean) -> Unit,
-    onDeleteCategory: (String) -> Unit,
-    onDeleteGroup: (String) -> Unit,
-    onMoveGroup: (String, Boolean) -> Unit,
-    onMoveCategory: (String, Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var groupName by remember { mutableStateOf("") }
-    var categoryName by remember { mutableStateOf("") }
-    var groupId by remember {
-        mutableStateOf(
-            manage.groups
-                .firstOrNull()
-                ?.id
-                .orEmpty(),
-        )
-    }
-    var selectedGroupId by remember { mutableStateOf<String?>(null) }
-    var selectedCategoryId by remember { mutableStateOf<String?>(null) }
-    var renameText by remember { mutableStateOf("") }
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
-    ) {
-        MetroText(EnvelopeCopy.MANAGE, Metro.typography.header)
-        MetroField(groupName, { groupName = it }, "new group")
-        MetroButton("add group") { onAddGroup(groupName) }
-        MetroField(categoryName, { categoryName = it }, "new category")
-        LazyColumn(Modifier.weight(1f)) {
-            manage.groups.forEach { group ->
-                item(key = "manage-group-${group.id}") {
-                    ManageGroupLine(
-                        group = group,
-                        selected = selectedGroupId == group.id,
-                        onSelect = {
-                            selectedGroupId = group.id
-                            selectedCategoryId = null
-                            renameText = group.name
-                            groupId = group.id
-                        },
-                        onMoveEarlier = { onMoveGroup(group.id, true) },
-                        onMoveLater = { onMoveGroup(group.id, false) },
-                        onDelete = { onDeleteGroup(group.id) },
-                    )
-                }
-                group.categories.forEach { category ->
-                    item(key = "manage-cat-${category.id}") {
-                        ManageCategoryLine(
-                            category = category,
-                            selected = selectedCategoryId == category.id,
-                            onSelect = {
-                                selectedCategoryId = category.id
-                                selectedGroupId = null
-                                renameText = category.name
-                                groupId = group.id
-                            },
-                            onMoveEarlier = { onMoveCategory(category.id, true) },
-                            onMoveLater = { onMoveCategory(category.id, false) },
-                            onHide = { onHideCategory(category.id, !category.hidden) },
-                            onDelete = { onDeleteCategory(category.id) },
-                        )
-                    }
-                }
-            }
-        }
-        MetroButton("add category") { onAddCategory(groupId, categoryName) }
-        if (selectedGroupId != null || selectedCategoryId != null) {
-            MetroField(renameText, { renameText = it }, "name", Modifier.testTag("manage-rename-field"))
-            MetroButton(EnvelopeCopy.RENAME) {
-                when {
-                    selectedCategoryId != null -> onRenameCategory(selectedCategoryId!!, renameText)
-                    selectedGroupId != null -> onRenameGroup(selectedGroupId!!, renameText)
-                }
-            }
-        }
-        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-    }
-}
-
-@Composable
-private fun ManageGroupLine(
-    group: ManageGroupRow,
-    selected: Boolean,
-    onSelect: () -> Unit,
-    onMoveEarlier: () -> Unit,
-    onMoveLater: () -> Unit,
-    onDelete: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    // Row actions show for the selected row only, as a button grid under its name.
-    Column(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress(onClick = onSelect)
-            .padding(vertical = MetroDimens.Row)
-            .testTag("manage-group-${group.id}"),
-    ) {
-        MetroText(
-            group.name,
-            Metro.typography.subheader,
-            color = if (selected) Metro.accent.text else Metro.colors.foreground,
-        )
-        if (selected) {
-            MetroButtonGrid(Modifier.padding(top = MetroDimens.Row)) {
-                MetroButton(EnvelopeCopy.MOVE_UP, onClick = onMoveEarlier)
-                MetroButton(EnvelopeCopy.MOVE_DOWN, onClick = onMoveLater)
-                MetroButton(EnvelopeCopy.DELETE, onClick = onDelete)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ManageCategoryLine(
-    category: ManageCategoryRow,
-    selected: Boolean,
-    onSelect: () -> Unit,
-    onMoveEarlier: () -> Unit,
-    onMoveLater: () -> Unit,
-    onHide: () -> Unit,
-    onDelete: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val label = if (category.hidden) "${category.name} (hidden)" else category.name
-    Column(
-        modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress(onClick = onSelect)
-            .padding(start = MetroDimens.Gutter, top = MetroDimens.Row, bottom = MetroDimens.Row)
-            .testTag("manage-category-${category.id}"),
-    ) {
-        MetroText(
-            label,
-            Metro.typography.body,
-            color = if (selected) Metro.accent.text else Metro.colors.foreground,
-        )
-        if (selected) {
-            MetroButtonGrid(Modifier.padding(top = MetroDimens.Row)) {
-                MetroButton(EnvelopeCopy.MOVE_UP, onClick = onMoveEarlier)
-                MetroButton(EnvelopeCopy.MOVE_DOWN, onClick = onMoveLater)
-                MetroButton(if (category.hidden) EnvelopeCopy.SHOW else EnvelopeCopy.HIDE, onClick = onHide)
-                MetroButton(EnvelopeCopy.DELETE, onClick = onDelete)
             }
         }
     }

@@ -1166,10 +1166,12 @@ fun DueNorthApp(model: ShellViewModel) {
                                     onRenameGroup = model::renameCategoryGroup,
                                     onRenameCategory = model::renameEnvelopeCategory,
                                     onHideCategory = model::hideEnvelopeCategory,
+                                    onHideGroup = model::hideCategoryGroup,
+                                    onMoveToGroup = model::moveCategoryToGroup,
                                     onDeleteCategory = model::deleteEnvelopeCategory,
                                     onDeleteGroup = model::deleteCategoryGroup,
-                                    onMoveGroup = model::moveCategoryGroupOrder,
-                                    onMoveCategory = model::moveEnvelopeCategoryOrder,
+                                    onPlaceGroup = model::placeCategoryGroup,
+                                    onPlaceCategory = model::placeEnvelopeCategory,
                                     modifier = fill,
                                 )
                             }

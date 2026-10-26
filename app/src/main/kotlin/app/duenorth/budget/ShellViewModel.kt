@@ -1380,20 +1380,63 @@ class ShellViewModel(
         applyEnvelopeEdit { sync.deleteCategoryGroup(budgetId, groupId) }
     }
 
-    fun moveCategoryGroupOrder(
+    fun hideCategoryGroup(
         groupId: String,
-        earlier: Boolean,
+        hidden: Boolean,
     ) {
         val budgetId = _state.value.settings.openBudgetId ?: return
-        applyEnvelopeEdit { sync.moveCategoryGroupOrder(budgetId, groupId, earlier) }
+        applyEnvelopeEdit { sync.hideCategoryGroup(budgetId, groupId, hidden) }
     }
 
-    fun moveEnvelopeCategoryOrder(
+    fun moveCategoryToGroup(
         categoryId: String,
-        earlier: Boolean,
+        groupId: String,
     ) {
         val budgetId = _state.value.settings.openBudgetId ?: return
-        applyEnvelopeEdit { sync.moveEnvelopeCategoryOrder(budgetId, categoryId, earlier) }
+        applyEnvelopeEdit { sync.moveCategoryToGroup(budgetId, categoryId, groupId) }
+    }
+
+    /** A drop from the categories page's reorder: the list moves before the write lands. */
+    fun placeCategoryGroup(
+        groupId: String,
+        targetId: String?,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        _state.update { current ->
+            val manage = current.categoryManage ?: return@update current
+            current.copy(categoryManage = manage.copy(groups = placed(manage.groups, groupId, targetId) { it.id }))
+        }
+        applyEnvelopeEdit { sync.placeCategoryGroup(budgetId, groupId, targetId) }
+    }
+
+    fun placeEnvelopeCategory(
+        categoryId: String,
+        targetId: String?,
+    ) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        _state.update { current ->
+            val manage = current.categoryManage ?: return@update current
+            val groups =
+                manage.groups.map { group ->
+                    val holds = group.categories.any { it.id == categoryId }
+                    if (holds) group.copy(categories = placed(group.categories, categoryId, targetId) { it.id }) else group
+                }
+            current.copy(categoryManage = manage.copy(groups = groups))
+        }
+        applyEnvelopeEdit { sync.placeEnvelopeCategory(budgetId, categoryId, targetId) }
+    }
+
+    /** [rows] with [id] moved just before [targetId], or last when null. */
+    private fun <T> placed(
+        rows: List<T>,
+        id: String,
+        targetId: String?,
+        key: (T) -> String,
+    ): List<T> {
+        val row = rows.firstOrNull { key(it) == id } ?: return rows
+        val rest = rows.filter { key(it) != id }
+        val to = if (targetId == null) rest.size else rest.indexOfFirst { key(it) == targetId }.takeIf { it >= 0 } ?: return rows
+        return rest.toMutableList().apply { add(to, row) }
     }
 
     /**

@@ -22,6 +22,7 @@ object EnvelopeCopy {
     const val MOVE_UP = "move up"
     const val MOVE_DOWN = "move down"
     const val ENTER_NAME = "enter a name"
+    const val NO_GROUP = "pick a group"
 
     // The category page: what is available, recent spending, and the month's budget.
     const val AVAILABLE = "available"
@@ -46,12 +47,15 @@ data class ManageCategoryRow(
     val id: String,
     val name: String,
     val hidden: Boolean,
+    /** Money budgeted or transactions filed: such a category can only be hidden, never deleted. */
+    val inUse: Boolean = false,
 )
 
 data class ManageGroupRow(
     val id: String,
     val name: String,
     val categories: List<ManageCategoryRow>,
+    val hidden: Boolean = false,
 )
 
 data class CategoryManagePage(
@@ -163,6 +167,87 @@ class EnvelopeBook(
         hidden: Boolean,
     ) {
         SyncSchema.recordLocal(session, clock, "categories", categoryId, "hidden", if (hidden) "1" else "0")
+    }
+
+    fun hideGroup(
+        groupId: String,
+        hidden: Boolean,
+    ) {
+        SyncSchema.recordLocal(session, clock, "category_groups", groupId, "hidden", if (hidden) "1" else "0")
+    }
+
+    /** Files [categoryId] under [groupId], last in it. */
+    fun moveCategoryToGroup(
+        categoryId: String,
+        groupId: String,
+    ): EnvelopeEditResult {
+        val group =
+            session
+                .query(
+                    "SELECT id FROM category_groups WHERE id = ? AND IFNULL(tombstone, 0) = 0 AND IFNULL(is_income, 0) = 0",
+                    listOf(groupId),
+                ).firstOrNull() ?: return EnvelopeEditResult.Rejected(EnvelopeCopy.NO_GROUP)
+        val current =
+            session
+                .query("SELECT cat_group FROM categories WHERE id = ? AND IFNULL(tombstone, 0) = 0", listOf(categoryId))
+                .firstOrNull() ?: return EnvelopeEditResult.Rejected(EnvelopeCopy.ENTER_NAME)
+        if (current.str("cat_group") == group.str("id")) return EnvelopeEditResult.Saved
+        SyncSchema.recordLocal(session, clock, "categories", categoryId, "sort_order", nextCategoryOrder(groupId).toString())
+        SyncSchema.recordLocal(session, clock, "categories", categoryId, "cat_group", groupId)
+        return EnvelopeEditResult.Saved
+    }
+
+    /** Places [groupId] before [targetId], or last when null, as Actual's drag does. */
+    fun placeGroup(
+        groupId: String,
+        targetId: String?,
+    ): EnvelopeEditResult {
+        val items =
+            session
+                .query(
+                    """
+                    SELECT id, sort_order FROM category_groups
+                    WHERE IFNULL(tombstone, 0) = 0 AND IFNULL(is_income, 0) = 0
+                    ORDER BY sort_order, id
+                    """.trimIndent(),
+                ).map { it.str("id").orEmpty() to it.double("sort_order") }
+        if (items.none { it.first == groupId }) return EnvelopeEditResult.Rejected(EnvelopeCopy.NO_GROUP)
+        return place("category_groups", groupId, items, targetId)
+    }
+
+    /** Places [categoryId] before [targetId] in its own group, or last in it when null. */
+    fun placeCategory(
+        categoryId: String,
+        targetId: String?,
+    ): EnvelopeEditResult {
+        val row =
+            session
+                .query("SELECT cat_group FROM categories WHERE id = ? AND IFNULL(tombstone, 0) = 0", listOf(categoryId))
+                .firstOrNull() ?: return EnvelopeEditResult.Rejected(EnvelopeCopy.ENTER_NAME)
+        val items =
+            session
+                .query(
+                    """
+                    SELECT id, sort_order FROM categories
+                    WHERE cat_group = ? AND IFNULL(tombstone, 0) = 0
+                    ORDER BY sort_order, id
+                    """.trimIndent(),
+                    listOf(row.str("cat_group").orEmpty()),
+                ).map { it.str("id").orEmpty() to it.double("sort_order") }
+        return place("categories", categoryId, items, targetId)
+    }
+
+    private fun place(
+        table: String,
+        id: String,
+        items: List<Pair<String, Double>>,
+        targetId: String?,
+    ): EnvelopeEditResult {
+        if (targetId == id) return EnvelopeEditResult.Saved
+        val (updates, order) = AccountsBook.shoveSortOrders(items, targetId)
+        updates.forEach { (row, sort) -> SyncSchema.recordLocal(session, clock, table, row, "sort_order", sort.toString()) }
+        SyncSchema.recordLocal(session, clock, table, id, "sort_order", order.toString())
+        return EnvelopeEditResult.Saved
     }
 
     fun deleteCategory(categoryId: String): EnvelopeEditResult {

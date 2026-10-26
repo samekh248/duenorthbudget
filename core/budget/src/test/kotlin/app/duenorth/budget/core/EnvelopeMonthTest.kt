@@ -110,6 +110,62 @@ class EnvelopeMonthTest {
         }
     }
 
+    @Test
+    fun moveBetweenGroupsHideGroupAndPlace() {
+        db { session, clock ->
+            val book = EnvelopeBook(session, clock)
+            val bills = book.addGroup("Bills")
+            val rent = book.addCategory(bills, "Rent")
+            book.assignBudgeted(202610, rent, 5_000L)
+            var manage = ShellReader.loadCategoryManage(session)
+            val expenses = manage.groups.first { it.id == "g-exp" }
+            assertTrue(
+                manage.groups
+                    .flatMap { it.categories }
+                    .first { it.id == rent }
+                    .inUse,
+            )
+            assertTrue(expenses.categories.none { it.inUse })
+
+            assertEquals(EnvelopeEditResult.Saved, book.moveCategoryToGroup("c-fun", bills))
+            assertTrue(book.moveCategoryToGroup("c-fun", "nope") is EnvelopeEditResult.Rejected)
+            manage = ShellReader.loadCategoryManage(session)
+            assertEquals(
+                listOf(rent, "c-fun"),
+                manage.groups
+                    .first { it.id == bills }
+                    .categories
+                    .map { it.id },
+            )
+            assertEquals(
+                listOf("c-food"),
+                manage.groups
+                    .first { it.id == "g-exp" }
+                    .categories
+                    .map { it.id },
+            )
+
+            assertEquals(EnvelopeEditResult.Saved, book.placeCategory("c-fun", rent))
+            assertEquals(EnvelopeEditResult.Saved, book.placeGroup(bills, "g-exp"))
+            book.hideGroup(bills, true)
+            manage = ShellReader.loadCategoryManage(session)
+            assertEquals(listOf(bills, "g-exp"), manage.groups.map { it.id })
+            assertEquals(
+                listOf("c-fun", rent),
+                manage.groups
+                    .first()
+                    .categories
+                    .map { it.id },
+            )
+            assertTrue(manage.groups.first().hidden)
+
+            assertEquals(EnvelopeEditResult.Saved, book.placeGroup(bills, null))
+            assertEquals(listOf("g-exp", bills), ShellReader.loadCategoryManage(session).groups.map { it.id })
+            val shell = ShellReader.read(session, BudgetMetadata("h", "H"), LocalDate.of(2026, 10, 7))
+            assertTrue(shell.groups.none { it.id == bills })
+        }
+    }
+
     fun hiddenCategoryStaysOutOfMonthView() {
         db { session, clock ->
             EnvelopeBook(session, clock).hideCategory("c-food", true)
