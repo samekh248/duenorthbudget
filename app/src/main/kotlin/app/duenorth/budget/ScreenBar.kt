@@ -68,6 +68,8 @@ object ScreenBar {
         budgetEditing: Boolean = false,
         schedules: SchedulesBar = SchedulesBar(),
         rollover: Boolean = false,
+        accountsReorder: Boolean = false,
+        accountClosed: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -107,7 +109,7 @@ object ScreenBar {
                             spec("end-budget-edit", AppGlyph.Save, BudgetEditCopy.DONE),
                             spec("cancel-budget-edit", AppGlyph.Cancel, BudgetEditCopy.CANCEL),
                         ) + fills() + templates(templates)
-                    // The accounts pivot item carries account management, so the month menu does not.
+                    // The accounts pivot item carries account management in its menu, so the month menu does not.
                     // Select mode swaps the inbox's bar for what can be done to the checked rows.
                     homeSection == HOME_INBOX && inboxSelecting ->
                         listOf(
@@ -121,12 +123,20 @@ object ScreenBar {
                             spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT),
                             addTransaction(),
                         ) + undo(undoLabel) + settings()
+                    // Reorder happens in place on the accounts list; done is the only way on.
+                    homeSection == HOME_ACCOUNTS && accountsReorder ->
+                        listOf(spec("reorder", AppGlyph.Save, AccountScreenCopy.DONE))
                     homeSection == HOME_ACCOUNTS ->
                         listOf(
-                            spec("accounts", AppGlyph.Budgets, AccountScreenCopy.MANAGE),
                             addTransaction(),
                             spec("schedules", AppGlyph.Calendar, ScheduleScreenCopy.SCHEDULES),
                             menu("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
+                            menu("reorder", AppGlyph.Categories, AccountScreenCopy.REORDER),
+                            menu(
+                                "show-closed",
+                                AppGlyph.Categories,
+                                if (showClosed) AccountScreenCopy.HIDE_CLOSED else AccountScreenCopy.SHOW_CLOSED,
+                            ),
                         ) + undo(undoLabel) + settings()
                     mode == BudgetMode.TRACKING ->
                         listOf(
@@ -158,19 +168,13 @@ object ScreenBar {
                         add(menu("import", AppGlyph.Import, "import"))
                         add(menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT))
                         add(menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE))
-                        add(menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE))
+                        if (accountClosed) {
+                            add(menu("reopen", AppGlyph.Undo, AccountScreenCopy.REOPEN))
+                        } else {
+                            add(menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE))
+                        }
                     } + undo(undoLabel)
                 }
-            ShellRoute.Accounts ->
-                listOf(
-                    spec("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
-                    menu(
-                        "show-closed",
-                        AppGlyph.Categories,
-                        if (showClosed) AccountScreenCopy.HIDE_CLOSED else AccountScreenCopy.SHOW_CLOSED,
-                    ),
-                    menu("reorder", AppGlyph.Categories, AccountScreenCopy.REORDER),
-                ) + undo(undoLabel)
             ShellRoute.AddAccount,
             is ShellRoute.EditAccount,
             -> saveCancel()
@@ -300,6 +304,10 @@ object ScreenBar {
                 open = state.scheduleDetails?.summary?.completed != true,
             ),
             rolloverOn(state),
+            state.accountsReorder,
+            state.register
+                ?.account
+                ?.closed == true,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -399,13 +407,13 @@ class ScreenBarHandlers(
     val onFill: (MonthFillKind) -> Unit = {},
     val onToBudget: () -> Unit = {},
     val onUndo: () -> Unit = {},
-    val onAccounts: () -> Unit = {},
     val onAddAccount: () -> Unit = {},
     val onShowClosed: () -> Unit = {},
     val onShowHidden: () -> Unit = {},
     val onReorder: () -> Unit = {},
     val onEditAccount: () -> Unit = {},
     val onCloseAccount: () -> Unit = {},
+    val onReopenAccount: () -> Unit = {},
     val onAddSchedule: () -> Unit = {},
     val onRules: () -> Unit = {},
     val onAddRule: () -> Unit = {},
@@ -467,13 +475,13 @@ class ScreenBarHandlers(
             "zero" -> ({ onFill(MonthFillKind.ZERO) })
             "to-budget" -> onToBudget
             "undo" -> onUndo
-            "accounts" -> onAccounts
             "add-account" -> onAddAccount
             "show-closed" -> onShowClosed
             "show-hidden" -> onShowHidden
             "reorder" -> onReorder
             "edit-account" -> onEditAccount
             "close" -> onCloseAccount
+            "reopen" -> onReopenAccount
             "add-schedule" -> onAddSchedule
             "rules" -> onRules
             "add-rule" -> onAddRule

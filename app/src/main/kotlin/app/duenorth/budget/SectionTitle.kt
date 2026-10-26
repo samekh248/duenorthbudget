@@ -99,7 +99,6 @@ object SectionTitle {
             ShellRoute.OnboardingSignIn,
             ShellRoute.OnboardingFiles,
             // Top-level views.
-            ShellRoute.Accounts,
             ShellRoute.Rules,
             ShellRoute.Payees,
             ShellRoute.Templates,

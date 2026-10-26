@@ -5,10 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -16,7 +14,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -36,11 +33,10 @@ import app.duenorth.budget.design.theme.MetroDimens
 object AccountScreenCopy {
     const val TITLE = "accounts"
     const val ADD = "add account"
-    const val MANAGE = "manage"
     const val SHOW_CLOSED = "show closed accounts"
     const val HIDE_CLOSED = "hide closed accounts"
     const val REORDER = "reorder"
-    const val REORDER_HINT = "tap an account to move it up"
+    const val REORDER_HINT = "drag an account by its handle"
     const val DONE = "done"
     const val ON_BUDGET = "on budget"
     const val OFF_BUDGET = "off budget"
@@ -60,88 +56,6 @@ object AccountScreenCopy {
     const val FORCE_HINT = "or force close to delete it and its transactions"
 }
 
-/** Every account with its balance; reorder mode and the closed list come from the `•••` menu. Tag `accounts-screen`. */
-@Composable
-fun AccountsScreen(
-    accounts: List<AccountDetail>,
-    currency: CurrencySpec,
-    showClosed: Boolean,
-    reorder: Boolean,
-    onAccount: (String) -> Unit,
-    onMoveUp: (String) -> Unit,
-    onReopen: (String) -> Unit,
-    onDoneReorder: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val open = accounts.filter { !it.closed }
-    val onBudget = open.filter { !it.offBudget }
-    val offBudget = open.filter { it.offBudget }
-    val closed = if (showClosed) accounts.filter { it.closed } else emptyList()
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("accounts-screen"),
-    ) {
-        MetroText(AccountScreenCopy.TITLE, Metro.typography.header)
-        if (reorder) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                MetroText(
-                    AccountScreenCopy.REORDER_HINT,
-                    Metro.typography.caption,
-                    Modifier.weight(1f).testTag("accounts-reorder-hint"),
-                    color = Metro.colors.secondary,
-                )
-                MetroText(
-                    AccountScreenCopy.DONE,
-                    Metro.typography.subheader,
-                    Modifier
-                        .heightIn(min = MetroDimens.TouchTarget)
-                        .metroPress(onDoneReorder)
-                        .padding(vertical = MetroDimens.Row)
-                        .testTag("accounts-reorder-done"),
-                    color = Metro.accent.text,
-                )
-            }
-        }
-        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Gutter)) {
-            if (onBudget.isNotEmpty()) {
-                item { AccountHeading(AccountScreenCopy.ON_BUDGET) }
-                items(onBudget, key = { it.id }) { account ->
-                    ManagedAccountLine(account, currency) { if (reorder) onMoveUp(account.id) else onAccount(account.id) }
-                }
-            }
-            if (offBudget.isNotEmpty()) {
-                item { AccountHeading(AccountScreenCopy.OFF_BUDGET) }
-                items(offBudget, key = { it.id }) { account ->
-                    ManagedAccountLine(account, currency) { if (reorder) onMoveUp(account.id) else onAccount(account.id) }
-                }
-            }
-            if (closed.isNotEmpty()) {
-                item { AccountHeading(AccountScreenCopy.CLOSED) }
-                items(closed, key = { it.id }) { account ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            ManagedAccountLine(account, currency, dim = true) { onAccount(account.id) }
-                        }
-                        MetroText(
-                            AccountScreenCopy.REOPEN,
-                            Metro.typography.body,
-                            Modifier
-                                .heightIn(min = MetroDimens.TouchTarget)
-                                .metroPress { onReopen(account.id) }
-                                .padding(start = MetroDimens.Gutter, top = MetroDimens.Row)
-                                .testTag("account-reopen-${account.id}"),
-                            color = Metro.accent.text,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun AccountHeading(label: String) {
     MetroText(
@@ -150,39 +64,6 @@ private fun AccountHeading(label: String) {
         Modifier.padding(top = MetroDimens.Gutter, bottom = 4.dp),
         color = Metro.colors.secondary,
     )
-}
-
-@Composable
-private fun ManagedAccountLine(
-    account: AccountDetail,
-    currency: CurrencySpec,
-    dim: Boolean = false,
-    onClick: () -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress(onClick)
-            .padding(vertical = MetroDimens.Row)
-            .testTag("accounts-line-${account.id}"),
-        verticalAlignment = Alignment.Top,
-    ) {
-        MetroText(
-            account.name,
-            Metro.typography.subheader,
-            Modifier.weight(1f).padding(end = 12.dp),
-            color = if (dim) Metro.colors.secondary else Metro.colors.foreground,
-            maxLines = 2,
-        )
-        MetroText(
-            MoneyFormat.format(account.balanceMinor, currency, formatOptions()),
-            Metro.typography.subheader,
-            Modifier.widthIn(max = 148.dp),
-            color = if (dim) Metro.colors.secondary else Metro.colors.foreground,
-            maxLines = 1,
-        )
-    }
 }
 
 /** New account: name, on or off budget, and an optional starting balance. Tag `account-add`. */
