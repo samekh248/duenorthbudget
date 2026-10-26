@@ -115,8 +115,17 @@ class ScreenBarTest {
     @Test
     fun homeInboxSectionOffersSelectAndSelectModeActsOnTheCheckedRows() {
         val inbox = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX)
-        assertEquals(listOf("select-inbox"), inbox.filter { it.primary }.map { it.id })
+        assertEquals(listOf("select-inbox", "add"), inbox.filter { it.primary }.map { it.id })
         assertEquals(listOf("settings"), inbox.filter { !it.primary }.map { it.id })
+        val empty =
+            ScreenBar.specsFor(
+                ShellRoute.Home,
+                hasBudget = true,
+                mode = BudgetMode.ENVELOPE,
+                homeSection = ScreenBar.HOME_INBOX,
+                inboxEmpty = true,
+            )
+        assertEquals(listOf("add"), empty.filter { it.primary }.map { it.id })
         val selecting =
             ScreenBar.specsFor(
                 ShellRoute.Home,
