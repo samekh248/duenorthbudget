@@ -111,6 +111,31 @@ class EnvelopeMonthTest {
     }
 
     @Test
+    fun hiddenCategoriesAndGroupsListLast() {
+        db { session, clock ->
+            val book = EnvelopeBook(session, clock)
+            val bills = book.addGroup("Bills")
+            val rent = book.addCategory(bills, "Rent")
+            val water = book.addCategory(bills, "Water")
+            val power = book.addCategory(bills, "Power")
+            book.hideCategory(rent, true)
+            val manage = ShellReader.loadCategoryManage(session)
+            assertEquals(
+                listOf(water, power, rent),
+                manage.groups
+                    .first { it.id == bills }
+                    .categories
+                    .map { it.id },
+            )
+            book.hideGroup("g-exp", true)
+            assertEquals(
+                listOf(bills, "g-exp"),
+                ShellReader.loadCategoryManage(session).groups.map { it.id },
+            )
+        }
+    }
+
+    @Test
     fun moveBetweenGroupsHideGroupAndPlace() {
         db { session, clock ->
             val book = EnvelopeBook(session, clock)
@@ -147,7 +172,6 @@ class EnvelopeMonthTest {
 
             assertEquals(EnvelopeEditResult.Saved, book.placeCategory("c-fun", rent))
             assertEquals(EnvelopeEditResult.Saved, book.placeGroup(bills, "g-exp"))
-            book.hideGroup(bills, true)
             manage = ShellReader.loadCategoryManage(session)
             assertEquals(listOf(bills, "g-exp"), manage.groups.map { it.id })
             assertEquals(
@@ -157,7 +181,11 @@ class EnvelopeMonthTest {
                     .categories
                     .map { it.id },
             )
-            assertTrue(manage.groups.first().hidden)
+            // A hidden group lists last, wherever it is placed.
+            book.hideGroup(bills, true)
+            manage = ShellReader.loadCategoryManage(session)
+            assertEquals(listOf("g-exp", bills), manage.groups.map { it.id })
+            assertTrue(manage.groups.last().hidden)
 
             assertEquals(EnvelopeEditResult.Saved, book.placeGroup(bills, null))
             assertEquals(listOf("g-exp", bills), ShellReader.loadCategoryManage(session).groups.map { it.id })

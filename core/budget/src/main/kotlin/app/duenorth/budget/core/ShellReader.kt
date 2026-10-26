@@ -478,24 +478,27 @@ object ShellReader {
         val byGroup = categories.groupBy { it.str("cat_group").orEmpty() }
         return CategoryManagePage(
             groups =
-                groups.map { group ->
-                    val groupId = group.str("id").orEmpty()
-                    ManageGroupRow(
-                        id = groupId,
-                        name = group.str("name").orEmpty(),
-                        categories =
-                            (byGroup[groupId] ?: emptyList()).map { row ->
-                                val id = row.str("id").orEmpty()
-                                ManageCategoryRow(
-                                    id = id,
-                                    name = row.str("name").orEmpty(),
-                                    hidden = row.bool("hidden"),
-                                    inUse = id in inUse,
-                                )
-                            },
-                        hidden = group.bool("hidden"),
-                    )
-                },
+                groups
+                    .map { group ->
+                        val groupId = group.str("id").orEmpty()
+                        ManageGroupRow(
+                            id = groupId,
+                            name = group.str("name").orEmpty(),
+                            // Hidden categories list under the shown ones, as hidden groups do.
+                            categories =
+                                (byGroup[groupId] ?: emptyList())
+                                    .map { row ->
+                                        val id = row.str("id").orEmpty()
+                                        ManageCategoryRow(
+                                            id = id,
+                                            name = row.str("name").orEmpty(),
+                                            hidden = row.bool("hidden"),
+                                            inUse = id in inUse,
+                                        )
+                                    }.sortedBy { it.hidden },
+                            hidden = group.bool("hidden"),
+                        )
+                    }.sortedBy { it.hidden },
         )
     }
 }
