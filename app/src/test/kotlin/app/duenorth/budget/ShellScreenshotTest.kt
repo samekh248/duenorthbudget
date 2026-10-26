@@ -290,8 +290,9 @@ class ShellScreenshotTest {
                                             AppBarButton(AppGlyph.Cancel, InboxCopy.CANCEL, onClick = {}),
                                         )
                                     inbox ->
-                                        listOf(
-                                            AppBarButton(AppGlyph.Select, InboxCopy.SELECT, onClick = {}),
+                                        listOfNotNull(
+                                            AppBarButton(AppGlyph.Select, InboxCopy.SELECT, onClick = {}).takeIf { shown.inbox.isNotEmpty() },
+                                            AppBarButton(AppGlyph.Add, "add", onClick = {}),
                                         )
                                     style.relief ->
                                         listOf(

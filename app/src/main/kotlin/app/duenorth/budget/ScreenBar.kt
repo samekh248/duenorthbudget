@@ -63,6 +63,8 @@ object ScreenBar {
         showHidden: Boolean = false,
         selecting: Boolean = false,
         inboxSelecting: Boolean = false,
+        /** The inbox holds no transactions, so there is nothing to select. */
+        inboxEmpty: Boolean = false,
         /** The open budget lives on a server this phone is signed in to, so the inbox menu can sync it. */
         inboxSync: Boolean = false,
         bankLinked: Boolean = false,
@@ -119,11 +121,12 @@ object ScreenBar {
                             spec("categorize-selected", AppGlyph.Categories, InboxCopy.CATEGORIZE),
                             spec("end-inbox-selecting", AppGlyph.Cancel, InboxCopy.CANCEL),
                         )
-                    // The inbox only sorts what arrives; adding a transaction lives on the other home bars.
+                    // Add a transaction is always on the inbox bar; select only shows while there is something to check.
                     homeSection == HOME_INBOX ->
-                        listOf(
-                            spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT),
-                        ) + serverSync(inboxSync) + undo(undoLabel) + settings()
+                        buildList {
+                            if (!inboxEmpty) add(spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT))
+                            add(addTransaction())
+                        } + serverSync(inboxSync) + undo(undoLabel) + settings()
                     // Reorder happens in place on the accounts list; done is the only way on.
                     homeSection == HOME_ACCOUNTS && accountsReorder ->
                         listOf(spec("reorder", AppGlyph.Save, AccountScreenCopy.DONE))
@@ -297,6 +300,7 @@ object ScreenBar {
             state.settings.showHiddenCategories,
             state.registerSelection != null,
             state.inboxSelection != null,
+            state.shell?.inbox.isNullOrEmpty(),
             state.signedIn && !state.cloudFileId.isNullOrBlank(),
             state.registerBankLinked,
             transactionMenu(state),
