@@ -36,6 +36,7 @@ object AccountScreenCopy {
     const val SHOW_CLOSED = "show closed accounts"
     const val HIDE_CLOSED = "hide closed accounts"
     const val REORDER = "reorder"
+    const val SYNC = "sync"
     const val REORDER_HINT = "drag an account by its handle"
     const val DONE = "done"
     const val ON_BUDGET = "on budget"

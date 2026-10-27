@@ -291,8 +291,11 @@ internal fun ShellViewModel.finishBrowserSignIn(
 
 fun ShellViewModel.onboardingRefresh() {
     viewModelScope.launch {
+        mutate { it.copy(remoteRefreshing = true) }
         val result = withContext(Dispatchers.IO) { sync.refreshRemote() }
-        mutate { it.copy(remoteFiles = result.files, serverError = result.error, signedIn = sync.signedIn()) }
+        mutate {
+            it.copy(remoteFiles = result.files, serverError = result.error, signedIn = sync.signedIn(), remoteRefreshing = false)
+        }
     }
 }
 

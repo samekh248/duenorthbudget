@@ -75,6 +75,8 @@ object ScreenBar {
         accountClosed: Boolean = false,
         /** The close page is asking again before a force close, which carries its own buttons. */
         accountForceConfirm: Boolean = false,
+        /** An open account is linked through SimpleFIN and the budget lives on a server, so the accounts bar can bank sync. */
+        accountsBankSync: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -132,8 +134,9 @@ object ScreenBar {
                     homeSection == HOME_ACCOUNTS && accountsReorder ->
                         listOf(spec("reorder", AppGlyph.Save, AccountScreenCopy.DONE))
                     homeSection == HOME_ACCOUNTS ->
-                        listOf(
+                        listOfNotNull(
                             addTransaction(),
+                            spec("bank-sync", AppGlyph.Sync, AccountScreenCopy.SYNC).takeIf { accountsBankSync },
                             spec("schedules", AppGlyph.Calendar, ScheduleScreenCopy.SCHEDULES),
                             menu("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
                             menu("reorder", AppGlyph.Categories, AccountScreenCopy.REORDER),
@@ -321,16 +324,35 @@ object ScreenBar {
                 ?.account
                 ?.closed == true,
             state.accountForceConfirm != null,
+            state.signedIn &&
+                !state.cloudFileId.isNullOrBlank() &&
+                state.shell
+                    ?.accounts
+                    .orEmpty()
+                    .any { it.bankSync && !it.closed },
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
                 glyph = spec.glyph,
                 label = spec.label,
                 primary = spec.primary,
+                spinning = spec.glyph == AppGlyph.Sync && spec.primary && syncRunning(spec.id, state),
                 run = handlers.bind(spec.id, state),
             )
         }
     }
+
+    /** Whether the work a sync button starts is running now: its glyph turns only while it is. */
+    internal fun syncRunning(
+        id: String,
+        state: ShellUiState,
+    ): Boolean =
+        when (id) {
+            "sync" -> state.importFetchPending || state.bankSyncing
+            "bank-sync" -> state.bankSyncing
+            "refresh" -> state.remoteRefreshing
+            else -> false
+        }
 
     private fun transactionMenu(state: ShellUiState): TransactionMenu {
         val route = state.route as? ShellRoute.EditTransaction ?: return TransactionMenu.NEW
@@ -425,6 +447,7 @@ class ScreenBarHandlers(
     val onReconcile: () -> Unit,
     val onImport: () -> Unit,
     val onBankSync: () -> Unit = {},
+    val onBankSyncAll: () -> Unit = {},
     val onSave: () -> Unit,
     val onCancel: () -> Unit,
     val onFill: (MonthFillKind) -> Unit = {},
@@ -492,6 +515,7 @@ class ScreenBarHandlers(
             "search" -> onSearch
             "import" -> onImport
             "sync" -> onBankSync
+            "bank-sync" -> onBankSyncAll
             "save" -> onSave
             "cancel" -> onCancel
             "copy-last" -> ({ onFill(MonthFillKind.COPY_LAST) })

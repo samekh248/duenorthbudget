@@ -2,7 +2,13 @@ package app.duenorth.budget.design.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -81,6 +87,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -504,6 +511,8 @@ data class ScreenAction(
     val glyph: AppGlyph,
     val label: String,
     val primary: Boolean = true,
+    /** A sync button whose sync is running: its glyph turns until it ends. */
+    val spinning: Boolean = false,
     val run: () -> Unit,
 )
 
@@ -651,7 +660,10 @@ private fun AppBarIcon(
                 onClickLabel = action.label,
                 role = Role.Button,
                 onClick = onClick,
-            ).semantics { contentDescription = action.label },
+            ).semantics {
+                contentDescription = action.label
+                if (action.spinning) stateDescription = "syncing"
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val style = Metro.style
@@ -675,7 +687,7 @@ private fun AppBarIcon(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            AppGlyphIcon(action.glyph, if (filled) accent.onFill else colors.foreground)
+            AppGlyphIcon(action.glyph, if (filled) accent.onFill else colors.foreground, Modifier.spin(action.spinning))
         }
         if (showLabel) {
             MetroText(
@@ -692,6 +704,49 @@ private fun AppBarIcon(
         }
     }
 }
+
+/**
+ * As in due north tasks: a steady turn while [spinning], drawn in the layer only so nothing
+ * recomposes per frame. When it stops, the glyph eases on to upright rather than snapping back.
+ * Still with animations off.
+ */
+@Composable
+private fun Modifier.spin(spinning: Boolean): Modifier {
+    if (!Metro.animations) return this
+    // The angle the spin had reached, read when it stops; written from the draw phase.
+    val reached = remember { floatArrayOf(0f) }
+    val settle = remember { Animatable(0f) }
+    var settling by remember { mutableStateOf(false) }
+    LaunchedEffect(spinning) {
+        if (spinning || reached[0] == 0f) return@LaunchedEffect
+        settling = true
+        settle.snapTo(reached[0])
+        val left = (FULL_TURN - reached[0]) / FULL_TURN
+        settle.animateTo(FULL_TURN, tween((SPIN_MS * left).toInt(), easing = MetroMotion.EaseOut))
+        reached[0] = 0f
+        settling = false
+    }
+    return when {
+        spinning -> {
+            val angle =
+                rememberInfiniteTransition(label = "sync spin").animateFloat(
+                    initialValue = 0f,
+                    targetValue = FULL_TURN,
+                    animationSpec = infiniteRepeatable(tween(SPIN_MS, easing = LinearEasing), RepeatMode.Restart),
+                    label = "angle",
+                )
+            graphicsLayer {
+                rotationZ = angle.value
+                reached[0] = angle.value
+            }
+        }
+        settling -> graphicsLayer { rotationZ = settle.value }
+        else -> this
+    }
+}
+
+private const val FULL_TURN = 360f
+private const val SPIN_MS = 1200
 
 fun List<AppBarButton>.asScreenActions(): List<ScreenAction> =
     map { ScreenAction(id = it.id, glyph = it.glyph, label = it.label, primary = true, run = it.onClick) }
@@ -942,8 +997,9 @@ object AppGlyphInk {
 fun AppGlyphIcon(
     glyph: AppGlyph,
     color: Color = Metro.colors.foreground,
+    modifier: Modifier = Modifier,
 ) {
-    Canvas(Modifier.size(22.dp)) {
+    Canvas(modifier.size(22.dp)) {
         with(AppGlyphInk) { draw(glyph, color) }
     }
 }

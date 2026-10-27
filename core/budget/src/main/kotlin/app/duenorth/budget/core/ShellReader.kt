@@ -44,7 +44,7 @@ object ShellReader {
         val accounts =
             session.query(
                 """
-                SELECT id, name, offbudget, closed, sort_order
+                SELECT id, name, offbudget, closed, sort_order, account_sync_source, account_id
                 FROM accounts
                 WHERE IFNULL(tombstone, 0) = 0 ${if (showClosedAccounts) "" else "AND IFNULL(closed, 0) = 0"}
                 ORDER BY offbudget, sort_order, name, id
@@ -160,6 +160,7 @@ object ShellReader {
                         offBudget = row.bool("offbudget"),
                         closed = row.bool("closed"),
                         balanceMinor = balances[id] ?: 0L,
+                        bankSync = row.str("account_sync_source") == "simpleFin" && !row.str("account_id").isNullOrBlank(),
                     )
                 },
             inbox =
