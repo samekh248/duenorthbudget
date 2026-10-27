@@ -73,6 +73,8 @@ object ScreenBar {
         schedules: SchedulesBar = SchedulesBar(),
         accountsReorder: Boolean = false,
         accountClosed: Boolean = false,
+        /** The close page is asking again before a force close, which carries its own buttons. */
+        accountForceConfirm: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -177,6 +179,16 @@ object ScreenBar {
             ShellRoute.AddAccount,
             is ShellRoute.EditAccount,
             -> saveCancel()
+            // Close account is the page's save; force close stays on the page, under its warning.
+            is ShellRoute.CloseAccount ->
+                if (accountForceConfirm) {
+                    emptyList()
+                } else {
+                    listOf(
+                        spec("save", AppGlyph.Save, AccountScreenCopy.CLOSE),
+                        spec("cancel", AppGlyph.Cancel, "cancel"),
+                    )
+                }
             ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, RuleScreenCopy.ADD)) + undo(undoLabel)
             // Upcoming switches between its list and its calendar; all has nothing to switch.
             ShellRoute.Schedules ->
@@ -308,6 +320,7 @@ object ScreenBar {
             state.register
                 ?.account
                 ?.closed == true,
+            state.accountForceConfirm != null,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
