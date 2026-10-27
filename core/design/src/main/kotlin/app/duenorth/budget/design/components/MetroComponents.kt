@@ -68,6 +68,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -746,6 +747,10 @@ private fun Modifier.spin(spinning: Boolean): Modifier {
 }
 
 private const val FULL_TURN = 360f
+private const val SYNC_TOP_END = 335f
+private const val SYNC_SWEEP = 130f
+private const val SYNC_HEAD_LENGTH = 3.6f
+private const val SYNC_HEAD_HALF = 3f
 private const val SPIN_MS = 1200
 
 fun List<AppBarButton>.asScreenActions(): List<ScreenAction> =
@@ -756,7 +761,7 @@ object AppGlyphInk {
         when (glyph) {
             AppGlyph.Budgets -> 3
             AppGlyph.Appearance -> 3
-            AppGlyph.Sync -> 6
+            AppGlyph.Sync -> 4
             AppGlyph.Payees -> 2
             AppGlyph.Hold -> 2
             AppGlyph.Categories -> 3
@@ -807,33 +812,40 @@ object AppGlyphInk {
             }
             // Two arrows chasing each other round a circle, the WP8.1 sync mark (distinct from transfer's straight arrows).
             AppGlyph.Sync -> {
-                val radius = 6.5.dp.toPx()
-                val center = Offset(w / 2, h / 2)
-                val head = 3.dp.toPx()
-                listOf(200f, 20f).forEach { start ->
+                // As in due north tasks: two arcs chasing each other clockwise, each ending in a solid
+                // head that sits on the arc's end and points along it (WP8.1 sync), so the glyph reads
+                // the same mid-spin. Drawn on a 24 x 24 grid scaled to the canvas.
+                val u = size.minDimension / 24f
+                val r = 7.5f
+                for (end in listOf(SYNC_TOP_END, SYNC_TOP_END + 180f)) {
                     drawArc(
                         color,
-                        startAngle = start,
-                        sweepAngle = 130f,
-                        useCenter = false,
-                        topLeft = Offset(center.x - radius, center.y - radius),
+                        end - SYNC_SWEEP,
+                        SYNC_SWEEP,
+                        false,
+                        topLeft = Offset((12f - r) * u, (12f - r) * u),
                         size =
                             androidx.compose.ui.geometry
-                                .Size(radius * 2, radius * 2),
+                                .Size(2 * r * u, 2 * r * u),
                         style = stroke,
                     )
-                    val end = Math.toRadians((start + 130f).toDouble())
-                    val tip = Offset(center.x + radius * kotlin.math.cos(end).toFloat(), center.y + radius * kotlin.math.sin(end).toFloat())
-                    val heading = kotlin.math.atan2(kotlin.math.cos(end), -kotlin.math.sin(end))
-                    listOf(150.0, -150.0).forEach { spread ->
-                        val back = heading + Math.toRadians(spread)
-                        drawLine(
-                            color,
-                            tip,
-                            Offset(tip.x + head * kotlin.math.cos(back).toFloat(), tip.y + head * kotlin.math.sin(back).toFloat()),
-                            strokeWidth = 1.6.dp.toPx(),
-                        )
-                    }
+                    val a = Math.toRadians(end.toDouble())
+                    // Outward from the centre, then clockwise along the arc.
+                    val nx = kotlin.math.cos(a).toFloat()
+                    val ny = kotlin.math.sin(a).toFloat()
+                    val tx = -ny
+                    val ty = nx
+                    val ex = 12f + r * nx
+                    val ey = 12f + r * ny
+                    drawPath(
+                        Path().apply {
+                            moveTo((ex + tx * SYNC_HEAD_LENGTH) * u, (ey + ty * SYNC_HEAD_LENGTH) * u)
+                            lineTo((ex + nx * SYNC_HEAD_HALF) * u, (ey + ny * SYNC_HEAD_HALF) * u)
+                            lineTo((ex - nx * SYNC_HEAD_HALF) * u, (ey - ny * SYNC_HEAD_HALF) * u)
+                            close()
+                        },
+                        color,
+                    )
                 }
             }
             AppGlyph.Payees -> {
