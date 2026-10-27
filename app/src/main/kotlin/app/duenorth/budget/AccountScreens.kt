@@ -131,7 +131,7 @@ fun EditAccountScreen(
 
 /**
  * Close: picks where a balance goes, and a category when it leaves the budget. Nothing is
- * written until the close button. Force close asks again on its own screen. Tag `account-close`.
+ * written until close account on the bar. Force close asks again on its own screen. Tag `account-close`.
  */
 @Composable
 fun CloseAccountScreen(
@@ -193,8 +193,11 @@ fun CloseAccountScreen(
                 }
             }
         }
-        MetroButton(AccountScreenCopy.CLOSE, Modifier.padding(top = MetroDimens.Gutter).testTag("account-close-confirm")) {
-            onClose(destinationId, if (needsCategory) categoryId else null)
+        RememberFormSave { onClose(destinationId, if (needsCategory) categoryId else null) }
+        if (!formSaveOnBar()) {
+            MetroButton(AccountScreenCopy.CLOSE, Modifier.padding(top = MetroDimens.Gutter).testTag("account-close-confirm")) {
+                onClose(destinationId, if (needsCategory) categoryId else null)
+            }
         }
         if (needsBalanceMove) {
             MetroText(

@@ -65,6 +65,11 @@ class AccountContentTest {
         assertTrue("edit-account" in register && "close" in register && "reopen" !in register)
         val closedRegister = ScreenBar.specsFor(ShellRoute.Register("a1"), true, BudgetMode.ENVELOPE, accountClosed = true).map { it.id }
         assertTrue("reopen" in closedRegister && "close" !in closedRegister)
+        val close = ScreenBar.specsFor(ShellRoute.CloseAccount("a1"), true, BudgetMode.ENVELOPE)
+        assertEquals(listOf("save", "cancel"), close.map { it.id })
+        assertTrue(close.all { it.primary })
+        assertEquals(AccountScreenCopy.CLOSE, close.first().label)
+        assertTrue(ScreenBar.specsFor(ShellRoute.CloseAccount("a1"), true, BudgetMode.ENVELOPE, accountForceConfirm = true).isEmpty())
     }
 
     @Test
