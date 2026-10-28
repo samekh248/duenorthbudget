@@ -84,6 +84,26 @@ class ShellScreenshotTest {
     @Test
     fun homeFreeAfterPlansDark() = snap("home_free_after_plans_dark", dark = true, shell = withPlans(), showAhead = true)
 
+    // Later plans overrun what's left to budget: the figure turns red.
+    @Test
+    fun homeFreeAfterPlansShortLight() =
+        snap("home_free_after_plans_short_light", dark = false, shell = withPlans(-6_500), showAhead = true)
+
+    @Test
+    fun homeFreeAfterPlansShortDark() = snap("home_free_after_plans_short_dark", dark = true, shell = withPlans(-6_500), showAhead = true)
+
+    // The relief styles: tile relief gives the figure its own raised tile, mica holds it on the one card.
+    @Test
+    fun homeFreeAfterPlansStyles() =
+        MetroStyle.entries.filter { it.relief }.forEach { style ->
+            for (dark in listOf(false, true)) {
+                val theme = if (dark) "dark" else "light"
+                snap("style_${style.id}_home_free_after_plans_$theme", dark, withPlans(), showAhead = true, style = style)
+            }
+        }
+
+    private fun withPlans(free: Long): MonthShell = sample().let { it.copy(ahead = ActualMonthMath.FuturePlans(free, 202612)) }
+
     private fun withPlans(): MonthShell = sample().let { it.copy(ahead = ActualMonthMath.FuturePlans(it.headerMinor - 40_000, 202612)) }
 
     /** Rent and Rainy day are on target, Power and Gas are short, Rainy day saves toward a #goal. */
