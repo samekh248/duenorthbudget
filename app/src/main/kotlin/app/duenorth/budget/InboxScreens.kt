@@ -102,7 +102,7 @@ object InboxCopy {
     const val NO_SUGGESTION = "no suggestion"
     const val ACCEPT = "accept"
     const val CATEGORIZE = "categorize"
-    const val SELECT = "select"
+    const val SELECT = "batch mode"
     const val CANCEL = "cancel"
     const val TRANSACTIONS = "transactions"
     const val FILED_TO = "filed to"
