@@ -395,15 +395,15 @@ fun TemplateApplyList(
                 }
             }
         }
-        MetroButtonGrid(Modifier.padding(top = 12.dp)) {
-            if (preview.rows.isNotEmpty()) {
-                MetroButton(
-                    "${if (preview.overwrite) TemplateCopy.OVERWRITE else TemplateCopy.APPLY} ${preview.rows.size}",
-                    Modifier.testTag("template-apply-confirm"),
-                    onClick = onConfirm,
-                )
-            }
-            MetroButton(TemplateLanesCopy.KEEP, Modifier.testTag("template-apply-keep"), onClick = onKeep)
-        }
+        ConfirmAnswers(
+            yes =
+                preview.rows
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { "${if (preview.overwrite) TemplateCopy.OVERWRITE else TemplateCopy.APPLY} ${it.size}" },
+            onYes = onConfirm,
+            onKeep = onKeep,
+            yesTag = "template-apply-confirm",
+            keepTag = "template-apply-keep",
+        )
     }
 }

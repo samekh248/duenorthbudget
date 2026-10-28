@@ -1600,19 +1600,15 @@ fun ReconcileWarningScreen(
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText(RegisterCopy.RECONCILE_WARN, Metro.typography.header)
-        MetroButtonGrid {
-            MetroButton("change", onClick = onChange)
-            MetroButton("keep", onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = RegisterCopy.RECONCILE_CHANGE,
+        body = RegisterCopy.RECONCILE_WARN,
+        yes = "change",
+        onYes = onChange,
+        onKeep = onKeep,
+        tag = "reconcile-warning",
+        modifier = modifier,
+    )
 }
 
 @Composable

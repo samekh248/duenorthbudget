@@ -42,21 +42,17 @@ fun PayeesScreen(
             .background(Metro.colors.background),
     ) {
         if (mergeTarget != null && editing != null) {
-            Column(Modifier.padding(MetroDimens.Gutter)) {
-                MetroText("merge payees", Metro.typography.header)
-                MetroText(
-                    "This name already exists. Confirm to merge transactions into the existing payee.",
-                    Metro.typography.body,
-                    Modifier.padding(top = MetroDimens.Gutter),
-                )
-                MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
-                    MetroButton("merge") {
-                        onConfirmMerge(editing!!.id, name)
-                        editing = null
-                    }
-                    MetroButton("cancel") { onCancelMerge() }
-                }
-            }
+            ConfirmPage(
+                title = PayeeScreenCopy.MERGE_TITLE,
+                body = PayeeScreenCopy.MERGE_BODY,
+                yes = PayeeScreenCopy.MERGE,
+                onYes = {
+                    onConfirmMerge(editing!!.id, name)
+                    editing = null
+                },
+                onKeep = onCancelMerge,
+                tag = "payee-merge",
+            )
         } else if (editing != null) {
             Column(Modifier.padding(MetroDimens.Gutter)) {
                 MetroText("rename payee", Metro.typography.header)
@@ -114,4 +110,11 @@ private fun RowChoice(
             .metroPress(onClick = onSelect),
         color = if (selected) Metro.accent.text else Metro.colors.secondary,
     )
+}
+
+/** Words for the payees page's questions. */
+object PayeeScreenCopy {
+    const val MERGE_TITLE = "merge payees?"
+    const val MERGE_BODY = "this name already exists; merging moves these transactions to the existing payee"
+    const val MERGE = "merge"
 }

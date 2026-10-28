@@ -76,13 +76,12 @@ object CategoryManageCopy {
     const val SHOW_GROUP = "show group"
     const val HIDE_HINT = "keeps its history"
     const val DELETE = "delete"
-    const val KEEP = "keep"
     const val HIDDEN = "hidden"
     const val IN_USE = "has transactions · hide it instead"
-    const val DELETE_CATEGORY_BODY = "It has no transactions and no money budgeted, so nothing else in the budget changes."
-    const val DELETE_CATEGORY_NOTE = "Deleting syncs to your other devices. To keep it around without seeing it, hide it instead."
-    const val DELETE_GROUP_BODY = "The group is empty, so nothing else in the budget changes."
-    const val DELETE_GROUP_NOTE = "Deleting syncs to your other devices."
+    const val DELETE_CATEGORY_BODY = "it has no transactions and no money budgeted, so nothing else in the budget changes"
+    const val DELETE_CATEGORY_NOTE = "deleting syncs to your other devices; to keep it without seeing it, hide it instead"
+    const val DELETE_GROUP_BODY = "the group is empty, so nothing else in the budget changes"
+    const val DELETE_GROUP_NOTE = "deleting syncs to your other devices"
 
     fun addTo(group: String) = "add category to $group"
 
@@ -661,30 +660,17 @@ private fun DeletePage(
     onKeep: () -> Unit,
 ) {
     val category = current is ManageDelete.Category
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .quietTap {}
-            .padding(MetroDimens.Gutter)
-            .testTag("manage-delete"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText(CategoryManageCopy.delete(current.name), Metro.typography.header, maxLines = 3)
-        MetroText(
-            if (category) CategoryManageCopy.DELETE_CATEGORY_BODY else CategoryManageCopy.DELETE_GROUP_BODY,
-            Metro.typography.body,
-        )
-        MetroText(
-            if (category) CategoryManageCopy.DELETE_CATEGORY_NOTE else CategoryManageCopy.DELETE_GROUP_NOTE,
-            Metro.typography.body,
-            color = Metro.colors.secondary,
-        )
-        MetroButtonGrid {
-            MetroButton(CategoryManageCopy.DELETE, Modifier.testTag("manage-delete-confirm"), onClick = onDelete)
-            MetroButton(CategoryManageCopy.KEEP, Modifier.testTag("manage-delete-keep"), onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = CategoryManageCopy.delete(current.name),
+        body = if (category) CategoryManageCopy.DELETE_CATEGORY_BODY else CategoryManageCopy.DELETE_GROUP_BODY,
+        note = if (category) CategoryManageCopy.DELETE_CATEGORY_NOTE else CategoryManageCopy.DELETE_GROUP_NOTE,
+        yes = CategoryManageCopy.DELETE,
+        onYes = onDelete,
+        onKeep = onKeep,
+        tag = "manage-delete",
+        yesTag = "manage-delete-confirm",
+        keepTag = "manage-delete-keep",
+    )
 }
 
 /** Takes a tap with no press look: the scrim that closes a sheet, and the panels that keep taps off the list. */

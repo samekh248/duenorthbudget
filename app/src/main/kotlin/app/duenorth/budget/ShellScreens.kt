@@ -1018,20 +1018,15 @@ fun ConfirmSwitchScreen(
     onStay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText("open $opening", Metro.typography.header)
-        MetroText("leave $leaving on the phone", Metro.typography.subheader)
-        MetroButtonGrid {
-            MetroButton("open", onClick = onOpen)
-            MetroButton("stay", onClick = onStay)
-        }
-    }
+    ConfirmPage(
+        title = "open $opening",
+        body = "leave $leaving on the phone",
+        yes = "open",
+        onYes = onOpen,
+        onKeep = onStay,
+        tag = "confirm-switch",
+        modifier = modifier,
+    )
 }
 
 @Composable

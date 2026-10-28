@@ -253,26 +253,20 @@ fun ConfirmReplaceScreen(
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText("replace $serverName", Metro.typography.header)
-        MetroText("with $phoneName", Metro.typography.subheader)
-        MetroButtonGrid {
-            MetroButton("replace", onClick = onReplace)
-            MetroButton("keep", onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = "replace $serverName",
+        body = "with $phoneName",
+        yes = "replace",
+        onYes = onReplace,
+        onKeep = onKeep,
+        tag = "confirm-replace",
+        modifier = modifier,
+    )
 }
 
 /** Words on the budget picker's replace confirmation. */
 object ReplaceBudgetCopy {
     const val USE = "use"
-    const val KEEP = "keep"
     const val LOST = "changes that never synced to a server are lost"
 
     fun use(name: String) = "use $name"
@@ -299,20 +293,16 @@ fun ConfirmReplaceBudgetScreen(
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("confirm-replace-budget"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText(ReplaceBudgetCopy.use(opening), Metro.typography.header)
-        MetroText(ReplaceBudgetCopy.clears(clearing), Metro.typography.subheader, Modifier.testTag("replace-budget-clears"))
-        MetroText(ReplaceBudgetCopy.LOST, Metro.typography.body, color = Metro.colors.secondary)
-        MetroButtonGrid {
-            MetroButton(ReplaceBudgetCopy.USE, Modifier.testTag("replace-budget-use"), onClick = onUse)
-            MetroButton(ReplaceBudgetCopy.KEEP, Modifier.testTag("replace-budget-keep"), onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = ReplaceBudgetCopy.use(opening),
+        body = ReplaceBudgetCopy.clears(clearing),
+        note = ReplaceBudgetCopy.LOST,
+        yes = ReplaceBudgetCopy.USE,
+        onYes = onUse,
+        onKeep = onKeep,
+        tag = "confirm-replace-budget",
+        modifier = modifier,
+        yesTag = "replace-budget-use",
+        keepTag = "replace-budget-keep",
+    )
 }

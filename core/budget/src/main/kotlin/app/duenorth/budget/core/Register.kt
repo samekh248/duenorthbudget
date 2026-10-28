@@ -14,6 +14,7 @@ object RegisterCopy {
     const val CHOOSE_ACCOUNT = "choose an account"
     const val SPLIT_MUST_ADD = "split must add up"
     const val RECONCILE_WARN = "this reconciliation will no longer match"
+    const val RECONCILE_CHANGE = "change a reconciled transaction?"
     const val NO_CATEGORY = "no category"
     const val SPLIT = "split"
     const val ADD_SPLIT = "add split"

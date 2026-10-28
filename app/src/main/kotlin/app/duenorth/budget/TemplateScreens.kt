@@ -54,6 +54,19 @@ fun TemplatesScreen(
     onConfirmPreview: () -> Unit = {},
     onKeepPreview: () -> Unit = {},
 ) {
+    if (confirm != null) {
+        ConfirmPage(
+            title = TemplateCopy.OVERWRITE_TITLE,
+            caption = monthLabel(month),
+            body = confirm,
+            yes = TemplateCopy.OVERWRITE,
+            onYes = onConfirm,
+            onKeep = onKeep,
+            tag = "templates-confirm",
+            modifier = modifier,
+        )
+        return
+    }
     Column(
         modifier
             .fillMaxSize()
@@ -74,14 +87,6 @@ fun TemplatesScreen(
         MetroText(caption, Metro.typography.caption, color = Metro.colors.secondary)
         if (applyPreview != null && currency != null) {
             TemplateApplyList(applyPreview, currency, onConfirmPreview, onKeepPreview)
-            return@Column
-        }
-        if (confirm != null) {
-            MetroText(confirm, Metro.typography.subheader, Modifier.testTag("templates-confirm"))
-            MetroButtonGrid {
-                MetroButton(TemplateCopy.OVERWRITE, Modifier.testTag("templates-confirm-yes"), onClick = onConfirm)
-                MetroButton(MonthActionCopy.KEEP, Modifier.testTag("templates-confirm-keep"), onClick = onKeep)
-            }
             return@Column
         }
         if (lanes != null && currency != null) {

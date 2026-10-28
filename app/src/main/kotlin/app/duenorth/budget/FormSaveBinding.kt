@@ -9,14 +9,26 @@ import app.duenorth.budget.design.components.ScreenAction
 
 class FormSaveHost {
     private val handler = mutableStateOf<(() -> Unit)?>(null)
-    private val barOverride = mutableStateOf<List<ScreenAction>?>(null)
+    private val barOverrides = mutableStateOf<List<Pair<Int, List<ScreenAction>>>>(emptyList())
+    private var overrideCount = 0
     private val actions = mutableMapOf<String, () -> Unit>()
 
     /** Actions a form's own page (a picker over the form) puts on the bar in place of the route's. */
-    val bar: List<ScreenAction>? get() = barOverride.value
+    val bar: List<ScreenAction>? get() = barOverrides.value.maxByOrNull { it.first }?.second
 
-    fun overrideBar(actions: List<ScreenAction>?) {
-        barOverride.value = actions
+    /** A place in the stack of overrides: one taken later sits above, as a page drawn over another does. */
+    fun overrideSlot(): Int = ++overrideCount
+
+    /**
+     * [slot]'s actions replace the bar until it passes null. Overrides stack, so a confirmation drawn over a page
+     * that has its own override (a delete question over the categories page) hands the bar back when it closes.
+     */
+    fun overrideBar(
+        slot: Int,
+        actions: List<ScreenAction>?,
+    ) {
+        val others = barOverrides.value.filter { it.first != slot }
+        barOverrides.value = if (actions == null) others else others + (slot to actions)
     }
 
     fun bind(save: () -> Unit) {
@@ -75,9 +87,10 @@ fun RememberFormAction(
 @Composable
 fun RememberBarOverride(actions: List<ScreenAction>) {
     val host = LocalFormSaveHost.current
+    val slot = remember(host) { host?.overrideSlot() ?: 0 }
     DisposableEffect(host, actions) {
-        host?.overrideBar(actions)
-        onDispose { host?.overrideBar(null) }
+        host?.overrideBar(slot, actions)
+        onDispose { host?.overrideBar(slot, null) }
     }
 }
 

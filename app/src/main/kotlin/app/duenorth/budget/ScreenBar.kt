@@ -73,7 +73,7 @@ object ScreenBar {
         schedules: SchedulesBar = SchedulesBar(),
         accountsReorder: Boolean = false,
         accountClosed: Boolean = false,
-        /** The close page is asking again before a force close, which carries its own buttons. */
+        /** The close page is asking again before a force close; the question puts its own answers on the bar. */
         accountForceConfirm: Boolean = false,
         /** An open account is linked through SimpleFIN and the budget lives on a server, so the accounts bar can bank sync. */
         accountsBankSync: Boolean = false,

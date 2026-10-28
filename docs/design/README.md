@@ -29,5 +29,12 @@ here still follow the Due North Tasks reference,
 `docs/design/metro-mockups.svg` in
 [samekh248/duenorthtasks](https://github.com/samekh248/duenorthtasks).
 
+Every question the app asks before a change (copy last month, delete a
+category, remove a server, post a schedule twice) is one shared confirm page,
+`ConfirmPage` in `app/.../ConfirmPage.kt`: the title as a question, a lowercase
+line on what changes, and its two answers on the app bar in place of the page
+underneath's. The yes answer is the action's own verb (replace, delete, post
+anyway); the other is always keep.
+
 The rules that matter are in `.specify/memory/constitution.md` (Principles I
 and II). Fluidity wins when a Metro motion would stutter.

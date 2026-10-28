@@ -220,21 +220,17 @@ fun ForceCloseConfirmScreen(
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("account-force-close-confirm"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText(AccountScreenCopy.FORCE_CLOSE, Metro.typography.header)
-        MetroText(reason, Metro.typography.subheader)
-        MetroButtonGrid {
-            MetroButton(AccountScreenCopy.FORCE_CLOSE, Modifier.testTag("account-force-close-yes"), onClick = onConfirm)
-            MetroButton(AccountScreenCopy.KEEP, Modifier.testTag("account-force-close-keep"), onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = AccountScreenCopy.FORCE_CLOSE,
+        body = reason,
+        yes = AccountScreenCopy.FORCE_CLOSE,
+        onYes = onConfirm,
+        onKeep = onKeep,
+        tag = "account-force-close-confirm",
+        modifier = modifier,
+        yesTag = "account-force-close-yes",
+        keepTag = "account-force-close-keep",
+    )
 }
 
 @Composable
