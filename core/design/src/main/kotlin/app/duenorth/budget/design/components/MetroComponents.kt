@@ -71,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -506,6 +507,7 @@ enum class AppGlyph {
     Select,
     Search,
     Delete,
+    Edit,
 }
 
 @Immutable
@@ -800,6 +802,7 @@ object AppGlyphInk {
             AppGlyph.Select -> 4
             AppGlyph.Search -> 2
             AppGlyph.Delete -> 4
+            AppGlyph.Edit -> 2
         }
 
     fun DrawScope.draw(
@@ -979,6 +982,22 @@ object AppGlyphInk {
                 listOf(9.5f, 12.5f).forEach { x ->
                     drawLine(color, Offset(x.dp.toPx(), 9.dp.toPx()), Offset(x.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.2.dp.toPx())
                 }
+            }
+            AppGlyph.Edit -> {
+                // A pencil leaning down to the left, its point at the bottom and a band below its end: the WP "edit" glyph.
+                drawPath(
+                    Path().apply {
+                        moveTo(4.dp.toPx(), 18.dp.toPx())
+                        lineTo(5.6.dp.toPx(), 13.6.dp.toPx())
+                        lineTo(14.6.dp.toPx(), 4.6.dp.toPx())
+                        lineTo(17.4.dp.toPx(), 7.4.dp.toPx())
+                        lineTo(8.4.dp.toPx(), 16.4.dp.toPx())
+                        close()
+                    },
+                    color,
+                    style = Stroke(width = 1.6.dp.toPx(), join = StrokeJoin.Miter),
+                )
+                drawLine(color, Offset(12.6.dp.toPx(), 6.6.dp.toPx()), Offset(15.4.dp.toPx(), 9.4.dp.toPx()), strokeWidth = 1.6.dp.toPx())
             }
             AppGlyph.Breakdown -> {
                 drawLine(color, Offset(4.dp.toPx(), 5.dp.toPx()), Offset(18.dp.toPx(), 5.dp.toPx()), strokeWidth = 1.6.dp.toPx())

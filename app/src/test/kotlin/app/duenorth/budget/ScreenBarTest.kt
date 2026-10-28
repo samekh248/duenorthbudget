@@ -13,9 +13,9 @@ class ScreenBarTest {
     @Test
     fun homeEnvelopeActions() {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
-        assertEquals(listOf("add"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add", "edit-budget"), specs.filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("edit-budget", "hold", "categories", "show-hidden", "rules", "settings"),
+            listOf("hold", "categories", "show-hidden", "rules", "settings"),
             specs.filter { !it.primary }.map { it.id },
         )
     }
@@ -243,7 +243,7 @@ class ScreenBarTest {
     fun homeTrackingOmitsHold() {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.TRACKING)
         val ids = specs.map { it.id }
-        assertEquals(listOf("add"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add", "edit-budget"), specs.filter { it.primary }.map { it.id })
         assertTrue(ids.contains("categories"))
         assertFalse(ids.contains("hold"))
     }

@@ -180,7 +180,7 @@ object ScreenBar {
                                 if (showClosed) AccountScreenCopy.HIDE_CLOSED else AccountScreenCopy.SHOW_CLOSED,
                             ),
                         ) + undo(undoLabel) + settings()
-                    // Add a transaction is the budget's one button; hold and categories follow edit budget in the menu.
+                    // Add a transaction and edit budget are the budget's buttons; hold and categories head the menu.
                     mode == BudgetMode.TRACKING ->
                         listOf(addTransaction()) + editBudget() + categories() + hidden(showHidden) + rules() +
                             undo(undoLabel) + settings()
@@ -445,8 +445,8 @@ object ScreenBar {
             menu("auto-hold-off", AppGlyph.Hold, "${MonthFillCopy.AUTO_HOLD} ${IncomeCopy.HOLD_OFF}"),
         )
 
-    /** Home `•••` → edit budget heads the budget's menu. */
-    private fun editBudget() = listOf(menu("edit-budget", AppGlyph.Categories, BudgetEditCopy.EDIT))
+    /** Edit budget sits on the budget's bar, right of add. */
+    private fun editBudget() = listOf(spec("edit-budget", AppGlyph.Edit, BudgetEditCopy.EDIT))
 
     /** Home `•••` → hold money for next month, envelope budgets only. */
     private fun hold() = listOf(menu("hold", AppGlyph.Hold, "hold"))

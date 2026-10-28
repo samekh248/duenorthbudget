@@ -49,7 +49,7 @@ object BudgetKeys {
     const val EQUALS = "="
 }
 
-/** Home `•••` → edit budget, or a tap on to budget: opens edit mode on the budget item. */
+/** The budget bar's edit budget button, or a tap on to budget: opens edit mode on the budget item. */
 fun ShellViewModel.startBudgetEdit() {
     val shell = state.value.shell ?: return
     mutate {
