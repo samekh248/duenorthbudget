@@ -45,6 +45,9 @@ class HttpBankSyncTransport : BankSyncTransport {
         val connection =
             java.net.URL("$base/simplefin/transactions").openConnection() as java.net.HttpURLConnection
         try {
+            // A bridge that never answers would hold the budget's lock, and every sync behind it, for good.
+            connection.connectTimeout = CONNECT_TIMEOUT_MS
+            connection.readTimeout = READ_TIMEOUT_MS
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("X-ACTUAL-TOKEN", token)
@@ -54,7 +57,9 @@ class HttpBankSyncTransport : BankSyncTransport {
             val stream = if (code >= 400) connection.errorStream else connection.inputStream
             val bytes = stream?.readBytes() ?: ByteArray(0)
             if (code != 200) throw BankSyncException(ImportCopy.FETCH_FAILED)
-            val root = json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject
+            val reply = json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject
+            // Actual answers `{"status":"ok","data":{...}}`, and a bank error comes back inside `data`.
+            val root = reply["data"] as? JsonObject ?: reply
             if (root.containsKey("error_code")) throw BankSyncException(ImportCopy.FETCH_FAILED)
             return parseSimpleFinResponse(root, 2)
         } catch (error: BankSyncException) {
@@ -98,18 +103,21 @@ class HttpBankSyncTransport : BankSyncTransport {
                     ?.string("amount")
                     ?.let { ImportFileParserAmount.parse(it, decimals) }
                 ?: return null
+        // Actual's server sends `payeeName`, `notes` and `transactionId`, the names its web app imports from.
         val payee =
-            row.string("payee_name")
+            row.string("payeeName")
+                ?: row.string("payee_name")
                 ?: row.string("imported_payee")
                 ?: row.string("payee")
                 ?: return null
-        val financialId = row.string("imported_id") ?: row.string("id")
+        val financialId = row.string("transactionId") ?: row.string("imported_id") ?: row.string("id")
         return ParsedImportRow(
             date = date,
             payee = payee,
             amountMinor = amount,
             financialId = financialId,
             importedPayee = row.string("imported_payee") ?: payee,
+            note = row.string("notes"),
         )
     }
 
@@ -122,6 +130,9 @@ class HttpBankSyncTransport : BankSyncTransport {
         return null
     }
 }
+
+private const val CONNECT_TIMEOUT_MS = 15_000
+private const val READ_TIMEOUT_MS = 90_000
 
 private object ImportFileParserAmount {
     fun parse(

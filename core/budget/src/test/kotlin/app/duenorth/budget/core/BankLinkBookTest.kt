@@ -144,6 +144,35 @@ class BankLinkBookTest {
         }
     }
 
+    @Test
+    fun fetchReadsTheTransactionsActualsServerSends() {
+        withPhone { server, phone, _ ->
+            server.providerData["/simplefin/transactions"] = SIMPLEFIN_TRANSACTIONS
+            val rows =
+                HttpBankSyncTransport().fetchTransactions(server.baseUrl, phone.sync.syncToken()!!, "ACT-1", "2026-08-01")
+            assertEquals(
+                listOf(
+                    ParsedImportRow(20261028, "Streamer", -999, "TRN-2", "Streamer", "STREAMING"),
+                    ParsedImportRow(20261027, "Coffee Shop", -4250, "TRN-1", "Coffee Shop", "COFFEE SHOP 123"),
+                ),
+                rows,
+            )
+        }
+    }
+
+    @Test
+    fun fetchFailsOnABankErrorInsideData() {
+        withPhone { server, phone, _ ->
+            server.providerData["/simplefin/transactions"] =
+                """{"error_type":"ACCOUNT_MISSING","error_code":"ACCOUNT_MISSING","reason":"not found"}"""
+            val failed =
+                runCatching {
+                    HttpBankSyncTransport().fetchTransactions(server.baseUrl, phone.sync.syncToken()!!, "ACT-1", "2026-08-01")
+                }
+            assertEquals(ImportCopy.FETCH_FAILED, failed.exceptionOrNull()?.message)
+        }
+    }
+
     private fun withPhone(block: (LocalActualServer, SyncPhone, String) -> Unit) {
         LocalActualServer().use { server ->
             val remote = server.addFile("Home", phoneFile())
@@ -175,6 +204,18 @@ class BankLinkBookTest {
               {"id":"ACT-1","name":"Everyday","balance":"1234.56","org":{"name":"First Bank","domain":"firstbank.example"}},
               {"id":"ACT-2","name":"Bills","balance":"-20.00","org":{"name":"First Bank","domain":"firstbank.example"}}
             ]}
+            """.trimIndent()
+
+        /** What Actual's server answers on `/simplefin/transactions`, inside `data` (recorded from 26.10). */
+        val SIMPLEFIN_TRANSACTIONS =
+            """
+            {"balances":[],"startingBalance":100000,"transactions":{"all":[
+              {"booked":false,"sortOrder":1793211853,"date":"2026-10-28","payeeName":"Streamer","notes":"STREAMING",
+               "transactionAmount":{"amount":"-9.99","currency":"USD"},"transactionId":"TRN-2","transactedDate":"2026-10-28"},
+              {"booked":true,"sortOrder":1793129053,"date":"2026-10-27","payeeName":"Coffee Shop","notes":"COFFEE SHOP 123",
+               "transactionAmount":{"amount":"-42.50","currency":"USD"},"transactionId":"TRN-1","transactedDate":"2026-10-27",
+               "postedDate":"2026-10-27"}
+            ],"booked":[],"pending":[]}}
             """.trimIndent()
     }
 }
