@@ -23,6 +23,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BackgroundSync
@@ -35,10 +38,12 @@ import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
-import app.duenorth.budget.design.components.MetroButton
-import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroComboBox
+import app.duenorth.budget.design.components.MetroContextMenu
+import app.duenorth.budget.design.components.MetroMenuItem
+import app.duenorth.budget.design.components.MetroSectionHeading
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.SectionSize
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Accent
 import app.duenorth.budget.design.theme.Metro
@@ -124,11 +129,26 @@ internal fun ServerItem(
     backgroundSyncHours: Int = BackgroundSync.DEFAULT_HOURS,
     onBackgroundSyncHours: (Int) -> Unit = {},
 ) {
+    // A server's commands open from its row, as the categories page's do.
+    var menu by remember { mutableStateOf<Pair<Rect, List<MetroMenuItem>>?>(null) }
+    var activeBounds by remember { mutableStateOf(Rect.Zero) }
     SettingsHeading("this phone syncs with", first = true)
     MetroText(
         activeInstance?.let { it.label ?: it.address } ?: SettingsCopy.NOT_CONNECTED,
         Metro.typography.subheader,
-        Modifier.testTag("instance-status"),
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .onGloballyPositioned { activeBounds = it.boundsInWindow() }
+            .then(
+                if (activeInstance != null) {
+                    Modifier.metroPress {
+                        menu = activeBounds to listOf(removeItem(activeInstance.id, onRemove))
+                    }
+                } else {
+                    Modifier
+                },
+            ).testTag("instance-status"),
         color = if (activeInstance != null) Metro.accent.text else Metro.colors.foreground,
     )
     if (activeInstance == null) {
@@ -149,30 +169,32 @@ internal fun ServerItem(
                 else -> SettingsCopy.SIGNED_OUT
             }
         MetroText(state, Metro.typography.body, Modifier.testTag("instance-state"))
-        MetroButtonGrid(Modifier.padding(top = MetroDimens.Row)) {
-            MetroButton("remove", Modifier.testTag("instance-remove-${activeInstance.id}")) { onRemove(activeInstance.id) }
-        }
     }
     val others = instances.filter { it.id != activeInstance?.id }
     if (others.isNotEmpty()) {
         SettingsHeading("saved servers")
         others.forEach { instance ->
-            Column(Modifier.padding(vertical = MetroDimens.Row)) {
-                MetroText(
-                    instance.label ?: instance.address,
-                    Metro.typography.subheader,
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = MetroDimens.TouchTarget)
-                        .testTag("instance-${instance.id}"),
-                )
-                MetroButtonGrid {
-                    MetroButton("make active", Modifier.testTag("instance-activate-${instance.id}")) { onMakeActive(instance.id) }
-                    MetroButton("remove", Modifier.testTag("instance-remove-${instance.id}")) { onRemove(instance.id) }
-                }
-            }
+            var bounds by remember { mutableStateOf(Rect.Zero) }
+            MetroText(
+                instance.label ?: instance.address,
+                Metro.typography.subheader,
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = MetroDimens.TouchTarget)
+                    .onGloballyPositioned { bounds = it.boundsInWindow() }
+                    .metroPress {
+                        menu =
+                            bounds to
+                            listOf(
+                                MetroMenuItem("make active", "instance-activate-${instance.id}") { onMakeActive(instance.id) },
+                                removeItem(instance.id, onRemove),
+                            )
+                    }.padding(vertical = MetroDimens.Row)
+                    .testTag("instance-${instance.id}"),
+            )
         }
     }
+    menu?.let { (anchor, items) -> MetroContextMenu(anchor, items, onDismiss = { menu = null }, tag = "instance-menu") }
     // Only a server can be synced with, so the interval shows once one is active.
     if (activeInstance != null) {
         SettingsHeading("background sync", tag = "settings-background-sync")
@@ -294,20 +316,16 @@ internal fun AdvancedItem(
         Metro.typography.body,
         Modifier.testTag("settings-encryption-state"),
     )
-    MetroButtonGrid(Modifier.padding(top = MetroDimens.Row)) {
-        if (encrypted) {
-            MetroButton(SettingsCopy.CHANGE_PASSWORD, Modifier.testTag("encryption-change")) { onEncryption(EncryptionMode.CHANGE) }
-            MetroButton(SettingsCopy.REMOVE_PASSWORD, Modifier.testTag("encryption-remove")) { onEncryption(EncryptionMode.REMOVE) }
-        } else {
-            MetroButton(SettingsCopy.SET_PASSWORD, Modifier.testTag("encryption-set")) { onEncryption(EncryptionMode.SET) }
-        }
+    if (encrypted) {
+        SettingsActionRow(SettingsCopy.CHANGE_PASSWORD, "encryption-change") { onEncryption(EncryptionMode.CHANGE) }
+        SettingsActionRow(SettingsCopy.REMOVE_PASSWORD, "encryption-remove") { onEncryption(EncryptionMode.REMOVE) }
+    } else {
+        SettingsActionRow(SettingsCopy.SET_PASSWORD, "encryption-set") { onEncryption(EncryptionMode.SET) }
     }
     SettingsHeading("repair", tag = "settings-advanced")
-    MetroButtonGrid(Modifier.padding(top = MetroDimens.Row)) {
-        MetroButton("rebuild totals", Modifier.testTag("settings-rebuild")) { onRequest(AdvancedConfirm.Rebuild) }
-        MetroButton("repair splits", Modifier.testTag("settings-repair")) { onRequest(AdvancedConfirm.Repair) }
-        MetroButton("reset sync", Modifier.testTag("settings-reset-sync")) { onRequest(AdvancedConfirm.ResetSync) }
-    }
+    SettingsActionRow("rebuild totals", "settings-rebuild") { onRequest(AdvancedConfirm.Rebuild) }
+    SettingsActionRow("repair splits", "settings-repair") { onRequest(AdvancedConfirm.Repair) }
+    SettingsActionRow("reset sync", "settings-reset-sync") { onRequest(AdvancedConfirm.ResetSync) }
 }
 
 @Composable
@@ -316,13 +334,11 @@ private fun SettingsHeading(
     tag: String? = null,
     first: Boolean = false,
 ) {
-    MetroText(
+    MetroSectionHeading(
         text,
-        Metro.typography.groupHeader,
-        Modifier
-            .padding(top = if (first) 0.dp else MetroDimens.Gutter)
-            .then(if (tag != null) Modifier.testTag(tag) else Modifier),
-        color = Metro.colors.secondary,
+        if (tag != null) Modifier.testTag(tag) else Modifier,
+        size = SectionSize.PAGE,
+        first = first,
     )
 }
 
@@ -384,3 +400,8 @@ private fun <T> ListPicker(
 ) {
     MetroComboBox(choices, selected, label, onPick, tag, Modifier.padding(top = 4.dp))
 }
+
+private fun removeItem(
+    id: String,
+    onRemove: (String) -> Unit,
+) = MetroMenuItem("remove", "instance-remove-$id", accent = true) { onRemove(id) }

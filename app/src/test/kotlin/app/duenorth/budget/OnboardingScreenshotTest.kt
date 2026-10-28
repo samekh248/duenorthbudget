@@ -184,13 +184,14 @@ class OnboardingScreenshotTest {
     ) {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark, animationsEnabled = false) {
-                // The page with the app bar it gets on the phone; the bar owns save.
-                CompositionLocalProvider(LocalFormSaveHost provides FormSaveHost()) {
+                // The page with the app bar it gets on the phone; the bar owns save, and a question takes it over.
+                val host = rememberFormSaveHost()
+                CompositionLocalProvider(LocalFormSaveHost provides host) {
                     Column(Modifier.width(390.dp).height(780.dp)) {
                         Box(Modifier.weight(1f)) { content() }
                         MetroAppBar(
                             actions =
-                                ScreenBar
+                                host.bar ?: ScreenBar
                                     .specsFor(route, hasBudget = false, mode = null, passwordSignIn = !name.contains("browser"))
                                     .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
                             expanded = false,

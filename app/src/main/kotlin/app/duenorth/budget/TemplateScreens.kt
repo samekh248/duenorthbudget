@@ -22,10 +22,12 @@ import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.core.TemplatePlan
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.monthLabel
+import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import java.time.YearMonth
@@ -54,6 +56,19 @@ fun TemplatesScreen(
     onConfirmPreview: () -> Unit = {},
     onKeepPreview: () -> Unit = {},
 ) {
+    if (confirm != null) {
+        ConfirmPage(
+            title = TemplateCopy.OVERWRITE_TITLE,
+            caption = monthLabel(month),
+            body = confirm,
+            yes = TemplateCopy.OVERWRITE,
+            onYes = onConfirm,
+            onKeep = onKeep,
+            tag = "templates-confirm",
+            modifier = modifier,
+        )
+        return
+    }
     Column(
         modifier
             .fillMaxSize()
@@ -76,14 +91,6 @@ fun TemplatesScreen(
             TemplateApplyList(applyPreview, currency, onConfirmPreview, onKeepPreview)
             return@Column
         }
-        if (confirm != null) {
-            MetroText(confirm, Metro.typography.subheader, Modifier.testTag("templates-confirm"))
-            MetroButtonGrid {
-                MetroButton(TemplateCopy.OVERWRITE, Modifier.testTag("templates-confirm-yes"), onClick = onConfirm)
-                MetroButton(MonthActionCopy.KEEP, Modifier.testTag("templates-confirm-keep"), onClick = onKeep)
-            }
-            return@Column
-        }
         if (lanes != null && currency != null) {
             // The lanes list bad lines themselves, each with fix.
             if (result is TemplateResult.Invalid) {
@@ -100,11 +107,14 @@ fun TemplatesScreen(
         } else {
             TemplateOutcome(result, busy)
         }
-        MetroButtonGrid {
-            MetroButton(TemplateCopy.APPLY, Modifier.testTag("templates-apply"), onClick = onApply)
-            MetroButton(TemplateCopy.OVERWRITE, Modifier.testTag("templates-overwrite"), onClick = onOverwrite)
-            MetroButton(TemplateCopy.CHECK, Modifier.testTag("templates-check"), onClick = onCheck)
-        }
+        // Apply is the page's one button; overwrite and check sit in its menu.
+        PageBar(
+            listOf(
+                ScreenAction("templates-apply", AppGlyph.Save, TemplateCopy.APPLY, run = onApply),
+                ScreenAction("templates-overwrite", AppGlyph.Copy, TemplateCopy.OVERWRITE, primary = false, run = onOverwrite),
+                ScreenAction("templates-check", AppGlyph.Search, TemplateCopy.CHECK, primary = false, run = onCheck),
+            ),
+        )
     }
 }
 

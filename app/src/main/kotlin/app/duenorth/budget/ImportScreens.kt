@@ -26,8 +26,10 @@ import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.PreviewRowStatus
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterEntry
+import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -126,7 +128,7 @@ fun ImportReviewScreen(
                 ReviewRowEditor(row, page.categories, page, onCategory)
             }
         }
-        MetroButton(ImportCopy.DONE, Modifier.padding(top = MetroDimens.Grid), onClick = onDone)
+        PageBar(listOf(ScreenAction("import-done", AppGlyph.Save, ImportCopy.DONE, run = onDone)))
     }
 }
 

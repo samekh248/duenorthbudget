@@ -59,6 +59,18 @@ class CategoryManageContentTest {
         return host.bar.orEmpty().map { it.id }
     }
 
+    /** Taps the bar action [id], as the application bar would. */
+    private fun tapBar(id: String) {
+        compose.waitForIdle()
+        compose.runOnIdle {
+            host.bar
+                .orEmpty()
+                .single { it.id == id }
+                .run()
+        }
+        compose.waitForIdle()
+    }
+
     private fun field() = compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("manage-name-field")))
 
     @Test
@@ -101,14 +113,18 @@ class CategoryManageContentTest {
     fun anUnusedCategoryDeletesAfterTheConfirmPage() {
         show()
         compose.onNodeWithTag("manage-group-g-save").performClick()
+        val pageBar = bar()
         compose.onNodeWithTag("manage-category-c-gym").performClick()
         compose.onNodeWithTag("manage-action-delete").performClick()
         compose.onNodeWithTag("manage-delete").assertIsDisplayed()
-        compose.onNodeWithTag("manage-delete-keep").performClick()
+        // The question's answers take the bar, and keep hands it back to the categories page.
+        assertEquals(listOf(CONFIRM_YES, CONFIRM_KEEP), bar())
+        tapBar(CONFIRM_KEEP)
         assertEquals(emptyList<String>(), calls)
+        assertEquals(pageBar, bar())
         compose.onNodeWithTag("manage-category-c-gym").performClick()
         compose.onNodeWithTag("manage-action-delete").performClick()
-        compose.onNodeWithTag("manage-delete-confirm").performClick()
+        tapBar(CONFIRM_YES)
         assertEquals(listOf("delete c-gym"), calls)
     }
 
@@ -128,7 +144,7 @@ class CategoryManageContentTest {
         compose.onNodeWithTag("manage-group-g-pets").performTouchInput { longClick() }
         compose.onNodeWithTag("manage-sheet").assertIsDisplayed()
         compose.onNodeWithTag("manage-action-delete").performClick()
-        compose.onNodeWithTag("manage-delete-confirm").performClick()
+        tapBar(CONFIRM_YES)
         compose.onNodeWithTag("manage-group-g-bills").performTouchInput { longClick() }
         compose.onNodeWithTag("manage-action-delete").performClick()
         compose.onNodeWithTag("manage-action-hide").performClick()

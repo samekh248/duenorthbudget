@@ -68,6 +68,11 @@ class BankLinkContentTest {
         show(BankLinkSamples.linked().copy(error = "couldn't reach the bank provider"), onRemove = { removed++ })
         compose.onNodeWithTag("bank-linked").assertExists()
         compose.onNodeWithTag("bank-link-error").assertExists()
+        // Remove link asks first, and keep leaves the link alone.
+        compose.onNodeWithTag("bank-link-remove-ask").performScrollTo().performClick()
+        compose.onNodeWithTag("bank-link-remove-confirm-keep").performClick()
+        assertEquals(0, removed)
+        compose.onNodeWithTag("bank-link-remove-ask").performScrollTo().performClick()
         compose.onNodeWithTag("bank-link-remove").performClick()
         assertEquals(1, removed)
     }

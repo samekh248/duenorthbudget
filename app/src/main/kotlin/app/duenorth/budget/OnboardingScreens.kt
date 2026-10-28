@@ -260,7 +260,7 @@ fun OnboardingAddressScreen(
                 Modifier
                     .padding(top = MetroDimens.Row)
                     .testTag("onboarding-http-warning"),
-                color = Metro.colors.error,
+                color = Metro.accent.text,
             )
         } else if (parsed != null && parsed.candidates.size > 1) {
             // An address saved before the toggle, with no scheme of its own.

@@ -98,14 +98,14 @@ class SettingsScreenshotTest {
     fun experimentalOffDark() = snap("experimental_off_dark", SettingsPage.EXPERIMENTAL, dark = true)
 
     @Test
-    fun experimentalOfferLight() = page("experimental_offer_light", dark = false) { ExperimentalOfferScreen("Home", {}, {}) }
+    fun experimentalOfferLight() = page("experimental_offer_light", dark = false, hosted = true) { ExperimentalOfferScreen("Home", {}, {}) }
 
     @Test
     fun experimentalOfferChosenLight() =
-        page("experimental_offer_chosen_light", dark = false) { ExperimentalOfferScreen("Home", {}, {}, current = true) }
+        page("experimental_offer_chosen_light", dark = false, hosted = true) { ExperimentalOfferScreen("Home", {}, {}, current = true) }
 
     @Test
-    fun experimentalOfferDark() = page("experimental_offer_dark", dark = true) { ExperimentalOfferScreen("Home", {}, {}) }
+    fun experimentalOfferDark() = page("experimental_offer_dark", dark = true, hosted = true) { ExperimentalOfferScreen("Home", {}, {}) }
 
     private val home = SavedInstance("i1", "http://192.168.1.20:5006", "home server")
     private val office = SavedInstance("i2", "https://budget.example.com", "office")
@@ -188,11 +188,12 @@ class SettingsScreenshotTest {
     private fun page(
         name: String,
         dark: Boolean,
+        hosted: Boolean = false,
         content: @androidx.compose.runtime.Composable () -> Unit,
     ) {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
-                Box(Modifier.width(390.dp).height(780.dp)) { content() }
+                if (hosted) HostedPage(content) else Box(Modifier.width(390.dp).height(780.dp)) { content() }
             }
         }
     }

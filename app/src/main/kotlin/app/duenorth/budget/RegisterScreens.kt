@@ -1510,15 +1510,15 @@ fun SplitForm(
             }
         }
         RememberFormSave(commitSplit)
-        MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
-            MetroButton("add part") {
-                lines = lines + ("" to "")
-            }
-            if (!formSaveOnBar()) {
+        // In the app add split sits on the bar and one category in its menu, as on a transaction's details.
+        RememberFormAction(FORM_ADD_SPLIT) { lines = lines + ("" to "") }
+        if (!formSaveOnBar()) {
+            MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
+                MetroButton(RegisterCopy.ADD_SPLIT) { lines = lines + ("" to "") }
                 MetroButton("save", onClick = commitSplit)
-            }
-            if (row.parent) {
-                MetroButton("one category") { onUnsplit(row.id) }
+                if (row.parent) {
+                    MetroButton(RegisterCopy.ONE_CATEGORY) { onUnsplit(row.id) }
+                }
             }
         }
     }
@@ -1600,19 +1600,15 @@ fun ReconcileWarningScreen(
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText(RegisterCopy.RECONCILE_WARN, Metro.typography.header)
-        MetroButtonGrid {
-            MetroButton("change", onClick = onChange)
-            MetroButton("keep", onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = RegisterCopy.RECONCILE_CHANGE,
+        body = RegisterCopy.RECONCILE_WARN,
+        yes = "change",
+        onYes = onChange,
+        onKeep = onKeep,
+        tag = "reconcile-warning",
+        modifier = modifier,
+    )
 }
 
 @Composable

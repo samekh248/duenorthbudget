@@ -130,7 +130,14 @@ class SettingsContentTest {
         compose.onNodeWithTag("instance-address-line").assertTextEquals(home.address)
         compose.onNodeWithTag("instance-state").assertTextEquals(SyncCopy.NOT_REACHED)
         compose.onNodeWithTag("instance-i2").assertTextEquals(work.address)
+        // A server's commands open from its row.
+        compose.onNodeWithTag("instance-activate-i2").assertDoesNotExist()
+        compose.onNodeWithTag("instance-i2").performClick()
         compose.onNodeWithTag("instance-activate-i2").assertIsDisplayed()
+        compose.onNodeWithTag("instance-remove-i2").performClick()
+        assertEquals("i2", removed)
+        compose.onNodeWithTag("instance-menu").assertDoesNotExist()
+        compose.onNodeWithTag("instance-status").performClick()
         compose.onNodeWithTag("instance-remove-i1").performClick()
         assertEquals("i1", removed)
     }

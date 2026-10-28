@@ -300,7 +300,7 @@ private fun EditLine(
                     if (relief) {
                         Modifier.relief(Relief.Inset, small = true)
                     } else {
-                        Modifier.background(if (open) Color.White else Metro.colors.chrome)
+                        Modifier.background(if (open) Metro.colors.fieldActive else Metro.colors.chrome)
                     },
                 ).then(
                     when {
@@ -330,8 +330,8 @@ private fun EditLine(
                 Metro.typography.body.copy(textAlign = TextAlign.End),
                 color =
                     when {
-                        hint != null -> Color(0xFF8F8F8F)
-                        open && !relief -> Color.Black
+                        hint != null -> Metro.colors.fieldHint
+                        open && !relief -> Metro.colors.onFieldActive
                         else -> Metro.colors.foreground
                     },
                 maxLines = 1,

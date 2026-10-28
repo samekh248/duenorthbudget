@@ -95,8 +95,6 @@ import java.time.YearMonth
 sealed interface ShellRoute {
     data object Home : ShellRoute
 
-    data object Budgets : ShellRoute
-
     data object Create : ShellRoute
 
     data object ConfirmSwitch : ShellRoute
@@ -362,7 +360,7 @@ data class ShellUiState(
     val openIdPendingAddress: String? = null,
     val switchInstanceTarget: SavedInstance? = null,
     val encryptionError: String? = null,
-    val switchReturnRoute: ShellRoute = ShellRoute.Budgets,
+    val switchReturnRoute: ShellRoute = ShellRoute.Home,
     /** The phone's budgets that picking [pendingFile] clears. */
     val replaceBudgets: List<BudgetSummary> = emptyList(),
     val breakdown: ActualMonthMath.MonthBreakdown? = null,
@@ -557,11 +555,6 @@ class ShellViewModel(
         if (!registerGate.gestureActive) return
         registerGate.endGesture()
         _state.update { it.copy(register = registerGate.visible ?: it.register) }
-    }
-
-    fun showBudgets() {
-        history.clear()
-        _state.update { it.copy(route = ShellRoute.Budgets, settingsReturn = false, confirm = null, writeError = null) }
     }
 
     fun showCreate() {

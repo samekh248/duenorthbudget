@@ -232,21 +232,15 @@ fun ConfirmInstanceSwitchScreen(
     onStay: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("confirm-instance-switch"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText("open $opening", Metro.typography.header)
-        MetroText("leave $leaving", Metro.typography.subheader)
-        MetroButtonGrid {
-            MetroButton("open", onClick = onOpen)
-            MetroButton("stay", onClick = onStay)
-        }
-    }
+    ConfirmPage(
+        title = "open $opening",
+        body = "leave $leaving",
+        yes = "open",
+        onYes = onOpen,
+        onKeep = onStay,
+        tag = "confirm-instance-switch",
+        modifier = modifier,
+    )
 }
 
 /** Settings → server → remove: names the server and says the phone's budgets stay (spec 012 FR-007). */
@@ -257,21 +251,17 @@ fun ConfirmRemoveInstanceScreen(
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("confirm-remove-instance"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText("remove $name", Metro.typography.header)
-        MetroText(SettingsCopy.BUDGETS_STAY, Metro.typography.subheader)
-        MetroButtonGrid {
-            MetroButton("remove", Modifier.testTag("remove-instance-confirm"), onClick = onRemove)
-            MetroButton("keep", Modifier.testTag("remove-instance-keep"), onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = "remove $name",
+        body = SettingsCopy.BUDGETS_STAY,
+        yes = "remove",
+        onYes = onRemove,
+        onKeep = onKeep,
+        tag = "confirm-remove-instance",
+        modifier = modifier,
+        yesTag = "remove-instance-confirm",
+        keepTag = "remove-instance-keep",
+    )
 }
 
 @Composable
@@ -281,27 +271,23 @@ fun ConfirmAdvancedScreen(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val title =
+    val (title, yes) =
         when (kind) {
-            AdvancedConfirm.Rebuild -> "rebuild totals"
-            AdvancedConfirm.Repair -> "repair splits"
-            AdvancedConfirm.ResetSync -> "reset sync"
+            AdvancedConfirm.Rebuild -> "rebuild totals" to "rebuild"
+            AdvancedConfirm.Repair -> "repair splits" to "repair"
+            AdvancedConfirm.ResetSync -> "reset sync" to "reset"
         }
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("confirm-advanced"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText(title, Metro.typography.header)
-        MetroText("this changes the budget on this phone", Metro.typography.subheader)
-        MetroButtonGrid {
-            MetroButton("confirm", Modifier.testTag("advanced-confirm"), onClick = onConfirm)
-            MetroButton("stay", Modifier.testTag("advanced-cancel"), onClick = onCancel)
-        }
-    }
+    ConfirmPage(
+        title = title,
+        body = "this changes the budget on this phone",
+        yes = yes,
+        onYes = onConfirm,
+        onKeep = onCancel,
+        tag = "confirm-advanced",
+        modifier = modifier,
+        yesTag = "advanced-confirm",
+        keepTag = "advanced-cancel",
+    )
 }
 
 /** One page per encryption password action; save sits on the app bar (spec 012 FR-013). */

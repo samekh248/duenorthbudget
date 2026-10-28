@@ -156,26 +156,16 @@ fun FillConfirmScreen(
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("fill-confirm"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText(MonthActionCopy.fillTitle(confirm.kind), Metro.typography.header)
-        MetroText(monthLabel(month), Metro.typography.caption, color = Metro.colors.secondary)
-        MetroText(confirm.reason, Metro.typography.subheader)
-        MetroButtonGrid {
-            MetroButton(
-                if (confirm.kind == MonthFillKind.ZERO) MonthActionCopy.ZERO else MonthActionCopy.REPLACE,
-                Modifier.testTag("fill-confirm-yes"),
-                onClick = onConfirm,
-            )
-            MetroButton(MonthActionCopy.KEEP, Modifier.testTag("fill-confirm-keep"), onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = MonthActionCopy.fillTitle(confirm.kind),
+        caption = monthLabel(month),
+        body = confirm.reason,
+        yes = if (confirm.kind == MonthFillKind.ZERO) MonthActionCopy.ZERO else MonthActionCopy.REPLACE,
+        onYes = onConfirm,
+        onKeep = onKeep,
+        tag = "fill-confirm",
+        modifier = modifier,
+    )
 }
 
 /** Moves part of a category's budget back to to-budget (envelope only). */

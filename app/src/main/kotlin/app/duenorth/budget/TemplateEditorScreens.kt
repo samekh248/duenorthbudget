@@ -512,7 +512,8 @@ fun TemplateKindsScreen(
                 if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
-        if (line != null) {
+        // In the app remove line sits in the bar's menu.
+        if (line != null && !formSaveOnBar()) {
             MetroButtonGrid { MetroButton(TemplateEditorCopy.REMOVE_LINE, Modifier.testTag("template-remove"), onClick = onRemove) }
         }
     }
@@ -726,7 +727,8 @@ fun TemplateEditorScreen(
         }
         Spacer(Modifier.height(12.dp))
         TemplatePreview(kind, draft, preview?.takeIf { it.first == draft }?.second, month, currency, options)
-        if (!isNew) {
+        // In the app remove sits in the bar's menu.
+        if (!isNew && !formSaveOnBar()) {
             Spacer(Modifier.height(12.dp))
             MetroButtonGrid { MetroButton(TemplateEditorCopy.REMOVE, Modifier.testTag("template-remove"), onClick = onRemove) }
         }
@@ -824,19 +826,24 @@ private fun TemplatePreview(
     }
 }
 
-/** The category note without its template lines, which the tiles above show and edit. */
+/**
+ * The category note without its template lines, which the tiles above show and edit. In the app the page's save on
+ * the bar keeps a changed note too, through [onDraft]; on its own the page shows its own save button.
+ */
 @Composable
 fun CategoryNoteText(
     note: String,
     onSave: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onDraft: (String?) -> Unit = {},
 ) {
     val text = remember(note) { TemplateNote.parse(note).text }
     var draft by remember(text) { mutableStateOf(text) }
+    LaunchedEffect(text, draft) { onDraft(draft.takeIf { it != text }) }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         MetroText(TemplateEditorCopy.NOTE, Metro.typography.caption, color = Metro.colors.secondary)
         MetroField(draft, { draft = it }, TemplateEditorCopy.NOTE, Modifier.testTag("category-note"), lines = 2..6)
-        if (draft != text) {
+        if (draft != text && !formSaveOnBar()) {
             MetroButton("save ${TemplateEditorCopy.NOTE}", Modifier.testTag("category-note-save")) { onSave(draft) }
         }
     }

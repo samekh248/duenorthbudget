@@ -2,6 +2,7 @@ package app.duenorth.budget
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -13,12 +14,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.PayeeRow
+import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -42,21 +48,17 @@ fun PayeesScreen(
             .background(Metro.colors.background),
     ) {
         if (mergeTarget != null && editing != null) {
-            Column(Modifier.padding(MetroDimens.Gutter)) {
-                MetroText("merge payees", Metro.typography.header)
-                MetroText(
-                    "This name already exists. Confirm to merge transactions into the existing payee.",
-                    Metro.typography.body,
-                    Modifier.padding(top = MetroDimens.Gutter),
-                )
-                MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
-                    MetroButton("merge") {
-                        onConfirmMerge(editing!!.id, name)
-                        editing = null
-                    }
-                    MetroButton("cancel") { onCancelMerge() }
-                }
-            }
+            ConfirmPage(
+                title = PayeeScreenCopy.MERGE_TITLE,
+                body = PayeeScreenCopy.MERGE_BODY,
+                yes = PayeeScreenCopy.MERGE,
+                onYes = {
+                    onConfirmMerge(editing!!.id, name)
+                    editing = null
+                },
+                onKeep = onCancelMerge,
+                tag = "payee-merge",
+            )
         } else if (editing != null) {
             Column(Modifier.padding(MetroDimens.Gutter)) {
                 MetroText("rename payee", Metro.typography.header)
@@ -65,12 +67,12 @@ fun PayeesScreen(
                 if (error != null) {
                     MetroText(error, Metro.typography.body, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)
                 }
-                MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
-                    MetroButton("save") {
-                        onRename(editing!!.id, name, false, rememberRule)
-                    }
-                    MetroButton("cancel") { editing = null }
-                }
+                PageBar(
+                    listOf(
+                        ScreenAction("payee-save", AppGlyph.Save, "save") { onRename(editing!!.id, name, false, rememberRule) },
+                        ScreenAction("payee-cancel", AppGlyph.Cancel, "cancel") { editing = null },
+                    ),
+                )
             }
         } else {
             if (error != null) {
@@ -100,18 +102,28 @@ fun PayeesScreen(
     }
 }
 
+/** Remember as rule as the off/on pair every setting in the app uses. */
 @Composable
 private fun RowChoice(
     label: String,
     selected: Boolean,
     onSelect: () -> Unit,
 ) {
-    MetroText(
-        label,
-        Metro.typography.body,
-        Modifier
-            .padding(top = MetroDimens.Gutter)
-            .metroPress(onClick = onSelect),
-        color = if (selected) Metro.accent.text else Metro.colors.secondary,
-    )
+    Row(Modifier.fillMaxWidth().padding(top = MetroDimens.Gutter), verticalAlignment = Alignment.CenterVertically) {
+        MetroText(label, Metro.typography.body, Modifier.weight(1f).padding(end = 12.dp))
+        MetroSegmentedToggle(
+            first = ExperimentalCopy.OFF,
+            second = ExperimentalCopy.ON,
+            firstSelected = !selected,
+            onSelect = { first -> if (first == selected) onSelect() },
+            tag = "payee-remember-rule",
+        )
+    }
+}
+
+/** Words for the payees page's questions. */
+object PayeeScreenCopy {
+    const val MERGE_TITLE = "merge payees?"
+    const val MERGE_BODY = "this name already exists; merging moves these transactions to the existing payee"
+    const val MERGE = "merge"
 }

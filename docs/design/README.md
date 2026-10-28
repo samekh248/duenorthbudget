@@ -29,5 +29,28 @@ here still follow the Due North Tasks reference,
 `docs/design/metro-mockups.svg` in
 [samekh248/duenorthtasks](https://github.com/samekh248/duenorthtasks).
 
+Every question the app asks before a change (copy last month, delete a
+category, remove a server, post a schedule twice) is one shared confirm page,
+`ConfirmPage` in `app/.../ConfirmPage.kt`: the title as a question, a lowercase
+line on what changes, and its two answers on the app bar in place of the page
+underneath's. The yes answer is the action's own verb (replace, delete, post
+anyway); the other is always keep.
+
+A page's own commands go on the app bar, never as body buttons: `PageBar` in
+`app/.../PageBar.kt` puts a page's current commands there (a step, a draft),
+and draws them as buttons only when the page stands alone in a preview. Body
+buttons stay only where each acts on one item in a list, such as accept on an
+inbox card.
+
+A row's commands open from the row in `MetroContextMenu` (core/design): the
+rest of the screen dims and a full-width panel of lowercase commands opens
+under the row. The inbox, the categories page and saved servers use it.
+
+A gray label over a group of fields or rows is `MetroSectionHeading`, a
+caption on forms (`SectionSize.FORM`) and a group header on pages such as
+settings (`SectionSize.PAGE`). A box being typed in uses the `fieldActive`,
+`onFieldActive` and `fieldHint` colors, and warnings use the accent; the red
+`error` color is for figures in the red only.
+
 The rules that matter are in `.specify/memory/constitution.md` (Principles I
 and II). Fluidity wins when a Metro motion would stutter.

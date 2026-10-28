@@ -16,10 +16,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.PhoneSettings
+import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
+import app.duenorth.budget.design.components.MetroSectionHeading
 import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.ScreenAction
+import app.duenorth.budget.design.components.SectionSize
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import java.time.YearMonth
@@ -121,12 +125,15 @@ fun ExperimentalOfferScreen(
                 MetroText(feature.hint, Metro.typography.caption, color = Metro.colors.secondary)
             }
         }
-        MetroButtonGrid(Modifier.padding(top = MetroDimens.Row)) {
-            val on = if (current == true) ExperimentalCopy.KEEP_ON else ExperimentalCopy.TURN_ON
-            val off = if (current == true) ExperimentalCopy.TURN_OFF else ExperimentalCopy.KEEP_OFF
-            MetroButton(on, Modifier.testTag("experimental-offer-on"), onClick = onTurnOn)
-            MetroButton(off, Modifier.testTag("experimental-offer-off"), onClick = onKeepOff)
-        }
+        // The two answers sit on the bar, so they show without scrolling past the explainer.
+        val on = if (current == true) ExperimentalCopy.KEEP_ON else ExperimentalCopy.TURN_ON
+        val off = if (current == true) ExperimentalCopy.TURN_OFF else ExperimentalCopy.KEEP_OFF
+        PageBar(
+            listOf(
+                ScreenAction("experimental-offer-on", AppGlyph.Save, on, run = onTurnOn),
+                ScreenAction("experimental-offer-off", AppGlyph.Cancel, off, run = onKeepOff),
+            ),
+        )
         MetroText(ExperimentalCopy.LATER, Metro.typography.caption, color = Metro.colors.secondary)
     }
 }
@@ -212,12 +219,7 @@ private fun SwitchRow(
 
 @Composable
 private fun Heading(text: String) {
-    MetroText(
-        text,
-        Metro.typography.groupHeader,
-        Modifier.padding(top = MetroDimens.Gutter),
-        color = Metro.colors.secondary,
-    )
+    MetroSectionHeading(text, size = SectionSize.PAGE)
 }
 
 /** Words for [ExperimentalFeature.FREE_AFTER_PLANS]: to budget less what later months already hold. */

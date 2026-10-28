@@ -24,6 +24,7 @@ import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroSectionHeading
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
@@ -59,12 +60,7 @@ object AccountScreenCopy {
 
 @Composable
 private fun AccountHeading(label: String) {
-    MetroText(
-        label,
-        Metro.typography.caption,
-        Modifier.padding(top = MetroDimens.Gutter, bottom = 4.dp),
-        color = Metro.colors.secondary,
-    )
+    MetroSectionHeading(label)
 }
 
 /** New account: name, on or off budget, and an optional starting balance. Tag `account-add`. */
@@ -220,21 +216,17 @@ fun ForceCloseConfirmScreen(
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("account-force-close-confirm"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText(AccountScreenCopy.FORCE_CLOSE, Metro.typography.header)
-        MetroText(reason, Metro.typography.subheader)
-        MetroButtonGrid {
-            MetroButton(AccountScreenCopy.FORCE_CLOSE, Modifier.testTag("account-force-close-yes"), onClick = onConfirm)
-            MetroButton(AccountScreenCopy.KEEP, Modifier.testTag("account-force-close-keep"), onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = AccountScreenCopy.FORCE_CLOSE,
+        body = reason,
+        yes = AccountScreenCopy.FORCE_CLOSE,
+        onYes = onConfirm,
+        onKeep = onKeep,
+        tag = "account-force-close-confirm",
+        modifier = modifier,
+        yesTag = "account-force-close-yes",
+        keepTag = "account-force-close-keep",
+    )
 }
 
 @Composable

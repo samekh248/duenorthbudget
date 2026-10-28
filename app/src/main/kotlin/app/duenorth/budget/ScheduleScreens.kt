@@ -41,6 +41,7 @@ import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroSectionHeading
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
@@ -52,28 +53,23 @@ fun ScheduleDuplicateScreen(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        MetroText("matching transaction", Metro.typography.header)
-        MetroText(
-            "A similar transaction is already in this account within two days of the due date.",
-            Metro.typography.body,
-        )
-        MetroButtonGrid {
-            MetroButton("post anyway") { onPostAnyway() }
-            MetroButton("cancel") { onCancel() }
-        }
-    }
+    ConfirmPage(
+        title = ScheduleScreenCopy.DUPLICATE_TITLE,
+        body = ScheduleScreenCopy.DUPLICATE_BODY,
+        yes = ScheduleScreenCopy.POST_ANYWAY,
+        onYes = onPostAnyway,
+        onKeep = onCancel,
+        tag = "schedule-duplicate",
+        modifier = modifier,
+    )
 }
 
 /** Words for the schedule editor (`contracts/schedules-rules.md`). */
 object ScheduleScreenCopy {
     const val SCHEDULES = "schedules"
+    const val DUPLICATE_TITLE = "post it again?"
+    const val DUPLICATE_BODY = "a similar transaction is already in this account within two days of the due date"
+    const val POST_ANYWAY = "post anyway"
     const val UPCOMING = "upcoming"
     const val ALL = "all"
     const val NEW = "new"
@@ -359,7 +355,7 @@ fun ScheduleEditorScreen(
 
 @Composable
 private fun Heading(text: String) {
-    MetroText(text, Metro.typography.caption, Modifier.padding(top = MetroDimens.Row), color = Metro.colors.secondary)
+    MetroSectionHeading(text)
 }
 
 @Composable

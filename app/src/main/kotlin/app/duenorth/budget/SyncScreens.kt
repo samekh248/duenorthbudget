@@ -25,10 +25,12 @@ import app.duenorth.budget.core.BudgetConflict
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SyncCopy
+import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -89,7 +91,7 @@ fun ServerScreen(
             MetroField(server, { server = it }, "address", Modifier.testTag("server-address"))
             MetroField(password, { password = it }, "sign in", Modifier.testTag("server-password"), conceal = true)
             if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-            MetroButton("connect", Modifier.testTag("server-connect")) { onConnect(server, password) }
+            PageBar(listOf(ScreenAction("server-connect", AppGlyph.Save, "connect") { onConnect(server, password) }))
         } else {
             if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
             if (files.isEmpty()) {
@@ -116,12 +118,16 @@ fun ServerScreen(
                     }
                 }
             }
-            MetroButtonGrid {
-                MetroButton("sync now", onClick = onSync)
-                MetroButton("send budget", onClick = onUpload)
-                if (conflictCount > 0) MetroButton("conflicts", onClick = onConflicts)
-                MetroButton("sign out", onClick = onSignOut)
-            }
+            // Sync is the page's button; the rest of the server's commands sit in its menu.
+            PageBar(
+                listOfNotNull(
+                    ScreenAction("server-sync", AppGlyph.Sync, "sync now", run = onSync),
+                    ScreenAction("server-upload", AppGlyph.Budgets, "send budget", primary = false, run = onUpload),
+                    ScreenAction("server-conflicts", AppGlyph.Reconcile, "conflicts", primary = false, run = onConflicts)
+                        .takeIf { conflictCount > 0 },
+                    ScreenAction("server-sign-out", AppGlyph.Cancel, "sign out", primary = false, run = onSignOut),
+                ),
+            )
         }
     }
 }
@@ -253,26 +259,20 @@ fun ConfirmReplaceScreen(
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText("replace $serverName", Metro.typography.header)
-        MetroText("with $phoneName", Metro.typography.subheader)
-        MetroButtonGrid {
-            MetroButton("replace", onClick = onReplace)
-            MetroButton("keep", onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = "replace $serverName",
+        body = "with $phoneName",
+        yes = "replace",
+        onYes = onReplace,
+        onKeep = onKeep,
+        tag = "confirm-replace",
+        modifier = modifier,
+    )
 }
 
 /** Words on the budget picker's replace confirmation. */
 object ReplaceBudgetCopy {
     const val USE = "use"
-    const val KEEP = "keep"
     const val LOST = "changes that never synced to a server are lost"
 
     fun use(name: String) = "use $name"
@@ -299,20 +299,16 @@ fun ConfirmReplaceBudgetScreen(
     onKeep: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("confirm-replace-budget"),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        MetroText(ReplaceBudgetCopy.use(opening), Metro.typography.header)
-        MetroText(ReplaceBudgetCopy.clears(clearing), Metro.typography.subheader, Modifier.testTag("replace-budget-clears"))
-        MetroText(ReplaceBudgetCopy.LOST, Metro.typography.body, color = Metro.colors.secondary)
-        MetroButtonGrid {
-            MetroButton(ReplaceBudgetCopy.USE, Modifier.testTag("replace-budget-use"), onClick = onUse)
-            MetroButton(ReplaceBudgetCopy.KEEP, Modifier.testTag("replace-budget-keep"), onClick = onKeep)
-        }
-    }
+    ConfirmPage(
+        title = ReplaceBudgetCopy.use(opening),
+        body = ReplaceBudgetCopy.clears(clearing),
+        note = ReplaceBudgetCopy.LOST,
+        yes = ReplaceBudgetCopy.USE,
+        onYes = onUse,
+        onKeep = onKeep,
+        tag = "confirm-replace-budget",
+        modifier = modifier,
+        yesTag = "replace-budget-use",
+        keepTag = "replace-budget-keep",
+    )
 }

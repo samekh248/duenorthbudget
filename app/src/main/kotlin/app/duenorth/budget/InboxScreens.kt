@@ -80,6 +80,9 @@ import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
+import app.duenorth.budget.design.components.MetroContextMenu
+import app.duenorth.budget.design.components.MetroContextMenuPanel
+import app.duenorth.budget.design.components.MetroMenuItem
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.controlFrame
 import app.duenorth.budget.design.components.metroPress
@@ -375,36 +378,14 @@ internal fun inboxMenuItems(
         },
     )
 
-/**
- * The Metro context menu: the rest of the screen dims, the pressed row stays bright, and a
- * full-width panel of lowercase actions opens under it (over it when there is no room below).
- */
+/** The inbox's long-press menu: the shared Metro context menu, tagged `inbox-menu`. */
 @Composable
 private fun InboxMenu(
     anchor: Rect,
     items: List<Pair<String, () -> Unit>>,
     onDismiss: () -> Unit,
 ) {
-    // Read before the popup: its own window does not get the screen's insets.
-    val density = LocalDensity.current
-    val top = WindowInsets.statusBars.getTop(density)
-    val bottom = WindowInsets.navigationBars.getBottom(density)
-    Popup(
-        popupPositionProvider = WholeWindow,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
-        InboxMenuPanel(anchor, items, onDismiss, safeTop = top, safeBottom = bottom)
-    }
-}
-
-private object WholeWindow : PopupPositionProvider {
-    override fun calculatePosition(
-        anchorBounds: IntRect,
-        windowSize: IntSize,
-        layoutDirection: LayoutDirection,
-        popupContentSize: IntSize,
-    ): IntOffset = IntOffset.Zero
+    MetroContextMenu(anchor, items.menuItems(), onDismiss, tag = INBOX_MENU)
 }
 
 @Composable
@@ -415,55 +396,12 @@ internal fun InboxMenuPanel(
     safeTop: Int = 0,
     safeBottom: Int = 0,
 ) {
-    val scrim = Metro.colors.background.copy(alpha = MENU_SCRIM)
-    Layout(
-        content = {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .background(Metro.colors.chrome)
-                    .padding(vertical = MetroDimens.Row)
-                    .testTag("inbox-menu"),
-            ) {
-                items.forEach { (label, run) ->
-                    MetroText(
-                        label,
-                        Metro.typography.subheader,
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = MetroDimens.TouchTarget)
-                            .metroPress {
-                                onDismiss()
-                                run()
-                            }.padding(horizontal = MENU_INSET, vertical = 8.dp),
-                        maxLines = 1,
-                        // Ellipsis rather than clip, so descenders such as g and y are never cut at the line's edge.
-                        softWrap = false,
-                    )
-                }
-            }
-        },
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .drawBehind {
-                    drawRect(scrim, Offset.Zero, Size(size.width, anchor.top.coerceAtLeast(0f)))
-                    drawRect(scrim, Offset(0f, anchor.bottom), Size(size.width, (size.height - anchor.bottom).coerceAtLeast(0f)))
-                }.pointerInput(Unit) { detectTapGestures { onDismiss() } },
-    ) { measurables, constraints ->
-        val panel = measurables.single().measure(constraints.copy(minWidth = constraints.maxWidth, minHeight = 0))
-        val below = anchor.bottom.roundToInt()
-        // Keep the panel clear of the navigation bar and the status bar.
-        val limit = constraints.maxHeight - safeBottom
-        val y =
-            if (below + panel.height <= limit) {
-                below
-            } else {
-                (anchor.top.roundToInt() - panel.height).coerceIn(safeTop, (limit - panel.height).coerceAtLeast(safeTop))
-            }
-        layout(constraints.maxWidth, constraints.maxHeight) { panel.place(0, y) }
-    }
+    MetroContextMenuPanel(anchor, items.menuItems(), onDismiss, INBOX_MENU, safeTop, safeBottom)
 }
+
+private fun List<Pair<String, () -> Unit>>.menuItems() = map { (label, run) -> MetroMenuItem(label, run = run) }
+
+private const val INBOX_MENU = "inbox-menu"
 
 /** One inbox row as shown: the row, and the category it was just filed under while its confirmation plays. */
 internal data class InboxEntry(
@@ -884,8 +822,6 @@ private val FEATURED_AIR_BELOW = 28.dp
 internal val FEATURED_PAD = 20.dp
 private val FEATURED_EMPTY = 96.dp
 private val CHECK_SIZE = 26.dp
-private val MENU_INSET = 24.dp
-private const val MENU_SCRIM = 0.7f
 internal const val FILED_HOLD_MS = 900L
 private val DAY_AIR_ABOVE = 12.dp
 private const val MODE_OUT_MS = 90
