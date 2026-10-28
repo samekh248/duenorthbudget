@@ -608,8 +608,9 @@ private fun InboxGroupHeading(
             .testTag("inbox-group-$title"),
         verticalAlignment = Alignment.Bottom,
     ) {
-        MetroText(title, Metro.typography.groupHeader, Modifier.weight(1f), maxLines = 1)
-        MetroText("$count", Metro.typography.groupHeader, color = Metro.colors.secondary, maxLines = 1)
+        // A size up from the rows and in the accent, so a group reads apart from the day headings under it.
+        MetroText(title, Metro.typography.subheader, Modifier.weight(1f), color = Metro.accent.text, maxLines = 1)
+        MetroText("$count", Metro.typography.subheader, color = Metro.colors.secondary, maxLines = 1)
     }
 }
 
@@ -854,7 +855,7 @@ private val FEATURED_EMPTY = 96.dp
 private val CHECK_SIZE = 26.dp
 internal const val FILED_HOLD_MS = 900L
 private val DAY_AIR_ABOVE = 12.dp
-private val GROUP_AIR_ABOVE = 20.dp
+private val GROUP_AIR_ABOVE = 24.dp
 private const val MODE_OUT_MS = 90
 private const val MODE_IN_MS = 180
 
