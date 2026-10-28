@@ -26,7 +26,6 @@ import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.SectionSize
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
-import java.time.YearMonth
 
 /**
  * The features behind `flags.experimental`. Most have their own Actual flag, so they are per
@@ -227,17 +226,7 @@ object FreeAfterPlansCopy {
     const val PLANNED = "spoken for by later months"
     const val FREE = "free after later plans"
 
-    const val LABEL = "free after plans"
-
-    /** `through december`, with the year once it differs from [open]'s. */
-    fun through(
-        open: YearMonth,
-        throughMonth: Int,
-    ): String {
-        val through = YearMonth.of(throughMonth / 100, throughMonth % 100)
-        val name = through.month.name.lowercase()
-        return if (through.year == open.year) "through $name" else "through $name ${through.year}"
-    }
+    const val LABEL = "unassigned"
 }
 
 /** Experimental free-after-later-plans: on only with the master switch and this phone's setting. */
