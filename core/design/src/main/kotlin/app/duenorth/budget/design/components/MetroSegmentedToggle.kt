@@ -52,12 +52,19 @@ fun MetroSegmentedToggle(
     tag: String,
     modifier: Modifier = Modifier,
 ) {
-    // Mica: the options share a track on a layer card. Tile relief stands them up side by side.
+    // Mica: the options share a track on a layer card. Tile relief stands them up side by side, Windows 10 Mobile just apart.
     val style = Metro.style
     val track = if (style.layers) Modifier.relief(Relief.Raised).padding(3.dp) else Modifier
     Row(
         modifier.height(IntrinsicSize.Min).then(track).testTag(tag),
-        horizontalArrangement = Arrangement.spacedBy(if (style.relief && !style.layers) 10.dp else 0.dp),
+        horizontalArrangement =
+            Arrangement.spacedBy(
+                when {
+                    style.mobile10 -> 4.dp
+                    style.relief && !style.layers -> 10.dp
+                    else -> 0.dp
+                },
+            ),
     ) {
         options.forEachIndexed { index, label ->
             Segment(label, index == selected, "$tag-$label") { onSelect(index) }
@@ -86,6 +93,8 @@ private fun Segment(
                     relief && selected -> Modifier.relief(Relief.Raised, small = true, fill = accent.fill)
                     style.layers -> Modifier
                     relief -> Modifier.relief(Relief.Raised, small = true)
+                    // Windows 10 Mobile: flat blocks, grey until chosen, one gutter apart.
+                    style.mobile10 -> Modifier.background(if (selected) accent.fill else ink.copy(alpha = 0.2f))
                     else ->
                         Modifier
                             .background(if (selected) accent.fill else Color.Transparent)

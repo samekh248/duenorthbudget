@@ -12,6 +12,9 @@ import androidx.compose.ui.unit.dp
  * type, pivot, square corners, flat accent fills, round app-bar buttons and grid, and only adds light and shade.
  * Mica is the Windows 11 look, chosen the same day from the acrylic mockups: a tinted page, rounded layer cards
  * edged by a hairline, and an acrylic app bar and keypad that float above the page.
+ * Windows 10 Mobile follows the Windows 10 Mobile guidelines, chosen on 2026-10-28 from the pivot mockup: a compact
+ * pivot, sentence case, a flat 48dp command bar of bare glyphs, grey filled buttons, outlined text boxes and plain
+ * unbanded lists on pure white or black.
  */
 enum class MetroStyle(
     val id: String,
@@ -24,14 +27,17 @@ enum class MetroStyle(
     val filledAdd: Boolean = false,
     /** Surfaces are rounded layer cards with a hairline edge instead of light and shade; bars float (mica). */
     val layers: Boolean = false,
+    /** Windows 10 Mobile: compact type in sentence case, a flat command bar, filled buttons, no bands (mobile 10). */
+    val mobile10: Boolean = false,
 ) {
     Metro("metro", "metro"),
     TileRelief("tile-relief", "tile relief", panels = true, heroTiles = true, filledAdd = true),
     Mica("mica", "mica", panels = true, filledAdd = true, layers = true),
+    Mobile10("windows-10-mobile", "windows 10 mobile", mobile10 = true),
     ;
 
     /** Whether surfaces are drawn by [MetroSurface] (relief or layers) rather than Metro's outlines. */
-    val relief: Boolean get() = this != Metro
+    val relief: Boolean get() = this != Metro && !mobile10
 
     /** The relief of a control at rest: raised, or under mica a field (a layer card with a line under it). */
     val control: Relief get() = if (layers) Relief.Inset else Relief.Raised
@@ -75,8 +81,8 @@ data class MetroSurface(
             style: MetroStyle,
             dark: Boolean,
         ): MetroSurface =
-            if (style == MetroStyle.Metro) {
-                Flat
+            if (!style.relief) {
+                Flat.copy(style = style)
             } else if (style.layers) {
                 MetroSurface(
                     style,
@@ -116,6 +122,13 @@ internal object StylePalettes {
         val (background, chrome) =
             when (style) {
                 MetroStyle.Metro -> return metro
+                // Windows 10 Mobile keeps the white or black page, under a ChromeMedium bar and BaseMedium secondary ink.
+                MetroStyle.Mobile10 ->
+                    return metro.copy(
+                        chrome = Color(if (dark) 0xFF1F1F1F else 0xFFF2F2F2),
+                        secondary = Color(if (dark) 0xFF999999 else 0xFF666666),
+                        outline = Color(if (dark) 0xFF666666 else 0xFF999999),
+                    )
                 MetroStyle.TileRelief -> if (dark) 0xFF101010 to 0xFF1F1F1F else 0xFFEEEEEE to 0xFFE3E3E3
                 MetroStyle.Mica -> if (dark) 0xFF1E1D22 to 0xFF2C2C30 else 0xFFF1EFF3 to 0xFFF9F9F9
             }

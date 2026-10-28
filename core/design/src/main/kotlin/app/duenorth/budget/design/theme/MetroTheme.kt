@@ -108,6 +108,22 @@ data class MetroTypography(
             )
 
         val Default: MetroTypography = create()
+
+        /**
+         * The Windows 10 Mobile type ramp: Title 24 for the pivot's headers, Subheader 34, Subtitle 20, Base and
+         * Body 15, Caption 12.
+         */
+        val Mobile10: MetroTypography =
+            Default.copy(
+                sectionHeader = Default.sectionHeader.copy(fontSize = 24.sp),
+                pageTitle = Default.pageTitle.copy(fontSize = 14.sp),
+                header = Default.header.copy(fontSize = 34.sp),
+                subheader = Default.subheader.copy(fontSize = 20.sp, lineHeight = 24.sp),
+                groupHeader = Default.groupHeader.copy(fontWeight = MetroWeights.Regular),
+                body = Default.body.copy(fontSize = 15.sp, lineHeight = 20.sp),
+                control = Default.control.copy(fontSize = 15.sp),
+                caption = Default.caption.copy(fontWeight = MetroWeights.Regular, fontSize = 12.sp, lineHeight = 16.sp),
+            )
     }
 }
 
@@ -255,7 +271,7 @@ fun MetroTheme(
         LocalAccent provides accentColors.copy(text = Contrast.ensure(accentColors.text, colors.background)),
         LocalMetroSurface provides MetroSurface.of(style, darkTheme),
         LocalAppAccent provides accent,
-        LocalMetroTypography provides MetroTypography.Default,
+        LocalMetroTypography provides if (style.mobile10) MetroTypography.Mobile10 else MetroTypography.Default,
         LocalAnimationsEnabled provides animationsEnabled,
         content = content,
     )

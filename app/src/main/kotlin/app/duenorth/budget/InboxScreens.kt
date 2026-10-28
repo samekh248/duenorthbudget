@@ -84,6 +84,7 @@ import app.duenorth.budget.design.components.MetroContextMenu
 import app.duenorth.budget.design.components.MetroContextMenuPanel
 import app.duenorth.budget.design.components.MetroMenuItem
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.Mobile10Dimens
 import app.duenorth.budget.design.components.controlFrame
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
@@ -533,17 +534,23 @@ internal fun AccentButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    // Windows 10 Mobile's accent button is the flat block alone, as short as its other buttons.
+    val mobile10 = Metro.style.mobile10
     Box(
         modifier
             .fillMaxWidth()
-            .heightIn(min = MetroDimens.ButtonMin)
+            .heightIn(min = if (mobile10) Mobile10Dimens.Button else MetroDimens.ButtonMin)
             .border(MetroDimens.Stroke, Metro.accent.fill)
             .background(Metro.accent.fill)
             .metroPress(onClick)
             .padding(horizontal = 9.5.dp, vertical = 3.5.dp),
         contentAlignment = Alignment.Center,
     ) {
-        MetroText(label, Metro.typography.body.copy(fontWeight = MetroWeights.Semibold), color = Metro.accent.onFill)
+        MetroText(
+            label,
+            if (mobile10) Metro.typography.body else Metro.typography.body.copy(fontWeight = MetroWeights.Semibold),
+            color = Metro.accent.onFill,
+        )
     }
 }
 

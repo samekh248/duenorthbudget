@@ -105,10 +105,10 @@ class ShellScreenshotTest {
     @Test
     fun homeFreeAfterPlansShortDark() = snap("home_free_after_plans_short_dark", dark = true, shell = withPlans(-6_500), showAhead = true)
 
-    // The relief styles: tile relief gives the figure its own raised tile, mica holds it on the one card.
+    // The other styles: tile relief gives the figure its own raised tile, mica holds it on the one card.
     @Test
     fun homeFreeAfterPlansStyles() =
-        MetroStyle.entries.filter { it.relief }.forEach { style ->
+        MetroStyle.entries.filter { it != MetroStyle.Metro }.forEach { style ->
             for (dark in listOf(false, true)) {
                 val theme = if (dark) "dark" else "light"
                 snap("style_${style.id}_home_free_after_plans_$theme", dark, withPlans(), showAhead = true, style = style)
@@ -143,10 +143,10 @@ class ShellScreenshotTest {
             )
         }
 
-    // The relief styles (settings, appearance, style): the month with goals, and the accounts list.
+    // The other styles (settings, appearance, style): the month with goals, the accounts list and the inbox.
     @Test
     fun styleHomes() =
-        MetroStyle.entries.filter { it.relief }.forEach { style ->
+        MetroStyle.entries.filter { it != MetroStyle.Metro }.forEach { style ->
             for (dark in listOf(false, true)) {
                 val theme = if (dark) "dark" else "light"
                 snap("style_${style.id}_home_$theme", dark, withGoals(), prefs = templatesOn, style = style)
@@ -155,6 +155,13 @@ class ShellScreenshotTest {
                     dark,
                     sample().copy(accounts = manyAccounts()),
                     section = HomeSections.headers.indexOf(HomeSections.ACCOUNTS),
+                    style = style,
+                )
+                snap(
+                    "style_${style.id}_inbox_$theme",
+                    dark,
+                    sample(),
+                    section = HomeSections.headers.indexOf(HomeSections.INBOX),
                     style = style,
                 )
             }

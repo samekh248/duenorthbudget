@@ -44,7 +44,7 @@ class BudgetEditScreenshotTest {
     // The relief styles on the keypad: keys stand up (tile relief) or are layer cards (mica).
     @Test
     fun styleKeypads() =
-        MetroStyle.entries.filter { it.relief }.forEach { style ->
+        MetroStyle.entries.filter { it != MetroStyle.Metro }.forEach { style ->
             for (dark in listOf(false, true)) {
                 snap("style_${style.id}_keypad_${if (dark) "dark" else "light"}", dark, BudgetEdit("c-groceries", "+80"), style = style)
             }

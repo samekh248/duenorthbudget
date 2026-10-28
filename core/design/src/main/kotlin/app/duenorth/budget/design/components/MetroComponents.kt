@@ -74,8 +74,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
@@ -122,7 +125,7 @@ fun MetroText(
     softWrap: Boolean = true,
 ) {
     BasicText(
-        text = text,
+        text = if (Metro.style.mobile10) sentenceCase(text) else text,
         modifier = modifier,
         style = style.copy(color = color),
         maxLines = maxLines,
@@ -130,6 +133,19 @@ fun MetroText(
         overflow = if (softWrap) TextOverflow.Clip else TextOverflow.Ellipsis,
     )
 }
+
+/**
+ * Windows 10 Mobile writes labels in sentence case where Metro writes them in lowercase: the first letter is raised
+ * when the text starts in lowercase, so names, figures and all-caps titles are left as they are.
+ */
+fun sentenceCase(text: String): String =
+    if (text.firstOrNull()?.isLowerCase() ==
+        true
+    ) {
+        text.replaceFirstChar { it.titlecaseChar() }
+    } else {
+        text
+    }
 
 @Composable
 fun Modifier.metroPress(onClick: () -> Unit): Modifier = metroPress(onClick, onLongClick = null)
@@ -256,10 +272,12 @@ private fun MetroFieldFrame(
     val colors = Metro.colors
     // A relief style cuts the box into the page and writes in the page's own ink.
     val relief = Metro.style.relief
+    // Windows 10 Mobile outlines the box on the page in a 2dp border that turns to the accent while typing.
+    val mobile10 = Metro.style.mobile10
     val background = if (colors.isDark) Color.White else Color(0xFFBFBFBF)
     val hintColor =
         when {
-            relief -> colors.secondary
+            relief || mobile10 -> colors.secondary
             colors.isDark -> Color(0xFF909090)
             else -> Color(0xFF8F8F8F)
         }
@@ -269,8 +287,13 @@ private fun MetroFieldFrame(
     Box(
         modifier
             .then(if (fill) Modifier.fillMaxWidth() else Modifier)
-            .then(if (relief) Modifier.relief(Relief.Inset, small = true) else Modifier.background(background))
             .then(
+                when {
+                    relief -> Modifier.relief(Relief.Inset, small = true)
+                    mobile10 -> Modifier.onFocusChanged { focused = it.hasFocus }.border(2.dp, if (focused) focusLine else colors.outline)
+                    else -> Modifier.background(background)
+                },
+            ).then(
                 if (Metro.style.layers) {
                     Modifier.onFocusChanged { focused = it.hasFocus }.drawWithContent {
                         drawContent()
@@ -287,7 +310,7 @@ private fun MetroFieldFrame(
             .padding(horizontal = if (relief) 14.dp else 8.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        val ink = Metro.typography.control.copy(color = if (relief) colors.foreground else Color.Black)
+        val ink = Metro.typography.control.copy(color = if (relief || mobile10) colors.foreground else Color.Black)
         if (prefix == null) {
             if (empty) {
                 MetroText(hint, Metro.typography.control, color = hintColor)
@@ -296,7 +319,7 @@ private fun MetroFieldFrame(
         } else {
             // The prefix is part of the value but cannot be typed over: a darker grey than the hint,
             // so an empty box still reads as prefix then hint.
-            val prefixColor = if (relief) colors.secondary else Color(0xFF5A5A5A)
+            val prefixColor = if (relief || mobile10) colors.secondary else Color(0xFF5A5A5A)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (onPrefixClick == null) {
                     MetroText(
@@ -447,6 +470,10 @@ private fun MetroActionButton(
     val relief = Metro.style.relief
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    if (Metro.style.mobile10) {
+        Mobile10Button(label, modifier, interaction, pressed, onClick)
+        return
+    }
     Box(
         modifier
             .heightIn(min = MetroDimens.ButtonMin)
@@ -479,6 +506,40 @@ private fun MetroActionButton(
                 },
         )
     }
+}
+
+/** The Windows 10 Mobile button: a flat grey block with no outline, darker under the finger, its label in regular. */
+@Composable
+private fun Mobile10Button(
+    label: String,
+    modifier: Modifier,
+    interaction: MutableInteractionSource,
+    pressed: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = Metro.colors
+    Box(
+        modifier
+            .heightIn(min = Mobile10Dimens.Button)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .background(colors.foreground.copy(alpha = if (pressed) 0.4f else 0.2f))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        MetroText(label, Metro.typography.body, color = colors.foreground)
+    }
+}
+
+/** Sizes of the Windows 10 Mobile style that differ from Metro's. */
+object Mobile10Dimens {
+    /** A button: taller than the 32epx desktop button, so it stays an easy touch target. */
+    val Button = 40.dp
+
+    /** The closed command bar. */
+    val CommandBar = 48.dp
+
+    /** One command bar button. */
+    val CommandSlot = 68.dp
 }
 
 enum class AppGlyph {
@@ -565,6 +626,10 @@ fun MetroAppBar(
         }
     }
     val style = Metro.style
+    if (style.mobile10) {
+        Mobile10CommandBar(primary, secondary, expanded, onExpandedChange, modifier, windowInsets, host, registration)
+        return
+    }
     val chrome =
         if (style.layers) {
             // Mica: an acrylic sheet floating a gutter in from the screen's edges, over the page's content.
@@ -633,6 +698,119 @@ fun MetroAppBar(
                                 action.run()
                             }.heightIn(min = MetroDimens.TouchTarget)
                             .padding(vertical = 10.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The Windows 10 Mobile command bar: bare glyphs right-aligned on a flat 48dp bar, the ellipsis last. Opened, it
+ * shows each glyph's label under it and the secondary commands below as a plain list.
+ */
+@Composable
+private fun Mobile10CommandBar(
+    primary: List<ScreenAction>,
+    secondary: List<ScreenAction>,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    modifier: Modifier,
+    windowInsets: WindowInsets,
+    host: AppBarHostState?,
+    registration: ExpandedAppBar,
+) {
+    val colors = Metro.colors
+    Column(
+        modifier
+            .fillMaxWidth()
+            .then(
+                if (host != null) {
+                    Modifier.onGloballyPositioned { registration.boundsInWindow = it.boundsInWindow() }
+                } else {
+                    Modifier
+                },
+            ).background(colors.chrome)
+            .windowInsetsPadding(windowInsets)
+            .animateContentSize(tween(MetroMotion.SHORT_MS, easing = MetroMotion.EaseOut)),
+    ) {
+        Row(Modifier.fillMaxWidth().heightIn(min = Mobile10Dimens.CommandBar), horizontalArrangement = Arrangement.End) {
+            primary.forEach { action ->
+                Column(
+                    Modifier
+                        .width(Mobile10Dimens.CommandSlot)
+                        .then(
+                            if (action.apart && action != primary.first()) {
+                                val rule = colors.secondary
+                                Modifier.testTag("app-bar-rule-${action.id}").drawBehind {
+                                    val inset = 12.dp.toPx()
+                                    drawLine(
+                                        rule,
+                                        Offset(0f, inset),
+                                        Offset(0f, Mobile10Dimens.CommandBar.toPx() - inset),
+                                        strokeWidth = 1.dp.toPx(),
+                                    )
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ).testTag("app-bar-${action.id}")
+                        .clickable(
+                            interactionSource = null,
+                            indication = null,
+                            onClickLabel = action.label,
+                            role = Role.Button,
+                        ) {
+                            onExpandedChange(false)
+                            action.run()
+                        }.semantics {
+                            contentDescription = action.label
+                            if (action.spinning) stateDescription = "syncing"
+                        }.padding(top = 14.dp, bottom = if (expanded) 8.dp else 14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    AppGlyphIcon(action.glyph, colors.foreground, Modifier.syncSpin(action.spinning))
+                    if (expanded) {
+                        MetroText(
+                            action.label,
+                            Metro.typography.caption,
+                            Modifier.wrapContentWidth(unbounded = true).padding(top = 4.dp),
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                }
+            }
+            Box(
+                Modifier
+                    .size(width = MetroDimens.TouchTarget, height = Mobile10Dimens.CommandBar)
+                    .testTag("app-bar-ellipsis")
+                    .clickable(
+                        interactionSource = null,
+                        indication = null,
+                        role = Role.Button,
+                        onClick = { onExpandedChange(!expanded) },
+                    ).semantics { contentDescription = if (expanded) "less" else "more" }
+                    .padding(top = 4.dp),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                EllipsisDots(colors.foreground)
+            }
+        }
+        if (expanded && secondary.isNotEmpty()) {
+            Column(Modifier.padding(bottom = 8.dp)) {
+                secondary.forEach { action ->
+                    MetroText(
+                        action.label,
+                        Metro.typography.body,
+                        Modifier
+                            .fillMaxWidth()
+                            .testTag("app-bar-menu-${action.id}")
+                            .clickable(interactionSource = null, indication = null, role = Role.Button) {
+                                onExpandedChange(false)
+                                action.run()
+                            }.heightIn(min = MetroDimens.TouchTarget)
+                            .padding(horizontal = MetroDimens.Gutter, vertical = 13.dp),
                     )
                 }
             }
@@ -1064,8 +1242,113 @@ fun AppGlyphIcon(
     modifier: Modifier = Modifier,
     size: Dp = 22.dp,
 ) {
+    val mobile10 = Metro.style.mobile10
     Canvas(modifier.size(size)) {
-        with(AppGlyphInk) { draw(glyph, color) }
+        if (mobile10) {
+            with(Mdl2GlyphInk) { draw(glyph, color) }
+        } else {
+            with(AppGlyphInk) { draw(glyph, color) }
+        }
+    }
+}
+
+/**
+ * The glyphs of the Windows 10 Mobile style, after Segoe MDL2 Assets (which may not be bundled): hairline strokes on
+ * a 20-unit grid, square ends and mitred corners, drawn 20dp inside the glyph's box. Each is an SVG path.
+ */
+object Mdl2GlyphInk {
+    private const val GRID = 20f
+
+    private val paths: Map<AppGlyph, String> =
+        mapOf(
+            // OpenFolder: the budget files.
+            AppGlyph.Budgets to "M1.5 16.5V3.5h5.5l2 2h8v3M1.5 16.5l3-8h14l-3 8z",
+            // Brightness: a sun and its eight rays.
+            AppGlyph.Appearance to
+                "M10 6a4 4 0 1 0 0 8a4 4 0 1 0 0-8zM10 1v2.5M10 16.5V19M1 10h2.5M16.5 10H19M3.6 3.6l1.8 1.8M14.6 14.6l1.8 1.8" +
+                "M3.6 16.4l1.8-1.8M14.6 5.4l1.8-1.8",
+            // Sync: two arcs chasing each other, each with a corner for its arrowhead.
+            AppGlyph.Sync to "M16.4 8.5A6.6 6.6 0 0 0 4.3 6.5M3.6 11.5a6.6 6.6 0 0 0 12.1 2M4 2.5v4.2h4.2M16 17.5v-4.2h-4.2",
+            // Contact: a head over the shoulders.
+            AppGlyph.Payees to "M10 2a4.2 4.2 0 1 0 0 8.4a4.2 4.2 0 1 0 0-8.4zM2.5 18.5a7.5 7.5 0 0 1 15 0",
+            // Pause.
+            AppGlyph.Hold to "M5 3.5h3v13H5zM12 3.5h3v13h-3z",
+            // ViewAll: four tiles.
+            AppGlyph.Categories to "M2.5 2.5h6v6h-6zM11.5 2.5h6v6h-6zM2.5 11.5h6v6h-6zM11.5 11.5h6v6h-6z",
+            AppGlyph.Add to "M10 2v16M2 10h16",
+            // Switch: one arrow out, one back.
+            AppGlyph.Transfer to "M2 7h15M13.5 3.5L17 7l-3.5 3.5M18 13H3M6.5 9.5L3 13l3.5 3.5",
+            // CheckMark.
+            AppGlyph.Reconcile to "M2.5 10.5l5 5L17.5 5",
+            // Download: an arrow onto a line.
+            AppGlyph.Import to "M10 2v11.5M5.5 9l4.5 4.5L14.5 9M2.5 17.5h15",
+            // Accept.
+            AppGlyph.Save to "M2.5 10.5l5 5L17.5 5",
+            AppGlyph.Cancel to "M3.5 3.5l13 13M16.5 3.5l-13 13",
+            AppGlyph.ChevronLeft to "M13 3.5L6.5 10l6.5 6.5",
+            AppGlyph.ChevronRight to "M7 3.5l6.5 6.5L7 16.5",
+            AppGlyph.ChevronDown to "M3.5 7l6.5 6.5L16.5 7",
+            // Calendar: a page under its binding rings.
+            AppGlyph.Calendar to "M2 4h16v14H2zM2 8h16M6 2v4M14 2v4",
+            // List.
+            AppGlyph.Breakdown to "M2 4.5h16M2 8.5h11M2 12.5h13M2 16.5h16",
+            AppGlyph.Copy to "M6.5 6.5h11v11h-11zM3.5 13.5h-1v-11h11v1",
+            // A bar chart under its mean.
+            AppGlyph.Average to "M3.5 18v-4M10 18V7M16.5 18v-6M2 10.5h16",
+            AppGlyph.Zero to "M10 3a5 7 0 1 1 0 14a5 7 0 1 1 0-14z",
+            // Undo: back along a line that turns home.
+            AppGlyph.Undo to "M6.5 3.5L3 7l3.5 3.5M3 7h9a4.5 4.5 0 0 1 0 9H6",
+            // MultiSelect: ticked boxes before their lines.
+            AppGlyph.Select to "M2 3h6v6H2zM2 11h6v6H2zM3.6 6.1l1.2 1.2L6.6 5M11 6h7M11 14h7",
+            // Search: the lens up and right, its handle down and left.
+            AppGlyph.Search to "M12 2a6 6 0 1 0 0 12a6 6 0 1 0 0-12zM7.7 12.3L2 18",
+            // Delete: a bin with its lid and handle and two ribs.
+            AppGlyph.Delete to "M2 4.5h16M7.5 4.5V2h5v2.5M4 4.5l1 13.5h10l1-13.5M8.5 7.5v7.5M11.5 7.5v7.5",
+        )
+
+    private val parsed = mutableMapOf<AppGlyph, Path>()
+
+    private fun pathOf(glyph: AppGlyph): Path =
+        parsed.getOrPut(glyph) {
+            if (glyph == AppGlyph.Settings) gear() else PathParser().parsePathString(paths.getValue(glyph)).toPath()
+        }
+
+    /** Settings: an eight-toothed gear round its hub. */
+    private fun gear(): Path =
+        Path().apply {
+            val teeth = 8
+            val outer = 8.5f
+            val inner = 6.6f
+            for (i in 0 until teeth * 4) {
+                val angle = Math.toRadians(i * 360.0 / (teeth * 4) - 90.0 / teeth)
+                val r = if ((i / 2) % 2 == 0) outer else inner
+                val x = 10f + r * kotlin.math.cos(angle).toFloat()
+                val y = 10f + r * kotlin.math.sin(angle).toFloat()
+                if (i == 0) moveTo(x, y) else lineTo(x, y)
+            }
+            close()
+            addOval(
+                androidx.compose.ui.geometry
+                    .Rect(7f, 7f, 13f, 13f),
+            )
+        }
+
+    fun DrawScope.draw(
+        glyph: AppGlyph,
+        color: Color,
+    ) {
+        val box = size.minDimension
+        val glyphSize = minOf(box, 20.dp.toPx())
+        val scale = glyphSize / GRID
+        translate((size.width - glyphSize) / 2, (size.height - glyphSize) / 2) {
+            scale(scale, pivot = Offset.Zero) {
+                drawPath(
+                    pathOf(glyph),
+                    color,
+                    style = Stroke(width = 1.dp.toPx() / scale, cap = StrokeCap.Square, join = StrokeJoin.Miter),
+                )
+            }
+        }
     }
 }
 

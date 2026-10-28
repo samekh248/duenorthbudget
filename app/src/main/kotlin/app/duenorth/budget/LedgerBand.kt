@@ -23,12 +23,18 @@ import app.duenorth.budget.design.theme.Relief
 
 /**
  * The faint band under every other row of a ledger list (the register, accounts and the budget), which
- * separates rows without drawing lines between them.
+ * separates rows without drawing lines between them. None under Windows 10 Mobile.
  */
 internal val ledgerBand: Color
     @Composable
     @ReadOnlyComposable
-    get() = if (Metro.colors.isDark) Color.White.copy(alpha = 0.06f) else Color.Black.copy(alpha = 0.035f)
+    get() =
+        when {
+            // Windows 10 Mobile lists run unbanded, their rows set apart by air alone.
+            Metro.style.mobile10 -> Color.Transparent
+            Metro.colors.isDark -> Color.White.copy(alpha = 0.06f)
+            else -> Color.Black.copy(alpha = 0.035f)
+        }
 
 /** Paints [fill] behind the row, running past the screen gutter to both edges of the screen. */
 internal fun Modifier.ledgerFill(fill: Color): Modifier =
