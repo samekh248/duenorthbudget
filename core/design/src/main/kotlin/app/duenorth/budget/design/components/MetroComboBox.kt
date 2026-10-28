@@ -45,7 +45,12 @@ fun <T> MetroComboBox(
                     // Open, the box is pressed in; otherwise it stands up like a button (under mica, a field).
                     Modifier.relief(if (open) Relief.Inset else Metro.style.control, small = true)
                 } else {
-                    Modifier.border(MetroDimens.Stroke, if (open) Metro.accent.fill else Metro.colors.foreground)
+                    if (Metro.style.mobile10) {
+                        // Windows 10 Mobile: the combo box's 2dp grey edge, the accent while open.
+                        Modifier.border(2.dp, if (open) Metro.accent.fill else Metro.colors.outline)
+                    } else {
+                        Modifier.border(MetroDimens.Stroke, if (open) Metro.accent.fill else Metro.colors.foreground)
+                    }
                 },
             ).testTag(tag),
     ) {

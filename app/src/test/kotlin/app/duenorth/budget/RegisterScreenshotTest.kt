@@ -130,7 +130,7 @@ class RegisterScreenshotTest {
     // The relief styles on the register (plain and searching) and the transaction form.
     @Test
     fun styleRegisters() =
-        MetroStyle.entries.filter { it.relief }.forEach { style ->
+        MetroStyle.entries.filter { it != MetroStyle.Metro }.forEach { style ->
             for (dark in listOf(false, true)) {
                 val theme = if (dark) "dark" else "light"
                 snapSearch("style_${style.id}_register_$theme", dark, style, search = null)
