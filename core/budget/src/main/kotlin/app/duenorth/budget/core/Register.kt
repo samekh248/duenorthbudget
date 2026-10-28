@@ -257,6 +257,10 @@ sealed interface ForcedWrite {
         val transactionId: String,
     ) : ForcedWrite
 
+    data class Deletes(
+        val transactionIds: List<String>,
+    ) : ForcedWrite
+
     data class Category(
         val transactionId: String,
         val categoryId: String?,
@@ -890,20 +894,29 @@ class RegisterBook(
     fun delete(
         transactionId: String,
         force: Boolean,
+    ): WriteResult = delete(listOf(transactionId), force, ForcedWrite.Delete(transactionId))
+
+    /** Deletes [transactionIds] together, each with its transfer partner and split parts. */
+    fun deleteAll(
+        transactionIds: List<String>,
+        force: Boolean,
+    ): WriteResult = delete(transactionIds, force, ForcedWrite.Deletes(transactionIds))
+
+    private fun delete(
+        transactionIds: List<String>,
+        force: Boolean,
+        retry: ForcedWrite,
     ): WriteResult =
         write {
-            val txn = find(transactionId) ?: return@write WriteResult.Saved
-            if (txn.tombstone) return@write WriteResult.Saved
-            val partner = txn.transferId?.let { find(it) }?.takeIf { !it.tombstone }
-            val kids = if (txn.parent) children(txn.id) else emptyList()
-            guard(
-                listOfNotNull(txn, partner) + kids,
-                force,
-                ForcedWrite.Delete(transactionId),
-            )?.let { return@write it }
-            tombstone(txn.id)
-            partner?.let { tombstone(it.id) }
-            kids.forEach { tombstone(it.id) }
+            val rows =
+                transactionIds.mapNotNull { find(it) }.filter { !it.tombstone }.flatMap { txn ->
+                    val partner = txn.transferId?.let { find(it) }?.takeIf { !it.tombstone }
+                    val kids = if (txn.parent) children(txn.id) else emptyList()
+                    listOfNotNull(txn, partner) + kids
+                }
+            if (rows.isEmpty()) return@write WriteResult.Saved
+            guard(rows, force, retry)?.let { return@write it }
+            rows.map { it.id }.distinct().forEach { tombstone(it) }
             WriteResult.Saved
         }
 

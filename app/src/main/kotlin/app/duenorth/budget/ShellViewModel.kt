@@ -1956,6 +1956,22 @@ class ShellViewModel(
         )
     }
 
+    /** Deletes every checked row as one undo step and leaves select mode. */
+    fun deleteSelectedInbox() {
+        val picked = _state.value.inboxSelection ?: return
+        val rows =
+            _state.value.shell
+                ?.inbox
+                .orEmpty()
+                .filter { it.id in picked }
+        if (rows.isEmpty() || writing) return
+        _state.update { it.copy(inboxSelection = null) }
+        launchWrite { id ->
+            val result = withContext(Dispatchers.IO) { library.deleteTransactions(id, rows.map { it.id }, false) }
+            publish(result, rows.first().accountId, stayOnRegister = false)
+        }
+    }
+
     /** Opens the picker for every checked row; the category picked files them all. */
     fun categorizeSelectedInbox() {
         val picked = _state.value.inboxSelection ?: return
@@ -2304,6 +2320,7 @@ class ShellViewModel(
             when (val retry = pending.retry) {
                 is ForcedWrite.Category -> retry.transactionId
                 is ForcedWrite.Categories -> retry.assignments.keys.firstOrNull()
+                is ForcedWrite.Deletes -> retry.transactionIds.firstOrNull()
                 else -> null
             }?.let { id ->
                 _state.value.shell
@@ -2320,6 +2337,7 @@ class ShellViewModel(
                     when (val retry = pending.retry) {
                         is ForcedWrite.Save -> library.saveTransaction(id, retry.draft)
                         is ForcedWrite.Delete -> library.deleteTransaction(id, retry.transactionId, true)
+                        is ForcedWrite.Deletes -> library.deleteTransactions(id, retry.transactionIds, true)
                         is ForcedWrite.Category ->
                             library.setTransactionCategory(id, retry.transactionId, retry.categoryId, true)
                         is ForcedWrite.Categories -> library.setTransactionsCategory(id, retry.assignments, true)

@@ -4,6 +4,7 @@ import app.duenorth.budget.core.AutoHoldChoice
 import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.EnvelopeCopy
+import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.RegisterCopy
@@ -18,7 +19,31 @@ data class ScreenBarSpec(
     val glyph: AppGlyph,
     val label: String,
     val primary: Boolean = true,
+    /** A destructive button, set apart from the rest of the bar. */
+    val apart: Boolean = false,
 )
+
+/** What the inbox's checked rows allow: nothing, categorize and delete, or accept as well when every one has a category. */
+enum class InboxPick {
+    NONE,
+    NEEDS_CATEGORY,
+    READY,
+    ;
+
+    companion object {
+        fun of(
+            picked: Set<String>,
+            inbox: List<InboxRow>,
+        ): InboxPick {
+            val rows = inbox.filter { it.id in picked }
+            return when {
+                rows.isEmpty() -> NONE
+                rows.all { it.suggestionId != null } -> READY
+                else -> NEEDS_CATEGORY
+            }
+        }
+    }
+}
 
 /** Which commands a transaction's details page offers in its `•••` menu (spec 013). */
 enum class TransactionMenu {
@@ -63,6 +88,8 @@ object ScreenBar {
         showHidden: Boolean = false,
         selecting: Boolean = false,
         inboxSelecting: Boolean = false,
+        /** What the checked inbox rows allow, which decides the select bar's buttons. */
+        inboxPick: InboxPick = InboxPick.NONE,
         /** The inbox holds no transactions, so there is nothing to select. */
         inboxEmpty: Boolean = false,
         /** The open budget lives on a server this phone is signed in to, so the inbox menu can sync it. */
@@ -119,13 +146,18 @@ object ScreenBar {
                             spec("cancel-budget-edit", AppGlyph.Cancel, BudgetEditCopy.CANCEL),
                         ) + fills() + templates(templates)
                     // The accounts pivot item carries account management in its menu, so the month menu does not.
-                    // Select mode swaps the inbox's bar for what can be done to the checked rows.
+                    // Select mode swaps the inbox's bar for what can be done to the checked rows: with none
+                    // checked only cancel, accept only while every checked row has a category, and delete
+                    // set apart at the end.
                     homeSection == HOME_INBOX && inboxSelecting ->
-                        listOf(
-                            spec("accept-selected", AppGlyph.Save, InboxCopy.ACCEPT),
-                            spec("categorize-selected", AppGlyph.Categories, InboxCopy.CATEGORIZE),
-                            spec("end-inbox-selecting", AppGlyph.Cancel, InboxCopy.CANCEL),
-                        )
+                        buildList {
+                            if (inboxPick == InboxPick.READY) add(spec("accept-selected", AppGlyph.Save, InboxCopy.ACCEPT))
+                            if (inboxPick != InboxPick.NONE) add(spec("categorize-selected", AppGlyph.Categories, InboxCopy.CATEGORIZE))
+                            add(spec("end-inbox-selecting", AppGlyph.Cancel, InboxCopy.CANCEL))
+                            if (inboxPick != InboxPick.NONE) {
+                                add(ScreenBarSpec("delete-selected", AppGlyph.Delete, InboxCopy.DELETE, apart = true))
+                            }
+                        }
                     // Add a transaction is always on the inbox bar; select only shows while there is something to check.
                     homeSection == HOME_INBOX ->
                         buildList {
@@ -333,6 +365,7 @@ object ScreenBar {
             state.settings.showHiddenCategories,
             state.registerSelection != null,
             state.inboxSelection != null,
+            state.inboxSelection?.let { InboxPick.of(it, state.shell?.inbox.orEmpty()) } ?: InboxPick.NONE,
             state.shell?.inbox.isNullOrEmpty(),
             state.signedIn && !state.cloudFileId.isNullOrBlank(),
             state.registerBankLinked,
@@ -361,6 +394,7 @@ object ScreenBar {
                 glyph = spec.glyph,
                 label = spec.label,
                 primary = spec.primary,
+                apart = spec.apart,
                 spinning = spec.glyph == AppGlyph.Sync && spec.primary && syncRunning(spec.id, state),
                 run = handlers.bind(spec.id, state),
             )
@@ -523,6 +557,7 @@ class ScreenBarHandlers(
     val onAcceptSelected: () -> Unit = {},
     val onCategorizeSelected: () -> Unit = {},
     val onEndInboxSelecting: () -> Unit = {},
+    val onDeleteSelected: () -> Unit = {},
     val onSyncServer: () -> Unit = {},
     val onAddSplit: () -> Unit = {},
     val onUnsplit: () -> Unit = {},
@@ -597,6 +632,7 @@ class ScreenBarHandlers(
             "accept-selected" -> onAcceptSelected
             "categorize-selected" -> onCategorizeSelected
             "end-inbox-selecting" -> onEndInboxSelecting
+            "delete-selected" -> onDeleteSelected
             "add-split" -> onAddSplit
             "unsplit" -> onUnsplit
             "schedule-transaction" -> onScheduleTransaction

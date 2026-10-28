@@ -428,6 +428,23 @@ class RegisterBookTest {
         }
     }
 
+    // The inbox's select-mode delete: every checked row goes together, asking first if one is reconciled.
+    @Test
+    fun deleteAllRemovesEveryRowTogether() {
+        db { session, book ->
+            book.save(draft("one", amount = -100))
+            book.save(draft("two", amount = -200))
+            book.save(draft("three", amount = -300))
+            session.exec("UPDATE transactions SET reconciled = 1 WHERE id = 'two'")
+            val asked = book.deleteAll(listOf("one", "two"), false) as WriteResult.Confirm
+            assertEquals(ForcedWrite.Deletes(listOf("one", "two")), asked.retry)
+            assertEquals(3, aliveCount(session))
+            assertEquals(WriteResult.Saved, book.deleteAll(listOf("one", "two"), true))
+            assertEquals(1, aliveCount(session))
+            assertEquals(-300L, book.read("checking")!!.balanceMinor)
+        }
+    }
+
     // The form's cleared choice rides on the save; leaving it out keeps the row as it is.
     @Test
     fun saveSetsClearedAndMovesBetweenAccounts() {

@@ -292,6 +292,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onAcceptSelected = model::acceptSelectedInbox,
                     onCategorizeSelected = model::categorizeSelectedInbox,
                     onEndInboxSelecting = model::endInboxSelecting,
+                    onDeleteSelected = model::deleteSelectedInbox,
                     onSyncServer = model::syncInbox,
                     onCancel = {
                         when (state.route) {

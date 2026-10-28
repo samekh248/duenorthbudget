@@ -581,6 +581,14 @@ class BudgetLibrary(
         edit(budgetId, UndoCopy.DELETE_TRANSACTION) { RegisterBook(it).delete(transactionId, force) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    fun deleteTransactions(
+        budgetId: String,
+        transactionIds: List<String>,
+        force: Boolean,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.DELETE_TRANSACTION) { RegisterBook(it).deleteAll(transactionIds, force) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     fun setTransactionsCleared(
         budgetId: String,
         transactionIds: List<String>,
