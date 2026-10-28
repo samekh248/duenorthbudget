@@ -51,6 +51,7 @@ object SectionTitle {
                 is ShellRoute.EditAccount,
                 is ShellRoute.CloseAccount,
                 ShellRoute.AddAccount,
+                ShellRoute.BankSyncReport,
                 -> HomeSections.ACCOUNTS
                 is ShellRoute.CategoryBudget,
                 is ShellRoute.TemplateKinds,
@@ -101,7 +102,6 @@ object SectionTitle {
             // Top-level views.
             ShellRoute.Rules,
             ShellRoute.Payees,
-            ShellRoute.BankSyncReport,
             ShellRoute.Templates,
             ShellRoute.ManageCategories,
             ShellRoute.Schedules,

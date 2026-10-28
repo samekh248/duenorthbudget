@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import app.duenorth.budget.core.BankSyncFailure
@@ -73,26 +75,9 @@ class BankSyncPanelContentTest {
                 failures = listOf(BankSyncFailure("Card", "fetch did not finish")),
             )
         compose.setContent { MetroTheme { BankSyncReportScreen(ui) } }
-        compose
-            .onNodeWithTag(
-                "bank-sync-report-Checking",
-            ).assert(
-                androidx.compose.ui.test
-                    .hasAnyDescendant(
-                        androidx.compose.ui.test
-                            .hasText(BankSyncCopy.SYNCED),
-                    ),
-            )
-        compose
-            .onNodeWithTag(
-                "bank-sync-report-Card",
-            ).assert(
-                androidx.compose.ui.test
-                    .hasAnyDescendant(
-                        androidx.compose.ui.test
-                            .hasText("fetch did not finish"),
-                    ),
-            )
+        compose.onNodeWithTag("bank-sync-report-Checking").assertExists()
+        compose.onNodeWithTag("bank-sync-report-Card").assert(hasAnyDescendant(hasText("fetch did not finish")))
+        compose.onNodeWithTag("bank-sync-report-synced", useUnmergedTree = true).assertTextEquals(BankSyncCopy.syncedOf(1, 2))
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTagCount(tag: String) =

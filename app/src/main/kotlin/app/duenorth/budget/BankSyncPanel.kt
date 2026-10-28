@@ -2,12 +2,15 @@ package app.duenorth.budget
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -53,6 +56,9 @@ object BankSyncCopy {
     const val DETAILS = "details"
     const val TITLE = "bank sync"
     const val SYNCED = "synced"
+    const val FAILED_LABEL = "failed"
+    const val FAILED_HEADING = "didn't sync"
+    const val SYNCING_HEADING = "syncing now"
     const val WAITING = "syncing…"
     const val ALL_SYNCED = "every linked account synced"
     const val NONE_STARTED = "no linked account was reached"
@@ -64,6 +70,11 @@ object BankSyncCopy {
     fun failure(failure: BankSyncFailure) = "${failure.accountName}: ${failure.message}"
 
     fun more(count: Int) = "and $count more"
+
+    fun syncedOf(
+        synced: Int,
+        total: Int,
+    ) = "$synced of $total synced"
 }
 
 /** At most this many failed accounts are named; the rest are counted. */
@@ -165,8 +176,9 @@ private fun TileAction(
 }
 
 /**
- * The failed sync's full page: one line per linked account this sync reached, synced or failed with
- * its reason, under the reason the sync as a whole stopped when it did. Follows a retry live.
+ * The failed sync's full page, laid out as a schedule's details are: the accounts section line, the
+ * page's name, how many accounts synced and failed, then a ledger per outcome with each account and
+ * what happened to it. Follows a retry live.
  */
 @Composable
 fun BankSyncReportScreen(
@@ -174,64 +186,90 @@ fun BankSyncReportScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = Metro.colors
-    LazyColumn(modifier.fillMaxSize().background(colors.background).testTag("bank-sync-report")) {
-        item {
-            MetroText(BankSyncCopy.TITLE, Metro.typography.header, Modifier.padding(MetroDimens.Gutter))
-            val summary =
-                when {
-                    ui == null -> BankSyncCopy.ALL_SYNCED
-                    ui.running -> BankSyncCopy.SYNCING_BANKS
-                    ui.error != null -> ui.error
-                    else -> BankSyncCopy.FINISHED_WITH_ERRORS
-                }
-            MetroText(
-                summary,
-                Metro.typography.body,
-                Modifier.padding(horizontal = MetroDimens.Gutter).padding(bottom = MetroDimens.Gutter),
-                color = if (ui != null && !ui.running) colors.error else colors.secondary,
-            )
-        }
-        val failures = ui?.failures.orEmpty().associateBy { it.accountName }
-        val names = (ui?.started.orEmpty() + failures.keys).distinct()
-        if (ui != null && names.isEmpty() && !ui.running) {
-            item {
-                MetroText(BankSyncCopy.NONE_STARTED, Metro.typography.body, Modifier.padding(horizontal = MetroDimens.Gutter))
-            }
-        }
-        items(names) { name ->
-            val failure = failures[name]
-            val fetching = ui?.running == true && ui.accountName == name && failure == null
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = MetroDimens.TouchTarget)
-                    .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp)
-                    .testTag("bank-sync-report-$name"),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AppGlyphIcon(
-                    when {
-                        failure != null -> AppGlyph.Cancel
-                        fetching -> AppGlyph.Sync
-                        else -> AppGlyph.Reconcile
-                    },
-                    if (failure != null) colors.error else Metro.accent.text,
-                    Modifier.syncSpin(fetching),
-                    size = 22.dp,
-                )
-                Column(Modifier.padding(start = 14.dp).weight(1f)) {
-                    MetroText(name, Metro.typography.subheader, maxLines = 1)
-                    MetroText(
+    val failures = ui?.failures.orEmpty().associateBy { it.accountName }
+    val names = (ui?.started.orEmpty() + failures.keys).distinct()
+    val failed = names.filter { it in failures }
+    val fetching = ui?.accountName?.takeIf { ui.running && it !in failures }
+    val synced = names.filter { it !in failures && it != fetching }
+    LazyColumn(
+        modifier
+            .fillMaxSize()
+            .background(colors.background)
+            .padding(horizontal = MetroDimens.Gutter)
+            .testTag("bank-sync-report"),
+    ) {
+        item(key = "title") { MetroText(BankSyncCopy.TITLE, Metro.typography.header, maxLines = 1) }
+        item(key = "totals") {
+            Row(Modifier.fillMaxWidth().padding(top = MetroDimens.Row, bottom = MetroDimens.Grid)) {
+                BudgetTotal(
+                    label =
                         when {
-                            failure != null -> failure.message
-                            fetching -> BankSyncCopy.WAITING
-                            else -> BankSyncCopy.SYNCED
+                            ui == null -> BankSyncCopy.ALL_SYNCED
+                            ui.running -> BankSyncCopy.SYNCING_BANKS
+                            else -> ui.error ?: BankSyncCopy.FINISHED_WITH_ERRORS
                         },
-                        Metro.typography.caption,
-                        color = if (failure != null) colors.error else colors.secondary,
-                    )
-                }
+                    amount = BankSyncCopy.syncedOf(synced.size, names.size),
+                    amountColor = Metro.accent.text,
+                    amountTag = "bank-sync-report-synced",
+                    modifier = Modifier.weight(1f),
+                )
+                BudgetTotal(
+                    label = BankSyncCopy.FAILED_LABEL,
+                    amount = failed.size.toString(),
+                    amountColor = if (failed.isEmpty()) colors.foreground else colors.error,
+                    amountTag = "bank-sync-report-failed",
+                    alignEnd = true,
+                )
             }
+        }
+        if (ui != null && names.isEmpty() && !ui.running) {
+            item(key = "none") { MetroText(BankSyncCopy.NONE_STARTED, Metro.typography.body, color = colors.secondary) }
+        }
+        if (failed.isNotEmpty()) {
+            item(key = "failed") { ReportHeading(BankSyncCopy.FAILED_HEADING) }
+            failed.forEachIndexed { i, name ->
+                item(key = "failed-$name") { ReportLine(name, failures.getValue(name).message, ledgerBanded(i), error = true) }
+            }
+        }
+        if (fetching != null) {
+            item(key = "now") { ReportHeading(BankSyncCopy.SYNCING_HEADING) }
+            item(key = "now-$fetching") { ReportLine(fetching, BankSyncCopy.WAITING, banded = false) }
+        }
+        if (synced.isNotEmpty()) {
+            item(key = "synced") { ReportHeading(BankSyncCopy.SYNCED) }
+            synced.forEachIndexed { i, name ->
+                item(key = "synced-$name") { ReportLine(name, null, ledgerBanded(i)) }
+            }
+        }
+        item(key = "end") { Spacer(Modifier.height(MetroDimens.Grid)) }
+    }
+}
+
+@Composable
+private fun ReportHeading(label: String) {
+    MetroText(label, Metro.typography.caption, Modifier.padding(top = 14.dp, bottom = 4.dp), color = Metro.accent.text)
+}
+
+/** An account on a ledger line: its name, and why it failed under it. */
+@Composable
+private fun ReportLine(
+    name: String,
+    detail: String?,
+    banded: Boolean,
+    error: Boolean = false,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .ledgerFill(if (banded) ledgerBand else Color.Transparent)
+            .padding(vertical = 6.dp)
+            .testTag("bank-sync-report-$name"),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        MetroText(name, Metro.typography.body, maxLines = 2)
+        if (detail != null) {
+            MetroText(detail, Metro.typography.caption, color = if (error) Metro.colors.error else Metro.colors.secondary, maxLines = 2)
         }
     }
 }

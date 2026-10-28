@@ -232,7 +232,7 @@ class ShellScreenshotTest {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
                 Column(Modifier.width(390.dp).height(780.dp)) {
-                    BankSyncReportScreen(ui, Modifier.weight(1f))
+                    SectionTitled(HomeSections.ACCOUNTS.uppercase(), Modifier.weight(1f)) { BankSyncReportScreen(ui) }
                     MetroAppBar(
                         ScreenBar
                             .specsFor(ShellRoute.BankSyncReport, hasBudget = true, mode = BudgetMode.ENVELOPE)
