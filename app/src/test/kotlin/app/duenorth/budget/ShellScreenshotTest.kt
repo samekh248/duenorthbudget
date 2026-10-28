@@ -4,21 +4,25 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.ActualMonthMath
+import app.duenorth.budget.core.BankSyncFailure
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.GroupRow
+import app.duenorth.budget.core.ImportCopy
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
@@ -178,6 +182,45 @@ class ShellScreenshotTest {
             section = HomeSections.headers.indexOf(HomeSections.ACCOUNTS),
         )
 
+    // Bank sync on the accounts page: a strip just above the bar names the account fetching now.
+    @Test
+    fun accountsBankSyncingLight() = bankSyncSnap("accounts_bank_syncing_light", dark = false, BankSyncUi(accountName = "Joint checking"))
+
+    @Test
+    fun accountsBankSyncingDark() = bankSyncSnap("accounts_bank_syncing_dark", dark = true, BankSyncUi(accountName = "Joint checking"))
+
+    // An account failed mid-sync: its short error shows under the one fetching now.
+    @Test
+    fun accountsBankSyncErrorLight() =
+        bankSyncSnap("accounts_bank_sync_error_light", dark = false, BankSyncUi(accountName = "Savings", failures = listOf(cardFailure)))
+
+    @Test
+    fun accountsBankSyncErrorDark() =
+        bankSyncSnap("accounts_bank_sync_error_dark", dark = true, BankSyncUi(accountName = "Savings", failures = listOf(cardFailure)))
+
+    // Done with an error: the glyph rests and the strip offers retry.
+    @Test
+    fun accountsBankSyncRetryLight() =
+        bankSyncSnap("accounts_bank_sync_retry_light", dark = false, BankSyncUi(running = false, failures = listOf(cardFailure)))
+
+    @Test
+    fun accountsBankSyncRetryDark() =
+        bankSyncSnap("accounts_bank_sync_retry_dark", dark = true, BankSyncUi(running = false, failures = listOf(cardFailure)))
+
+    private val cardFailure = BankSyncFailure("Credit card", ImportCopy.FETCH_FAILED)
+
+    private fun bankSyncSnap(
+        name: String,
+        dark: Boolean,
+        ui: BankSyncUi,
+    ) = snap(
+        name,
+        dark = dark,
+        shell = sample().copy(accounts = manyAccounts()),
+        section = HomeSections.headers.indexOf(HomeSections.ACCOUNTS),
+        bankSync = ui,
+    )
+
     @Test
     fun accountsReorderLight() =
         snap(
@@ -257,29 +300,34 @@ class ShellScreenshotTest {
         style: MetroStyle = MetroStyle.Metro,
         showAhead: Boolean = false,
         accountsReorder: Boolean = false,
+        bankSync: BankSyncUi? = null,
     ) {
         val inbox = section == HomeSections.headers.indexOf(HomeSections.INBOX)
         val accounts = section == ScreenBar.HOME_ACCOUNTS
         val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
         val justFiled = if (filed) listOf(InboxFiled(shell.inbox.first(), 0, "Dining")) else emptyList()
+        // A still of a running sync: a turning glyph never lets the capture settle.
         captureRoboImage("src/test/snapshots/$name.png") {
-            MetroTheme(darkTheme = dark, style = style) {
+            MetroTheme(darkTheme = dark, style = style, animationsEnabled = bankSync?.running != true) {
                 CompositionLocalProvider(LocalFormatPrefs provides prefs) {
                     Column(Modifier.width(390.dp).height(780.dp)) {
-                        HomePivot(
-                            shell = shown,
-                            loading = false,
-                            openMonth = shell.month,
-                            monthWindow = MonthWindow.around(shell.month),
-                            initialSection = section,
-                            onGesture = {},
-                            modifier = Modifier.weight(1f),
-                            inboxFiled = justFiled,
-                            inboxSelection = selection,
-                            netWorth = netWorth,
-                            showAhead = showAhead,
-                            accountsReorder = accountsReorder,
-                        )
+                        Box(Modifier.weight(1f)) {
+                            HomePivot(
+                                shell = shown,
+                                loading = false,
+                                openMonth = shell.month,
+                                monthWindow = MonthWindow.around(shell.month),
+                                initialSection = section,
+                                onGesture = {},
+                                modifier = Modifier.fillMaxSize(),
+                                inboxFiled = justFiled,
+                                inboxSelection = selection,
+                                netWorth = netWorth,
+                                showAhead = showAhead,
+                                accountsReorder = accountsReorder,
+                            )
+                            bankSync?.let { BankSyncPanel(it, {}, {}, Modifier.align(Alignment.BottomCenter)) }
+                        }
                         MetroAppBar(
                             actions =
                                 when {
@@ -317,7 +365,17 @@ class ShellScreenshotTest {
                                                 mode = BudgetMode.ENVELOPE,
                                                 homeSection = ScreenBar.HOME_ACCOUNTS,
                                                 accountsReorder = accountsReorder,
-                                            ).map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} }
+                                                accountsBankSync = bankSync != null,
+                                            ).map {
+                                                ScreenAction(
+                                                    it.id,
+                                                    it.glyph,
+                                                    it.label,
+                                                    it.primary,
+                                                    spinning =
+                                                        it.id == "bank-sync" && bankSync?.running == true,
+                                                ) {}
+                                            }
                                     }
                                 },
                             expanded = false,

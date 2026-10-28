@@ -211,6 +211,10 @@ class BankSyncBook(
         today: LocalDate,
         nowMillis: Long,
         ids: () -> String,
+        /** Each linked account as its fetch starts, so the screen can name it. */
+        onAccount: (BankLinkedAccount) -> Unit = {},
+        /** Each account that failed, as it fails. */
+        onFailure: (BankSyncFailure) -> Unit = {},
     ): BankSyncSummary {
         val linked =
             session
@@ -226,19 +230,22 @@ class BankSyncBook(
         val start = today.minusDays(89)
         val startIso = String.format("%04d-%02d-%02d", start.year, start.monthValue, start.dayOfMonth)
         var added = 0
-        var failed = 0
+        val failures = mutableListOf<BankSyncFailure>()
         linked.forEach { account ->
+            onAccount(account)
             val rows =
                 try {
                     transport.fetchTransactions(serverAddress, token, account.bankAccountId, startIso)
-                } catch (_: BankSyncException) {
-                    failed++
+                } catch (error: BankSyncException) {
+                    val failure = BankSyncFailure(account.name, error.message ?: ImportCopy.FETCH_FAILED)
+                    failures += failure
+                    onFailure(failure)
                     return@forEach
                 }
             added += ImportBook(session, ids).confirm(account.accountId, rows, review = false).addedIds.size
             SyncSchema.write(session, "accounts", account.accountId, "last_sync", nowMillis.toString())
         }
-        return BankSyncSummary(accounts = linked.size, added = added, failed = failed)
+        return BankSyncSummary(accounts = linked.size, added = added, failures = failures)
     }
 }
 
@@ -246,7 +253,15 @@ class BankSyncBook(
 data class BankSyncSummary(
     val accounts: Int,
     val added: Int,
-    val failed: Int,
+    val failures: List<BankSyncFailure> = emptyList(),
+) {
+    val failed: Int get() = failures.size
+}
+
+/** One account the bank sync could not fetch, and the short reason. */
+data class BankSyncFailure(
+    val accountName: String,
+    val message: String,
 )
 
 class FakeBankSyncTransport(

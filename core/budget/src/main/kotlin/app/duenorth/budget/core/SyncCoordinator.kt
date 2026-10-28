@@ -423,11 +423,15 @@ class SyncCoordinator(
     }
 
     /** Fetches every bank-linked account of [budgetId] into the budget; null when it was left alone. */
-    fun syncBanks(budgetId: String): BankSyncSummary? {
+    fun syncBanks(
+        budgetId: String,
+        onAccount: (BankLinkedAccount) -> Unit = {},
+        onFailure: (BankSyncFailure) -> Unit = {},
+    ): BankSyncSummary? {
         if (!canSyncUnattended(budgetId)) return null
         val token = syncToken() ?: return null
         val address = activeAddress() ?: return null
-        return library.syncBankAccounts(budgetId, address, token, bankTransport, dates.today(), now())
+        return library.syncBankAccounts(budgetId, address, token, bankTransport, dates.today(), now(), onAccount, onFailure)
     }
 
     /**

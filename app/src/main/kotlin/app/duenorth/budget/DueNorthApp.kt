@@ -348,6 +348,12 @@ fun DueNorthApp(model: ShellViewModel) {
             syncing = state.syncing || state.importFetchPending,
             progress = state.syncProgress,
             bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
+            overBar =
+                state.bankSync
+                    ?.takeIf { state.route == ShellRoute.Home && state.homeSection == ScreenBar.HOME_ACCOUNTS }
+                    ?.let { ui ->
+                        { modifier -> BankSyncPanel(ui, onRetry = model::syncBanks, onDismiss = model::dismissBankSync, modifier) }
+                    },
         ) { modifier ->
             CompositionLocalProvider(
                 LocalFormSaveHost provides formSaveHost,

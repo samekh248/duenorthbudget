@@ -127,6 +127,44 @@ class ImportBookTest {
         }
     }
 
+    // The accounts page's panel names each account as it starts and each one that fails, and the rest still run.
+    @Test
+    fun syncAllReportsEachAccountAndItsFailure() {
+        withBook { session, _, _ ->
+            session.exec("INSERT INTO accounts (id, name, offbudget, type, sort_order) VALUES ('card', 'Card', 0, 'credit', 2)")
+            session.exec("UPDATE accounts SET account_sync_source = 'simpleFin', account_id = 'bank-' || id")
+            val transport =
+                object : BankSyncTransport {
+                    override fun fetchTransactions(
+                        serverAddress: String,
+                        token: String,
+                        bankAccountId: String,
+                        startDateIso: String,
+                    ): List<ParsedImportRow> {
+                        if (bankAccountId == "bank-checking") throw BankSyncException(ImportCopy.FETCH_FAILED)
+                        return listOf(ParsedImportRow(20261008, "New", -300, financialId = "n1"))
+                    }
+                }
+            val started = mutableListOf<String>()
+            val failed = mutableListOf<BankSyncFailure>()
+            val summary =
+                BankSyncBook(session, transport).syncAll(
+                    "https://example.test",
+                    "token",
+                    LocalDate.of(2026, 10, 10),
+                    0L,
+                    { UUID.randomUUID().toString() },
+                    onAccount = { started += it.name },
+                    onFailure = { failed += it },
+                )
+            assertEquals(listOf("Checking", "Card"), started)
+            assertEquals(listOf(BankSyncFailure("Checking", ImportCopy.FETCH_FAILED)), failed)
+            assertEquals(failed, summary.failures)
+            assertEquals(1, summary.failed)
+            assertEquals(1, summary.added)
+        }
+    }
+
     private fun withBook(block: (SqlSession, RegisterBook, ImportBook) -> Unit) {
         val file = File.createTempFile("import", ".sqlite")
         file.delete()

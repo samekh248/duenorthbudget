@@ -953,7 +953,12 @@ class BudgetLibrary(
         transport: BankSyncTransport,
         today: java.time.LocalDate,
         nowMillis: Long,
-    ): BankSyncSummary? = serial { open(budgetId) { BankSyncBook(it, transport).syncAll(serverAddress, token, today, nowMillis, ids) } }
+        onAccount: (BankLinkedAccount) -> Unit = {},
+        onFailure: (BankSyncFailure) -> Unit = {},
+    ): BankSyncSummary? =
+        serial {
+            open(budgetId) { BankSyncBook(it, transport).syncAll(serverAddress, token, today, nowMillis, ids, onAccount, onFailure) }
+        }
 
     /**
      * Clears one budget from the phone: its folder, the open-budget pointer when it is the open

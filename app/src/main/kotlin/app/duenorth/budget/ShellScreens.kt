@@ -997,6 +997,8 @@ fun ShellChrome(
     statusBar: WindowInsets = WindowInsets.statusBars,
     /** False while a page puts its own panel where the bar goes, as the budget's keypad does. */
     bar: Boolean = true,
+    /** Laid over the bottom of the page, just above the bar, as the accounts page's bank sync panel is. */
+    overBar: (@Composable (Modifier) -> Unit)? = null,
     content: @Composable (Modifier) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -1015,7 +1017,10 @@ fun ShellChrome(
                 .windowInsetsPadding(statusBar),
         ) {
             if (syncing) SyncProgressBar(progress)
-            content(Modifier.weight(1f).aboveKeyboard(keyboard) { if (bar) barHeight else 0 })
+            Box(Modifier.weight(1f).aboveKeyboard(keyboard) { if (bar) barHeight else 0 }) {
+                content(Modifier.fillMaxSize())
+                overBar?.invoke(Modifier.align(Alignment.BottomCenter))
+            }
             if (bar) MetroAppBar(actions, expanded, { expanded = it }, Modifier.onSizeChanged { barHeight = it.height })
         }
     }
