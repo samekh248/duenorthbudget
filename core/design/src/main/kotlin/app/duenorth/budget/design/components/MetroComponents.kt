@@ -505,6 +505,7 @@ enum class AppGlyph {
     Undo,
     Select,
     Search,
+    Delete,
 }
 
 @Immutable
@@ -515,6 +516,8 @@ data class ScreenAction(
     val primary: Boolean = true,
     /** A sync button whose sync is running: its glyph turns until it ends. */
     val spinning: Boolean = false,
+    /** A destructive button, set apart from the rest of the bar by a rule and extra air. */
+    val apart: Boolean = false,
     val run: () -> Unit,
 )
 
@@ -589,7 +592,7 @@ fun MetroAppBar(
                 horizontalArrangement = Arrangement.spacedBy(MetroDimens.AppBarGap),
             ) {
                 primary.forEach { action ->
-                    AppBarIcon(action, expanded) {
+                    AppBarIcon(action, expanded, rule = action.apart && action != primary.first()) {
                         onExpandedChange(false)
                         action.run()
                     }
@@ -648,13 +651,25 @@ private fun EllipsisDots(color: Color) {
 private fun AppBarIcon(
     action: ScreenAction,
     showLabel: Boolean,
+    /** Draws a thin upright rule in the gap before the button, setting it apart; the bar keeps its width. */
+    rule: Boolean = false,
     onClick: () -> Unit,
 ) {
     val colors = Metro.colors
+    val ruleColor = colors.secondary
     Column(
         Modifier
             .width(MetroDimens.AppBarSlot)
-            .metroTilt()
+            .then(
+                if (rule) {
+                    Modifier.testTag("app-bar-rule-${action.id}").drawBehind {
+                        val x = -MetroDimens.AppBarGap.toPx() / 2
+                        drawLine(ruleColor, Offset(x, 0f), Offset(x, MetroDimens.AppBarIcon.toPx()), strokeWidth = 1.dp.toPx())
+                    }
+                } else {
+                    Modifier
+                },
+            ).metroTilt()
             .testTag("app-bar-${action.id}")
             .clickable(
                 interactionSource = null,
@@ -784,6 +799,7 @@ object AppGlyphInk {
             AppGlyph.Undo -> 3
             AppGlyph.Select -> 4
             AppGlyph.Search -> 2
+            AppGlyph.Delete -> 4
         }
 
     fun DrawScope.draw(
@@ -947,6 +963,22 @@ object AppGlyphInk {
                 // A lens with its handle running down to the right: the WP "search" glyph.
                 drawCircle(color, radius = 5.5.dp.toPx(), center = Offset(9.5.dp.toPx(), 9.5.dp.toPx()), style = stroke)
                 drawLine(color, Offset(13.5.dp.toPx(), 13.5.dp.toPx()), Offset(18.dp.toPx(), 18.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+            }
+            AppGlyph.Delete -> {
+                // A bin under its lid, with its handle and two ribs: the WP "delete" glyph.
+                drawLine(color, Offset(4.dp.toPx(), 6.dp.toPx()), Offset(18.dp.toPx(), 6.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(9.dp.toPx(), 3.5.dp.toPx()), Offset(13.dp.toPx(), 3.5.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawRect(
+                    color,
+                    topLeft = Offset(6.dp.toPx(), 6.dp.toPx()),
+                    size =
+                        androidx.compose.ui.geometry
+                            .Size(10.dp.toPx(), 12.dp.toPx()),
+                    style = stroke,
+                )
+                listOf(9.5f, 12.5f).forEach { x ->
+                    drawLine(color, Offset(x.dp.toPx(), 9.dp.toPx()), Offset(x.dp.toPx(), 15.dp.toPx()), strokeWidth = 1.2.dp.toPx())
+                }
             }
             AppGlyph.Breakdown -> {
                 drawLine(color, Offset(4.dp.toPx(), 5.dp.toPx()), Offset(18.dp.toPx(), 5.dp.toPx()), strokeWidth = 1.6.dp.toPx())

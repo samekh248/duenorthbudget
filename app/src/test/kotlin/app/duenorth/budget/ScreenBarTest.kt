@@ -1,6 +1,7 @@
 package app.duenorth.budget
 
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.TemplateKind
 import org.junit.Assert.assertEquals
@@ -168,7 +169,47 @@ class ScreenBarTest {
                 homeSection = ScreenBar.HOME_INBOX,
                 inboxSelecting = true,
             )
-        assertEquals(listOf("accept-selected", "categorize-selected", "end-inbox-selecting"), selecting.map { it.id })
+        assertEquals(listOf("end-inbox-selecting"), selecting.map { it.id })
+    }
+
+    @Test
+    fun inboxSelectBarFollowsTheCheckedRows() {
+        fun ids(pick: InboxPick) =
+            ScreenBar
+                .specsFor(
+                    ShellRoute.Home,
+                    hasBudget = true,
+                    mode = BudgetMode.ENVELOPE,
+                    homeSection = ScreenBar.HOME_INBOX,
+                    inboxSelecting = true,
+                    inboxPick = pick,
+                ).map { it.id }
+        assertEquals(listOf("end-inbox-selecting"), ids(InboxPick.NONE))
+        assertEquals(listOf("categorize-selected", "end-inbox-selecting", "delete-selected"), ids(InboxPick.NEEDS_CATEGORY))
+        assertEquals(
+            listOf("accept-selected", "categorize-selected", "end-inbox-selecting", "delete-selected"),
+            ids(InboxPick.READY),
+        )
+        val delete =
+            ScreenBar
+                .specsFor(
+                    ShellRoute.Home,
+                    hasBudget = true,
+                    mode = BudgetMode.ENVELOPE,
+                    homeSection = ScreenBar.HOME_INBOX,
+                    inboxSelecting = true,
+                    inboxPick = InboxPick.READY,
+                ).single { it.id == "delete-selected" }
+        assertTrue(delete.apart && delete.primary)
+    }
+
+    @Test
+    fun inboxPickReadsTheCheckedRowsCategories() {
+        val ready = InboxRow("a", "A", -100, 20261015, "visa", "Visa", "", "c-1", "Dining")
+        val bare = InboxRow("b", "B", -100, 20261015, "visa", "Visa", "")
+        assertEquals(InboxPick.NONE, InboxPick.of(emptySet(), listOf(ready, bare)))
+        assertEquals(InboxPick.READY, InboxPick.of(setOf("a"), listOf(ready, bare)))
+        assertEquals(InboxPick.NEEDS_CATEGORY, InboxPick.of(setOf("a", "b"), listOf(ready, bare)))
     }
 
     @Test

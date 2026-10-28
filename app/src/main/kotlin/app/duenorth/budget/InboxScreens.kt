@@ -113,6 +113,8 @@ object InboxCopy {
     const val DELETE = "delete"
     const val GO_TO = "go to"
     const val SYNC = "sync"
+    const val READY = "ready to accept"
+    const val NEEDS_CATEGORY = "needs a category"
 }
 
 /** What a row's tap and long-press menu can do, beyond accept and categorize. */
@@ -226,17 +228,21 @@ fun InboxSection(
         ) { picked ->
             if (picked != null) {
                 LazyColumn(Modifier.fillMaxSize(), state = selectList) {
+                    // Two groups: rows with a category to accept, then rows that still need one.
                     // Rows just filed stay in the list until their confirmation has played.
-                    inboxDayItems(entries) { i, entry ->
-                        InboxLine(
-                            entry = entry,
-                            amount = money(entry.row.amountMinor),
-                            banded = ledgerBanded(i),
-                            onFiledShown = onFiledShown,
-                            onTap = { onToggle(entry.row.id) },
-                            onMenu = null,
-                            checked = entry.row.id in picked,
-                        )
+                    inboxSelectGroups(entries).forEach { (title, group) ->
+                        item(key = "group-$title") { InboxGroupHeading(title, group.size) }
+                        inboxDayItems(group) { i, entry ->
+                            InboxLine(
+                                entry = entry,
+                                amount = money(entry.row.amountMinor),
+                                banded = ledgerBanded(i),
+                                onFiledShown = onFiledShown,
+                                onTap = { onToggle(entry.row.id) },
+                                onMenu = null,
+                                checked = entry.row.id in picked,
+                            )
+                        }
                     }
                 }
             } else {
@@ -583,6 +589,31 @@ private class EasedHeight {
 private fun Modifier.clipBelow(): Modifier =
     drawWithContent { clipRect(-size.width, 0f, size.width * 2, size.height) { this@drawWithContent.drawContent() } }
 
+/** Select mode's groups, each in inbox order: rows ready to accept, then rows that need a category. Empty groups are left out. */
+internal fun inboxSelectGroups(entries: List<InboxEntry>): List<Pair<String, List<InboxEntry>>> {
+    val (ready, needs) = entries.partition { it.row.suggestionId != null }
+    return listOf(InboxCopy.READY to ready, InboxCopy.NEEDS_CATEGORY to needs).filter { it.second.isNotEmpty() }
+}
+
+/** A select-mode group's heading: its name, with how many rows wait under it. */
+@Composable
+private fun InboxGroupHeading(
+    title: String,
+    count: Int,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = GROUP_AIR_ABOVE, bottom = 2.dp)
+            .testTag("inbox-group-$title"),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        // A size up from the rows and in the accent, so a group reads apart from the day headings under it.
+        MetroText(title, Metro.typography.subheader, Modifier.weight(1f), color = Metro.accent.text, maxLines = 1)
+        MetroText("$count", Metro.typography.subheader, color = Metro.colors.secondary, maxLines = 1)
+    }
+}
+
 /** Runs of entries that share a date, in inbox order. */
 internal fun inboxDays(entries: List<InboxEntry>): List<List<InboxEntry>> =
     entries.fold(mutableListOf<MutableList<InboxEntry>>()) { days, entry ->
@@ -824,6 +855,7 @@ private val FEATURED_EMPTY = 96.dp
 private val CHECK_SIZE = 26.dp
 internal const val FILED_HOLD_MS = 900L
 private val DAY_AIR_ABOVE = 12.dp
+private val GROUP_AIR_ABOVE = 24.dp
 private const val MODE_OUT_MS = 90
 private const val MODE_IN_MS = 180
 

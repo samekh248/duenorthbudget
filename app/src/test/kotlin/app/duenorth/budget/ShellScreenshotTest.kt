@@ -306,16 +306,40 @@ class ShellScreenshotTest {
     @Test
     fun inboxLight() = snap("inbox_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX))
 
-    // Select mode: a check box on every row, and the bar acts on the checked ones.
+    // Select mode: a check box on every row, grouped into ready to accept and needs a category, and
+    // the bar acts on the checked ones. Only cancel until a row is checked.
     @Test
-    fun inboxSelectLight() =
-        snap(
-            "inbox_select_light",
-            dark = false,
-            shell = sample(),
-            section = HomeSections.headers.indexOf(HomeSections.INBOX),
-            selection = setOf(sample().inbox.first().id),
-        )
+    fun inboxSelectNoneLight() = selectSnap("inbox_select_none_light", dark = false, emptySet())
+
+    @Test
+    fun inboxSelectNoneDark() = selectSnap("inbox_select_none_dark", dark = true, emptySet())
+
+    // Every checked row has a category: accept, categorize, cancel, then delete set apart.
+    @Test
+    fun inboxSelectLight() = selectSnap("inbox_select_light", dark = false, setOf("coffee", "shell"))
+
+    @Test
+    fun inboxSelectDark() = selectSnap("inbox_select_dark", dark = true, setOf("coffee", "shell"))
+
+    // A checked row with no category hides accept.
+    @Test
+    fun inboxSelectNeedsCategoryLight() = selectSnap("inbox_select_needs_category_light", dark = false, setOf("coffee", "atm"))
+
+    @Test
+    fun inboxSelectNeedsCategoryDark() = selectSnap("inbox_select_needs_category_dark", dark = true, setOf("coffee", "atm"))
+
+    private fun selectSnap(
+        name: String,
+        dark: Boolean,
+        selection: Set<String>,
+    ) = snap(
+        name,
+        dark = dark,
+        // Four rows, so both groups fit on the screen.
+        shell = sample().let { it.copy(inbox = it.inbox.filter { row -> row.id in setOf("coffee", "shell", "rent", "atm") }) },
+        section = HomeSections.headers.indexOf(HomeSections.INBOX),
+        selection = selection,
+    )
 
     // Corner Coffee just filed: the confirmation fills the featured panel before the next one rises in.
     @Test
@@ -390,12 +414,7 @@ class ShellScreenshotTest {
                         MetroAppBar(
                             actions =
                                 when {
-                                    inbox && selection != null ->
-                                        listOf(
-                                            AppBarButton(AppGlyph.Save, InboxCopy.ACCEPT, onClick = {}),
-                                            AppBarButton(AppGlyph.Categories, InboxCopy.CATEGORIZE, onClick = {}),
-                                            AppBarButton(AppGlyph.Cancel, InboxCopy.CANCEL, onClick = {}),
-                                        )
+                                    inbox && selection != null -> emptyList()
                                     inbox ->
                                         listOfNotNull(
                                             AppBarButton(
@@ -414,7 +433,18 @@ class ShellScreenshotTest {
                                             AppBarButton(AppGlyph.Appearance, "appearance", onClick = {}),
                                         )
                                 }.asScreenActions().let { fake ->
-                                    if (!accounts) {
+                                    if (inbox && selection != null) {
+                                        ScreenBar
+                                            .specsFor(
+                                                ShellRoute.Home,
+                                                hasBudget = true,
+                                                mode = BudgetMode.ENVELOPE,
+                                                homeSection = ScreenBar.HOME_INBOX,
+                                                inboxSelecting = true,
+                                                inboxPick = InboxPick.of(selection, shown.inbox),
+                                            ).filter { it.primary }
+                                            .map { ScreenAction(it.id, it.glyph, it.label, it.primary, apart = it.apart) {} }
+                                    } else if (!accounts) {
                                         fake
                                     } else {
                                         ScreenBar
