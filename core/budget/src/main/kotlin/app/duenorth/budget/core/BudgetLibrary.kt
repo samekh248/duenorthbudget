@@ -429,9 +429,10 @@ class BudgetLibrary(
                     )
                 }
             // A goal is only stored once templates are applied that month; until then the rows measure what the
-            // templates ask, so their bars are not left empty.
+            // templates ask, so their bars are not left empty. The bars are a hint: a template that cannot be worked
+            // out leaves the stored goals in place rather than taking the budget down with it.
             if (!templatesOn) return@use shell
-            val goals = TemplateEngine(session, clock.today()).goals(viewMonth)
+            val goals = runCatching { TemplateEngine(session, clock.today()).goals(viewMonth) }.getOrElse { return@use shell }
             shell.copy(
                 groups =
                     shell.groups.map { group ->
