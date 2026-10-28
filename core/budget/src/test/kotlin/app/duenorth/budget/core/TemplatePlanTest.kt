@@ -56,6 +56,31 @@ class TemplatePlanTest {
     }
 
     @Test
+    fun budgetRowsMeasureTemplatesBeforeTheyAreApplied() {
+        fixture.open().use { opened ->
+            fun goals() =
+                opened.library
+                    .readShell(opened.budgetId, october)!!
+                    .groups
+                    .flatMap { it.categories }
+                    .associate { it.id to (it.goalMinor to it.longGoal) }
+            assertTrue(goals().values.all { it.first == null })
+            opened.library.setPreference(opened.budgetId, "flags.experimental", "true")
+            val live = goals().filterValues { it.first != null }
+            assertTrue(live.isNotEmpty())
+            opened.library.applyTemplates(opened.budgetId, october, overwrite = true, confirmed = true)
+            val stored =
+                opened.db { session ->
+                    session
+                        .query("SELECT category, goal, long_goal FROM zero_budgets WHERE month = ?", listOf(october.toActualMonth()))
+                        .filter { it.values["goal"] != null }
+                        .associate { it.str("category").orEmpty() to (it.long("goal") to it.bool("long_goal")) }
+                }
+            live.forEach { (category, goal) -> assertEquals(category, stored[category], goal.first to goal.second) }
+        }
+    }
+
+    @Test
     fun noPlanWhileTemplatesAreOff() {
         fixture.open().use { opened -> assertNull(opened.library.templatePlan(opened.budgetId, october)) }
     }

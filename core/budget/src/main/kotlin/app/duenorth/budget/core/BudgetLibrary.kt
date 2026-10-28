@@ -413,12 +413,36 @@ class BudgetLibrary(
         val database = File(dir, "db.sqlite")
         if (!database.exists()) return null
         val viewMonth = month ?: YearMonth.from(clock.today())
+        val templatesOn = readFormatPrefs(id).templatesOn
         return sessions.use(database) { session ->
             ActualSchema.ensure(session)
             SyncSchema.ensure(session)
-            settings().let { settings ->
-                ShellReader.read(session, metadata, clock.today(), viewMonth, settings.showClosedAccounts, settings.showHiddenCategories)
-            }
+            val shell =
+                settings().let { settings ->
+                    ShellReader.read(
+                        session,
+                        metadata,
+                        clock.today(),
+                        viewMonth,
+                        settings.showClosedAccounts,
+                        settings.showHiddenCategories,
+                    )
+                }
+            // A goal is only stored once templates are applied that month; until then the rows measure what the
+            // templates ask, so their bars are not left empty.
+            if (!templatesOn) return@use shell
+            val goals = TemplateEngine(session, clock.today()).goals(viewMonth)
+            shell.copy(
+                groups =
+                    shell.groups.map { group ->
+                        group.copy(
+                            categories =
+                                group.categories.map { row ->
+                                    goals[row.id]?.let { (goal, long) -> row.copy(goalMinor = goal, longGoal = long) } ?: row
+                                },
+                        )
+                    },
+            )
         }
     }
 

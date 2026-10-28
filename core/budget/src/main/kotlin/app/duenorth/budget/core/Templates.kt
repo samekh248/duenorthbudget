@@ -504,6 +504,28 @@ class TemplateEngine(
     }
 
     /**
+     * The goal a run would write for each visible templated category in [month], as (amount, long goal): a `#goal`
+     * line's target, else what its priority lines ask. Lets the budget rows measure templates that were never
+     * applied this month, as the category page does. Writes nothing.
+     */
+    fun goals(month: YearMonth): Map<String, Pair<Long, Boolean>> {
+        val detailed = ShellReader.loadDetailed(session, month)
+        return categories()
+            .filter { it.visible && !it.income && it.templates.isNotEmpty() }
+            .mapNotNull { category ->
+                val goal = category.templates.filterIsInstance<Template.Goal>().firstOrNull()
+                val asked = category.templates.filter { it.priority != null }
+                when {
+                    goal != null -> category.id to (toMinor(goal.amount) to true)
+                    asked.isNotEmpty() ->
+                        category.id to
+                            (asked.sumOf { amountFor(it, category, month, detailed.categories, detailed.figures.headerMinor) } to false)
+                    else -> null
+                }
+            }.toMap()
+    }
+
+    /**
      * Every visible category's templates laid out the way an overwrite would run them (the templates screen's
      * lanes): priorities lowest first, each template given what it asks while to budget lasts, then remainder lines
      * by weight, then goals, which budget nothing. Lines that do not read are listed apart. Writes nothing.
