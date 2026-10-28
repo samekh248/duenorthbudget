@@ -1,5 +1,8 @@
 package app.duenorth.budget
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -35,12 +38,61 @@ class BankSyncPanelContentTest {
         var dismissed = 0
         val ui = BankSyncUi(running = false, failures = listOf(BankSyncFailure("Card", "fetch did not finish")))
         compose.setContent { MetroTheme { BankSyncPanel(ui, { retried++ }, { dismissed++ }) } }
-        compose.onNodeWithTag("bank-sync-status").assertTextEquals(BankSyncCopy.FINISHED_WITH_ERRORS)
-        compose.onNodeWithTag("bank-sync-error").assertTextEquals("Card: fetch did not finish")
+        compose.onNodeWithTag("bank-sync-title", useUnmergedTree = true).assertTextEquals(BankSyncCopy.FINISHED_WITH_ERRORS)
+        compose.onNodeWithTag("bank-sync-error", useUnmergedTree = true).assertTextEquals("Card: fetch did not finish")
         compose.onNodeWithTag("bank-sync-retry").performClick()
         compose.onNodeWithTag("bank-sync-dismiss").performClick()
         assertEquals(1, retried)
         assertEquals(1, dismissed)
+    }
+
+    // A failed sync's tile opens its page on a tap; a running one does not.
+    @Test
+    fun failedTileOpensItsPage() {
+        var opened = 0
+        var ui by androidx.compose.runtime.mutableStateOf(BankSyncUi(accountName = "Checking"))
+        compose.mainClock.autoAdvance = false
+        compose.setContent { MetroTheme { BankSyncPanel(ui, {}, {}, onOpen = { opened++ }) } }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("bank-sync-panel").performClick()
+        assertEquals(0, opened)
+        ui = BankSyncUi(running = false, failures = listOf(BankSyncFailure("Card", "fetch did not finish")))
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("bank-sync-panel").performClick()
+        assertEquals(1, opened)
+    }
+
+    // The page lists each account the sync reached: synced, or failed with its reason.
+    @Test
+    fun reportListsEachAccount() {
+        val ui =
+            BankSyncUi(
+                running = false,
+                started = listOf("Checking", "Card"),
+                failures = listOf(BankSyncFailure("Card", "fetch did not finish")),
+            )
+        compose.setContent { MetroTheme { BankSyncReportScreen(ui) } }
+        compose
+            .onNodeWithTag(
+                "bank-sync-report-Checking",
+            ).assert(
+                androidx.compose.ui.test
+                    .hasAnyDescendant(
+                        androidx.compose.ui.test
+                            .hasText(BankSyncCopy.SYNCED),
+                    ),
+            )
+        compose
+            .onNodeWithTag(
+                "bank-sync-report-Card",
+            ).assert(
+                androidx.compose.ui.test
+                    .hasAnyDescendant(
+                        androidx.compose.ui.test
+                            .hasText("fetch did not finish"),
+                    ),
+            )
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTagCount(tag: String) =

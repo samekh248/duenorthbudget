@@ -195,6 +195,12 @@ object ScreenBar {
                     )
                 }
             ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, RuleScreenCopy.ADD)) + undo(undoLabel)
+            // The failed sync's page: retry runs every linked account again, dismiss clears the tile.
+            ShellRoute.BankSyncReport ->
+                listOf(
+                    spec("bank-sync", AppGlyph.Sync, BankSyncCopy.RETRY),
+                    spec("bank-sync-dismiss", AppGlyph.Cancel, BankSyncCopy.DISMISS),
+                )
             // Upcoming switches between its list and its calendar; all has nothing to switch.
             ShellRoute.Schedules ->
                 listOf(spec("add-schedule", AppGlyph.Add, ScheduleScreenCopy.NEW)) +
@@ -475,6 +481,7 @@ class ScreenBarHandlers(
     val onImport: () -> Unit,
     val onBankSync: () -> Unit = {},
     val onBankSyncAll: () -> Unit = {},
+    val onDismissBankSync: () -> Unit = {},
     val onSave: () -> Unit,
     val onCancel: () -> Unit,
     val onFill: (MonthFillKind) -> Unit = {},
@@ -544,6 +551,7 @@ class ScreenBarHandlers(
             "import" -> onImport
             "sync" -> onBankSync
             "bank-sync" -> onBankSyncAll
+            "bank-sync-dismiss" -> onDismissBankSync
             "save" -> onSave
             "cancel" -> onCancel
             "copy-last" -> ({ onFill(MonthFillKind.COPY_LAST) })

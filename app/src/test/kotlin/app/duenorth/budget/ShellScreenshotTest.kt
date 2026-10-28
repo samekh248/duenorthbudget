@@ -207,17 +207,56 @@ class ShellScreenshotTest {
     fun accountsBankSyncRetryDark() =
         bankSyncSnap("accounts_bank_sync_retry_dark", dark = true, BankSyncUi(running = false, failures = listOf(cardFailure)))
 
+    // The tile stays over every page while it matters: here over the budget.
+    @Test
+    fun budgetBankSyncingDark() =
+        bankSyncSnap("budget_bank_syncing_dark", dark = true, BankSyncUi(accountName = "Checking"), HomeSections.BUDGET)
+
+    // Tapping a failed sync's tile opens this page: each account the sync reached, and why one failed.
+    @Test
+    fun bankSyncReportLight() = reportSnap("bank_sync_report_light", dark = false)
+
+    @Test
+    fun bankSyncReportDark() = reportSnap("bank_sync_report_dark", dark = true)
+
+    private fun reportSnap(
+        name: String,
+        dark: Boolean,
+    ) {
+        val ui =
+            BankSyncUi(
+                running = false,
+                started = listOf("Checking", "Joint checking", "Credit card", "Savings"),
+                failures = listOf(cardFailure),
+            )
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Column(Modifier.width(390.dp).height(780.dp)) {
+                    BankSyncReportScreen(ui, Modifier.weight(1f))
+                    MetroAppBar(
+                        ScreenBar
+                            .specsFor(ShellRoute.BankSyncReport, hasBudget = true, mode = BudgetMode.ENVELOPE)
+                            .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                        expanded = false,
+                        onExpandedChange = {},
+                    )
+                }
+            }
+        }
+    }
+
     private val cardFailure = BankSyncFailure("Credit card", ImportCopy.FETCH_FAILED)
 
     private fun bankSyncSnap(
         name: String,
         dark: Boolean,
         ui: BankSyncUi,
+        section: String = HomeSections.ACCOUNTS,
     ) = snap(
         name,
         dark = dark,
         shell = sample().copy(accounts = manyAccounts()),
-        section = HomeSections.headers.indexOf(HomeSections.ACCOUNTS),
+        section = HomeSections.headers.indexOf(section),
         bankSync = ui,
     )
 

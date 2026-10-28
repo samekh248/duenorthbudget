@@ -101,6 +101,7 @@ object SectionTitle {
             // Top-level views.
             ShellRoute.Rules,
             ShellRoute.Payees,
+            ShellRoute.BankSyncReport,
             ShellRoute.Templates,
             ShellRoute.ManageCategories,
             ShellRoute.Schedules,

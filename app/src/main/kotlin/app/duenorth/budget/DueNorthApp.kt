@@ -272,6 +272,7 @@ fun DueNorthApp(model: ShellViewModel) {
                         model.fetchBankTransactions(accountId)
                     },
                     onBankSyncAll = model::syncBanks,
+                    onDismissBankSync = model::dismissBankSync,
                     onSave = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.confirmImport()
@@ -343,6 +344,7 @@ fun DueNorthApp(model: ShellViewModel) {
                 )
             }
         val actions = formSaveHost.bar ?: ScreenBar.forState(state, handlers)
+        // The bank sync tile stays over every page while banks fetch or a failure waits.
         ShellChrome(
             actions,
             syncing = state.syncing || state.importFetchPending,
@@ -350,9 +352,11 @@ fun DueNorthApp(model: ShellViewModel) {
             bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
             overBar =
                 state.bankSync
-                    ?.takeIf { state.route == ShellRoute.Home && state.homeSection == ScreenBar.HOME_ACCOUNTS }
+                    ?.takeIf { state.route != ShellRoute.BankSyncReport }
                     ?.let { ui ->
-                        { modifier -> BankSyncPanel(ui, onRetry = model::syncBanks, onDismiss = model::dismissBankSync, modifier) }
+                        { modifier ->
+                            BankSyncPanel(ui, model::syncBanks, model::dismissBankSync, modifier, onOpen = model::openBankSyncReport)
+                        }
                     },
         ) { modifier ->
             CompositionLocalProvider(
@@ -606,6 +610,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onStay = model::cancelSwitch,
                                 modifier = fill,
                             )
+                        ShellRoute.BankSyncReport -> BankSyncReportScreen(state.bankSync, fill)
                         ShellRoute.Payees ->
                             PayeesScreen(
                                 payees = state.payees,

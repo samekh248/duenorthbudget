@@ -170,6 +170,9 @@ sealed interface ShellRoute {
 
     data object Payees : ShellRoute
 
+    /** The bank sync tile's full page: how each linked account went, with retry. */
+    data object BankSyncReport : ShellRoute
+
     data object Settings : ShellRoute
 
     /** A budget just opened that has never had experimental features chosen: try them or keep them off. */
@@ -501,10 +504,16 @@ class ShellViewModel(
         viewModelScope.launch { runBankSync(id, quiet = false) }
     }
 
-    /** Closes the panel a failed bank sync left open. */
+    /** Closes the tile a failed bank sync left open, and its page if that is showing. */
     fun dismissBankSync() {
         if (_state.value.bankSyncing) return
         _state.update { it.copy(bankSync = null) }
+        if (_state.value.route == ShellRoute.BankSyncReport) back()
+    }
+
+    /** A tap on the failed sync's tile: the full page, with every account and why each failed. */
+    fun openBankSyncReport() {
+        if (_state.value.route != ShellRoute.BankSyncReport) push(ShellRoute.BankSyncReport)
     }
 
     /**
@@ -523,7 +532,10 @@ class ShellViewModel(
                     sync.syncBanks(
                         id,
                         onAccount = { account ->
-                            _state.update { it.copy(bankSync = (it.bankSync ?: BankSyncUi()).copy(accountName = account.name)) }
+                            _state.update {
+                                val shown = it.bankSync ?: BankSyncUi()
+                                it.copy(bankSync = shown.copy(accountName = account.name, started = shown.started + account.name))
+                            }
                         },
                         onFailure = { failure ->
                             _state.update {
@@ -550,7 +562,7 @@ class ShellViewModel(
                     if (error == null && failures.isEmpty()) {
                         null
                     } else {
-                        BankSyncUi(running = false, failures = failures, error = error)
+                        BankSyncUi(running = false, started = it.bankSync?.started.orEmpty(), failures = failures, error = error)
                     },
             )
         }

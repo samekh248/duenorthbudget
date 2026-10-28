@@ -42,6 +42,14 @@ class ScreenBarTest {
         assertEquals("sync", specs.single { it.id == "bank-sync" }.label)
     }
 
+    // The failed sync's page retries every linked account, and dismiss clears the tile.
+    @Test
+    fun bankSyncReportBarRetriesAndDismisses() {
+        val specs = ScreenBar.specsFor(ShellRoute.BankSyncReport, hasBudget = true, mode = BudgetMode.ENVELOPE)
+        assertEquals(listOf("bank-sync", "bank-sync-dismiss"), specs.map { it.id })
+        assertEquals(listOf("retry", "dismiss"), specs.map { it.label })
+    }
+
     // A sync button turns only while its own sync is running.
     @Test
     fun syncButtonsSpinOnlyWhileSyncing() {
