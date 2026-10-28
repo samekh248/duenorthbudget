@@ -170,6 +170,9 @@ sealed interface ShellRoute {
 
     data object Payees : ShellRoute
 
+    /** The bank sync tile's full page: how each linked account went, with retry. */
+    data object BankSyncReport : ShellRoute
+
     data object Settings : ShellRoute
 
     /** A budget just opened that has never had experimental features chosen: try them or keep them off. */
@@ -343,6 +346,8 @@ data class ShellUiState(
     val importFetchPending: Boolean = false,
     /** Every SimpleFIN account is fetching, from the accounts bar or at launch. */
     val bankSyncing: Boolean = false,
+    /** What the accounts page's bank sync panel shows; null when there is nothing to show. */
+    val bankSync: BankSyncUi? = null,
     /** The onboarding files list is asking the server for its budgets again. */
     val remoteRefreshing: Boolean = false,
     val registerBankLinked: Boolean = false,
@@ -486,23 +491,82 @@ class ShellViewModel(
             val id = _state.value.settings.openBudgetId ?: return@launch
             if (_state.value.locked) return@launch
             // Launch fetches the banks first, so the sync after sends what they brought to the server.
-            _state.update { it.copy(bankSyncing = true) }
-            withContext(Dispatchers.IO) { runCatching { sync.syncBanksThenBudget(id) ?: sync.sync(id) } }
-            _state.update { it.copy(bankSyncing = false) }
-            reload()
+            // The panel only shows once a linked account starts, so a budget with none never sees it.
+            runBankSync(id, quiet = true)
         }
     }
 
-    /** The accounts bar's sync: every SimpleFIN account fetches, then the budget syncs so the server has what they brought. */
+    /** The accounts bar's sync, and the panel's retry: every SimpleFIN account fetches, then the budget syncs. */
     fun syncBanks() {
         val id = _state.value.settings.openBudgetId ?: return
         if (_state.value.bankSyncing || _state.value.locked) return
-        viewModelScope.launch {
-            _state.update { it.copy(bankSyncing = true) }
-            withContext(Dispatchers.IO) { runCatching { sync.syncBanksThenBudget(id) } }
-            _state.update { it.copy(bankSyncing = false) }
-            reload()
+        _state.update { it.copy(bankSync = BankSyncUi()) }
+        viewModelScope.launch { runBankSync(id, quiet = false) }
+    }
+
+    /** Closes the tile a failed bank sync left open, and its page if that is showing. */
+    fun dismissBankSync() {
+        if (_state.value.bankSyncing) return
+        _state.update { it.copy(bankSync = null) }
+        if (_state.value.route == ShellRoute.BankSyncReport) back()
+    }
+
+    /** A tap on the failed sync's tile: the full page, with every account and why each failed. */
+    fun openBankSyncReport() {
+        if (_state.value.route != ShellRoute.BankSyncReport) push(ShellRoute.BankSyncReport)
+    }
+
+    /**
+     * Fetches every linked account, naming each in the panel as it starts and any that fail, then
+     * syncs the budget so the server has what they brought. The panel stays only when something
+     * failed. [quiet] leaves it closed when bank sync could not run at all (signed out, locked).
+     */
+    private suspend fun runBankSync(
+        id: String,
+        quiet: Boolean,
+    ) {
+        _state.update { it.copy(bankSyncing = true) }
+        val banks =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    sync.syncBanks(
+                        id,
+                        onAccount = { account ->
+                            _state.update {
+                                val shown = it.bankSync ?: BankSyncUi()
+                                it.copy(bankSync = shown.copy(accountName = account.name, started = shown.started + account.name))
+                            }
+                        },
+                        onFailure = { failure ->
+                            _state.update {
+                                val shown = it.bankSync ?: BankSyncUi()
+                                it.copy(bankSync = shown.copy(failures = shown.failures + failure))
+                            }
+                        },
+                    )
+                }
+            }
+        withContext(Dispatchers.IO) { runCatching { sync.sync(id) } }
+        val summary = banks.getOrNull()
+        val error =
+            when {
+                banks.isFailure -> BankSyncCopy.FAILED
+                summary == null && !quiet -> BankSyncCopy.UNAVAILABLE
+                else -> null
+            }
+        val failures = summary?.failures.orEmpty()
+        _state.update {
+            it.copy(
+                bankSyncing = false,
+                bankSync =
+                    if (error == null && failures.isEmpty()) {
+                        null
+                    } else {
+                        BankSyncUi(running = false, started = it.bankSync?.started.orEmpty(), failures = failures, error = error)
+                    },
+            )
         }
+        reload()
     }
 
     /**

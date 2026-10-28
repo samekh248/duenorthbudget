@@ -96,6 +96,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.duenorth.budget.design.MetroMotion
@@ -688,7 +689,7 @@ private fun AppBarIcon(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            AppGlyphIcon(action.glyph, if (filled) accent.onFill else colors.foreground, Modifier.spin(action.spinning))
+            AppGlyphIcon(action.glyph, if (filled) accent.onFill else colors.foreground, Modifier.syncSpin(action.spinning))
         }
         if (showLabel) {
             MetroText(
@@ -712,7 +713,7 @@ private fun AppBarIcon(
  * Still with animations off.
  */
 @Composable
-private fun Modifier.spin(spinning: Boolean): Modifier {
+fun Modifier.syncSpin(spinning: Boolean): Modifier {
     if (!Metro.animations) return this
     // The angle the spin had reached, read when it stops; written from the draw phase.
     val reached = remember { floatArrayOf(0f) }
@@ -1010,8 +1011,9 @@ fun AppGlyphIcon(
     glyph: AppGlyph,
     color: Color = Metro.colors.foreground,
     modifier: Modifier = Modifier,
+    size: Dp = 22.dp,
 ) {
-    Canvas(modifier.size(22.dp)) {
+    Canvas(modifier.size(size)) {
         with(AppGlyphInk) { draw(glyph, color) }
     }
 }

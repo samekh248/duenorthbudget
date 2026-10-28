@@ -51,6 +51,7 @@ object SectionTitle {
                 is ShellRoute.EditAccount,
                 is ShellRoute.CloseAccount,
                 ShellRoute.AddAccount,
+                ShellRoute.BankSyncReport,
                 -> HomeSections.ACCOUNTS
                 is ShellRoute.CategoryBudget,
                 is ShellRoute.TemplateKinds,
