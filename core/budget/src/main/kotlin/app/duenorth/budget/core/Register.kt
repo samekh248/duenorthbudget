@@ -18,6 +18,7 @@ object RegisterCopy {
     const val NO_CATEGORY = "no category"
     const val SPLIT = "split"
     const val ADD_SPLIT = "add split"
+    const val ONE_CATEGORY = "one category"
     const val SCHEDULE = "schedule"
     const val DELETE = "delete"
     const val TRANSFER = "transfer"

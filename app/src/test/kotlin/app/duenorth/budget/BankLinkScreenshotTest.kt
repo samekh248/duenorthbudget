@@ -44,7 +44,7 @@ class BankLinkScreenshotTest {
     ) {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
-                Box(Modifier.width(390.dp).height(780.dp)) { content() }
+                HostedPage(content)
             }
         }
     }

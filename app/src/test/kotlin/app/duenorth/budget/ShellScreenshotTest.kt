@@ -390,7 +390,7 @@ class ShellScreenshotTest {
     ) {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
-                Box(Modifier.width(390.dp).height(780.dp)) {
+                HostedPage {
                     ServerScreen(
                         address = "http://192.168.1.20:5006",
                         signedIn = true,

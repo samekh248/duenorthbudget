@@ -17,10 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,8 +33,7 @@ import app.duenorth.budget.core.ReportsPage
 import app.duenorth.budget.core.ReviewCopy
 import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.core.monthLabel
-import app.duenorth.budget.design.components.MetroButton
-import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroComboBox
 import app.duenorth.budget.design.components.MetroPivot
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.PivotItem
@@ -197,19 +193,23 @@ private fun RangePicker(
         }
     }
     if (preset == ReportPreset.CUSTOM) {
-        var start by remember(range) { mutableStateOf(range?.start?.toString().orEmpty()) }
-        var end by remember(range) { mutableStateOf(range?.end?.toString().orEmpty()) }
+        // Two month pickers: each pick applies at once, and a start after the end moves the end with it.
+        val latest = maxOf(YearMonth.now(), range?.end ?: YearMonth.now())
+        val months = remember(latest) { (0L until CUSTOM_MONTHS).map { latest.minusMonths(it) } }
+        val start = range?.start ?: latest.minusMonths(5)
+        val end = range?.end ?: latest
+        val label: (YearMonth) -> String = { it.format(MONTH).lowercase() }
         Row(
             Modifier.fillMaxWidth().padding(horizontal = MetroDimens.Gutter),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            MetroField(start, { start = it }, "from yyyy-mm", Modifier.weight(1f).testTag("report-custom-start"))
-            MetroField(end, { end = it }, "to yyyy-mm", Modifier.weight(1f).testTag("report-custom-end"))
-            MetroButton("apply", Modifier.testTag("report-custom-apply")) {
-                val from = runCatching { YearMonth.parse(start.trim()) }.getOrNull()
-                val to = runCatching { YearMonth.parse(end.trim()) }.getOrNull()
-                if (from != null && to != null && from <= to) onCustom(ReportRange(from, to))
+            Column(Modifier.weight(1f)) {
+                MetroText("from", Metro.typography.caption, color = Metro.colors.secondary)
+                MetroComboBox(months, start, label, { onCustom(ReportRange(it, maxOf(it, end))) }, "report-custom-start")
+            }
+            Column(Modifier.weight(1f)) {
+                MetroText("to", Metro.typography.caption, color = Metro.colors.secondary)
+                MetroComboBox(months, end, label, { onCustom(ReportRange(minOf(start, it), it)) }, "report-custom-end")
             }
         }
     }
@@ -379,3 +379,6 @@ private fun Bar(
         }
     }
 }
+
+/** How far back the custom range's month pickers reach. */
+private const val CUSTOM_MONTHS = 24L

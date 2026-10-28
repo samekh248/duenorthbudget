@@ -103,7 +103,6 @@ object SectionTitle {
             ShellRoute.Payees,
             ShellRoute.Templates,
             ShellRoute.ManageCategories,
-            ShellRoute.Budgets,
             ShellRoute.Schedules,
         )
 }

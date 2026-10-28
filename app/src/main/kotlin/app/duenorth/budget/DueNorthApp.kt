@@ -332,6 +332,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSignOut = model::signOutInstance,
                     onExport = model::exportBudget,
                     onAddSplit = { formSaveHost.run(FORM_ADD_SPLIT) },
+                    onUnsplit = { (state.route as? ShellRoute.SplitTransaction)?.transactionId?.let(model::unsplit) },
                     onScheduleTransaction = {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
                     },
@@ -506,15 +507,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                         ?: state.switchInstanceTarget?.address.orEmpty(),
                                 onOpen = { model.confirmInstanceSwitch() },
                                 onStay = model::cancelInstanceSwitch,
-                                modifier = fill,
-                            )
-                        ShellRoute.Budgets ->
-                            BudgetsScreen(
-                                budgets = state.budgets,
-                                openId = state.settings.openBudgetId,
-                                onOpen = model::requestSwitch,
-                                onCreate = model::showCreate,
-                                onSamples = if (state.developerMode) model::showSampleBudgets else null,
                                 modifier = fill,
                             )
                         ShellRoute.SampleBudgets ->

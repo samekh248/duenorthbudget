@@ -41,6 +41,7 @@ import app.duenorth.budget.core.UpcomingScheduleRow
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroSectionHeading
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
@@ -354,7 +355,7 @@ fun ScheduleEditorScreen(
 
 @Composable
 private fun Heading(text: String) {
-    MetroText(text, Metro.typography.caption, Modifier.padding(top = MetroDimens.Row), color = Metro.colors.secondary)
+    MetroSectionHeading(text)
 }
 
 @Composable

@@ -124,6 +124,12 @@ data class MetroColors(
     /** A block behind a figure in the red: the Windows Phone red swatch, with white on it. */
     val errorFill: Color = Color(0xFFE51400),
     val onErrorFill: Color = Color(0xFFFFFFFF),
+    /** A text box while it is being typed in: white on either theme, as on Windows Phone. */
+    val fieldActive: Color = Color(0xFFFFFFFF),
+    /** Text in a box being typed in. */
+    val onFieldActive: Color = Color(0xFF000000),
+    /** A hint in a box being typed in, such as a sum still being worked out. */
+    val fieldHint: Color = Color(0xFF8F8F8F),
 ) {
     companion object {
         val Light =

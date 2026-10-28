@@ -83,6 +83,8 @@ fun CategoryBudgetScreen(
     // Signed, so a negative budget (money moved out) reads as one.
     val initial = prefs.editSignedAmount(category.budgetedMinor, shell.currency.decimals)
     var amount by remember(category, prefs) { mutableStateOf(initial) }
+    // A changed note waiting for the bar's save; null while the note is as saved.
+    var noteDraft by remember(note) { mutableStateOf<String?>(null) }
     // "+500" typed over the amount adds to it. This box starts filled in, so a leading minus is a negative
     // amount ("-150"), not "take 150 off".
     val base = if (amount.trimStart().startsWith("-")) null else category.budgetedMinor
@@ -103,7 +105,7 @@ fun CategoryBudgetScreen(
         // Only while budget templates are on (spec 010 US5): the note's own text heads the page, its template lines
         // show as tiles with the budget.
         if (note != null) {
-            CategoryNoteText(note, onSaveNote)
+            CategoryNoteText(note, onSaveNote, onDraft = { noteDraft = it })
             Spacer(Modifier.height(SECTION_GAP))
         }
         AvailableBar(category, template, shell.currency)
@@ -118,7 +120,11 @@ fun CategoryBudgetScreen(
             currency = shell.currency,
         )
         if (error != null) MetroText(error, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
-        RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals, base = base)) }
+        // One save on the bar keeps both a changed note and the amount.
+        RememberFormSave {
+            noteDraft?.let(onSaveNote)
+            onSave(prefs.readAmount(amount, shell.currency.decimals, base = base))
+        }
         // In the app the bar carries save and move; the buttons are for the page on its own.
         if (!formSaveOnBar()) {
             MetroButtonGrid(Modifier.padding(top = MetroDimens.Gutter)) {

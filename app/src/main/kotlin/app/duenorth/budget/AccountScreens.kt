@@ -24,6 +24,7 @@ import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroSectionHeading
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
@@ -59,12 +60,7 @@ object AccountScreenCopy {
 
 @Composable
 private fun AccountHeading(label: String) {
-    MetroText(
-        label,
-        Metro.typography.caption,
-        Modifier.padding(top = MetroDimens.Gutter, bottom = 4.dp),
-        color = Metro.colors.secondary,
-    )
+    MetroSectionHeading(label)
 }
 
 /** New account: name, on or off budget, and an optional starting balance. Tag `account-add`. */

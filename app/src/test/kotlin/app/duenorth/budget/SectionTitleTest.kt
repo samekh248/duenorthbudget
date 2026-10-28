@@ -27,7 +27,6 @@ class SectionTitleTest {
         assertNull(title(ShellRoute.Payees, settingsReturn = true))
         assertNull(title(ShellRoute.Templates))
         assertNull(title(ShellRoute.ManageCategories))
-        assertNull(title(ShellRoute.Budgets))
         assertNull(title(ShellRoute.Schedules))
     }
 

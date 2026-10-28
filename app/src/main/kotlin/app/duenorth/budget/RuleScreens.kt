@@ -45,6 +45,7 @@ import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroComboBox
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroSectionHeading
 import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.ScreenAction
@@ -344,7 +345,7 @@ private fun PartsHeading(
             .padding(top = MetroDimens.Grid, bottom = MetroDimens.FieldLabelGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MetroText(label.uppercase(), Metro.typography.control, Modifier.padding(end = 8.dp))
+        MetroSectionHeading(label, Modifier.padding(end = 8.dp), first = true)
         MetroText(hint, Metro.typography.caption, Modifier.weight(1f), color = Metro.colors.secondary)
         control?.invoke()
     }

@@ -1,6 +1,8 @@
 package app.duenorth.budget
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -61,6 +63,39 @@ class ReportContentTest {
         }
         compose.onNodeWithTag("report-spending-empty", useUnmergedTree = true).assertExists()
         compose.onNodeWithText(ReportsCopy.NOTHING).assertExists()
+    }
+
+    @Test
+    fun aCustomRangeIsTwoMonthPickersThatApplyAtOnce() {
+        val picked = mutableListOf<ReportRange>()
+        compose.setContent {
+            MetroTheme {
+                ReportsScreen(
+                    ReportSamples.page(),
+                    false,
+                    ReportPreset.CUSTOM,
+                    SpendingGroupBy.CATEGORY,
+                    true,
+                    {},
+                    { picked += it },
+                    {},
+                    {},
+                )
+            }
+        }
+        compose.onAllNodesWithTag("report-custom-apply").assertCountEquals(0)
+        tapShown("report-custom-start-value")
+        tapShown("report-custom-start-2026-08")
+        // An end before the start moves the start with it.
+        tapShown("report-custom-end-value")
+        tapShown("report-custom-end-2026-05")
+        assertEquals(
+            listOf(
+                ReportRange(YearMonth.of(2026, 8), YearMonth.of(2026, 9)),
+                ReportRange(YearMonth.of(2026, 5), YearMonth.of(2026, 5)),
+            ),
+            picked,
+        )
     }
 
     @Test
@@ -179,4 +214,17 @@ class ReportContentTest {
         model.back()
         assertEquals(ShellRoute.Home, model.state.value.route)
     }
+
+    /** The pivot lays out its neighbours too: tap the copy that is on screen. */
+    private fun tapShown(tag: String) {
+        val nodes = compose.onAllNodesWithTag(tag)
+        val shown =
+            nodes.fetchSemanticsNodes().indexOfFirst { node ->
+                node.boundsInRoot.width > 0f && node.boundsInRoot.left in 0f..ON_SCREEN
+            }
+        nodes[shown].performClick()
+        compose.waitForIdle()
+    }
 }
+
+private const val ON_SCREEN = 1000f

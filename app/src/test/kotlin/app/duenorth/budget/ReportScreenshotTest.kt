@@ -43,6 +43,12 @@ class ReportScreenshotTest {
     fun spendingDark() = snap("report_spending_dark", dark = true, item = ReportItems.SPENDING)
 
     @Test
+    fun customRangeLight() = capture("report_custom_range_light", dark = false) { Reports(ReportItems.CASH_FLOW, ReportPreset.CUSTOM) }
+
+    @Test
+    fun customRangeDark() = capture("report_custom_range_dark", dark = true) { Reports(ReportItems.CASH_FLOW, ReportPreset.CUSTOM) }
+
+    @Test
     fun netWorthTodayLight() = capture("reports_networth_today_light", dark = false) { NetWorthToday() }
 
     @Test
@@ -64,8 +70,11 @@ class ReportScreenshotTest {
     }
 
     @Composable
-    private fun Reports(item: Int) {
-        ReportsScreen(ReportSamples.page(), false, ReportPreset.LAST_6, SpendingGroupBy.CATEGORY, true, {}, {}, {}, {}, initialItem = item)
+    private fun Reports(
+        item: Int,
+        preset: ReportPreset = ReportPreset.LAST_6,
+    ) {
+        ReportsScreen(ReportSamples.page(), false, preset, SpendingGroupBy.CATEGORY, true, {}, {}, {}, {}, initialItem = item)
     }
 
     private fun snap(

@@ -22,10 +22,10 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [33], qualifiers = "w411dp-h891dp-xxhdpi")
 class TemplateScreenshotTest {
     @Test
-    fun invalidLight() = snap("templates_invalid_light", dark = false) { Templates(TemplateSamples.invalid, null) }
+    fun invalidLight() = snap("templates_invalid_light", dark = false, hosted = true) { Templates(TemplateSamples.invalid, null) }
 
     @Test
-    fun invalidDark() = snap("templates_invalid_dark", dark = true) { Templates(TemplateSamples.invalid, null) }
+    fun invalidDark() = snap("templates_invalid_dark", dark = true, hosted = true) { Templates(TemplateSamples.invalid, null) }
 
     @Test
     fun overwriteConfirmLight() =
@@ -59,11 +59,12 @@ class TemplateScreenshotTest {
     private fun snap(
         name: String,
         dark: Boolean,
+        hosted: Boolean = false,
         content: @Composable () -> Unit,
     ) {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
-                Box(Modifier.width(390.dp).height(780.dp)) { content() }
+                if (hosted) HostedPage(content) else Box(Modifier.width(390.dp).height(780.dp)) { content() }
             }
         }
     }

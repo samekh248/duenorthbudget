@@ -925,46 +925,6 @@ fun CreateBudgetScreen(
 }
 
 @Composable
-fun BudgetsScreen(
-    budgets: List<BudgetSummary>,
-    openId: String?,
-    onOpen: (String) -> Unit,
-    onCreate: () -> Unit,
-    onSamples: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-    ) {
-        MetroText("budgets", Metro.typography.header)
-        LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
-            items(budgets, key = { it.id }) { budget ->
-                val open = budget.id == openId
-                MetroText(
-                    if (open) "${budget.name}  open" else budget.name,
-                    Metro.typography.subheader,
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = MetroDimens.TouchTarget)
-                        .metroPress { onOpen(budget.id) }
-                        .padding(vertical = MetroDimens.Row),
-                    color = if (open) Metro.accent.text else Metro.colors.foreground,
-                )
-            }
-        }
-        MetroButtonGrid(Modifier.padding(top = 12.dp)) {
-            MetroButton("new budget", onClick = onCreate)
-            if (onSamples != null) {
-                MetroButton(ShellCopy.SAMPLE_BUDGETS, Modifier.testTag("sample-budgets"), onClick = onSamples)
-            }
-        }
-    }
-}
-
-@Composable
 fun SampleBudgetsScreen(
     samples: List<MockBudgetDataset>,
     error: String?,

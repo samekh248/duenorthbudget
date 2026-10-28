@@ -275,6 +275,7 @@ object BankLinkCopy {
     const val NO_ACCOUNTS = "no accounts yet"
     const val LINKED = "linked to"
     const val REMOVE = "remove link"
+    const val REMOVE_BODY = "this account stops syncing from the bank; its transactions stay"
     const val LINK = "link bank account"
     const val UNREACHABLE = "couldn't reach the bank provider"
     const val SIGN_IN_FIRST = "sign in to a server first"

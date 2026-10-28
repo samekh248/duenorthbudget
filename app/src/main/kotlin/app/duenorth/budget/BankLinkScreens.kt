@@ -23,10 +23,12 @@ import app.duenorth.budget.core.ExternalAccount
 import app.duenorth.budget.core.GoCardlessBank
 import app.duenorth.budget.core.GoCardlessLink
 import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -50,7 +52,10 @@ data class BankLinkUi(
         get() = BankProvider.entries.filter { it in configured || it == BankProvider.SIMPLEFIN }
 }
 
-/** Register `•••` → bank link: pick a provider, sign in or send a token, then pick the bank account. */
+/**
+ * Register `•••` → bank link: pick a provider, sign in or send a token, then pick the bank account. Each step's
+ * next move (save token, find banks, I've signed in) is the bar's button; remove link sits in its menu and asks first.
+ */
 @Composable
 fun BankLinkScreen(
     ui: BankLinkUi,
@@ -65,6 +70,40 @@ fun BankLinkScreen(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var token by remember { mutableStateOf("") }
+    var country by remember { mutableStateOf("") }
+    var askingRemove by remember { mutableStateOf(false) }
+    if (askingRemove && ui.linked != null) {
+        ConfirmPage(
+            title = "${BankLinkCopy.REMOVE} to ${ui.linked.second}",
+            body = BankLinkCopy.REMOVE_BODY,
+            yes = BankLinkCopy.REMOVE,
+            onYes = {
+                askingRemove = false
+                onRemove()
+            },
+            onKeep = { askingRemove = false },
+            tag = "bank-link-remove-confirm",
+            modifier = modifier,
+            yesTag = "bank-link-remove",
+        )
+        return
+    }
+    val step =
+        when {
+            ui.loading -> null
+            ui.provider == BankProvider.SIMPLEFIN && BankProvider.SIMPLEFIN !in ui.configured ->
+                ScreenAction("bank-token-send", AppGlyph.Save, BankLinkCopy.SEND_TOKEN) {
+                    val sent = token
+                    token = ""
+                    if (sent.isNotBlank()) onToken(sent)
+                }
+            ui.provider == BankProvider.GOCARDLESS && ui.goCardless != null ->
+                ScreenAction("bank-signed-in", AppGlyph.Save, BankLinkCopy.SIGNED_IN, run = onSignedIn)
+            ui.provider == BankProvider.GOCARDLESS ->
+                ScreenAction("bank-country-find", AppGlyph.Search, BankLinkCopy.FIND_BANKS) { onCountry(country) }
+            else -> null
+        }
     Column(
         modifier
             .fillMaxSize()
@@ -78,11 +117,18 @@ fun BankLinkScreen(
         if (ui.accountName.isNotEmpty()) MetroText(ui.accountName, Metro.typography.caption, color = Metro.colors.secondary)
         ui.linked?.let { (provider, bank) ->
             MetroText("${BankLinkCopy.LINKED} $bank · ${provider.label}", Metro.typography.subheader, Modifier.testTag("bank-linked"))
-            MetroButton(BankLinkCopy.REMOVE, Modifier.testTag("bank-link-remove"), onClick = onRemove)
         }
         if (ui.error != null) {
             MetroText(ui.error, Metro.typography.body, Modifier.testTag("bank-link-error"), color = Metro.accent.text)
         }
+        PageBar(
+            listOfNotNull(
+                step,
+                ui.linked?.let {
+                    ScreenAction("bank-link-remove-ask", AppGlyph.Cancel, BankLinkCopy.REMOVE, primary = false) { askingRemove = true }
+                },
+            ),
+        )
         if (ui.loading) {
             MetroText("…", Metro.typography.subheader, color = Metro.colors.secondary)
             return@Column
@@ -92,8 +138,11 @@ fun BankLinkScreen(
             Pick(provider.label, selected = provider == ui.provider, tag = "bank-provider-${provider.syncSource}") { onProvider(provider) }
         }
         when (ui.provider) {
-            BankProvider.SIMPLEFIN -> if (BankProvider.SIMPLEFIN !in ui.configured) TokenEntry(onToken)
-            BankProvider.GOCARDLESS -> GoCardlessSteps(ui, onCountry, onInstitution, onOpenBank, onSignedIn)
+            BankProvider.SIMPLEFIN ->
+                if (BankProvider.SIMPLEFIN !in ui.configured) {
+                    MetroField(token, { token = it }, BankLinkCopy.TOKEN, Modifier.testTag("bank-token"), conceal = true)
+                }
+            BankProvider.GOCARDLESS -> GoCardlessSteps(ui, country, { country = it }, onInstitution, onOpenBank)
             else -> Unit
         }
         val accounts = ui.accounts
@@ -115,37 +164,22 @@ fun BankLinkScreen(
     }
 }
 
-/** The SimpleFIN setup token: masked, sent once, then cleared and never shown again. */
-@Composable
-private fun TokenEntry(onToken: (String) -> Unit) {
-    var token by remember { mutableStateOf("") }
-    MetroField(token, { token = it }, BankLinkCopy.TOKEN, Modifier.testTag("bank-token"), conceal = true)
-    MetroButton(BankLinkCopy.SEND_TOKEN, Modifier.testTag("bank-token-send")) {
-        val sent = token
-        token = ""
-        if (sent.isNotBlank()) onToken(sent)
-    }
-}
-
+/** GoCardless: a country, then its banks; once one is picked, the bank's own sign-in page opens from here. */
 @Composable
 private fun GoCardlessSteps(
     ui: BankLinkUi,
-    onCountry: (String) -> Unit,
+    country: String,
+    onCountryText: (String) -> Unit,
     onInstitution: (String) -> Unit,
     onOpenBank: (String) -> Unit,
-    onSignedIn: () -> Unit,
 ) {
     val link = ui.goCardless
     if (link != null) {
-        MetroButtonGrid {
-            MetroButton(BankLinkCopy.SIGN_IN, Modifier.testTag("bank-signin")) { onOpenBank(link.link) }
-            MetroButton(BankLinkCopy.SIGNED_IN, Modifier.testTag("bank-signed-in"), onClick = onSignedIn)
-        }
+        // Opening the bank sits by its step; I've signed in is the bar's button.
+        MetroButtonGrid { MetroButton(BankLinkCopy.SIGN_IN, Modifier.testTag("bank-signin")) { onOpenBank(link.link) } }
         return
     }
-    var country by remember { mutableStateOf("") }
-    MetroField(country, { country = it }, BankLinkCopy.COUNTRY, Modifier.testTag("bank-country"))
-    MetroButton(BankLinkCopy.FIND_BANKS, Modifier.testTag("bank-country-find")) { onCountry(country) }
+    MetroField(country, onCountryText, BankLinkCopy.COUNTRY, Modifier.testTag("bank-country"))
     for (bank in ui.goCardlessBanks) {
         Pick(bank.name, selected = false, tag = "bank-institution-${bank.id}") { onInstitution(bank.id) }
     }

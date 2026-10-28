@@ -423,38 +423,6 @@ class ShellContentTest {
     }
 
     @Test
-    fun budgetsScreenHidesSamplesUnlessDeveloperMode() {
-        compose.setContent {
-            MetroTheme {
-                BudgetsScreen(
-                    budgets = emptyList(),
-                    openId = null,
-                    onOpen = {},
-                    onCreate = {},
-                    onSamples = null,
-                )
-            }
-        }
-        compose.onAllNodesWithTag("sample-budgets").assertCountEquals(0)
-    }
-
-    @Test
-    fun budgetsScreenShowsSamplesInDeveloperMode() {
-        compose.setContent {
-            MetroTheme {
-                BudgetsScreen(
-                    budgets = emptyList(),
-                    openId = null,
-                    onOpen = {},
-                    onCreate = {},
-                    onSamples = {},
-                )
-            }
-        }
-        compose.onNodeWithTag("sample-budgets").assertIsDisplayed()
-    }
-
-    @Test
     fun goalBarsShowOnGoalRowsOnlyWhileTemplatesAreOn() {
         val shell =
             sample().copy(

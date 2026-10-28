@@ -1510,15 +1510,15 @@ fun SplitForm(
             }
         }
         RememberFormSave(commitSplit)
-        MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
-            MetroButton("add part") {
-                lines = lines + ("" to "")
-            }
-            if (!formSaveOnBar()) {
+        // In the app add split sits on the bar and one category in its menu, as on a transaction's details.
+        RememberFormAction(FORM_ADD_SPLIT) { lines = lines + ("" to "") }
+        if (!formSaveOnBar()) {
+            MetroButtonGrid(Modifier.padding(top = MetroDimens.Grid)) {
+                MetroButton(RegisterCopy.ADD_SPLIT) { lines = lines + ("" to "") }
                 MetroButton("save", onClick = commitSplit)
-            }
-            if (row.parent) {
-                MetroButton("one category") { onUnsplit(row.id) }
+                if (row.parent) {
+                    MetroButton(RegisterCopy.ONE_CATEGORY) { onUnsplit(row.id) }
+                }
             }
         }
     }

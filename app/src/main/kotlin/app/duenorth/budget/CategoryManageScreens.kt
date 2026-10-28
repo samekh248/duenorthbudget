@@ -30,7 +30,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.disabled
@@ -49,7 +52,9 @@ import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
+import app.duenorth.budget.design.components.MetroContextMenu
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroMenuItem
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
@@ -65,11 +70,9 @@ object CategoryManageCopy {
     const val SAVE = "save"
     const val CANCEL = "cancel"
     const val NAME = "name"
-    const val GROUP = "group"
     const val RENAME = "rename"
     const val ADD_CATEGORY = "add category"
     const val MOVE_TO_GROUP = "move to group"
-    const val MOVE_TO = "move to"
     const val HIDE = "hide"
     const val SHOW = "show"
     const val HIDE_GROUP = "hide group"
@@ -169,6 +172,8 @@ fun ManageCategoriesScreen(
 ) {
     var open by rememberSaveable { mutableStateOf(listOf<String>()) }
     var sheet by remember { mutableStateOf<ManageSheet?>(null) }
+    // The row a menu belongs to, in window coordinates.
+    var anchor by remember { mutableStateOf(Rect.Zero) }
     var edit by remember { mutableStateOf<ManageEdit?>(null) }
     var text by remember { mutableStateOf(TextFieldValue()) }
     var confirm by remember { mutableStateOf<ManageDelete?>(null) }
@@ -265,7 +270,10 @@ fun ManageCategoriesScreen(
                                 text = text,
                                 onText = { text = it },
                                 onToggle = { open = if (expanded) open - group.id else open + group.id },
-                                onMenu = { sheet = ManageSheet.Group(group) },
+                                onMenu = { bounds ->
+                                    anchor = bounds
+                                    sheet = ManageSheet.Group(group)
+                                },
                                 modifier = if (reorder) drag.follow(group.id, groupIds) else Modifier,
                                 lifted = drag.dragging == group.id,
                                 handle = if (reorder) drag.handle(group.id, groupIds, onPlaceGroup) else null,
@@ -281,7 +289,10 @@ fun ManageCategoriesScreen(
                                     renaming = edit == ManageEdit.Category(category.id),
                                     text = text,
                                     onText = { text = it },
-                                    onOpen = { sheet = ManageSheet.Category(group, category) },
+                                    onOpen = { bounds ->
+                                        anchor = bounds
+                                        sheet = ManageSheet.Category(group, category)
+                                    },
                                     banded = ledgerBanded(index),
                                     modifier = if (reorder) categoryDrag.follow(category.id, ids) else Modifier,
                                     lifted = categoryDrag.dragging == category.id,
@@ -313,76 +324,68 @@ fun ManageCategoriesScreen(
             }
         }
 
-        when (val current = sheet) {
-            is ManageSheet.Category ->
-                ActionSheet(current.group.name, current.category.name, onDismiss = { sheet = null }) {
-                    SheetAction(CategoryManageCopy.RENAME, "manage-action-rename") {
-                        startEdit(ManageEdit.Category(current.category.id), current.category.name)
-                    }
-                    if (manage.groups.size > 1) {
-                        SheetAction(CategoryManageCopy.MOVE_TO_GROUP, "manage-action-move", detail = "${current.group.name} ›") {
-                            sheet = ManageSheet.MoveTo(current.group, current.category)
-                        }
-                    }
+        // Every row's commands open in the Metro context menu under the row, as the inbox's do.
+        val menu: List<MetroMenuItem>? =
+            when (val current = sheet) {
+                is ManageSheet.Category -> {
                     val hidden = current.category.hidden
-                    SheetAction(
-                        if (hidden) CategoryManageCopy.SHOW else CategoryManageCopy.HIDE,
-                        "manage-action-hide",
-                        detail = if (hidden) null else CategoryManageCopy.HIDE_HINT,
-                    ) {
-                        sheet = null
-                        onHideCategory(current.category.id, !hidden)
-                    }
-                    SheetAction(
-                        CategoryManageCopy.DELETE,
-                        "manage-action-delete",
-                        detail = if (current.category.inUse) CategoryManageCopy.IN_USE else null,
-                        enabled = !current.category.inUse,
-                        accent = true,
-                    ) {
-                        confirm = ManageDelete.Category(current.category.id, current.category.name)
-                        sheet = null
-                    }
+                    listOfNotNull(
+                        MetroMenuItem(CategoryManageCopy.RENAME, "manage-action-rename") {
+                            startEdit(ManageEdit.Category(current.category.id), current.category.name)
+                        },
+                        MetroMenuItem(CategoryManageCopy.MOVE_TO_GROUP, "manage-action-move", detail = "${current.group.name} ›") {
+                            sheet = ManageSheet.MoveTo(current.group, current.category)
+                        }.takeIf { manage.groups.size > 1 },
+                        MetroMenuItem(
+                            if (hidden) CategoryManageCopy.SHOW else CategoryManageCopy.HIDE,
+                            "manage-action-hide",
+                            detail = if (hidden) null else CategoryManageCopy.HIDE_HINT,
+                        ) { onHideCategory(current.category.id, !hidden) },
+                        MetroMenuItem(
+                            CategoryManageCopy.DELETE,
+                            "manage-action-delete",
+                            detail = if (current.category.inUse) CategoryManageCopy.IN_USE else null,
+                            enabled = !current.category.inUse,
+                            accent = true,
+                        ) { confirm = ManageDelete.Category(current.category.id, current.category.name) },
+                    )
                 }
-            is ManageSheet.Group -> {
-                val group = current.group
-                val hides = CategoryManageCopy.hidesAll(group.categories.size).takeIf { !group.hidden && group.categories.isNotEmpty() }
-                ActionSheet(CategoryManageCopy.GROUP, group.name, onDismiss = { sheet = null }) {
-                    SheetAction(CategoryManageCopy.RENAME, "manage-action-rename") { startEdit(ManageEdit.Group(group.id), group.name) }
-                    SheetAction(CategoryManageCopy.ADD_CATEGORY, "manage-action-add") {
-                        if (group.id !in open) open = open + group.id
-                        startEdit(ManageEdit.NewCategory(group.id), "")
-                    }
-                    SheetAction(
-                        if (group.hidden) CategoryManageCopy.SHOW_GROUP else CategoryManageCopy.HIDE_GROUP,
-                        "manage-action-hide",
-                        detail = hides,
-                    ) {
-                        sheet = null
-                        onHideGroup(group.id, !group.hidden)
-                    }
-                    SheetAction(
-                        CategoryManageCopy.DELETE,
-                        "manage-action-delete",
-                        detail = if (group.categories.isEmpty()) null else CategoryManageCopy.emptyFirst(group.categories.size),
-                        enabled = group.categories.isEmpty(),
-                        accent = true,
-                    ) {
-                        confirm = ManageDelete.Group(group.id, group.name)
-                        sheet = null
-                    }
+                is ManageSheet.Group -> {
+                    val group = current.group
+                    val hides = CategoryManageCopy.hidesAll(group.categories.size).takeIf { !group.hidden && group.categories.isNotEmpty() }
+                    listOf(
+                        MetroMenuItem(
+                            CategoryManageCopy.RENAME,
+                            "manage-action-rename",
+                        ) { startEdit(ManageEdit.Group(group.id), group.name) },
+                        MetroMenuItem(CategoryManageCopy.ADD_CATEGORY, "manage-action-add") {
+                            if (group.id !in open) open = open + group.id
+                            startEdit(ManageEdit.NewCategory(group.id), "")
+                        },
+                        MetroMenuItem(
+                            if (group.hidden) CategoryManageCopy.SHOW_GROUP else CategoryManageCopy.HIDE_GROUP,
+                            "manage-action-hide",
+                            detail = hides,
+                        ) { onHideGroup(group.id, !group.hidden) },
+                        MetroMenuItem(
+                            CategoryManageCopy.DELETE,
+                            "manage-action-delete",
+                            detail = if (group.categories.isEmpty()) null else CategoryManageCopy.emptyFirst(group.categories.size),
+                            enabled = group.categories.isEmpty(),
+                            accent = true,
+                        ) { confirm = ManageDelete.Group(group.id, group.name) },
+                    )
                 }
+                // Move to opens a second menu under the same row, one line per other group.
+                is ManageSheet.MoveTo ->
+                    manage.groups.filter { it.id != current.group.id }.map { target ->
+                        MetroMenuItem(target.name, "manage-move-${target.id}") { onMoveToGroup(current.category.id, target.id) }
+                    }
+                null -> null
             }
-            is ManageSheet.MoveTo ->
-                ActionSheet(CategoryManageCopy.MOVE_TO, current.category.name, onDismiss = { sheet = null }) {
-                    manage.groups.filter { it.id != current.group.id }.forEach { target ->
-                        SheetAction(target.name, "manage-move-${target.id}") {
-                            sheet = null
-                            onMoveToGroup(current.category.id, target.id)
-                        }
-                    }
-                }
-            null -> Unit
+        if (menu != null) {
+            // A command closes the menu first; one that opens the next menu or a question sets that after.
+            MetroContextMenu(anchor, menu, onDismiss = { sheet = null }, tag = "manage-sheet")
         }
 
         confirm?.let { current ->
@@ -409,12 +412,14 @@ private fun GroupLine(
     text: TextFieldValue,
     onText: (TextFieldValue) -> Unit,
     onToggle: () -> Unit,
-    onMenu: () -> Unit,
+    onMenu: (Rect) -> Unit,
     modifier: Modifier,
     lifted: Boolean,
     handle: Modifier?,
     reorder: Boolean,
 ) {
+    // Where the row sits, so its menu opens under it.
+    var bounds by remember { mutableStateOf(Rect.Zero) }
     val hiddenCount = group.categories.count { it.hidden }
     val summary =
         buildList {
@@ -429,7 +434,8 @@ private fun GroupLine(
         modifier
             .fillMaxWidth()
             .background(if (lifted) Metro.colors.chrome else Color.Transparent)
-            .then(if (renaming || reorder) Modifier else Modifier.metroPress(onToggle, onLongClick = onMenu))
+            .onGloballyPositioned { bounds = it.boundsInWindow() }
+            .then(if (renaming || reorder) Modifier else Modifier.metroPress(onToggle, onLongClick = { onMenu(bounds) }))
             .padding(top = MetroDimens.Row)
             .testTag("manage-group-${group.id}"),
     ) {
@@ -465,7 +471,7 @@ private fun GroupLine(
                         Metro.typography.body,
                         Modifier
                             .heightIn(min = MetroDimens.TouchTarget)
-                            .metroPress(onMenu)
+                            .metroPress { onMenu(bounds) }
                             .padding(horizontal = 12.dp, vertical = 10.dp)
                             .testTag("manage-group-menu-${group.id}"),
                         color = Metro.accent.text,
@@ -495,12 +501,14 @@ private fun CategoryLine(
     renaming: Boolean,
     text: TextFieldValue,
     onText: (TextFieldValue) -> Unit,
-    onOpen: () -> Unit,
+    onOpen: (Rect) -> Unit,
     banded: Boolean,
     modifier: Modifier,
     lifted: Boolean,
     handle: Modifier?,
 ) {
+    // Where the row sits, so its menu opens under it.
+    var bounds by remember { mutableStateOf(Rect.Zero) }
     Row(
         modifier
             .fillMaxWidth()
@@ -511,7 +519,8 @@ private fun CategoryLine(
                     banded && !renaming -> ledgerBand
                     else -> Color.Transparent
                 },
-            ).then(if (renaming || handle != null) Modifier else Modifier.metroPress(onOpen, onLongClick = onOpen))
+            ).onGloballyPositioned { bounds = it.boundsInWindow() }
+            .then(if (renaming || handle != null) Modifier else Modifier.metroPress({ onOpen(bounds) }, onLongClick = { onOpen(bounds) }))
             .padding(start = MetroDimens.Gutter)
             .testTag("manage-category-${category.id}"),
         verticalAlignment = Alignment.CenterVertically,
@@ -582,77 +591,6 @@ private fun AddLine(
     }
 }
 
-/** A panel up from the bottom over a dimmed list, as a Windows Phone context menu: a caption, a title, its actions. */
-@Composable
-private fun ActionSheet(
-    caption: String,
-    title: String,
-    onDismiss: () -> Unit,
-    actions: @Composable () -> Unit,
-) {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = if (Metro.colors.isDark) 0.6f else 0.35f))
-            .quietTap(onDismiss)
-            .testTag("manage-sheet-scrim"),
-    ) {
-        Column(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(Metro.colors.chrome)
-                .quietTap {}
-                .verticalScroll(rememberScrollState())
-                .padding(MetroDimens.Gutter)
-                .testTag("manage-sheet"),
-        ) {
-            MetroText(caption.uppercase(), Metro.typography.caption, color = Metro.colors.secondary)
-            MetroText(title, Metro.typography.subheader, Modifier.padding(bottom = MetroDimens.Row), maxLines = 2)
-            actions()
-        }
-    }
-}
-
-@Composable
-private fun SheetAction(
-    label: String,
-    tag: String,
-    detail: String? = null,
-    enabled: Boolean = true,
-    accent: Boolean = false,
-    onClick: () -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .then(if (enabled) Modifier.metroPress(onClick) else Modifier.semantics(mergeDescendants = true) { disabled() })
-            .testTag(tag),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        MetroText(
-            label,
-            Metro.typography.subheader,
-            Modifier.weight(1f),
-            color =
-                when {
-                    !enabled -> Metro.colors.secondary
-                    accent -> Metro.accent.text
-                    else -> Metro.colors.foreground
-                },
-        )
-        if (detail != null) {
-            MetroText(
-                detail,
-                Metro.typography.caption.copy(textAlign = TextAlign.End),
-                Modifier.padding(start = 12.dp),
-                color = Metro.colors.secondary,
-            )
-        }
-    }
-}
-
 @Composable
 private fun DeletePage(
     current: ManageDelete,
@@ -672,8 +610,3 @@ private fun DeletePage(
         keepTag = "manage-delete-keep",
     )
 }
-
-/** Takes a tap with no press look: the scrim that closes a sheet, and the panels that keep taps off the list. */
-@Composable
-private fun Modifier.quietTap(onTap: () -> Unit): Modifier =
-    clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onTap)
