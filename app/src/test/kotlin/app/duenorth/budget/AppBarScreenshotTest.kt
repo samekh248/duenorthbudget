@@ -59,7 +59,7 @@ class AppBarScreenshotTest {
     private val home =
         listOf(
             ScreenAction("add", AppGlyph.Add, "add") {},
-            ScreenAction("edit-budget", AppGlyph.Categories, "edit budget", primary = false) {},
+            ScreenAction("edit-budget", AppGlyph.Edit, "edit budget") {},
             ScreenAction("hold", AppGlyph.Hold, "hold", primary = false) {},
             ScreenAction("categories", AppGlyph.Categories, "categories", primary = false) {},
             ScreenAction("rules", AppGlyph.Categories, "rules", primary = false) {},

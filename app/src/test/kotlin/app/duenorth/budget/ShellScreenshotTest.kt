@@ -53,6 +53,19 @@ class ShellScreenshotTest {
     @Test
     fun homeDark() = snap("home_dark", dark = true, shell = sample())
 
+    // The budget's real bar: add and edit budget as buttons, the rest in the menu.
+    @Test
+    fun budgetBarLight() = budgetBarSnap("home_budget_bar_light", dark = false, expanded = false)
+
+    @Test
+    fun budgetBarDark() = budgetBarSnap("home_budget_bar_dark", dark = true, expanded = false)
+
+    @Test
+    fun budgetBarExpandedLight() = budgetBarSnap("home_budget_bar_expanded_light", dark = false, expanded = true)
+
+    @Test
+    fun budgetBarExpandedDark() = budgetBarSnap("home_budget_bar_expanded_dark", dark = true, expanded = true)
+
     @Test
     fun emptyLight() =
         snap(
@@ -471,6 +484,39 @@ class ShellScreenshotTest {
                             onExpandedChange = {},
                         )
                     }
+                }
+            }
+        }
+    }
+
+    private fun budgetBarSnap(
+        name: String,
+        dark: Boolean,
+        expanded: Boolean,
+    ) {
+        val shell = sample()
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Column(Modifier.width(390.dp).height(780.dp)) {
+                    Box(Modifier.weight(1f)) {
+                        HomePivot(
+                            shell = shell,
+                            loading = false,
+                            openMonth = shell.month,
+                            monthWindow = MonthWindow.around(shell.month),
+                            initialSection = HomeSections.headers.indexOf(HomeSections.BUDGET),
+                            onGesture = {},
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                    MetroAppBar(
+                        actions =
+                            ScreenBar
+                                .specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
+                                .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                        expanded = expanded,
+                        onExpandedChange = {},
+                    )
                 }
             }
         }
