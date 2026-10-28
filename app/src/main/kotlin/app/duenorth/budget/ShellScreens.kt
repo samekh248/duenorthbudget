@@ -7,9 +7,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -391,10 +393,28 @@ fun BudgetSection(
     val tiles = style.heroTiles
     val onTile = if (tiles) (if (error) Metro.colors.onErrorFill else Metro.accent.onFill) else null
     val tile = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+    val ahead = shell.ahead?.takeIf { showAhead && shell.mode == BudgetMode.ENVELOPE }
+    val hasHeld = shell.bufferedMinor != 0L
+    // Three tiles won't fit one row, so held drops under free after plans.
+    val heldBelow = tiles && ahead != null
+    val held: @Composable (Modifier) -> Unit = { slot ->
+        if (hasHeld) {
+            BudgetTotal(
+                label = "held",
+                amount = MoneyFormat.format(shell.bufferedMinor, shell.currency, formatOptions),
+                amountColor = Metro.colors.secondary,
+                amountTag = "held-amount",
+                alignEnd = true,
+                modifier = if (tiles) slot.relief(Relief.Raised, small = true).then(tile) else slot,
+            )
+        }
+    }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         Row(
             Modifier
                 .fillMaxWidth()
+                // Tiles on one row share the tallest tile's height.
+                .then(if (tiles) Modifier.height(IntrinsicSize.Min) else Modifier)
                 .then(
                     when {
                         tiles -> Modifier.padding(top = 6.dp)
@@ -418,6 +438,7 @@ fun BudgetSection(
                         if (tiles) {
                             Modifier
                                 .weight(1.3f)
+                                .fillMaxHeight()
                                 .relief(Relief.Raised, small = true, fill = if (error) Metro.colors.errorFill else Metro.accent.fill)
                                 .then(tile)
                         } else {
@@ -431,29 +452,39 @@ fun BudgetSection(
                         },
                     ),
             )
-            if (shell.bufferedMinor != 0L) {
+            if (!heldBelow) held(if (tiles) Modifier.weight(1f).fillMaxHeight() else Modifier)
+            if (ahead != null) {
+                // Plain ink, not the accent (which can itself be red); red only once plans overrun it.
                 BudgetTotal(
-                    label = "held",
-                    amount = MoneyFormat.format(shell.bufferedMinor, shell.currency, formatOptions),
-                    amountColor = Metro.colors.secondary,
-                    amountTag = "held-amount",
+                    label = FreeAfterPlansCopy.LABEL,
+                    amount = MoneyFormat.format(ahead.freeMinor, shell.currency, formatOptions),
+                    amountColor = if (ahead.freeMinor < 0) Metro.colors.error else Metro.colors.foreground,
+                    amountTag = "free-after-plans",
                     alignEnd = true,
-                    modifier = if (tiles) Modifier.weight(1f).relief(Relief.Raised, small = true).then(tile) else Modifier,
+                    note = FreeAfterPlansCopy.through(shell.month, ahead.throughMonth),
+                    modifier =
+                        (
+                            if (tiles) {
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .relief(Relief.Raised, small = true)
+                                    .then(tile)
+                            } else {
+                                Modifier
+                            }
+                        ).testTag("free-after-plans-figure"),
                 )
             }
         }
-        val ahead = shell.ahead
-        if (showAhead && ahead != null && shell.mode == BudgetMode.ENVELOPE) {
-            MetroText(
-                FreeAfterPlansCopy.line(
-                    MoneyFormat.format(ahead.freeMinor, shell.currency, formatOptions),
-                    shell.month,
-                    ahead.throughMonth,
-                ),
-                Metro.typography.caption,
-                Modifier.padding(top = MetroDimens.Row).testTag("free-after-plans"),
-                color = if (ahead.freeMinor < 0) Metro.colors.error else Metro.colors.secondary,
-            )
+        if (heldBelow && hasHeld) {
+            Row(
+                Modifier.fillMaxWidth().padding(top = MetroDimens.Gutter),
+                horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
+            ) {
+                Spacer(Modifier.weight(1.3f))
+                held(Modifier.weight(1f))
+            }
         }
         if (notice != null) MonthNotice(notice, Modifier.padding(top = MetroDimens.Row))
         if (shell.groups.isEmpty() && shell.incomeGroups.isEmpty()) {
@@ -573,6 +604,8 @@ internal fun BudgetTotal(
     error: Boolean = false,
     /** Ink for the caption, on a tile; null keeps the page's secondary (or error) color. */
     labelColor: Color? = null,
+    /** A second caption under the amount. */
+    note: String? = null,
 ) {
     val align = if (alignEnd) TextAlign.End else TextAlign.Start
     Column(modifier, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
@@ -599,6 +632,13 @@ internal fun BudgetTotal(
                 Metro.typography.subheader.copy(textAlign = align),
                 color = amountColor,
                 modifier = Modifier.testTag(amountTag),
+            )
+        }
+        if (note != null) {
+            MetroText(
+                note,
+                Metro.typography.caption.copy(textAlign = align),
+                color = labelColor?.copy(alpha = 0.85f) ?: Metro.colors.secondary,
             )
         }
     }

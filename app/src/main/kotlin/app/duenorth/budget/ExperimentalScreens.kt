@@ -227,16 +227,16 @@ object FreeAfterPlansCopy {
     const val PLANNED = "spoken for by later months"
     const val FREE = "free after later plans"
 
-    /** `120.00 free after plans through december`, with the year once it differs from [open]'s. */
-    fun line(
-        amount: String,
+    const val LABEL = "free after plans"
+
+    /** `through december`, with the year once it differs from [open]'s. */
+    fun through(
         open: YearMonth,
         throughMonth: Int,
     ): String {
         val through = YearMonth.of(throughMonth / 100, throughMonth % 100)
         val name = through.month.name.lowercase()
-        val label = if (through.year == open.year) name else "$name ${through.year}"
-        return "$amount free after plans through $label"
+        return if (through.year == open.year) "through $name" else "through $name ${through.year}"
     }
 }
 
