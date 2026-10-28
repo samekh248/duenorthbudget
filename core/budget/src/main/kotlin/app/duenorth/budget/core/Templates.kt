@@ -430,8 +430,9 @@ class TemplateEngine(
                             it
                     }
                 }
-            if (remainders.isNotEmpty() && available > 0) {
-                val totalWeight = remainders.fold(BigDecimal.ZERO) { sum, (_, template) -> sum + template.weight }
+            val totalWeight = remainders.fold(BigDecimal.ZERO) { sum, (_, template) -> sum + template.weight }
+            // `remainder 0` lines alone share nothing, rather than dividing by a zero weight.
+            if (remainders.isNotEmpty() && available > 0 && totalWeight.signum() > 0) {
                 val perWeight = available.toDouble() / totalWeight.toDouble()
                 var left = available
                 remainders.forEachIndexed { index, (category, template) ->
@@ -574,17 +575,15 @@ class TemplateEngine(
             val laneChips =
                 remainders.mapIndexed { n, (category, index) ->
                     val share =
-                        if (n ==
-                            remainders.lastIndex
-                        ) {
-                            left
-                        } else {
-                            (pool.toDouble() * weights[n].toDouble() / total.toDouble()).roundToLong()
+                        when {
+                            total.signum() <= 0 -> 0L
+                            n == remainders.lastIndex -> left
+                            else -> (pool.toDouble() * weights[n].toDouble() / total.toDouble()).roundToLong()
                         }
                     left -= share
                     chip(category, index, null, share)
                 }
-            available -= pool
+            available -= pool - left
             lanes += TemplateLane(TemplateLane.Kind.REMAINDER, null, laneChips, available)
         }
         val goals = chips { it is Template.Goal }
@@ -703,7 +702,9 @@ class TemplateEngine(
         }
         if (inMonth > 0) return amount * inMonth
         if (template.full || next == null) return 0L
-        val left = ChronoUnit.MONTHS.between(month, YearMonth.from(next)) + 1
+        // A one-off date already past (a missed bill not yet marked done) is due now: what is still missing, in one
+        // month. Counting months to it would divide by zero or by a negative.
+        val left = (ChronoUnit.MONTHS.between(month, YearMonth.from(next)) + 1).coerceAtLeast(1L)
         return ((amount - carried).coerceAtLeast(0L).toDouble() / left).roundToLong()
     }
 

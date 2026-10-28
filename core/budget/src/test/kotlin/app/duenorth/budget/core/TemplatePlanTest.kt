@@ -81,6 +81,58 @@ class TemplatePlanTest {
     }
 
     @Test
+    fun aMissedOneOffScheduleDoesNotTakeTheBudgetDown() {
+        fixture.open().use { opened ->
+            opened.library.setPreference(opened.budgetId, "flags.experimental", "true")
+            val rent = fixture.id("categories", "Rent")
+            // Rent's schedule turned into a one-off bill due last month and not yet paid, with its 1,500 saved in
+            // September and carried into October. Counting months to a date already past divided 0 by 0.
+            opened.db { session ->
+                val rule = session.query("SELECT rule FROM schedules WHERE name = 'Rent'").single().str("rule")
+                val conditions = session.query("SELECT conditions FROM rules WHERE id = ?", listOf(rule)).single().str("conditions")!!
+                val oneOff = conditions.replace(Regex(""""value":\{"start".*?\}"""), "\"value\":\"2026-09-28\"")
+                check(oneOff != conditions)
+                session.exec("UPDATE rules SET conditions = ? WHERE id = ?", listOf(oneOff, rule))
+                session.exec(
+                    "INSERT INTO zero_budgets (id, month, category, amount) VALUES (?, ?, ?, ?)",
+                    listOf("202609-$rent", 202609, rent, 150_000L),
+                )
+            }
+            val row =
+                opened.library
+                    .readShell(opened.budgetId, october)!!
+                    .groups
+                    .flatMap { it.categories }
+                    .single { it.id == rent }
+            // Due now, and already covered by what carried over.
+            assertEquals(0L, row.goalMinor)
+            assertTrue(
+                opened.library
+                    .templatePlan(opened.budgetId, october)!!
+                    .lanes
+                    .isNotEmpty(),
+            )
+        }
+    }
+
+    @Test
+    fun remainderLinesWithNoWeightShareNothing() {
+        fixture.open().use { opened ->
+            opened.library.setPreference(opened.budgetId, "flags.experimental", "true")
+            opened.library.saveCategoryNote(opened.budgetId, fixture.id("categories", "Remainder A"), "#template remainder 0")
+            opened.library.saveCategoryNote(opened.budgetId, fixture.id("categories", "Remainder B"), "#template remainder 0")
+            val remainder =
+                opened.library
+                    .templatePlan(opened.budgetId, october)!!
+                    .lanes
+                    .single { it.kind == TemplateLane.Kind.REMAINDER }
+            assertTrue(remainder.chips.all { it.given == 0L })
+            val result = opened.library.applyTemplates(opened.budgetId, october, overwrite = true, confirmed = true)
+            assertTrue("$result", result is TemplateResult.Applied)
+        }
+    }
+
+    @Test
     fun noPlanWhileTemplatesAreOff() {
         fixture.open().use { opened -> assertNull(opened.library.templatePlan(opened.budgetId, october)) }
     }
