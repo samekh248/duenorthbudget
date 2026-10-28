@@ -2,7 +2,13 @@ package app.duenorth.budget.design.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -62,6 +68,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -81,6 +88,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -504,6 +512,8 @@ data class ScreenAction(
     val glyph: AppGlyph,
     val label: String,
     val primary: Boolean = true,
+    /** A sync button whose sync is running: its glyph turns until it ends. */
+    val spinning: Boolean = false,
     val run: () -> Unit,
 )
 
@@ -651,7 +661,10 @@ private fun AppBarIcon(
                 onClickLabel = action.label,
                 role = Role.Button,
                 onClick = onClick,
-            ).semantics { contentDescription = action.label },
+            ).semantics {
+                contentDescription = action.label
+                if (action.spinning) stateDescription = "syncing"
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val style = Metro.style
@@ -675,7 +688,7 @@ private fun AppBarIcon(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            AppGlyphIcon(action.glyph, if (filled) accent.onFill else colors.foreground)
+            AppGlyphIcon(action.glyph, if (filled) accent.onFill else colors.foreground, Modifier.spin(action.spinning))
         }
         if (showLabel) {
             MetroText(
@@ -693,6 +706,53 @@ private fun AppBarIcon(
     }
 }
 
+/**
+ * As in due north tasks: a steady turn while [spinning], drawn in the layer only so nothing
+ * recomposes per frame. When it stops, the glyph eases on to upright rather than snapping back.
+ * Still with animations off.
+ */
+@Composable
+private fun Modifier.spin(spinning: Boolean): Modifier {
+    if (!Metro.animations) return this
+    // The angle the spin had reached, read when it stops; written from the draw phase.
+    val reached = remember { floatArrayOf(0f) }
+    val settle = remember { Animatable(0f) }
+    var settling by remember { mutableStateOf(false) }
+    LaunchedEffect(spinning) {
+        if (spinning || reached[0] == 0f) return@LaunchedEffect
+        settling = true
+        settle.snapTo(reached[0])
+        val left = (FULL_TURN - reached[0]) / FULL_TURN
+        settle.animateTo(FULL_TURN, tween((SPIN_MS * left).toInt(), easing = MetroMotion.EaseOut))
+        reached[0] = 0f
+        settling = false
+    }
+    return when {
+        spinning -> {
+            val angle =
+                rememberInfiniteTransition(label = "sync spin").animateFloat(
+                    initialValue = 0f,
+                    targetValue = FULL_TURN,
+                    animationSpec = infiniteRepeatable(tween(SPIN_MS, easing = LinearEasing), RepeatMode.Restart),
+                    label = "angle",
+                )
+            graphicsLayer {
+                rotationZ = angle.value
+                reached[0] = angle.value
+            }
+        }
+        settling -> graphicsLayer { rotationZ = settle.value }
+        else -> this
+    }
+}
+
+private const val FULL_TURN = 360f
+private const val SYNC_TOP_END = 335f
+private const val SYNC_SWEEP = 130f
+private const val SYNC_HEAD_LENGTH = 3.6f
+private const val SYNC_HEAD_HALF = 3f
+private const val SPIN_MS = 1200
+
 fun List<AppBarButton>.asScreenActions(): List<ScreenAction> =
     map { ScreenAction(id = it.id, glyph = it.glyph, label = it.label, primary = true, run = it.onClick) }
 
@@ -701,7 +761,7 @@ object AppGlyphInk {
         when (glyph) {
             AppGlyph.Budgets -> 3
             AppGlyph.Appearance -> 3
-            AppGlyph.Sync -> 6
+            AppGlyph.Sync -> 4
             AppGlyph.Payees -> 2
             AppGlyph.Hold -> 2
             AppGlyph.Categories -> 3
@@ -752,33 +812,40 @@ object AppGlyphInk {
             }
             // Two arrows chasing each other round a circle, the WP8.1 sync mark (distinct from transfer's straight arrows).
             AppGlyph.Sync -> {
-                val radius = 6.5.dp.toPx()
-                val center = Offset(w / 2, h / 2)
-                val head = 3.dp.toPx()
-                listOf(200f, 20f).forEach { start ->
+                // As in due north tasks: two arcs chasing each other clockwise, each ending in a solid
+                // head that sits on the arc's end and points along it (WP8.1 sync), so the glyph reads
+                // the same mid-spin. Drawn on a 24 x 24 grid scaled to the canvas.
+                val u = size.minDimension / 24f
+                val r = 7.5f
+                for (end in listOf(SYNC_TOP_END, SYNC_TOP_END + 180f)) {
                     drawArc(
                         color,
-                        startAngle = start,
-                        sweepAngle = 130f,
-                        useCenter = false,
-                        topLeft = Offset(center.x - radius, center.y - radius),
+                        end - SYNC_SWEEP,
+                        SYNC_SWEEP,
+                        false,
+                        topLeft = Offset((12f - r) * u, (12f - r) * u),
                         size =
                             androidx.compose.ui.geometry
-                                .Size(radius * 2, radius * 2),
+                                .Size(2 * r * u, 2 * r * u),
                         style = stroke,
                     )
-                    val end = Math.toRadians((start + 130f).toDouble())
-                    val tip = Offset(center.x + radius * kotlin.math.cos(end).toFloat(), center.y + radius * kotlin.math.sin(end).toFloat())
-                    val heading = kotlin.math.atan2(kotlin.math.cos(end), -kotlin.math.sin(end))
-                    listOf(150.0, -150.0).forEach { spread ->
-                        val back = heading + Math.toRadians(spread)
-                        drawLine(
-                            color,
-                            tip,
-                            Offset(tip.x + head * kotlin.math.cos(back).toFloat(), tip.y + head * kotlin.math.sin(back).toFloat()),
-                            strokeWidth = 1.6.dp.toPx(),
-                        )
-                    }
+                    val a = Math.toRadians(end.toDouble())
+                    // Outward from the centre, then clockwise along the arc.
+                    val nx = kotlin.math.cos(a).toFloat()
+                    val ny = kotlin.math.sin(a).toFloat()
+                    val tx = -ny
+                    val ty = nx
+                    val ex = 12f + r * nx
+                    val ey = 12f + r * ny
+                    drawPath(
+                        Path().apply {
+                            moveTo((ex + tx * SYNC_HEAD_LENGTH) * u, (ey + ty * SYNC_HEAD_LENGTH) * u)
+                            lineTo((ex + nx * SYNC_HEAD_HALF) * u, (ey + ny * SYNC_HEAD_HALF) * u)
+                            lineTo((ex - nx * SYNC_HEAD_HALF) * u, (ey - ny * SYNC_HEAD_HALF) * u)
+                            close()
+                        },
+                        color,
+                    )
                 }
             }
             AppGlyph.Payees -> {
@@ -942,8 +1009,9 @@ object AppGlyphInk {
 fun AppGlyphIcon(
     glyph: AppGlyph,
     color: Color = Metro.colors.foreground,
+    modifier: Modifier = Modifier,
 ) {
-    Canvas(Modifier.size(22.dp)) {
+    Canvas(modifier.size(22.dp)) {
         with(AppGlyphInk) { draw(glyph, color) }
     }
 }

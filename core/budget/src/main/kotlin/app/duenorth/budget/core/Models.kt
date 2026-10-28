@@ -442,6 +442,8 @@ data class AccountRow(
     val offBudget: Boolean,
     val closed: Boolean,
     val balanceMinor: Long,
+    /** Linked through SimpleFIN, so the accounts bar's sync fetches it with the others. */
+    val bankSync: Boolean = false,
 )
 
 data class InboxRow(

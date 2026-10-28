@@ -343,6 +343,10 @@ data class ShellUiState(
     val importReview: ImportReviewPage? = null,
     val importError: String? = null,
     val importFetchPending: Boolean = false,
+    /** Every SimpleFIN account is fetching, from the accounts bar or at launch. */
+    val bankSyncing: Boolean = false,
+    /** The onboarding files list is asking the server for its budgets again. */
+    val remoteRefreshing: Boolean = false,
     val registerBankLinked: Boolean = false,
     val categoryManage: CategoryManagePage? = null,
     val instances: List<SavedInstance> = emptyList(),
@@ -484,7 +488,21 @@ class ShellViewModel(
             val id = _state.value.settings.openBudgetId ?: return@launch
             if (_state.value.locked) return@launch
             // Launch fetches the banks first, so the sync after sends what they brought to the server.
+            _state.update { it.copy(bankSyncing = true) }
             withContext(Dispatchers.IO) { runCatching { sync.syncBanksThenBudget(id) ?: sync.sync(id) } }
+            _state.update { it.copy(bankSyncing = false) }
+            reload()
+        }
+    }
+
+    /** The accounts bar's sync: every SimpleFIN account fetches, then the budget syncs so the server has what they brought. */
+    fun syncBanks() {
+        val id = _state.value.settings.openBudgetId ?: return
+        if (_state.value.bankSyncing || _state.value.locked) return
+        viewModelScope.launch {
+            _state.update { it.copy(bankSyncing = true) }
+            withContext(Dispatchers.IO) { runCatching { sync.syncBanksThenBudget(id) } }
+            _state.update { it.copy(bankSyncing = false) }
             reload()
         }
     }

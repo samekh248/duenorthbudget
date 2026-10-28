@@ -271,6 +271,7 @@ fun DueNorthApp(model: ShellViewModel) {
                             (state.route as? ShellRoute.Register)?.accountId ?: return@ScreenBarHandlers
                         model.fetchBankTransactions(accountId)
                     },
+                    onBankSyncAll = model::syncBanks,
                     onSave = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.confirmImport()

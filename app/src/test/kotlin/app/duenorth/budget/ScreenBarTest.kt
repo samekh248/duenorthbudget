@@ -27,6 +27,33 @@ class ScreenBarTest {
         assertEquals("schedules", specs.single { it.id == "schedules" }.label)
     }
 
+    // A SimpleFIN-linked budget on a server gets a sync button beside add on the accounts bar.
+    @Test
+    fun accountsBarSyncsBanksWhenLinked() {
+        val specs =
+            ScreenBar.specsFor(
+                ShellRoute.Home,
+                hasBudget = true,
+                mode = BudgetMode.ENVELOPE,
+                homeSection = ScreenBar.HOME_ACCOUNTS,
+                accountsBankSync = true,
+            )
+        assertEquals(listOf("add", "bank-sync", "schedules"), specs.filter { it.primary }.map { it.id })
+        assertEquals("sync", specs.single { it.id == "bank-sync" }.label)
+    }
+
+    // A sync button turns only while its own sync is running.
+    @Test
+    fun syncButtonsSpinOnlyWhileSyncing() {
+        val idle = ShellUiState()
+        listOf("sync", "bank-sync", "refresh").forEach { assertFalse(ScreenBar.syncRunning(it, idle)) }
+        assertTrue(ScreenBar.syncRunning("sync", idle.copy(importFetchPending = true)))
+        assertTrue(ScreenBar.syncRunning("bank-sync", idle.copy(bankSyncing = true)))
+        assertFalse(ScreenBar.syncRunning("bank-sync", idle.copy(importFetchPending = true)))
+        assertTrue(ScreenBar.syncRunning("refresh", idle.copy(remoteRefreshing = true)))
+        assertFalse(ScreenBar.syncRunning("add", idle.copy(bankSyncing = true)))
+    }
+
     // Upcoming switches between its list and calendar; all has nothing to switch.
     @Test
     fun schedulesBarSwitchesUpcomingView() {
