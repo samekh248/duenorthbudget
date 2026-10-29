@@ -1244,7 +1244,7 @@ fun AppGlyphIcon(
 ) {
     val mobile10 = Metro.style.mobile10
     Canvas(modifier.size(size)) {
-        if (mobile10) {
+        if (mobile10 && Mdl2GlyphInk.covers(glyph)) {
             with(Mdl2GlyphInk) { draw(glyph, color) }
         } else {
             with(AppGlyphInk) { draw(glyph, color) }
@@ -1304,7 +1304,12 @@ object Mdl2GlyphInk {
             AppGlyph.Search to "M12 2a6 6 0 1 0 0 12a6 6 0 1 0 0-12zM7.7 12.3L2 18",
             // Delete: a bin with its lid and handle and two ribs.
             AppGlyph.Delete to "M2 4.5h16M7.5 4.5V2h5v2.5M4 4.5l1 13.5h10l1-13.5M8.5 7.5v7.5M11.5 7.5v7.5",
+            // Edit: a pencil down to the left, its tip and the band behind it.
+            AppGlyph.Edit to "M2.5 17.5l1-4.5L14 2.5L17.5 6L7 16.5zM12 4.5L15.5 8M3.5 13L7 16.5",
         )
+
+    /** Whether this style has its own ink for [glyph]; one it lacks falls back to Metro's rather than failing. */
+    fun covers(glyph: AppGlyph): Boolean = glyph == AppGlyph.Settings || glyph in paths
 
     private val parsed = mutableMapOf<AppGlyph, Path>()
 
