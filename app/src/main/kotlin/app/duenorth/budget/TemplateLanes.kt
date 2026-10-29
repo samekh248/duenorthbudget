@@ -49,6 +49,7 @@ import app.duenorth.budget.design.components.relief
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.Relief
+import app.duenorth.budget.design.theme.mobile10Card
 
 // The templates screen, option D of the template editor design (priority waterfall): every category's templates as
 // chips in priority lanes, with a meter of what is left to share after each lane.
@@ -268,10 +269,15 @@ private fun LaneChip(
                     scaleY = 1.05f
                 }
             }.then(
-                if (Metro.style.relief) {
-                    Modifier.relief(Relief.Raised, small = true)
-                } else {
-                    Modifier.border(MetroDimens.Stroke, if (lifted) Metro.accent.fill else Metro.colors.secondary.copy(alpha = 0.5f))
+                when {
+                    Metro.style.relief -> Modifier.relief(Relief.Raised, small = true)
+                    Metro.style.mobile10 ->
+                        Modifier
+                            .background(
+                                Metro.colors.mobile10Card,
+                            ).then(if (lifted) Modifier.border(2.dp, Metro.accent.fill) else Modifier)
+                    else ->
+                        Modifier.border(MetroDimens.Stroke, if (lifted) Metro.accent.fill else Metro.colors.secondary.copy(alpha = 0.5f))
                 },
             ).then(
                 if (draggable) {

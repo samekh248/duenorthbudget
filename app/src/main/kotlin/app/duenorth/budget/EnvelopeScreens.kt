@@ -56,6 +56,7 @@ import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.mobile10Fill
 import java.time.YearMonth
 
 @Composable
@@ -167,6 +168,10 @@ private fun AvailableBar(
     val total = (spent + left + over).coerceAtLeast(1)
     val scale = maxOf(total, template ?: 0)
     val track = Metro.colors.secondary.copy(alpha = 0.25f)
+    // Windows 10 Mobile draws a thin progress bar, spending in the grey ink instead of black.
+    val mobile10 = Metro.style.mobile10
+    val barHeight = if (mobile10) 4.dp else BAR_HEIGHT
+    val spentInk = if (mobile10) Metro.colors.secondary else Metro.colors.foreground
     Column(Modifier.fillMaxWidth().testTag("category-available")) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
             MetroText(EnvelopeCopy.AVAILABLE, Metro.typography.caption, Modifier.weight(1f), color = Metro.colors.secondary)
@@ -178,9 +183,9 @@ private fun AvailableBar(
             )
         }
         Box(Modifier.fillMaxWidth().padding(top = 8.dp).height(BAR_HEIGHT + 8.dp), contentAlignment = Alignment.CenterStart) {
-            Row(Modifier.fillMaxWidth().height(BAR_HEIGHT).background(track)) {
+            Row(Modifier.fillMaxWidth().height(barHeight).background(track)) {
                 if (spent + left + over == 0L) return@Row
-                if (spent > 0) Box(Modifier.weight(spent.toFloat() / scale).fillMaxHeight().background(Metro.colors.foreground))
+                if (spent > 0) Box(Modifier.weight(spent.toFloat() / scale).fillMaxHeight().background(spentInk))
                 if (left > 0) Box(Modifier.weight(left.toFloat() / scale).fillMaxHeight().background(Metro.accent.fill))
                 if (over > 0) Box(Modifier.weight(over.toFloat() / scale).fillMaxHeight().background(Metro.colors.error))
                 if (scale > total) Spacer(Modifier.weight((scale - total).toFloat() / scale))
@@ -195,7 +200,7 @@ private fun AvailableBar(
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            LegendKey(Metro.colors.foreground, "${EnvelopeCopy.SPENT} ${MoneyFormat.format(spent, currency, options)}")
+            LegendKey(spentInk, "${EnvelopeCopy.SPENT} ${MoneyFormat.format(spent, currency, options)}")
             if (category.availableMinor < 0) {
                 LegendKey(Metro.colors.error, "${EnvelopeCopy.OVER} ${MoneyFormat.format(over, currency, options)}")
             } else {
@@ -306,10 +311,10 @@ private fun BudgetedField(
                     Modifier
                         .heightIn(min = MetroDimens.TouchTarget)
                         .then(
-                            if (filled) {
-                                Modifier.background(Metro.accent.fill)
-                            } else {
-                                Modifier.border(2.dp, Metro.colors.foreground)
+                            when {
+                                filled -> Modifier.background(Metro.accent.fill)
+                                Metro.style.mobile10 -> Modifier.background(Metro.colors.mobile10Fill)
+                                else -> Modifier.border(2.dp, Metro.colors.foreground)
                             },
                         ).metroPress { onAmount(template) }
                         .padding(horizontal = 12.dp)
