@@ -16,6 +16,8 @@ object RegisterCopy {
     const val RECONCILE_WARN = "this reconciliation will no longer match"
     const val RECONCILE_CHANGE = "change a reconciled transaction?"
     const val NO_CATEGORY = "no category"
+    const val SUGGESTED = "suggested"
+    const val ALL_CATEGORIES = "all categories"
     const val SPLIT = "split"
     const val ADD_SPLIT = "add split"
     const val ONE_CATEGORY = "one category"
@@ -97,6 +99,8 @@ data class RegisterPage(
     val accounts: List<AccountChoice>,
     /** Possible matches in this account, shown above the rows until matched or called not a match. */
     val matches: List<MatchPair> = emptyList(),
+    /** What the transaction form's category list suggests first, by payee. */
+    val suggestions: CategorySuggestions = CategorySuggestions.EMPTY,
 ) {
     fun matching(payeeQuery: String): List<RegisterRow> {
         val query = payeeQuery.trim()
@@ -220,6 +224,8 @@ data class CategoryTarget(
     val categories: List<CategoryChoice>,
     /** The transaction's category now, which the picker opens on; null when it has none. */
     val categoryId: String? = null,
+    /** Category ids the picker shows first, in their own group; empty hides the group. */
+    val suggested: List<String> = emptyList(),
 )
 
 data class TransactionDraft(
@@ -695,6 +701,7 @@ class RegisterBook(
             categories = categories(),
             accounts = accounts(),
             matches = MatchFinder.find(session, accountId),
+            suggestions = CategorySuggester(session).index(),
         )
     }
 
@@ -718,6 +725,7 @@ class RegisterBook(
             currency = currency(),
             categories = categories(),
             categoryId = txn.categoryId,
+            suggested = CategorySuggester(session).forTransaction(txn.id),
         )
     }
 

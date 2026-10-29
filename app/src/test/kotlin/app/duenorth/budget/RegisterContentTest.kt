@@ -38,6 +38,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountChoice
 import app.duenorth.budget.core.CategoryChoice
+import app.duenorth.budget.core.CategorySuggestions
 import app.duenorth.budget.core.CategoryTarget
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatOptions
@@ -347,6 +348,92 @@ class RegisterContentTest {
         compose.onNodeWithText("Category 1").assertDoesNotExist()
         box.performImeAction()
         assertEquals(listOf<String?>("c-food"), picked)
+    }
+
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun inboxPickerLeadsWithSuggestedUntilTyping() {
+        val picked = mutableListOf<String?>()
+        compose.setContent {
+            MetroTheme {
+                CategoryPickerScreen(
+                    target =
+                        CategoryTarget(
+                            transactionId = "cafe",
+                            accountId = "checking",
+                            payee = "Cafe",
+                            amountMinor = -1_240,
+                            currency = Currencies.byCode("USD")!!,
+                            categories = many(),
+                            suggested = listOf("c-5", "c-gone", "c-food"),
+                        ),
+                    error = null,
+                    onPick = { picked += it },
+                )
+            }
+        }
+        compose.onNodeWithTag("category-group-suggested").assertTextEquals(RegisterCopy.SUGGESTED)
+        compose.onNodeWithTag("category-suggested-c-5").assertTextEquals("Category 5")
+        compose.onNodeWithTag("category-suggested-c-food").assertExists()
+        compose.onNodeWithTag("category-suggested-c-gone").assertDoesNotExist()
+        compose.onNodeWithTag("category-group-all").assertTextEquals(RegisterCopy.ALL_CATEGORIES)
+        compose.onNodeWithTag("category-suggested-c-5").performClick()
+        assertEquals(listOf<String?>("c-5"), picked)
+        compose.onNode(hasSetTextAction() and hasParent(hasTestTag("category-filter"))).performTextInput("cat")
+        compose.onNodeWithTag("category-group-suggested").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun inboxPickerWithoutSuggestionsHasNoGroup() {
+        compose.setContent {
+            MetroTheme {
+                CategoryPickerScreen(
+                    target =
+                        CategoryTarget(
+                            transactionId = "cafe",
+                            accountId = "checking",
+                            payee = "Cafe",
+                            amountMinor = -1_240,
+                            currency = Currencies.byCode("USD")!!,
+                            categories = many(),
+                        ),
+                    error = null,
+                    onPick = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("category-group-suggested").assertDoesNotExist()
+        compose.onNodeWithTag("category-group-all").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun formListSuggestsByPayeeAndDirection() {
+        val suggestions =
+            CategorySuggestions(
+                byPayee = mapOf("cafe" to listOf("c-2", "c-old")),
+                recentSpending = listOf("c-6"),
+                recentIncome = listOf("c-7"),
+            )
+        val categories = many() + CategoryChoice("c-old", "Old", "Living", income = false, hidden = true)
+        form(page = sample().copy(categories = categories, suggestions = suggestions))
+        compose.onNodeWithTag("transaction-category-value", useUnmergedTree = true).performClick()
+        compose.onNodeWithTag("transaction-category-group-suggested").assertTextEquals(RegisterCopy.SUGGESTED)
+        compose.onNodeWithTag("transaction-category-suggested-c-2").assertTextEquals("Category 2")
+        compose.onNodeWithTag("transaction-category-suggested-c-old").assertDoesNotExist()
+        compose.onNodeWithTag("transaction-category-suggested-c-2").performClick()
+        compose.onNodeWithText("Category 2").assertIsDisplayed()
+    }
+
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun formListFallsBackToRecentForANewPayee() {
+        val suggestions = CategorySuggestions(byPayee = mapOf("cafe" to listOf("c-2")), recentSpending = listOf("c-6"))
+        form(page = sample().copy(categories = many(), suggestions = suggestions), row = sample().rows.first().copy(payee = "Bakery"))
+        compose.onNodeWithTag("transaction-category-value", useUnmergedTree = true).performClick()
+        compose.onNodeWithTag("transaction-category-suggested-c-6").assertExists()
+        compose.onNodeWithTag("transaction-category-suggested-c-2").assertDoesNotExist()
     }
 
     @Test
