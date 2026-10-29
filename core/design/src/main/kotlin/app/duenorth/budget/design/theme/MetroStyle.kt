@@ -152,6 +152,12 @@ internal object StylePalettes {
     }
 }
 
+/** A Windows 10 Mobile button or block that acts: the ink at a fifth, as a W10M button's face. */
+val MetroColors.mobile10Fill: Color get() = foreground.copy(alpha = 0.2f)
+
+/** A Windows 10 Mobile card or tile that groups rather than acts: a faint wash of the ink, with no edge. */
+val MetroColors.mobile10Card: Color get() = foreground.copy(alpha = 0.06f)
+
 /** Moves [text] toward black (on a light page) or white (on a dark one) until it reads at [Contrast.MIN_TEXT]. */
 fun Contrast.ensure(
     text: Color,

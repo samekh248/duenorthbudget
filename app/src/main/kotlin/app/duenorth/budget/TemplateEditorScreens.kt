@@ -65,6 +65,7 @@ import app.duenorth.budget.design.components.relief
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.Relief
+import app.duenorth.budget.design.theme.mobile10Card
 import java.math.BigDecimal
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
@@ -164,17 +165,19 @@ object TemplateWords {
     private fun plain(value: BigDecimal): String = value.stripTrailingZeros().toPlainString()
 }
 
-/** A tile's face: raised under tile relief, a layer card under mica, a hairline box under Metro. */
+/** A tile's face: raised under tile relief, a layer card under mica, a faint card under Windows 10 Mobile, a hairline box under Metro. */
 @Composable
 private fun Modifier.templateTile(selected: Boolean = false): Modifier {
     val style = Metro.style
     val accent = Metro.accent.fill
     return this
         .then(
-            if (style.relief) {
-                relief(Relief.Raised)
-            } else {
-                border(MetroDimens.Stroke, if (selected) accent else Metro.colors.secondary.copy(alpha = 0.5f))
+            when {
+                style.relief -> relief(Relief.Raised)
+                // Windows 10 Mobile: a faint card, edged in the accent only once chosen.
+                style.mobile10 ->
+                    background(Metro.colors.mobile10Card).then(if (selected) Modifier.border(2.dp, accent) else Modifier)
+                else -> border(MetroDimens.Stroke, if (selected) accent else Metro.colors.secondary.copy(alpha = 0.5f))
             },
         ).then(
             if (selected && style.relief) {

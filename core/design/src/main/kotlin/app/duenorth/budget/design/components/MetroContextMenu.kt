@@ -155,7 +155,8 @@ private fun MenuLine(
     ) {
         MetroText(
             item.label,
-            Metro.typography.subheader,
+            // Windows 10 Mobile's menu flyout lists its items in body type.
+            if (Metro.style.mobile10) Metro.typography.body else Metro.typography.subheader,
             Modifier.weight(1f, fill = false),
             color =
                 when {

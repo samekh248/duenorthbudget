@@ -135,14 +135,25 @@ private fun Tray() {
         Modifier
             .padding(top = 4.dp)
             .size(220.dp, 86.dp)
-            .then(if (relief) Modifier.relief(Relief.Raised) else Modifier.border(MetroDimens.Stroke, colors.foreground))
-            .padding(12.dp),
+            .then(
+                when {
+                    relief -> Modifier.relief(Relief.Raised)
+                    // Windows 10 Mobile: the grey 2dp control edge.
+                    Metro.style.mobile10 -> Modifier.border(2.dp, colors.outline)
+                    else -> Modifier.border(MetroDimens.Stroke, colors.foreground)
+                },
+            ).padding(12.dp),
     ) {
         Box(
             Modifier
                 .fillMaxSize()
-                .then(if (relief) Modifier.relief(Relief.Inset) else Modifier.border(MetroDimens.Stroke, colors.secondary))
-                .drawBehind {
+                .then(
+                    when {
+                        relief -> Modifier.relief(Relief.Inset)
+                        Metro.style.mobile10 -> Modifier.border(2.dp, colors.secondary.copy(alpha = 0.5f))
+                        else -> Modifier.border(MetroDimens.Stroke, colors.secondary)
+                    },
+                ).drawBehind {
                     val y = size.height - 13.dp.toPx()
                     val half = 55.dp.toPx()
                     drawLine(

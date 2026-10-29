@@ -52,6 +52,7 @@ import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.mobile10Fill
 
 /** Words for spec 010's rule screens (`contracts/schedules-rules.md`). */
 object RuleScreenCopy {
@@ -412,8 +413,14 @@ private fun AddPartButton(
         Modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
-            .border(MetroDimens.Stroke, Metro.colors.secondary)
-            .metroPress(onClick)
+            // Windows 10 Mobile: a flat button face instead of the outline.
+            .then(
+                if (Metro.style.mobile10) {
+                    Modifier.background(Metro.colors.mobile10Fill)
+                } else {
+                    Modifier.border(MetroDimens.Stroke, Metro.colors.secondary)
+                },
+            ).metroPress(onClick)
             .padding(horizontal = 10.dp)
             .testTag("$tag-open"),
         verticalAlignment = Alignment.CenterVertically,

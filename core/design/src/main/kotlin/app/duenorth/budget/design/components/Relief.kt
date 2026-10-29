@@ -258,10 +258,16 @@ private fun blurred(
 
 /**
  * The edge of a Metro box (a date box, a check box, a picker cell): the 2.5 dp outline in [color], or under a
- * relief style the control's own relief instead, filled with [fill].
+ * relief style the control's own relief instead, filled with [fill]. Windows 10 Mobile draws its 2 dp control edge,
+ * grey where Metro's is ink.
  */
 @Composable
 fun Modifier.controlFrame(
     color: Color = Metro.colors.foreground,
     fill: Color = Metro.colors.background,
-): Modifier = if (Metro.style.relief) relief(Metro.style.control, small = true, fill = fill) else border(MetroDimens.Stroke, color)
+): Modifier =
+    when {
+        Metro.style.relief -> relief(Metro.style.control, small = true, fill = fill)
+        Metro.style.mobile10 -> border(2.dp, if (color == Metro.colors.foreground) Metro.colors.outline else color)
+        else -> border(MetroDimens.Stroke, color)
+    }
