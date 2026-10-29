@@ -70,6 +70,7 @@ open class DueNorthApplication : Application() {
         super.onCreate()
         developerMode = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         if (developerMode) {
+            CrashLog.install(this)
             StrictMode.setThreadPolicy(
                 StrictMode.ThreadPolicy
                     .Builder()
@@ -105,6 +106,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val application = application as DueNorthApplication
+        if (application.developerMode && savedInstanceState == null) CrashLog.offer(this)
         setContent {
             val model: ShellViewModel =
                 viewModel(
