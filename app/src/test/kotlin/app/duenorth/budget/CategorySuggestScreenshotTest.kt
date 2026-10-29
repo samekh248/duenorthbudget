@@ -46,6 +46,43 @@ class CategorySuggestScreenshotTest {
     fun inboxMobile10Dark() = snapInbox("category_suggested_inbox_w10m_dark", dark = true, style = MetroStyle.Mobile10)
 
     @Test
+    fun selectedMetroLight() =
+        snapInbox("category_selected_inbox_metro_light", dark = false, style = MetroStyle.Metro, current = "c-coffee")
+
+    @Test
+    fun selectedMetroDark() = snapInbox("category_selected_inbox_metro_dark", dark = true, style = MetroStyle.Metro, current = "c-coffee")
+
+    @Test
+    fun selectedTileReliefLight() =
+        snapInbox("category_selected_inbox_tile-relief_light", dark = false, style = MetroStyle.TileRelief, current = "c-coffee")
+
+    @Test
+    fun selectedTileReliefDark() =
+        snapInbox("category_selected_inbox_tile-relief_dark", dark = true, style = MetroStyle.TileRelief, current = "c-coffee")
+
+    @Test
+    fun selectedMicaLight() = snapInbox("category_selected_inbox_mica_light", dark = false, style = MetroStyle.Mica, current = "c-coffee")
+
+    @Test
+    fun selectedMicaDark() = snapInbox("category_selected_inbox_mica_dark", dark = true, style = MetroStyle.Mica, current = "c-coffee")
+
+    @Test
+    fun selectedMobile10Light() =
+        snapInbox("category_selected_inbox_w10m_light", dark = false, style = MetroStyle.Mobile10, current = "c-coffee")
+
+    @Test
+    fun selectedMobile10Dark() =
+        snapInbox("category_selected_inbox_w10m_dark", dark = true, style = MetroStyle.Mobile10, current = "c-coffee")
+
+    @Test
+    fun formSelectedMobile10Light() =
+        snapForm("category_selected_form_w10m_light", dark = false, style = MetroStyle.Mobile10, current = "c-coffee")
+
+    @Test
+    fun formSelectedMobile10Dark() =
+        snapForm("category_selected_form_w10m_dark", dark = true, style = MetroStyle.Mobile10, current = "c-coffee")
+
+    @Test
     fun formLight() = snapForm("category_suggested_form_light", dark = false)
 
     @Test
@@ -56,6 +93,7 @@ class CategorySuggestScreenshotTest {
         name: String,
         dark: Boolean,
         style: MetroStyle = MetroStyle.Default,
+        current: String? = null,
     ) {
         compose.setContent {
             MetroTheme(darkTheme = dark, style = style) {
@@ -69,6 +107,7 @@ class CategorySuggestScreenshotTest {
                                 amountMinor = -475,
                                 currency = Currencies.byCode("USD")!!,
                                 categories = categories,
+                                categoryId = current,
                                 suggested = listOf("c-coffee", "c-dining"),
                             ),
                         error = null,
@@ -85,13 +124,15 @@ class CategorySuggestScreenshotTest {
     private fun snapForm(
         name: String,
         dark: Boolean,
+        style: MetroStyle = MetroStyle.Default,
+        current: String? = null,
     ) {
         compose.setContent {
-            MetroTheme(darkTheme = dark) {
+            MetroTheme(darkTheme = dark, style = style) {
                 Box(Modifier.width(390.dp).height(780.dp)) {
                     TransactionForm(
                         page = page(),
-                        row = row(),
+                        row = row().copy(categoryId = current),
                         initialDate = "2026-10-07",
                         error = null,
                         onSave = {},
