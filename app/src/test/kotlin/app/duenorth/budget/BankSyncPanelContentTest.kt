@@ -9,6 +9,8 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import app.duenorth.budget.core.BankSyncFailure
+import app.duenorth.budget.core.BankSyncFix
+import app.duenorth.budget.core.SimpleFinError
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -78,6 +80,21 @@ class BankSyncPanelContentTest {
         compose.onNodeWithTag("bank-sync-report-Checking").assertExists()
         compose.onNodeWithTag("bank-sync-report-Card").assert(hasAnyDescendant(hasText("fetch did not finish")))
         compose.onNodeWithTag("bank-sync-report-synced", useUnmergedTree = true).assertTextEquals(BankSyncCopy.syncedOf(1, 2))
+    }
+
+    // A failed account that something can mend carries the button for it; one that nothing can carries none.
+    @Test
+    fun reportOffersEachFailuresFix() {
+        val attention = BankSyncFailure("Card", SimpleFinError.NEEDS_ATTENTION, "card", BankSyncFix.SIMPLEFIN)
+        val token = BankSyncFailure("Joint", SimpleFinError.TOKEN_REFUSED, "joint", BankSyncFix.TOKEN)
+        val down = BankSyncFailure("Savings", SimpleFinError.SERVER_DOWN, "savings")
+        val fixed = mutableListOf<BankSyncFailure>()
+        val ui = BankSyncUi(running = false, failures = listOf(attention, token, down))
+        compose.setContent { MetroTheme { BankSyncReportScreen(ui, onFix = { fixed += it }) } }
+        compose.onNodeWithTag("bank-sync-fix-Card").assert(hasText(BankSyncCopy.FIX_SIMPLEFIN)).performClick()
+        compose.onNodeWithTag("bank-sync-fix-Joint").assert(hasText(BankSyncCopy.FIX_TOKEN)).performClick()
+        assertEquals(0, compose.onAllNodesWithTagCount("bank-sync-fix-Savings"))
+        assertEquals(listOf(attention, token), fixed)
     }
 
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTagCount(tag: String) =

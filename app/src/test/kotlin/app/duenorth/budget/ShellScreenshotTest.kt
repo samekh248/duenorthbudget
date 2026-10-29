@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.ActualMonthMath
 import app.duenorth.budget.core.BankSyncFailure
+import app.duenorth.budget.core.BankSyncFix
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.Currencies
@@ -27,6 +28,7 @@ import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.RemoteFile
+import app.duenorth.budget.core.SimpleFinError
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
@@ -267,7 +269,11 @@ class ShellScreenshotTest {
             BankSyncUi(
                 running = false,
                 started = listOf("Checking", "Joint checking", "Credit card", "Savings"),
-                failures = listOf(cardFailure),
+                failures =
+                    listOf(
+                        BankSyncFailure("Credit card", SimpleFinError.NEEDS_ATTENTION, "card", BankSyncFix.SIMPLEFIN),
+                        BankSyncFailure("Savings", SimpleFinError.ACCOUNT_MISSING, "savings", BankSyncFix.RELINK),
+                    ),
             )
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {

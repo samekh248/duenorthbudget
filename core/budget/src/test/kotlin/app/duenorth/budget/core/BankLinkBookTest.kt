@@ -160,16 +160,39 @@ class BankLinkBookTest {
         }
     }
 
+    // Actual's server names what broke; each names its own fix (contracts/bank-link.md, Repair).
     @Test
-    fun fetchFailsOnABankErrorInsideData() {
+    fun fetchNamesEachSimpleFinErrorAndItsFix() {
         withPhone { server, phone, _ ->
-            server.providerData["/simplefin/transactions"] =
-                """{"error_type":"ACCOUNT_MISSING","error_code":"ACCOUNT_MISSING","reason":"not found"}"""
-            val failed =
-                runCatching {
-                    HttpBankSyncTransport().fetchTransactions(server.baseUrl, phone.sync.syncToken()!!, "ACT-1", "2026-08-01")
-                }
-            assertEquals(ImportCopy.FETCH_FAILED, failed.exceptionOrNull()?.message)
+            val cases =
+                listOf(
+                    "ACCOUNT_NEEDS_ATTENTION" to (SimpleFinError.NEEDS_ATTENTION to BankSyncFix.SIMPLEFIN),
+                    "INVALID_ACCESS_TOKEN" to (SimpleFinError.TOKEN_REFUSED to BankSyncFix.TOKEN),
+                    "ACCOUNT_MISSING" to (SimpleFinError.ACCOUNT_MISSING to BankSyncFix.RELINK),
+                    "SERVER_DOWN" to (SimpleFinError.SERVER_DOWN to null),
+                    "SOMETHING_NEW" to (ImportCopy.FETCH_FAILED to null),
+                )
+            for ((code, expected) in cases) {
+                server.providerData["/simplefin/transactions"] =
+                    """{"error_type":"$code","error_code":"$code","reason":"from the server"}"""
+                val failed =
+                    runCatching {
+                        HttpBankSyncTransport().fetchTransactions(server.baseUrl, phone.sync.syncToken()!!, "ACT-1", "2026-08-01")
+                    }.exceptionOrNull() as BankSyncException
+                assertEquals(code, expected.first, failed.message)
+                assertEquals(code, expected.second, failed.fix)
+            }
+        }
+    }
+
+    // A new token only takes if the access key claimed from the old one is cleared first, as Actual's reset does.
+    @Test
+    fun aNewTokenClearsTheOldAccessKey() {
+        withPhone { server, phone, _ ->
+            server.secrets["simplefin_accessKey"] = "https://user:pass@bridge.example/simplefin"
+            phone.sync.bankCall { it.saveSimpleFinToken(SETUP_TOKEN) }.getOrThrow()
+            assertNull(server.secrets["simplefin_accessKey"])
+            assertEquals(SETUP_TOKEN, server.secrets["simplefin_token"])
         }
     }
 
