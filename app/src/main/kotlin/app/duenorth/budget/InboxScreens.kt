@@ -152,10 +152,8 @@ fun InboxSection(
     /** How the menu's sync went; one line under the totals. */
     notice: String? = null,
 ) {
-    // Both sides of a possible match wait in the pair panel, not in the queue.
-    val paired = shell.matches.flatMapTo(mutableSetOf()) { it.ids }
     val pair = shell.matches.firstOrNull()?.takeIf { selection == null }
-    val inbox = shell.inbox.filter { it.id !in paired }.sortedBy { if (it.id == lead) 0 else 1 }
+    val inbox = inboxQueue(shell, lead)
     val entries = inboxEntries(inbox, filed)
     var menu by remember { mutableStateOf<Pair<InboxRow, Rect>?>(null) }
     if (entries.isEmpty() && pair == null) {
@@ -415,6 +413,18 @@ internal data class InboxEntry(
     val row: InboxRow,
     val filedTo: String? = null,
 )
+
+/**
+ * The inbox rows in the order the inbox shows them: the row a match just left leads, and both
+ * sides of a possible match wait in the pair panel instead. A filed row's place is its index here.
+ */
+internal fun inboxQueue(
+    shell: MonthShell,
+    lead: String?,
+): List<InboxRow> {
+    val paired = shell.matches.flatMapTo(mutableSetOf()) { it.ids }
+    return shell.inbox.filter { it.id !in paired }.sortedBy { if (it.id == lead) 0 else 1 }
+}
 
 /**
  * The inbox rows plus the rows just filed, each back at the place it left so its confirmation
