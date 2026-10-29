@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
@@ -190,6 +191,23 @@ private fun DrawScope.drawLayer(
             }
         clipPath(shape) {
             drawRect(surface.underline, Offset(topLeft.x, topLeft.y + size.height - hair), Size(size.width, hair))
+        }
+    }
+}
+
+/**
+ * Mica's mark of a field in use (a text box being typed in, an open combo box): a 2dp accent line along the
+ * bottom, over the field's resting underline, as Windows 11 draws it.
+ */
+@Composable
+fun Modifier.layerFocusLine(on: Boolean): Modifier {
+    val accent = Metro.accent.fill
+    return drawWithContent {
+        drawContent()
+        if (on) {
+            val line = 2.dp.toPx()
+            val inset = LayerCorner.Control.toPx() / 2
+            drawRect(accent, Offset(inset, size.height - line), Size(size.width - 2 * inset, line))
         }
     }
 }

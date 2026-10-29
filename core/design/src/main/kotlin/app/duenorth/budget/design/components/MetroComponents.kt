@@ -295,14 +295,7 @@ private fun MetroFieldFrame(
                 },
             ).then(
                 if (Metro.style.layers) {
-                    Modifier.onFocusChanged { focused = it.hasFocus }.drawWithContent {
-                        drawContent()
-                        if (focused) {
-                            val line = 2.dp.toPx()
-                            val inset = LayerCorner.Control.toPx() / 2
-                            drawRect(focusLine, Offset(inset, size.height - line), Size(size.width - 2 * inset, line))
-                        }
-                    }
+                    Modifier.onFocusChanged { focused = it.hasFocus }.layerFocusLine(focused)
                 } else {
                     Modifier
                 },
