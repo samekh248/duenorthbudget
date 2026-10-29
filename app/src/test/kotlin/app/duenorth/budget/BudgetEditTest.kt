@@ -31,6 +31,9 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class BudgetEditTest {
+    /** The budget library behind the model [household] made last. */
+    private lateinit var library: BudgetLibrary
+
     @Test
     fun plusTypedOnTheKeypadAddsToTheOldAmountButSavesNothingUntilDone() {
         val model = household("plus")
@@ -239,6 +242,8 @@ class BudgetEditTest {
         model.setExperimental(true)
         model.setGoalTemplates(true)
         await { model.state.value.formatPrefs.templatesOn }
+        // The screen shows the switch at once, but the file is written after; templates read the file.
+        await { library.readFormatPrefs(model.state.value.settings.openBudgetId!!).templatesOn }
         model.openCategoryBudget("c-gas")
         await { model.state.value.categoryNote != null }
         model.saveCategoryNote("#template 123")
@@ -283,7 +288,7 @@ class BudgetEditTest {
                 deleteRecursively()
                 mkdirs()
             }
-        val library = BudgetLibrary(root, AndroidSessionOpener(), BudgetClock.System)
+        library = BudgetLibrary(root, AndroidSessionOpener(), BudgetClock.System)
         library.createFromMock(MockBudgets.HOUSEHOLD) as CreateResult.Created
         val sync = SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System)
         val model = ShellViewModel(library, sync)
