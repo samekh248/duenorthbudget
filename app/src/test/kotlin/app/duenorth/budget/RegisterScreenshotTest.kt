@@ -47,6 +47,12 @@ class RegisterScreenshotTest {
     fun selectDark() = snapSelect("register_select_dark", dark = true)
 
     @Test
+    fun selectMicaLight() = snapSelect("style_mica_register_select_light", dark = false, MetroStyle.Mica)
+
+    @Test
+    fun selectMicaDark() = snapSelect("style_mica_register_select_dark", dark = true, MetroStyle.Mica)
+
+    @Test
     fun bankLinkedLight() = snapBankLinked("register_bank_linked_light", dark = false, expanded = false)
 
     @Test
@@ -92,9 +98,10 @@ class RegisterScreenshotTest {
     private fun snapSelect(
         name: String,
         dark: Boolean,
+        style: MetroStyle = MetroStyle.Metro,
     ) {
         captureRoboImage("src/test/snapshots/$name.png") {
-            MetroTheme(darkTheme = dark) {
+            MetroTheme(darkTheme = dark, style = style) {
                 Column(Modifier.width(390.dp).height(780.dp)) {
                     SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
                         RegisterScreen(

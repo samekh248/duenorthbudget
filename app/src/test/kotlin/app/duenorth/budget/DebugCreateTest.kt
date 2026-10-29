@@ -51,7 +51,10 @@ class DebugCreateTest {
     fun releaseCreateOpensOnTheGetStartedList() {
         val (library, model) = model("release-get-started", developerMode = false)
         model.create("Home", "USD")
-        await { model.state.value.shell != null }
+        // A first budget asks about experimental features first, then shows its home.
+        await { model.state.value.route is ShellRoute.ExperimentalOffer }
+        model.declineExperimentalOffer()
+        await { model.state.value.route == ShellRoute.Home && model.state.value.shell != null }
         assertEquals(ScreenBar.HOME_BUDGET, model.state.value.homeSection)
         assertEquals(
             4,

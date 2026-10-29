@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,6 +14,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.design.theme.Metro
@@ -52,6 +59,13 @@ fun <T> MetroComboBox(
                         Modifier.border(MetroDimens.Stroke, if (open) Metro.accent.fill else Metro.colors.foreground)
                     }
                 },
+            ).then(
+                if (Metro.style.layers) {
+                    // Mica: presses stay inside the rounded field, and the open box is underlined in the accent.
+                    Modifier.layerFocusLine(open).clip(RoundedCornerShape(LayerCorner.Control))
+                } else {
+                    Modifier
+                },
             ).testTag(tag),
     ) {
         if (!open) {
@@ -61,24 +75,42 @@ fun <T> MetroComboBox(
                 onClick = { if (choices.size > fullScreenThreshold) onOpenFull() else open = true },
             )
         } else {
+            val layers = Metro.style.layers
+            val accent = Metro.accent.fill
+            val wash = Metro.colors.foreground.copy(alpha = if (Metro.colors.isDark) 0.08f else 0.05f)
             choices.forEach { choice ->
+                val chosen = choice == selected
                 MetroText(
                     label(choice),
                     Metro.typography.control,
                     Modifier
                         .fillMaxWidth()
+                        .then(if (layers && chosen) Modifier.layerChosen(wash, accent) else Modifier)
                         .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress {
                             open = false
                             if (choice != selected) onPick(choice)
-                        }.padding(horizontal = 10.dp, vertical = MetroDimens.Row)
+                        }.padding(horizontal = comboInset(), vertical = MetroDimens.Row)
                         .testTag("$tag-$choice"),
-                    color = if (choice == selected) Metro.accent.text else Metro.colors.foreground,
+                    // Mica marks the chosen item with a wash and an accent pill, as a Windows 11 list does, not with colored text.
+                    color = if (chosen && !layers) Metro.accent.text else Metro.colors.foreground,
                 )
             }
         }
     }
 }
+
+/** A Windows 11 list's chosen item: a faint rounded [wash] inset from the box, with a short [accent] pill at its start. */
+private fun Modifier.layerChosen(
+    wash: Color,
+    accent: Color,
+): Modifier =
+    drawBehind {
+        val inset = 4.dp.toPx()
+        drawRoundRect(wash, Offset(inset, inset / 2), Size(size.width - 2 * inset, size.height - inset), CornerRadius(4.dp.toPx()))
+        val pill = Size(3.dp.toPx(), 16.dp.toPx())
+        drawRoundRect(accent, Offset(inset, (size.height - pill.height) / 2), pill, CornerRadius(pill.width / 2))
+    }
 
 /**
  * The closed face of a combo box: the value and a chevron in one touch-target row. Also the
@@ -95,7 +127,7 @@ fun MetroComboValue(
         modifier
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick)
-            .padding(horizontal = 10.dp)
+            .padding(horizontal = comboInset())
             .testTag(tag),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -109,3 +141,7 @@ fun MetroComboValue(
         AppGlyphIcon(AppGlyph.ChevronDown)
     }
 }
+
+/** How far a combo box's text sits from its edge: under mica 14dp, so it lines up with the text boxes. */
+@Composable
+private fun comboInset() = if (Metro.style.layers) 14.dp else 10.dp

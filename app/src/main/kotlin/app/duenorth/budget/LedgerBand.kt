@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -16,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.design.components.LayerCorner
 import app.duenorth.budget.design.components.relief
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -88,14 +91,18 @@ internal val ledgerBlocks: Boolean
 internal fun LedgerGroup(
     modifier: Modifier = Modifier,
     heading: @Composable () -> Unit,
+    /** False when the last row takes the panel's bottom air itself, so a tint on it runs to the panel's edge. */
+    bottomAir: Boolean = true,
     rows: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier
             .fillMaxWidth()
             .relief(Relief.Raised)
+            // Mica's card is rounded: a row's tint follows its corners rather than poking out square.
+            .then(if (Metro.style.layers) Modifier.clip(RoundedCornerShape(LayerCorner.Card)) else Modifier)
             .padding(horizontal = MetroDimens.Gutter)
-            .padding(bottom = MetroDimens.Row),
+            .padding(bottom = if (bottomAir) MetroDimens.Row else 0.dp),
     ) {
         heading()
         rows()

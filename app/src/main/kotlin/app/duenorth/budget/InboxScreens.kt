@@ -78,6 +78,7 @@ import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
+import app.duenorth.budget.design.components.LayerCheckBox
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroContextMenu
@@ -841,6 +842,15 @@ internal fun CheckSquare(
     checked: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    if (Metro.style.layers) {
+        LayerCheckBox(
+            checked,
+            modifier
+                .size(CHECK_SIZE)
+                .padding(MICA_CHECK_INSET),
+        )
+        return
+    }
     Box(
         modifier
             .size(CHECK_SIZE)
@@ -878,6 +888,9 @@ private val FEATURED_AIR_BELOW = 28.dp
 internal val FEATURED_PAD = 20.dp
 private val FEATURED_EMPTY = 96.dp
 private val CHECK_SIZE = 26.dp
+
+/** Mica's check box is Windows 11's 20dp, centred in the same slot. */
+private val MICA_CHECK_INSET = 3.dp
 internal const val FILED_HOLD_MS = 900L
 private val DAY_AIR_ABOVE = 12.dp
 private val GROUP_AIR_ABOVE = 24.dp
