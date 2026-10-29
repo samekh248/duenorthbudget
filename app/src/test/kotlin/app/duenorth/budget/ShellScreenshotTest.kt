@@ -354,10 +354,18 @@ class ShellScreenshotTest {
     @Test
     fun inboxSelectNeedsCategoryDark() = selectSnap("inbox_select_needs_category_dark", dark = true, setOf("coffee", "atm"))
 
+    // Mica's check boxes: rounded, edged rather than underlined, the accent when checked.
+    @Test
+    fun inboxSelectMicaLight() = selectSnap("style_mica_inbox_select_light", dark = false, setOf("coffee", "shell"), MetroStyle.Mica)
+
+    @Test
+    fun inboxSelectMicaDark() = selectSnap("style_mica_inbox_select_dark", dark = true, setOf("coffee", "shell"), MetroStyle.Mica)
+
     private fun selectSnap(
         name: String,
         dark: Boolean,
         selection: Set<String>,
+        style: MetroStyle = MetroStyle.Metro,
     ) = snap(
         name,
         dark = dark,
@@ -365,6 +373,7 @@ class ShellScreenshotTest {
         shell = sample().let { it.copy(inbox = it.inbox.filter { row -> row.id in setOf("coffee", "shell", "rent", "atm") }) },
         section = HomeSections.headers.indexOf(HomeSections.INBOX),
         selection = selection,
+        style = style,
     )
 
     // Corner Coffee just filed: the confirmation fills the featured panel before the next one rises in.
