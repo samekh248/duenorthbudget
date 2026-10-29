@@ -6,8 +6,8 @@ import android.content.Intent
 import java.io.File
 
 /**
- * Debug builds keep the last crash's stack trace, and the next launch offers to share it, since a phone has no
- * other way to show one without a computer and adb.
+ * The app keeps the last crash's stack trace, and the next launch offers to share it, since a phone has no other
+ * way to show one without a computer and adb. Release builds too: they are what goes on the phone that crashes.
  */
 object CrashLog {
     private const val FILE = "last-crash.txt"
