@@ -152,13 +152,16 @@ fun Modifier.metroPress(onClick: () -> Unit): Modifier = metroPress(onClick, onL
 
 /**
  * [metroPress] that also answers a long press, as list items do to start select mode. The pressed item sinks
- * in a little under a soft band, staying level, as Windows 10 Mobile's lists do.
+ * in a little under a soft band, staying level, as Windows 10 Mobile's lists do. A [bleed] holds the band still
+ * at the item's full size and runs it that far past each side, for an item whose surface runs past the gutter
+ * (the inbox's featured panel), so the band covers the whole surface while only the content sinks.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Modifier.metroPress(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
+    bleed: Dp? = null,
 ): Modifier {
     val animations = Metro.animations
     val pressedColor = if (Metro.colors.isDark) Color(0x29FFFFFF) else Color(0x1F000000)
@@ -176,10 +179,20 @@ fun Modifier.metroPress(
             role = Role.Button,
             onLongClick = onLongClick,
             onClick = onClick,
+        ).then(
+            if (bleed == null) {
+                Modifier
+            } else {
+                Modifier.drawBehind {
+                    if (!pressed) return@drawBehind
+                    val side = bleed.toPx()
+                    drawRect(pressedColor, Offset(-side, 0f), Size(size.width + 2 * side, size.height))
+                }
+            },
         ).graphicsLayer {
             scaleX = sink
             scaleY = sink
-        }.background(if (pressed) pressedColor else Color.Transparent)
+        }.background(if (pressed && bleed == null) pressedColor else Color.Transparent)
 }
 
 /** How far a pressed item sinks: 3% smaller, so a full-width row pulls in from both screen edges. */

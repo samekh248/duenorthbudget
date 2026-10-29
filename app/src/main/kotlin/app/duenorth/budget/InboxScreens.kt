@@ -478,7 +478,8 @@ private fun FeaturedPanel(
                     .fillMaxWidth()
                     .clipBelow()
                     .then(if (filed != null) Modifier.rising(rise) else Modifier)
-                    .metroPress(onClick = { onDetails(row.id) }, onLongClick = { onMenu(row, bounds) })
+                    // The press band covers the whole panel, past the gutter like its fill, not just the text column.
+                    .metroPress(onClick = { onDetails(row.id) }, onLongClick = { onMenu(row, bounds) }, bleed = MetroDimens.Gutter)
                     .padding(vertical = FEATURED_PAD)
                     .testTag("inbox-featured-${row.id}"),
             ) {
