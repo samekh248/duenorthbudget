@@ -158,7 +158,7 @@ class ImportBookTest {
                     onFailure = { failed += it },
                 )
             assertEquals(listOf("Checking", "Card"), started)
-            assertEquals(listOf(BankSyncFailure("Checking", ImportCopy.FETCH_FAILED)), failed)
+            assertEquals(listOf(BankSyncFailure("Checking", ImportCopy.FETCH_FAILED, "checking")), failed)
             assertEquals(failed, summary.failures)
             assertEquals(1, summary.failed)
             assertEquals(1, summary.added)

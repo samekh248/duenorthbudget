@@ -4,6 +4,8 @@ import androidx.lifecycle.viewModelScope
 import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BankLinkResult
 import app.duenorth.budget.core.BankProvider
+import app.duenorth.budget.core.BankSyncFailure
+import app.duenorth.budget.core.BankSyncFix
 import app.duenorth.budget.core.ExternalAccount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -14,14 +16,29 @@ import kotlinx.coroutines.withContext
 /** Register `•••` → bank link. */
 fun ShellViewModel.openBankLink() {
     val accountId = (state.value.route as? ShellRoute.Register)?.accountId ?: return
+    openBankLinkFor(BankLinkUi(accountId))
+}
+
+/**
+ * A failed account's fix on the bank sync page that the phone can carry out: SimpleFIN picked on its bank
+ * link, asking for a new setup token when SimpleFIN refused the old one, or listing its accounts to link again.
+ */
+fun ShellViewModel.repairBankLink(failure: BankSyncFailure) {
+    if (failure.accountId.isEmpty()) return
+    openBankLinkFor(
+        BankLinkUi(failure.accountId, provider = BankProvider.SIMPLEFIN, replacingToken = failure.fix == BankSyncFix.TOKEN),
+    )
+}
+
+private fun ShellViewModel.openBankLinkFor(ui: BankLinkUi) {
     val name =
         state.value.shell
             ?.accounts
-            ?.firstOrNull { it.id == accountId }
+            ?.firstOrNull { it.id == ui.accountId }
             ?.name
             .orEmpty()
-    push(ShellRoute.BankLink(accountId))
-    mutate { it.copy(bankLink = BankLinkUi(accountId, name)) }
+    push(ShellRoute.BankLink(ui.accountId))
+    mutate { it.copy(bankLink = ui.copy(accountName = name)) }
     refreshBankLink()
 }
 
@@ -39,13 +56,30 @@ private fun ShellViewModel.refreshBankLink() {
                 error = configured.exceptionOrNull()?.message,
             )
         }
+        // Opened to relink: SimpleFIN's accounts come up at once.
+        val ui = state.value.bankLink ?: return@launch
+        if (ui.provider == BankProvider.SIMPLEFIN && !ui.askingToken) loadBankAccounts(BankProvider.SIMPLEFIN)
     }
 }
 
 fun ShellViewModel.pickBankProvider(provider: BankProvider) {
-    updateBankLink { it.copy(provider = provider, accounts = null, goCardless = null, goCardlessBanks = emptyList(), error = null) }
+    updateBankLink {
+        it.copy(
+            provider = provider,
+            accounts = null,
+            goCardless = null,
+            goCardlessBanks = emptyList(),
+            error = null,
+            replacingToken = false,
+        )
+    }
     val ui = state.value.bankLink ?: return
     if (provider != BankProvider.GOCARDLESS && provider in ui.configured) loadBankAccounts(provider)
+}
+
+/** SimpleFIN is set up but its token was refused or revoked: the token field shows again. */
+fun ShellViewModel.replaceSimpleFinToken() {
+    updateBankLink { it.copy(provider = BankProvider.SIMPLEFIN, replacingToken = true, accounts = null, error = null) }
 }
 
 private fun ShellViewModel.loadBankAccounts(provider: BankProvider) {
@@ -63,7 +97,7 @@ fun ShellViewModel.sendSimpleFinToken(token: String) {
             updateBankLink { it.copy(error = sent.exceptionOrNull()?.message) }
             return@launch
         }
-        updateBankLink { it.copy(configured = (it.configured + BankProvider.SIMPLEFIN).distinct(), error = null) }
+        updateBankLink { it.copy(configured = (it.configured + BankProvider.SIMPLEFIN).distinct(), replacingToken = false, error = null) }
         loadBankAccounts(BankProvider.SIMPLEFIN)
     }
 }

@@ -46,7 +46,13 @@ data class BankLinkUi(
     val goCardless: GoCardlessLink? = null,
     val accounts: List<ExternalAccount>? = null,
     val error: String? = null,
+    /** SimpleFIN is set up but its token needs replacing, so the token field shows again. */
+    val replacingToken: Boolean = false,
 ) {
+    /** SimpleFIN is picked and waits for a setup token: a first one, or one to replace a refused one. */
+    val askingToken: Boolean
+        get() = provider == BankProvider.SIMPLEFIN && (BankProvider.SIMPLEFIN !in configured || replacingToken)
+
     /** Configured providers, plus SimpleFIN while it still needs its setup token. */
     val offered: List<BankProvider>
         get() = BankProvider.entries.filter { it in configured || it == BankProvider.SIMPLEFIN }
@@ -69,6 +75,8 @@ fun BankLinkScreen(
     onLink: (ExternalAccount) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
+    /** SimpleFIN is set up: ask for a new setup token in place of the one it has. */
+    onNewToken: () -> Unit = {},
 ) {
     var token by remember { mutableStateOf("") }
     var country by remember { mutableStateOf("") }
@@ -92,7 +100,7 @@ fun BankLinkScreen(
     val step =
         when {
             ui.loading -> null
-            ui.provider == BankProvider.SIMPLEFIN && BankProvider.SIMPLEFIN !in ui.configured ->
+            ui.askingToken ->
                 ScreenAction("bank-token-send", AppGlyph.Save, BankLinkCopy.SEND_TOKEN) {
                     val sent = token
                     token = ""
@@ -124,6 +132,8 @@ fun BankLinkScreen(
         PageBar(
             listOfNotNull(
                 step,
+                ScreenAction("bank-token-new", AppGlyph.Sync, BankLinkCopy.NEW_TOKEN, primary = false, run = onNewToken)
+                    .takeIf { ui.provider == BankProvider.SIMPLEFIN && !ui.askingToken && !ui.loading },
                 ui.linked?.let {
                     ScreenAction("bank-link-remove-ask", AppGlyph.Cancel, BankLinkCopy.REMOVE, primary = false) { askingRemove = true }
                 },
@@ -139,7 +149,7 @@ fun BankLinkScreen(
         }
         when (ui.provider) {
             BankProvider.SIMPLEFIN ->
-                if (BankProvider.SIMPLEFIN !in ui.configured) {
+                if (ui.askingToken) {
                     MetroField(token, { token = it }, BankLinkCopy.TOKEN, Modifier.testTag("bank-token"), conceal = true)
                 }
             BankProvider.GOCARDLESS -> GoCardlessSteps(ui, country, { country = it }, onInstitution, onOpenBank)

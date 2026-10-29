@@ -3,6 +3,7 @@ package app.duenorth.budget.core
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -56,11 +57,12 @@ class HttpBankSyncTransport : BankSyncTransport {
             val code = connection.responseCode
             val stream = if (code >= 400) connection.errorStream else connection.inputStream
             val bytes = stream?.readBytes() ?: ByteArray(0)
+            if (code == 401 || code == 403) throw BankSyncException(SyncCopy.SIGN_IN_AGAIN)
             if (code != 200) throw BankSyncException(ImportCopy.FETCH_FAILED)
             val reply = json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject
             // Actual answers `{"status":"ok","data":{...}}`, and a bank error comes back inside `data`.
             val root = reply["data"] as? JsonObject ?: reply
-            if (root.containsKey("error_code")) throw BankSyncException(ImportCopy.FETCH_FAILED)
+            root.string("error_code")?.let { throw SimpleFinError.of(it) }
             return parseSimpleFinResponse(root, 2)
         } catch (error: BankSyncException) {
             throw error
@@ -149,7 +151,40 @@ private object ImportFileParserAmount {
 
 class BankSyncException(
     message: String,
+    /** What the person can do about it, when anything. */
+    val fix: BankSyncFix? = null,
 ) : Exception(message)
+
+/** Where a broken bank connection is mended: none of these can be done from the phone alone. */
+enum class BankSyncFix {
+    /** The bank's sign-in at SimpleFIN Bridge lapsed (a changed password, a new MFA prompt, expired consent). */
+    SIMPLEFIN,
+
+    /** SimpleFIN refused the server's access token, so it needs a new setup token. */
+    TOKEN,
+
+    /** SimpleFIN no longer has the linked account, so it needs linking again. */
+    RELINK,
+}
+
+/** The `error_code`s Actual's server sends back from `/simplefin/transactions`, in the app's words. */
+object SimpleFinError {
+    /** Where SimpleFIN Bridge lists its connections; its sign-in page leads there. */
+    const val BRIDGE_URL = "https://bridge.simplefin.org/auth/login"
+    const val NEEDS_ATTENTION = "the bank needs you to sign in again at SimpleFIN"
+    const val TOKEN_REFUSED = "SimpleFIN refused the server's token"
+    const val ACCOUNT_MISSING = "SimpleFIN no longer has this account"
+    const val SERVER_DOWN = "SimpleFIN didn't answer"
+
+    fun of(code: String): BankSyncException =
+        when (code) {
+            "ACCOUNT_NEEDS_ATTENTION" -> BankSyncException(NEEDS_ATTENTION, BankSyncFix.SIMPLEFIN)
+            "INVALID_ACCESS_TOKEN" -> BankSyncException(TOKEN_REFUSED, BankSyncFix.TOKEN)
+            "ACCOUNT_MISSING" -> BankSyncException(ACCOUNT_MISSING, BankSyncFix.RELINK)
+            "SERVER_DOWN" -> BankSyncException(SERVER_DOWN)
+            else -> BankSyncException(ImportCopy.FETCH_FAILED)
+        }
+}
 
 class BankSyncBook(
     private val session: SqlSession,
@@ -248,7 +283,7 @@ class BankSyncBook(
                 try {
                     transport.fetchTransactions(serverAddress, token, account.bankAccountId, startIso)
                 } catch (error: BankSyncException) {
-                    val failure = BankSyncFailure(account.name, error.message ?: ImportCopy.FETCH_FAILED)
+                    val failure = BankSyncFailure(account.name, error.message ?: ImportCopy.FETCH_FAILED, account.accountId, error.fix)
                     failures += failure
                     onFailure(failure)
                     return@forEach
@@ -269,10 +304,12 @@ data class BankSyncSummary(
     val failed: Int get() = failures.size
 }
 
-/** One account the bank sync could not fetch, and the short reason. */
+/** One account the bank sync could not fetch, the short reason, and what would mend it. */
 data class BankSyncFailure(
     val accountName: String,
     val message: String,
+    val accountId: String = "",
+    val fix: BankSyncFix? = null,
 )
 
 class FakeBankSyncTransport(
@@ -293,6 +330,7 @@ object BankLinkCopy {
     const val NONE = "no bank providers are set up on this server"
     const val TOKEN = "SimpleFIN setup token"
     const val SEND_TOKEN = "save token"
+    const val NEW_TOKEN = "new setup token"
     const val COUNTRY = "country code, like GB"
     const val FIND_BANKS = "find banks"
     const val SIGN_IN = "sign in at your bank"
@@ -361,8 +399,12 @@ class BankLinkClient(
             (data as? JsonObject)?.get("configured")?.jsonPrimitive?.contentOrNull == "true"
         }
 
-    /** Sends the SimpleFIN setup token to the server and keeps no copy. */
+    /**
+     * Sends the SimpleFIN setup token to the server and keeps no copy. The access key claimed from an
+     * earlier token is cleared first, as Actual's reset does, so the server claims this one.
+     */
     fun saveSimpleFinToken(value: String) {
+        call("secret", JsonObject(mapOf("name" to JsonPrimitive("simplefin_accessKey"), "value" to JsonNull)))
         call("secret", JsonObject(mapOf("name" to JsonPrimitive("simplefin_token"), "value" to JsonPrimitive(value.trim()))))
     }
 

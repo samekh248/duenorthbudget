@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -232,7 +233,9 @@ class LocalActualServer(
             when {
                 path == "/secret" -> {
                     val name = body["name"]?.jsonPrimitive?.content.orEmpty()
-                    secrets[name] = body["value"]?.jsonPrimitive?.content.orEmpty()
+                    // A null value clears the secret, as Actual's reset sends.
+                    val value = body["value"]?.jsonPrimitive?.contentOrNull
+                    if (value == null) secrets.remove(name) else secrets[name] = value
                     if (name == "simplefin_token") configured["simplefin"] = true
                     null
                 }

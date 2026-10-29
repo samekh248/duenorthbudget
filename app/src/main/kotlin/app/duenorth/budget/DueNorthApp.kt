@@ -36,6 +36,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.duenorth.budget.core.BankSyncFix
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.Currencies
@@ -44,6 +45,7 @@ import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.OnboardingOrigin
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.ServerAddress
+import app.duenorth.budget.core.SimpleFinError
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.TemplateLines
 import app.duenorth.budget.core.TemplateNote
@@ -613,7 +615,15 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onStay = model::cancelSwitch,
                                 modifier = fill,
                             )
-                        ShellRoute.BankSyncReport -> BankSyncReportScreen(state.bankSync, fill)
+                        ShellRoute.BankSyncReport ->
+                            BankSyncReportScreen(state.bankSync, fill) { failure ->
+                                // The bank's own sign-in lives at SimpleFIN Bridge; the rest is mended on the bank link.
+                                if (failure.fix == BankSyncFix.SIMPLEFIN) {
+                                    openWebPage(context, SimpleFinError.BRIDGE_URL)
+                                } else {
+                                    model.repairBankLink(failure)
+                                }
+                            }
                         ShellRoute.Payees ->
                             PayeesScreen(
                                 payees = state.payees,
@@ -1050,6 +1060,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                     onLink = model::linkBank,
                                     onRemove = model::removeBankLink,
                                     modifier = fill,
+                                    onNewToken = model::replaceSimpleFinToken,
                                 )
                             }
                         }

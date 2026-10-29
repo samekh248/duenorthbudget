@@ -28,8 +28,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BankSyncFailure
+import app.duenorth.budget.core.BankSyncFix
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
+import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.syncSpin
 import app.duenorth.budget.design.metroTilt
@@ -66,6 +68,18 @@ object BankSyncCopy {
     const val FAILED = "bank sync did not finish"
     const val FINISHED_WITH_ERRORS = "sync had errors"
     const val SYNCING_BANKS = "syncing banks"
+    const val FIX_SIMPLEFIN = "fix at SimpleFIN"
+    const val FIX_TOKEN = "new setup token"
+    const val FIX_RELINK = "link again"
+
+    /** The button that mends a failed account, or null when nothing on the phone can. */
+    fun fix(fix: BankSyncFix?) =
+        when (fix) {
+            BankSyncFix.SIMPLEFIN -> FIX_SIMPLEFIN
+            BankSyncFix.TOKEN -> FIX_TOKEN
+            BankSyncFix.RELINK -> FIX_RELINK
+            null -> null
+        }
 
     fun failure(failure: BankSyncFailure) = "${failure.accountName}: ${failure.message}"
 
@@ -178,12 +192,14 @@ private fun TileAction(
 /**
  * The failed sync's full page, laid out as a schedule's details are: the accounts section line, the
  * page's name, how many accounts synced and failed, then a ledger per outcome with each account and
- * what happened to it. Follows a retry live.
+ * what happened to it, with the button that mends it when there is one. Follows a retry live.
  */
 @Composable
 fun BankSyncReportScreen(
     ui: BankSyncUi?,
     modifier: Modifier = Modifier,
+    /** A failed account's fix: SimpleFIN's own site, a new setup token, or linking again. */
+    onFix: (BankSyncFailure) -> Unit = {},
 ) {
     val colors = Metro.colors
     val failures = ui?.failures.orEmpty().associateBy { it.accountName }
@@ -228,7 +244,10 @@ fun BankSyncReportScreen(
         if (failed.isNotEmpty()) {
             item(key = "failed") { ReportHeading(BankSyncCopy.FAILED_HEADING) }
             failed.forEachIndexed { i, name ->
-                item(key = "failed-$name") { ReportLine(name, failures.getValue(name).message, ledgerBanded(i), error = true) }
+                val failure = failures.getValue(name)
+                item(key = "failed-$name") {
+                    ReportLine(name, failure.message, ledgerBanded(i), error = true, fix = BankSyncCopy.fix(failure.fix)) { onFix(failure) }
+                }
             }
         }
         if (fetching != null) {
@@ -250,13 +269,15 @@ private fun ReportHeading(label: String) {
     MetroText(label, Metro.typography.caption, Modifier.padding(top = 14.dp, bottom = 4.dp), color = Metro.accent.text)
 }
 
-/** An account on a ledger line: its name, and why it failed under it. */
+/** An account on a ledger line: its name, why it failed under it, and the button that mends it. */
 @Composable
 private fun ReportLine(
     name: String,
     detail: String?,
     banded: Boolean,
     error: Boolean = false,
+    fix: String? = null,
+    onFix: () -> Unit = {},
 ) {
     Column(
         Modifier
@@ -270,6 +291,9 @@ private fun ReportLine(
         MetroText(name, Metro.typography.body, maxLines = 2)
         if (detail != null) {
             MetroText(detail, Metro.typography.caption, color = if (error) Metro.colors.error else Metro.colors.secondary, maxLines = 2)
+        }
+        if (fix != null) {
+            MetroButton(fix, Modifier.padding(top = 8.dp, bottom = 4.dp).testTag("bank-sync-fix-$name"), onFix)
         }
     }
 }
