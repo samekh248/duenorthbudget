@@ -460,6 +460,10 @@ class ShellViewModel(
 
     private var writing = false
 
+    /** Inbox rows whose filing is still being written, and those of them whose confirmation has already played. */
+    private val inboxWriting = mutableSetOf<String>()
+    private val inboxPlayed = mutableSetOf<String>()
+
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
 
@@ -1842,7 +1846,7 @@ class ShellViewModel(
 
     /** Accept: files the row under the category its payee last went to, or opens the picker when there is none. */
     fun acceptInbox(transactionId: String) {
-        val inbox = _state.value.shell?.inbox ?: return
+        val inbox = shownInbox() ?: return
         val index = inbox.indexOfFirst { it.id == transactionId }
         val row = inbox.getOrNull(index) ?: return
         val categoryId = row.suggestionId
@@ -1913,8 +1917,17 @@ class ShellViewModel(
     }
 
     fun inboxFiledShown(transactionId: String) {
+        // The confirmation can end before the write and its reload land. Letting the row go then
+        // would show it again, still waiting, until the reload swaps in the next one.
+        if (transactionId in inboxWriting) {
+            inboxPlayed += transactionId
+            return
+        }
         _state.update { state -> state.copy(inboxFiled = state.inboxFiled.filterNot { it.row.id == transactionId }) }
     }
+
+    /** The inbox rows in the order the inbox shows them, so a filed row's index is the place it left. */
+    private fun shownInbox(): List<InboxRow>? = _state.value.shell?.let { inboxQueue(it, _state.value.inboxLead) }
 
     /** The inbox bar's select: every row gets a check box, and the bar acts on the checked ones. */
     fun startInboxSelecting() {
@@ -1939,8 +1952,7 @@ class ShellViewModel(
     fun acceptSelectedInbox() {
         val picked = _state.value.inboxSelection ?: return
         val rows =
-            _state.value.shell
-                ?.inbox
+            shownInbox()
                 .orEmpty()
                 .withIndex()
                 .filter { it.value.id in picked && it.value.suggestionId != null }
@@ -1999,20 +2011,30 @@ class ShellViewModel(
         filed: List<InboxFiled>,
         fromPicker: Boolean,
     ) {
-        if (writing || filed.isEmpty()) return
+        if (writing || filed.isEmpty() || _state.value.settings.openBudgetId == null) return
+        val ids = filed.map { it.row.id }
         _state.update { it.copy(inboxFiled = it.inboxFiled + filed) }
+        inboxWriting += ids
         val accountId = filed.first().row.accountId
         launchWrite { id ->
             val result =
-                withContext(Dispatchers.IO) {
-                    if (assignments.size == 1) {
-                        val (txn, category) = assignments.entries.single()
-                        library.setTransactionCategory(id, txn, category, false)
-                    } else {
-                        library.setTransactionsCategory(id, assignments, false)
+                try {
+                    withContext(Dispatchers.IO) {
+                        if (assignments.size == 1) {
+                            val (txn, category) = assignments.entries.single()
+                            library.setTransactionCategory(id, txn, category, false)
+                        } else {
+                            library.setTransactionsCategory(id, assignments, false)
+                        }
                     }
+                } catch (e: Throwable) {
+                    settleInboxWrite(ids)
+                    throw e
                 }
-            if (result !is WriteResult.Saved) filed.forEach { inboxFiledShown(it.row.id) }
+            if (result !is WriteResult.Saved) {
+                settleInboxWrite(ids)
+                ids.forEach(::inboxFiledShown)
+            }
             if (result is WriteResult.Saved) {
                 _state.update {
                     it.copy(
@@ -2021,7 +2043,12 @@ class ShellViewModel(
                 }
             }
             if (fromPicker || result is WriteResult.Saved) {
-                publish(result, accountId, stayOnRegister = false)
+                try {
+                    publish(result, accountId, stayOnRegister = false)
+                } finally {
+                    // The reload has the rows gone, so any confirmation that already played can leave now.
+                    if (result is WriteResult.Saved) settleInboxWrite(ids)
+                }
             } else {
                 when (result) {
                     is WriteResult.Rejected -> _state.update { it.copy(writeError = result.reason) }
@@ -2029,6 +2056,15 @@ class ShellViewModel(
                     else -> Unit
                 }
             }
+        }
+    }
+
+    /** Ends [ids]' write: rows whose confirmation already played leave the inbox now. */
+    private fun settleInboxWrite(ids: List<String>) {
+        inboxWriting -= ids.toSet()
+        val played = ids.filter { inboxPlayed.remove(it) }.toSet()
+        if (played.isNotEmpty()) {
+            _state.update { state -> state.copy(inboxFiled = state.inboxFiled.filterNot { it.row.id in played }) }
         }
     }
 
@@ -2218,10 +2254,7 @@ class ShellViewModel(
 
     fun submitCategory(categoryId: String?) {
         val target = _state.value.categoryTarget ?: return
-        val inbox =
-            _state.value.shell
-                ?.inbox
-                .orEmpty()
+        val inbox = shownInbox().orEmpty()
         val index = inbox.indexOfFirst { it.id == target.transactionId }
         val others = (_state.value.route as? ShellRoute.PickCategory)?.others.orEmpty()
         if (categoryId != null && others.isNotEmpty()) {
