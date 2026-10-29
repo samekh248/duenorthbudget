@@ -485,6 +485,21 @@ class RegisterContentTest {
         assertEquals(true, saved?.cleared)
     }
 
+    // A minus typed over income switches the toggle to expense and leaves the box unsigned, so it saves as shown.
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun aLeadingMinusSwitchesToExpense() {
+        var saved: TransactionDraft? = null
+        val host = form(row = null, onSave = { saved = it })
+        compose.onNodeWithTag("transaction-direction-income").performClick()
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("Cafe")
+        compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("-20")
+        compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).assertTextEquals("20")
+        compose.onNodeWithTag("transaction-direction-expense").assertIsSelected()
+        compose.runOnIdle { host.save() }
+        assertEquals(-2000L, saved?.amountMinor)
+    }
+
     // A new transaction starts uncleared, and uncleared is the first of the two.
     @Test
     @Config(sdk = [33], qualifiers = "w411dp-h891dp")

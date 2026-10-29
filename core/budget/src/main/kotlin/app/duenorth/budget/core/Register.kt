@@ -517,6 +517,15 @@ object RegisterEntry {
         )
     }
 
+    /**
+     * The amount box's text with a leading minus taken off, and whether it had one. The expense/income toggle
+     * is the only sign, so a minus typed at the start means expense rather than being dropped on save.
+     */
+    fun leadingMinus(amountText: String): Pair<String, Boolean> {
+        val trimmed = amountText.trimStart()
+        return if (trimmed.startsWith("-")) trimmed.removePrefix("-") to true else amountText to false
+    }
+
     /** The amount box's text as a signed amount, as [transaction] reads it; null while it isn't one yet. */
     fun signedAmount(
         amountText: String,
