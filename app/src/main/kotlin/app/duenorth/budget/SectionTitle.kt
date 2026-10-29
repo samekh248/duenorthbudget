@@ -61,6 +61,7 @@ object SectionTitle {
                 ShellRoute.HoldMonth,
                 ShellRoute.Breakdown,
                 ShellRoute.Assign,
+                ShellRoute.StarterCategories,
                 -> HomeSections.BUDGET
                 is ShellRoute.RuleEditor -> return SectionTitleCopy.RULES
                 is ShellRoute.ScheduleEditor,

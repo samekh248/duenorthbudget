@@ -10,6 +10,7 @@ import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SignInMethod
+import app.duenorth.budget.core.StarterCategoriesCopy
 import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.ScreenAction
@@ -216,6 +217,13 @@ object ScreenBar {
             ShellRoute.AddAccount,
             is ShellRoute.EditAccount,
             -> saveCancel()
+            // Add takes the checked groups; making them by hand is the categories page, in the menu.
+            ShellRoute.StarterCategories ->
+                listOf(
+                    spec("save", AppGlyph.Save, StarterCategoriesCopy.ADD),
+                    spec("cancel", AppGlyph.Cancel, "cancel"),
+                    menu("categories", AppGlyph.Categories, StarterCategoriesCopy.OWN),
+                )
             // Close account is the page's save; force close stays on the page, under its warning.
             is ShellRoute.CloseAccount ->
                 if (accountForceConfirm) {

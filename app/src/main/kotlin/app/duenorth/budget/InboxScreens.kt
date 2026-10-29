@@ -832,12 +832,20 @@ private fun InboxCheck(
     checked: Boolean,
     id: String,
 ) {
+    CheckSquare(checked, Modifier.testTag(if (checked) "inbox-checked-$id" else "inbox-unchecked-$id"))
+}
+
+/** An outlined square, filled with the accent and a tick when checked: the inbox's select mode and get started. */
+@Composable
+internal fun CheckSquare(
+    checked: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        Modifier
+        modifier
             .size(CHECK_SIZE)
             .controlFrame(fill = if (checked) Metro.accent.fill else Metro.colors.background)
-            .background(if (checked) Metro.accent.fill else Color.Transparent)
-            .testTag(if (checked) "inbox-checked-$id" else "inbox-unchecked-$id"),
+            .background(if (checked) Metro.accent.fill else Color.Transparent),
         contentAlignment = Alignment.Center,
     ) {
         if (checked) AppGlyphIcon(AppGlyph.Save, Metro.accent.onFill)
