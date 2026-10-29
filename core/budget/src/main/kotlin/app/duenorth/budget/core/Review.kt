@@ -11,7 +11,6 @@ object ReviewCopy {
     const val TOTAL = "total"
     const val NO_ACCOUNTS = "no accounts yet"
     const val INCLUDE_OFF_BUDGET = "include off budget"
-    const val PREVIOUS_MONTH = "previous month"
 }
 
 data class ReviewCategoryRow(

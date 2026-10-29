@@ -24,8 +24,15 @@ Planning uses [GitHub Spec Kit](https://github.com/github/spec-kit).
 | [008 Streamlined controls](specs/008-streamlined-controls/spec.md) | Month selection, working icons, actions, title lag |
 | [009 Settings and instance](specs/009-settings-home/spec.md) | Server choice, budget file, formatting, recovery |
 | [010 Actual parity](specs/010-actual-parity/spec.md) | Remaining Actual behaviors on the same file |
+| [011 Onboarding and instance setup](specs/011-onboarding-instance/spec.md) | First launch, server choice, first budget |
+| [012 Settings pivot](specs/012-settings-pivot/spec.md) | Settings as a five-item pivot |
+| [013 Transaction details](specs/013-transaction-details/spec.md) | The transaction form, category list and date picker |
 
-Specs 001–007 are implemented on `main`. Specs 008–010 are specified and not built yet. Feature quickstarts cover the shipped specs.
+Specs 001–013 are implemented on `main`. Feature quickstarts cover the shipped specs. Work wanted but not in a spec yet is in the [backlog](docs/backlog.md).
+
+### Checks
+
+Every pull request runs `.github/workflows/ci.yml`: ktlint, the core tests, the app tests with each screenshot compared to its baseline in `app/src/test/snapshots`, and a debug build. When a screen changes on purpose, re-record its baselines with `./gradlew :app:recordRoborazziDebug` and commit them with the change.
 
 ### Release signing
 

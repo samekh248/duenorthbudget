@@ -38,11 +38,6 @@ import java.time.YearMonth
 
 /** Words for the month actions of spec 010 (`contracts/month-actions.md`). */
 object MonthActionCopy {
-    const val INCOME = "income"
-    const val CARRIED = "from last month"
-    const val OVERSPENT = "overspent last month"
-    const val BUDGETED = "budgeted"
-    const val HELD = "held for next month"
     const val TOTAL = "to budget"
     const val REPLACE = "replace"
     const val ZERO = "set to zero"
@@ -65,87 +60,6 @@ data class FillConfirm(
     val kind: MonthFillKind,
     val reason: String,
 )
-
-/** The five parts of to-budget for the open month; envelope only. Tag `breakdown-screen`. */
-@Composable
-fun BreakdownScreen(
-    month: YearMonth,
-    breakdown: ActualMonthMath.MonthBreakdown,
-    currency: CurrencySpec,
-    modifier: Modifier = Modifier,
-    /** Experimental: what later months already budgeted, and what that leaves. */
-    showAhead: Boolean = false,
-) {
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter)
-            .testTag("breakdown-screen"),
-    ) {
-        MetroText(MonthFillCopy.BREAKDOWN, Metro.typography.header)
-        MetroText(monthLabel(month), Metro.typography.caption, color = Metro.colors.secondary)
-        Spacer(Modifier.height(MetroDimens.Grid))
-        BreakdownLine(MonthActionCopy.INCOME, breakdown.incomeMinor, currency, "breakdown-income")
-        BreakdownLine(MonthActionCopy.CARRIED, breakdown.carriedMinor, currency, "breakdown-carried")
-        BreakdownLine(MonthActionCopy.OVERSPENT, breakdown.overspentMinor, currency, "breakdown-overspent")
-        BreakdownLine(MonthActionCopy.BUDGETED, breakdown.budgetedMinor, currency, "breakdown-budgeted")
-        BreakdownLine(MonthActionCopy.HELD, breakdown.heldMinor, currency, "breakdown-held")
-        Spacer(
-            Modifier
-                .padding(vertical = MetroDimens.Row)
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(if (Metro.colors.isDark) Metro.colors.outline else Metro.colors.chrome),
-        )
-        BreakdownLine(
-            MonthActionCopy.TOTAL,
-            breakdown.totalMinor,
-            currency,
-            "breakdown-total",
-            emphasis = true,
-        )
-        val ahead = breakdown.ahead
-        if (showAhead && ahead != null) {
-            Spacer(Modifier.height(MetroDimens.Grid))
-            BreakdownLine(
-                FreeAfterPlansCopy.PLANNED,
-                ahead.freeMinor - breakdown.totalMinor,
-                currency,
-                "breakdown-planned",
-            )
-            BreakdownLine(FreeAfterPlansCopy.FREE, ahead.freeMinor, currency, "breakdown-free", emphasis = true)
-        }
-    }
-}
-
-@Composable
-private fun BreakdownLine(
-    label: String,
-    amountMinor: Long,
-    currency: CurrencySpec,
-    tag: String,
-    emphasis: Boolean = false,
-) {
-    val style = if (emphasis) Metro.typography.subheader else Metro.typography.body
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .testTag(tag),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        MetroText(label, style, Modifier.weight(1f), color = if (emphasis) Metro.colors.foreground else Metro.colors.secondary)
-        MetroText(
-            MoneyFormat.format(amountMinor, currency, formatOptions()),
-            style.copy(textAlign = TextAlign.End),
-            Modifier.testTag("$tag-amount"),
-            color = if (emphasis) Metro.accent.text else Metro.colors.foreground,
-            maxLines = 1,
-            softWrap = false,
-        )
-    }
-}
 
 /** Asks before a fill replaces amounts already budgeted; nothing is written until [onConfirm]. */
 @Composable

@@ -1768,20 +1768,6 @@ fun ReconcileWarningScreen(
 }
 
 @Composable
-private fun DirectionChoice(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    MetroText(
-        label,
-        Metro.typography.subheader,
-        Modifier.heightIn(min = MetroDimens.TouchTarget).metroPress(onClick).padding(vertical = MetroDimens.Row),
-        color = if (selected) Metro.accent.text else Metro.colors.foreground,
-    )
-}
-
-@Composable
 private fun ChoiceLine(
     label: String,
     selected: Boolean,

@@ -11,7 +11,6 @@ object ReconcileCopy {
     const val TOO_MANY_DECIMALS = "too many decimal places"
     const val NOT_BALANCED = "cleared total must match the statement"
     const val NO_SESSION = "no reconciliation in progress"
-    const val DIFFERENCE = "difference"
     const val STATEMENT = "statement"
     const val CLEARED = "cleared"
     const val RECONCILE = "reconcile"

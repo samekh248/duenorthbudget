@@ -300,9 +300,7 @@ object ScreenBar {
                         if (mode != BudgetMode.TRACKING) add(menu("to-budget", AppGlyph.Transfer, MonthActionCopy.TRANSFER))
                     }
                 }
-            ShellRoute.Create,
-            ShellRoute.Assign,
-            -> saveCancel()
+            ShellRoute.Create -> saveCancel()
             // Splitting starts in the form, under the category box, so the bar keeps to save and cancel.
             is ShellRoute.EditTransaction ->
                 saveCancel() +

@@ -139,20 +139,3 @@ private fun TemplateOutcome(
             }
     }
 }
-
-/** A category's note; template lines in it budget the category (spec 010 T061). */
-@Composable
-fun CategoryNoteEditor(
-    note: String,
-    onSave: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var text by remember(note) { mutableStateOf(note) }
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        MetroText(TemplateCopy.NOTE, Metro.typography.caption, color = Metro.colors.secondary)
-        MetroField(text, { text = it }, TemplateCopy.NOTE, Modifier.testTag("category-note"), lines = 3..8)
-        if (text != note) {
-            MetroButton("save ${TemplateCopy.SAVE_NOTE}", Modifier.testTag("category-note-save")) { onSave(text) }
-        }
-    }
-}

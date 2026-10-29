@@ -209,49 +209,6 @@ fun ConflictScreen(
 }
 
 @Composable
-fun AssignScreen(
-    categories: List<CategoryChoice>,
-    error: String?,
-    onAssign: (String, String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val prefs = LocalFormatPrefs.current
-    var selected by remember(categories) { mutableStateOf(categories.firstOrNull()?.id.orEmpty()) }
-    var amount by remember { mutableStateOf("") }
-    Column(
-        modifier
-            .fillMaxSize()
-            .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        MetroText("assign", Metro.typography.header)
-        MetroField(amount, { amount = it }, "amount", Modifier.testTag("assign-amount"))
-        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
-        LazyColumn(Modifier.weight(1f)) {
-            items(categories, key = { it.id }) { category ->
-                MetroText(
-                    category.name,
-                    Metro.typography.subheader,
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = MetroDimens.TouchTarget)
-                        .metroPress { selected = category.id }
-                        .padding(vertical = MetroDimens.Row),
-                    color = if (category.id == selected) Metro.accent.text else Metro.colors.foreground,
-                )
-            }
-        }
-        RememberFormSave { onAssign(selected, prefs.readAmount(amount)) }
-        if (!formSaveOnBar()) {
-            MetroButton("assign", Modifier.testTag("assign-save")) { onAssign(selected, prefs.readAmount(amount)) }
-        } else {
-            Box(Modifier.testTag("assign-save")) {}
-        }
-    }
-}
-
-@Composable
 fun ConfirmReplaceScreen(
     serverName: String,
     phoneName: String,

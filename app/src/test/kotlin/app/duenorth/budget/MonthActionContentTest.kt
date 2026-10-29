@@ -59,31 +59,6 @@ class MonthActionContentTest {
     val compose = createHostComposeRule()
 
     @Test
-    fun breakdownShowsEachPartAndTheTotal() {
-        val parts = ActualMonthMath.MonthBreakdown(420_000, 10_000, -5_000, -300_000, -20_000, 105_000)
-        compose.setContent {
-            MetroTheme {
-                Box(Modifier.width(390.dp).height(640.dp)) {
-                    BreakdownScreen(YearMonth.of(2026, 10), parts, USD)
-                }
-            }
-        }
-        compose.onNodeWithTag("breakdown-screen").assertExists()
-        mapOf(
-            "breakdown-income" to parts.incomeMinor,
-            "breakdown-carried" to parts.carriedMinor,
-            "breakdown-overspent" to parts.overspentMinor,
-            "breakdown-budgeted" to parts.budgetedMinor,
-            "breakdown-held" to parts.heldMinor,
-            "breakdown-total" to parts.totalMinor,
-        ).forEach { (tag, amount) ->
-            compose.onNodeWithTag("$tag-amount", useUnmergedTree = true).assertTextEquals(MoneyFormat.format(amount, USD))
-        }
-        val sum = parts.incomeMinor + parts.carriedMinor + parts.overspentMinor + parts.budgetedMinor + parts.heldMinor
-        assertEquals(parts.totalMinor, sum)
-    }
-
-    @Test
     fun fillConfirmButtonsCallBack() {
         var confirmed = 0
         var kept = 0

@@ -160,17 +160,6 @@ class ImportBook(
         return ImportConfirmResult(batchId, added, skipped)
     }
 
-    fun confirmPreview(
-        preview: ImportPreview,
-        candidates: List<ParsedImportRow>,
-    ): ImportConfirmResult {
-        val toAdd =
-            preview.rows
-                .filter { it.status == PreviewRowStatus.New }
-                .map { candidates[it.index] }
-        return confirm(preview.accountId, toAdd)
-    }
-
     fun readReview(): ImportReviewPage? {
         val batch = ImportBatch.read(session) ?: return null
         val account = account(batch.accountId) ?: return null

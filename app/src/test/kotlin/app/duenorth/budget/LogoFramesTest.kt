@@ -59,7 +59,7 @@ class LogoFramesTest {
         }
         compose.waitForIdle()
         compose.onRoot().captureRoboImage(
-            "build/outputs/roborazzi/screens/logo_frames_${if (dark) "dark" else "light"}.png",
+            "src/test/snapshots/logo_frames_${if (dark) "dark" else "light"}.png",
         )
     }
 

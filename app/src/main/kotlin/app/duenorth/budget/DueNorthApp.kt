@@ -659,13 +659,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSubmit = { password -> model.submitPassword(password, state.askEachTime) },
                                 modifier = fill,
                             )
-                        ShellRoute.Assign ->
-                            AssignScreen(
-                                categories = state.categories,
-                                error = state.editError,
-                                onAssign = model::assign,
-                                modifier = fill,
-                            )
                         ShellRoute.Conflicts ->
                             ConflictScreen(
                                 conflicts = state.conflicts,
@@ -901,21 +894,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                         modifier = inner,
                                     )
                                 }
-                            }
-                        }
-                        ShellRoute.Breakdown -> {
-                            val shell = state.shell
-                            val breakdown = state.breakdown
-                            if (shell == null || breakdown == null) {
-                                Placeholder()
-                            } else {
-                                BreakdownScreen(
-                                    month = state.pinnedMonth ?: state.openMonth,
-                                    breakdown = breakdown,
-                                    currency = shell.currency,
-                                    modifier = fill,
-                                    showAhead = state.freeAfterPlansOn,
-                                )
                             }
                         }
                         ShellRoute.StarterCategories ->

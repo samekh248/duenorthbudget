@@ -223,9 +223,6 @@ private fun Heading(text: String) {
 
 /** Words for [ExperimentalFeature.FREE_AFTER_PLANS]: to budget less what later months already hold. */
 object FreeAfterPlansCopy {
-    const val PLANNED = "spoken for by later months"
-    const val FREE = "free after later plans"
-
     const val LABEL = "unassigned"
 }
 

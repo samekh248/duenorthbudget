@@ -26,19 +26,6 @@ fun ShellViewModel.toggleShowHiddenCategories() {
     }
 }
 
-/** Opens the to-budget breakdown for the open month. Envelope only. */
-fun ShellViewModel.openBreakdown() {
-    val shell = state.value.shell ?: return
-    if (shell.mode != BudgetMode.ENVELOPE) return
-    push(ShellRoute.Breakdown)
-    mutate { it.copy(breakdown = null, monthNotice = null) }
-    val month = editorMonth()
-    viewModelScope.launch {
-        val breakdown = withContext(Dispatchers.IO) { library.readBreakdown(shell.budgetId, month) }
-        mutate { it.copy(breakdown = breakdown) }
-    }
-}
-
 /** Copy last month, 3 month average or set to zero. Asks first when [MonthFillResult.NeedsConfirm]. */
 fun ShellViewModel.fillMonth(
     kind: MonthFillKind,
@@ -190,18 +177,11 @@ private suspend fun ShellViewModel.repaintMonth(budgetId: String) {
         shellGate.offer(loaded.shell)
         if (!shellGate.gestureActive) months.applyLoaded(loaded, gestureActive = false)
     }
-    val breakdown =
-        if (state.value.route == ShellRoute.Breakdown) {
-            withContext(Dispatchers.IO) { library.readBreakdown(budgetId, month) }
-        } else {
-            state.value.breakdown
-        }
     mutate { current ->
         val open = loaded != null && !shellGate.gestureActive
         current.copy(
             shell = if (open) loaded!!.shell else current.shell,
             monthReview = if (open && current.pinnedMonth == null) loaded!!.review else current.monthReview,
-            breakdown = breakdown,
             undoLabel = library.undoLabel(budgetId),
         )
     }

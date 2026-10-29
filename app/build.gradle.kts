@@ -24,8 +24,9 @@ android {
             libs.versions.targetSdk
                 .get()
                 .toInt()
-        versionCode = 2
-        versionName = "0.1.1"
+        // A release build can set these with -PversionCode=3 -PversionName=0.1.2 instead of an edit here.
+        versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 2
+        versionName = findProperty("versionName") as String? ?: "0.1.1"
     }
 
     signingConfigs {

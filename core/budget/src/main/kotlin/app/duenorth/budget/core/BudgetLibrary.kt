@@ -957,16 +957,6 @@ class BudgetLibrary(
         edit(budgetId, UndoCopy.RENAME_PAYEE) { PayeeBook(it).rename(payeeId, newName, confirmMerge, rememberRule) }
             ?: PayeeWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
-    fun setRuleEnabled(
-        budgetId: String,
-        ruleId: String,
-        enabled: Boolean,
-    ): Boolean =
-        open(budgetId) {
-            RulesBook(it).setEnabled(ruleId, enabled)
-            true
-        } ?: false
-
     fun previewImportFile(
         budgetId: String,
         accountId: String,

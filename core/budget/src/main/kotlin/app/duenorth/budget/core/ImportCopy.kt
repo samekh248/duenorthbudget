@@ -9,7 +9,5 @@ object ImportCopy {
     const val DUPLICATE = "duplicate"
     const val REVIEW_HEADER = "review import"
     const val DONE = "done"
-    const val CONFIRM = "confirm"
     const val CANCEL = "cancel"
-    const val IMPORT_FILE = "import file"
 }

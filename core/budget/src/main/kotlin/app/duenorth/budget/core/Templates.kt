@@ -23,7 +23,6 @@ object TemplateCopy {
     const val OVERWRITE_CONFIRM = "this replaces every templated amount this month, including ones already budgeted"
     const val OFF = "turn on budget templates in settings first"
     const val NOTE = "note"
-    const val SAVE_NOTE = "note"
     const val APPLIED = "templates applied"
 }
 
