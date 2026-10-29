@@ -401,8 +401,9 @@ class ScreenBarTest {
         fun menu(kind: TransactionMenu) =
             ScreenBar
                 .specsFor(ShellRoute.EditTransaction("a", "t"), hasBudget = true, mode = BudgetMode.ENVELOPE, transaction = kind)
-        assertEquals(listOf("save", "add-split", "cancel"), menu(TransactionMenu.ORDINARY).filter { it.primary }.map { it.id })
-        assertEquals(listOf("save", "add-split", "cancel"), menu(TransactionMenu.NEW).filter { it.primary }.map { it.id })
+        // Splitting starts under the category box, so no transaction puts it on the bar.
+        assertEquals(listOf("save", "cancel"), menu(TransactionMenu.ORDINARY).filter { it.primary }.map { it.id })
+        assertEquals(listOf("save", "cancel"), menu(TransactionMenu.NEW).filter { it.primary }.map { it.id })
         assertEquals(listOf("save", "cancel"), menu(TransactionMenu.TRANSFER).filter { it.primary }.map { it.id })
         assertEquals(
             listOf("schedule-transaction", "delete-transaction", "settings"),

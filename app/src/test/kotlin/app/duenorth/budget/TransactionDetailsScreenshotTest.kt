@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountChoice
@@ -86,12 +87,28 @@ class TransactionDetailsScreenshotTest {
     @Test
     fun largeFontDark() = snap("transaction_font2x_dark", dark = true, fontScale = 2f)
 
-    // Option A: a saved split opens with its lines, and add split on the bar adds another.
+    // A saved split opens with its lines, and "add a category" under them adds a line that takes the rest.
     @Test
-    fun splitLight() = snap("transaction_split_light", dark = false, row = split()) { it.run(FORM_ADD_SPLIT) }
+    fun splitLight() = snap("transaction_split_light", dark = false, row = split()) { addSplitLine() }
 
     @Test
-    fun splitDark() = snap("transaction_split_dark", dark = true, row = split()) { it.run(FORM_ADD_SPLIT) }
+    fun splitDark() = snap("transaction_split_dark", dark = true, row = split()) { addSplitLine() }
+
+    // A line with no category refuses the save on the red block under that line.
+    @Test
+    fun splitErrorLight() = snap("transaction_split_error_light", dark = false, row = split()) { splitLineError(it) }
+
+    @Test
+    fun splitErrorDark() = snap("transaction_split_error_dark", dark = true, row = split()) { splitLineError(it) }
+
+    private fun addSplitLine() {
+        compose.onNodeWithTag("transaction-split-add", useUnmergedTree = true).performScrollTo().performClick()
+    }
+
+    private fun splitLineError(host: FormSaveHost) {
+        addSplitLine()
+        host.save()
+    }
 
     private fun split() =
         existing().copy(
@@ -152,7 +169,7 @@ class TransactionDetailsScreenshotTest {
             }
         }
         compose.waitForIdle()
-        compose.runOnIdle { act(host) }
+        act(host)
         compose.waitForIdle()
         compose.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }

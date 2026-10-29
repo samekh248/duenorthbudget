@@ -547,41 +547,56 @@ class RegisterContentTest {
         assertEquals("cash", saved?.accountId)
     }
 
-    // Option A with no split assumed: the form has one category until add split adds lines, one per tap.
+    // Option A: "split into more categories" under the category box starts two lines, and the last line takes the rest.
     @Test
     @Config(sdk = [33], qualifiers = "w411dp-h891dp")
-    fun addSplitAddsALinePerTapAndSavesTheParts() {
+    fun splitStartsUnderTheCategoryAndTheLastLineTakesTheRest() {
         var saved: TransactionDraft? = null
         val page = sample().copy(categories = listOf(GROCERIES, HOUSE))
         val host = form(page = page, row = null, onSave = { saved = it })
         compose.onNodeWithTag("transaction-split").assertDoesNotExist()
         compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-payee"))).performTextInput("Market")
         compose.onNode(hasSetTextAction() and hasParent(hasTestTag("amount-field"))).performTextInput("84.60")
-        compose.runOnIdle { host.run(FORM_ADD_SPLIT) }
+        compose.onNodeWithTag("transaction-split-start").performScrollTo().performClick()
         compose.onNodeWithTag("transaction-category").assertDoesNotExist()
         compose.onNodeWithTag("transaction-split-1-amount").assertExists()
         compose.onNodeWithTag("transaction-split-2-amount").assertDoesNotExist()
-        compose.runOnIdle { host.run(FORM_ADD_SPLIT) }
-        compose.onNodeWithTag("transaction-split-2-amount").assertExists()
-        compose.onNodeWithTag("transaction-split-2-remove").performScrollTo().performClick()
-        compose.onNodeWithTag("transaction-split-2-amount").assertDoesNotExist()
-
         compose.onNodeWithTag("transaction-split-0-category-value").performScrollTo().performClick()
         compose.onNodeWithText("Groceries").performClick()
         compose.onNodeWithTag("transaction-split-1-category-value").performScrollTo().performClick()
         compose.onNodeWithText("Household").performClick()
-        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-split-0-amount"))).performTextInput("60")
-        compose
-            .onNodeWithTag("transaction-split-left", useUnmergedTree = true)
-            .assertTextEquals("$24.60 ${TransactionFormCopy.LEFT}")
+
+        // Line one has no amount, and only the last line takes the rest: the red block sits under line one.
         compose.runOnIdle { host.save() }
-        compose.onNodeWithText(RegisterCopy.ENTER_AMOUNT).assertExists()
         assertEquals(null, saved)
-        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-split-1-amount"))).performTextInput("24.60")
+        compose.onNodeWithTag("transaction-split-0-error", useUnmergedTree = true).assertTextEquals(RegisterCopy.ENTER_AMOUNT)
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-split-0-amount"))).performTextInput("60")
+        compose.onNodeWithTag("transaction-split-0-error", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("transaction-split-left", useUnmergedTree = true).assertTextEquals(TransactionFormCopy.ADDS_UP)
+        compose.onNodeWithText("24.60", useUnmergedTree = true).assertExists()
         compose.runOnIdle { host.save() }
         assertEquals(listOf(SplitPart("c-food", -6_000), SplitPart("c-house", -2_460)), saved?.parts)
         assertEquals(null, saved?.categoryId)
+
+        // Adding a line fixes the rest where it was and the new line takes what is left, nothing here.
+        saved = null
+        compose.onNodeWithTag("transaction-split-add").performScrollTo().performClick()
+        compose.onNodeWithTag("transaction-split-2-amount").assertExists()
+        compose.runOnIdle { host.save() }
+        assertEquals(null, saved)
+        compose.onNodeWithTag("transaction-split-2-error", useUnmergedTree = true).assertTextEquals(RegisterCopy.CHOOSE_CATEGORY)
+        compose.onNodeWithTag("transaction-split-2-remove").performScrollTo().performClick()
+        compose.onNodeWithTag("transaction-split-2-amount").assertDoesNotExist()
+
+        // Typed lines past the total are the whole split's problem, on the block under the lines.
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-split-1-amount"))).performTextReplacement("30")
+        compose.onNodeWithTag("transaction-split-left", useUnmergedTree = true).assertTextEquals("$5.40 ${TransactionFormCopy.OVER}")
+        compose.runOnIdle { host.save() }
+        assertEquals(null, saved)
+        compose.onNodeWithTag("transaction-error-category", useUnmergedTree = true).assertTextEquals(RegisterCopy.SPLIT_MUST_ADD)
+        compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag("transaction-split-1-amount"))).performTextReplacement("-24.60")
+        compose.runOnIdle { host.save() }
+        assertEquals(listOf(SplitPart("c-food", -6_000), SplitPart("c-house", -2_460)), saved?.parts)
     }
 
     // A saved split opens with its lines; removing one leaves a single category, which unsplits it on save.
@@ -612,7 +627,7 @@ class RegisterContentTest {
     fun removingToOneLinePutsTheCategoryBack() {
         var saved: TransactionDraft? = null
         val host = form(onSave = { saved = it })
-        compose.runOnIdle { host.run(FORM_ADD_SPLIT) }
+        compose.onNodeWithTag("transaction-split-start").performScrollTo().performClick()
         compose.onNodeWithTag("transaction-split-1-remove").performScrollTo().performClick()
         compose.onNodeWithTag("transaction-split").assertDoesNotExist()
         compose.onNodeWithTag("transaction-category-value").assertTextEquals("Groceries")
@@ -644,6 +659,8 @@ class RegisterContentTest {
         form(page = page, row = row)
         compose.onNodeWithTag("transaction-category").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("transaction-transfer-label").assertTextEquals("transfer to Brokerage")
+        // A transfer keeps one category: it can't be split.
+        compose.onNodeWithTag("transaction-split-start").assertDoesNotExist()
     }
 
     @Test

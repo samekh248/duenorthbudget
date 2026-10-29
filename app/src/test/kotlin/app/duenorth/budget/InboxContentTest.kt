@@ -136,7 +136,6 @@ class InboxContentTest {
             actions =
                 InboxActions(
                     onDetails = { ran += "edit $it" },
-                    onSplit = { ran += "split $it" },
                     onSchedule = { ran += "schedule $it" },
                     onDelete = { ran += "delete $it" },
                     onOpenAccount = { ran += "account $it" },
@@ -144,19 +143,21 @@ class InboxContentTest {
         )
         compose.onNodeWithTag("inbox-row-shell").performTouchInput { longClick() }
         compose.onNodeWithTag("inbox-menu").assertIsDisplayed()
-        listOf("accept", "categorize", "edit", "split", "schedule", "delete", "go to checking").forEach {
+        listOf("accept", "categorize", "edit", "schedule", "delete", "go to checking").forEach {
             compose.onNode(hasText(it) and hasAnyAncestor(hasTestTag("inbox-menu"))).assertIsDisplayed()
         }
-        compose.onNodeWithText("split").performClick()
+        // Splitting is in the transaction's own form, which edit opens, so the menu has no split of its own.
+        compose.onNode(hasText("split") and hasAnyAncestor(hasTestTag("inbox-menu"))).assertDoesNotExist()
+        compose.onNodeWithText("schedule").performClick()
         compose.onNodeWithTag("inbox-menu").assertDoesNotExist()
-        assertEquals(listOf("split shell"), ran)
+        assertEquals(listOf("schedule shell"), ran)
         // The featured row has the same menu.
         compose.onNodeWithTag("inbox-featured-coffee").performTouchInput { longClick(center.copy(y = 10f)) }
         compose.onNodeWithText("go to visa").performClick()
-        assertEquals(listOf("split shell", "account visa"), ran)
+        assertEquals(listOf("schedule shell", "account visa"), ran)
         // No suggestion, no accept.
         val atm = inboxMenuItems(sampleInbox().last(), {}, {}, InboxActions()).map { it.first }
-        assertEquals(listOf("categorize", "edit", "split", "schedule", "delete", "go to checking"), atm)
+        assertEquals(listOf("categorize", "edit", "schedule", "delete", "go to checking"), atm)
     }
 
     @Test

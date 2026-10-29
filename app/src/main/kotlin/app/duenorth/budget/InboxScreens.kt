@@ -110,7 +110,6 @@ object InboxCopy {
     const val FILED_TO = "filed to"
     const val NO_CATEGORY = "no category"
     const val EDIT = "edit"
-    const val SPLIT = "split"
     const val SCHEDULE = "schedule"
     const val DELETE = "delete"
     const val GO_TO = "go to"
@@ -122,7 +121,6 @@ object InboxCopy {
 /** What a row's tap and long-press menu can do, beyond accept and categorize. */
 class InboxActions(
     val onDetails: (String) -> Unit = {},
-    val onSplit: (String) -> Unit = {},
     val onSchedule: (String) -> Unit = {},
     val onDelete: (String) -> Unit = {},
     val onOpenAccount: (String) -> Unit = {},
@@ -376,7 +374,6 @@ internal fun inboxMenuItems(
         row.suggestionId?.let { InboxCopy.ACCEPT to { onAccept(row.id) } },
         InboxCopy.CATEGORIZE to { onCategorize(row.id) },
         InboxCopy.EDIT to { actions.onDetails(row.id) },
-        InboxCopy.SPLIT to { actions.onSplit(row.id) },
         InboxCopy.SCHEDULE to { actions.onSchedule(row.id) },
         InboxCopy.DELETE to { actions.onDelete(row.id) },
         row.accountName.ifBlank { null }?.let { account ->
