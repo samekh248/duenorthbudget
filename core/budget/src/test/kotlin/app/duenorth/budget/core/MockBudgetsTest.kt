@@ -10,9 +10,9 @@ import java.time.YearMonth
 
 class MockBudgetsTest {
     @Test
-    fun catalogListsTheThreeDatasets() {
+    fun catalogListsTheDatasets() {
         assertEquals(
-            listOf(MockBudgets.HOUSEHOLD, MockBudgets.FULL_TOUR, MockBudgets.WIDE),
+            listOf(MockBudgets.HOUSEHOLD, MockBudgets.FULL_TOUR, MockBudgets.WIDE, MockBudgets.BRAND_NEW),
             MockBudgets.all.map { it.id },
         )
     }

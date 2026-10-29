@@ -363,12 +363,44 @@ class BudgetLibrary(
                     "INSERT INTO preferences (id, value) VALUES (?, ?)",
                     listOf("currency", currency.code),
                 )
+                seedIncome(session)
             }
             save(settings().copy(openBudgetId = id))
             CreateResult.Created(id)
         } catch (error: Exception) {
             dir.deleteRecursively()
             throw error
+        }
+    }
+
+    /**
+     * The income group a new Actual file starts with, so an account's starting balance lands in
+     * Starting Balances and counts toward to budget instead of staying uncategorized.
+     */
+    private fun seedIncome(session: SqlSession) {
+        val group = ids()
+        SyncSchema.writeRow(
+            session,
+            "category_groups",
+            group,
+            "name" to NewBudgetCopy.INCOME,
+            "is_income" to true,
+            "hidden" to false,
+            "tombstone" to false,
+            "sort_order" to 1.0,
+        )
+        listOf(NewBudgetCopy.INCOME, NewBudgetCopy.STARTING_BALANCES).forEachIndexed { index, name ->
+            SyncSchema.writeRow(
+                session,
+                "categories",
+                ids(),
+                "name" to name,
+                "cat_group" to group,
+                "is_income" to true,
+                "hidden" to false,
+                "tombstone" to false,
+                "sort_order" to (index + 1).toDouble(),
+            )
         }
     }
 
@@ -382,6 +414,8 @@ class BudgetLibrary(
     ): CreateResult {
         val dataset = MockBudgets.byId(datasetId) ?: return CreateResult.Rejected(ShellCopy.UNKNOWN_SAMPLE)
         val budgetName = name?.trim()?.ifEmpty { null } ?: dataset.title
+        // The brand new sample is the file a release build makes, so its get started list can be tried.
+        if (dataset.id == MockBudgets.BRAND_NEW) return create(budgetName, "USD")
         val id = ids()
         val dir = File(root, id)
         dir.mkdirs()

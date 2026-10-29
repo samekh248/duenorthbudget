@@ -21,6 +21,9 @@ object MockBudgets {
     const val FULL_TOUR = "full-tour"
     const val WIDE = "wide"
 
+    /** An empty file made the way release builds make one, with the get started list. */
+    const val BRAND_NEW = "brand-new"
+
     /** Debug builds create every new budget from this dataset. */
     const val WALKTHROUGH = FULL_TOUR
 
@@ -43,6 +46,11 @@ object MockBudgets {
                 id = WIDE,
                 title = "wide month",
                 summary = "many category groups and a long register for scroll and gesture checks",
+            ),
+            MockBudgetDataset(
+                id = BRAND_NEW,
+                title = "brand new",
+                summary = "an empty budget as release builds make it, with the get started list",
             ),
         )
 

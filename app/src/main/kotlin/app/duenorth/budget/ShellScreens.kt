@@ -50,6 +50,8 @@ import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.FormatOptions
+import app.duenorth.budget.core.GetStartedLine
+import app.duenorth.budget.core.GetStartedStep
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MockBudgetDataset
@@ -118,6 +120,10 @@ fun HomePivot(
     /** The accounts item's reorder mode: drag handles on its rows, and a drop moves the account. */
     accountsReorder: Boolean = false,
     onMoveAccount: (String, String?) -> Unit = { _, _ -> },
+    /** A new budget's get started list over the month; null once it is done or hidden. */
+    getStarted: List<GetStartedLine>? = null,
+    onGetStarted: (GetStartedStep) -> Unit = {},
+    onHideGetStarted: () -> Unit = {},
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
@@ -182,6 +188,9 @@ fun HomePivot(
                                 onToBudget = onToBudget,
                                 notice = notice,
                                 showAhead = showAhead,
+                                getStarted = getStarted,
+                                onGetStarted = onGetStarted,
+                                onHideGetStarted = onHideGetStarted,
                             )
                         }
                     }
@@ -381,6 +390,9 @@ fun BudgetSection(
     onToBudget: (() -> Unit)? = null,
     notice: String? = null,
     showAhead: Boolean = false,
+    getStarted: List<GetStartedLine>? = null,
+    onGetStarted: (GetStartedStep) -> Unit = {},
+    onHideGetStarted: () -> Unit = {},
 ) {
     val list = rememberLazyListState()
     val arrivals = remember { RowArrivals() }
@@ -472,7 +484,16 @@ fun BudgetSection(
         }
         if (three) Spacer(Modifier.height(MetroDimens.Grid))
         if (notice != null) MonthNotice(notice, Modifier.padding(top = MetroDimens.Row))
-        if (shell.groups.isEmpty() && shell.incomeGroups.isEmpty()) {
+        if (getStarted != null && shell.groups.isEmpty() && shell.incomeGroups.isEmpty()) {
+            GetStartedList(
+                getStarted,
+                shell,
+                onGetStarted,
+                onHideGetStarted,
+                Modifier.padding(top = MetroDimens.Grid),
+                formatOptions,
+            )
+        } else if (shell.groups.isEmpty() && shell.incomeGroups.isEmpty()) {
             Column(
                 Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Grid),
                 verticalArrangement = Arrangement.Center,
@@ -492,6 +513,21 @@ fun BudgetSection(
                 state = list,
                 contentPadding = cardListPadding(cards, top = MetroDimens.Grid),
             ) {
+                // The list leads the month until it is done, so a new budget opens on what to do next.
+                if (getStarted != null) {
+                    item(key = "get-started") {
+                        GetStartedList(
+                            getStarted,
+                            shell,
+                            onGetStarted,
+                            onHideGetStarted,
+                            Modifier
+                                .padding(bottom = MetroDimens.Grid)
+                                .then(if (cards) Modifier.padding(horizontal = MetroDimens.Gutter) else Modifier),
+                            formatOptions,
+                        )
+                    }
+                }
                 if (shell.groups.any { it.categories.isNotEmpty() }) {
                     item(key = "ledger-headings") {
                         LedgerHeadings(if (cards) Modifier.padding(horizontal = MetroDimens.Gutter) else Modifier)

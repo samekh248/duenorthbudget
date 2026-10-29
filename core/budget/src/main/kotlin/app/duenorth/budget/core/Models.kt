@@ -355,6 +355,8 @@ data class PhoneSettings(
     val freeAfterPlans: Boolean = false,
     /** Hours between background bank and budget syncs; 0 turns the background job off. */
     val backgroundSyncHours: Int = BackgroundSync.DEFAULT_HOURS,
+    /** Budgets made on this phone that still show the get started list over their month. */
+    val getStarted: List<String> = emptyList(),
 )
 
 /** The background sync's choices (settings → server). */

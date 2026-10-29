@@ -386,6 +386,9 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onAccount = model::openAccount,
                                 accountsReorder = state.accountsReorder,
                                 onMoveAccount = model::moveAccount,
+                                getStarted = state.getStarted(),
+                                onGetStarted = model::openGetStarted,
+                                onHideGetStarted = model::hideGetStarted,
                                 onInbox = model::openInbox,
                                 onAcceptInbox = model::acceptInbox,
                                 inboxFiled = state.inboxFiled,
@@ -934,6 +937,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                 )
                             }
                         }
+                        ShellRoute.StarterCategories ->
+                            StarterCategoriesScreen(error = state.editError, onAdd = model::addStarterCategories, modifier = fill)
                         ShellRoute.AddAccount ->
                             AddAccountScreen(error = state.editError, onSave = model::submitAddAccount, modifier = fill)
                         is ShellRoute.EditAccount -> {

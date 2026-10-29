@@ -36,6 +36,14 @@ line on what changes, and its two answers on the app bar in place of the page
 underneath's. The yes answer is the action's own verb (replace, delete, post
 anyway); the other is always keep.
 
+A budget made on the phone opens on the budget item with a get started list
+over its month (`GetStartedList` in `app/.../GetStartedScreens.kt`): add your
+accounts, set up categories, assign this month's money, add a bill that
+repeats. Each line opens the real page for that job and ticks itself once the
+budget shows it done; the list goes for good when all four are ticked or the
+person taps hide this list. Set up categories opens a starter set to trim
+while the budget has no categories, and the categories page after that.
+
 A page's own commands go on the app bar, never as body buttons: `PageBar` in
 `app/.../PageBar.kt` puts a page's current commands there (a step, a draft),
 and draws them as buttons only when the page stands alone in a preview. Body

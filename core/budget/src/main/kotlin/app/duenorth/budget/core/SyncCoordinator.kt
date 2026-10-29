@@ -735,6 +735,22 @@ class SyncCoordinator(
         return EditResult.Saved
     }
 
+    /** Get started → categories: the starter groups that were left checked, each with its categories, as one undo step. */
+    fun addStarterCategories(
+        budgetId: String,
+        groups: List<StarterGroup>,
+    ): EditResult {
+        if (groups.isEmpty()) return EditResult.Rejected(StarterCategoriesCopy.PICK_ONE)
+        journaled(budgetId, UndoCopy.CATEGORY) { session ->
+            val book = EnvelopeBook(session, syncClock)
+            groups.forEach { group ->
+                val groupId = book.addGroup(group.name)
+                group.categories.forEach { book.addCategory(groupId, it) }
+            }
+        } ?: return EditResult.Rejected(SyncCopy.LAST_FAILED)
+        return EditResult.Saved
+    }
+
     fun addEnvelopeCategory(
         budgetId: String,
         groupId: String,

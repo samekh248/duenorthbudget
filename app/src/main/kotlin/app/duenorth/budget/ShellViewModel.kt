@@ -168,6 +168,9 @@ sealed interface ShellRoute {
 
     data object ManageCategories : ShellRoute
 
+    /** Get started → set up categories, while the budget has none: a starter set to trim and add. */
+    data object StarterCategories : ShellRoute, StackRoute
+
     data object Payees : ShellRoute
 
     /** The bank sync tile's full page: how each linked account went, with retry. */
@@ -2403,6 +2406,8 @@ class ShellViewModel(
                             ?.path == OnboardingPath.SERVER && sync.signedIn()
                     val settingUp = _state.value.onboarding != null
                     finishOnboarding()
+                    // Debug builds fill the file from a sample, so only release builds have steps left to do.
+                    if (!developerMode) startGetStarted(result.id)
                     val toSettings = _state.value.settingsReturn
                     _state.update {
                         it.copy(
@@ -2440,6 +2445,7 @@ class ShellViewModel(
                 is CreateResult.Created -> {
                     val settingUp = _state.value.onboarding != null
                     finishOnboarding()
+                    if (datasetId == MockBudgets.BRAND_NEW) startGetStarted(result.id)
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
                     offerExperimental(always = settingUp)
@@ -3082,6 +3088,7 @@ class ShellViewModel(
         if (!loaded.locked && loaded.shell != null) {
             warmMonthWindow()
         }
+        retireFinishedGetStarted()
     }
 
     private fun ShellRoute.isRegisterFlow(): Boolean =
