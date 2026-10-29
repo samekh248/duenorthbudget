@@ -9,6 +9,7 @@ import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.MemorySecretStore
 import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.SyncCoordinator
+import kotlinx.coroutines.Dispatchers
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows
 import java.io.File
@@ -27,21 +28,12 @@ internal object ParityTestSupport {
         val library = BudgetLibrary(root, AndroidSessionOpener(), BudgetClock.System)
         library.createFromMock(MockBudgets.HOUSEHOLD) as CreateResult.Created
         val sync = SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System)
-        val model = ShellViewModel(library, sync)
+        val model = ShellViewModel(library, sync, io = Dispatchers.Main)
         await { !model.state.value.loading && model.state.value.shell != null }
         return model to library
     }
 
-    fun drain() {
-        Shadows.shadowOf(Looper.getMainLooper()).idle()
-    }
+    fun drain() = idleMain()
 
-    fun await(predicate: () -> Boolean) {
-        val deadline = System.nanoTime() + 10_000_000_000L
-        while (!predicate()) {
-            if (System.nanoTime() > deadline) error("timed out")
-            drain()
-            Thread.sleep(15)
-        }
-    }
+    fun await(predicate: () -> Boolean) = awaitMain(predicate = predicate)
 }

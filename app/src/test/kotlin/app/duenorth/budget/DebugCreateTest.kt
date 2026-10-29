@@ -9,6 +9,7 @@ import app.duenorth.budget.core.MemorySecretStore
 import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.StarterCategories
 import app.duenorth.budget.core.SyncCoordinator
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -29,7 +30,7 @@ class DebugCreateTest {
         val (library, model) = model("debug-create", developerMode = true)
         assertEquals(MockBudgets.WALKTHROUGH_NAME, model.state.value.defaultBudgetName)
         model.create(MockBudgets.WALKTHROUGH_NAME, "USD")
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         val shell = model.state.value.shell!!
         assertEquals(MockBudgets.WALKTHROUGH_NAME, shell.budgetName)
         assertTrue(shell.inbox.isNotEmpty())
@@ -41,7 +42,7 @@ class DebugCreateTest {
         val (_, model) = model("release-create", developerMode = false)
         assertEquals("", model.state.value.defaultBudgetName)
         model.create("Home", "USD")
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         val shell = model.state.value.shell!!
         assertEquals("Home", shell.budgetName)
         assertTrue(shell.inbox.isEmpty())
@@ -52,9 +53,9 @@ class DebugCreateTest {
         val (library, model) = model("release-get-started", developerMode = false)
         model.create("Home", "USD")
         // A first budget asks about experimental features first, then shows its home.
-        await { model.state.value.route is ShellRoute.ExperimentalOffer }
+        awaitMain { model.state.value.route is ShellRoute.ExperimentalOffer }
         model.declineExperimentalOffer()
-        await { model.state.value.route == ShellRoute.Home && model.state.value.shell != null }
+        awaitMain { model.state.value.route == ShellRoute.Home && model.state.value.shell != null }
         assertEquals(ScreenBar.HOME_BUDGET, model.state.value.homeSection)
         assertEquals(
             4,
@@ -67,7 +68,7 @@ class DebugCreateTest {
         model.openGetStarted(GetStartedStep.CATEGORIES)
         assertEquals(ShellRoute.StarterCategories, model.state.value.route)
         model.addStarterCategories(StarterCategories.all.take(2))
-        await {
+        awaitMain {
             model.state.value.route == ShellRoute.Home && model.state.value.shell!!
                 .groups.size == 2
         }
@@ -80,14 +81,14 @@ class DebugCreateTest {
 
         model.hideGetStarted()
         assertNull(model.state.value.getStarted())
-        await { library.settings().getStarted.isEmpty() }
+        awaitMain { library.settings().getStarted.isEmpty() }
     }
 
     @Test
     fun debugBrandNewSampleHasTheGetStartedList() {
         val (_, model) = model("debug-brand-new", developerMode = true)
         model.createSample(MockBudgets.BRAND_NEW)
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         assertTrue(
             model.state.value.shell!!
                 .groups
@@ -114,17 +115,8 @@ class DebugCreateTest {
         val clock = BudgetClock { LocalDate.of(2026, 10, 7) }
         val library = BudgetLibrary(root, AndroidSessionOpener(), clock)
         val sync = SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), clock)
-        val model = ShellViewModel(library, sync, developerMode = developerMode)
-        await { !model.state.value.loading }
+        val model = ShellViewModel(library, sync, developerMode = developerMode, io = Dispatchers.Main)
+        awaitMain { !model.state.value.loading }
         return library to model
-    }
-
-    private fun await(predicate: () -> Boolean) {
-        val deadline = System.nanoTime() + 5_000_000_000L
-        while (!predicate()) {
-            Shadows.shadowOf(Looper.getMainLooper()).idle()
-            check(System.nanoTime() < deadline) { "timed out" }
-            Thread.sleep(10)
-        }
     }
 }

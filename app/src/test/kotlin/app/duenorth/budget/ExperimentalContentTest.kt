@@ -29,10 +29,7 @@ class ExperimentalContentTest {
         val (model, library) = household("experimental-offer")
         val householdId = model.state.value.settings.openBudgetId!!
         // Let the launch's own loads finish, so none lands after the new budget opens.
-        repeat(40) {
-            ParityTestSupport.drain()
-            Thread.sleep(25)
-        }
+        settleMain(rounds = 40)
 
         model.createFromSettings("Trip", "USD")
         await { model.state.value.route is ShellRoute.ExperimentalOffer }

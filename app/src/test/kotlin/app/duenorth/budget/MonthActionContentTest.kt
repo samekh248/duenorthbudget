@@ -37,6 +37,7 @@ import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.UndoCopy
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.theme.MetroTheme
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -88,7 +89,7 @@ class MonthActionContentTest {
             model.state.value.shell!!
                 .month
         model.fillMonth(MonthFillKind.COPY_LAST)
-        await { model.state.value.fillConfirm != null }
+        awaitMain { model.state.value.fillConfirm != null }
         assertEquals(
             MonthFillCopy.REPLACES,
             model.state.value.fillConfirm!!
@@ -98,13 +99,13 @@ class MonthActionContentTest {
 
         model.keepFill()
         assertNull(model.state.value.fillConfirm)
-        drain()
+        idleMain()
         assertEquals(220_000L, budgeted(library, budgetId, month, "c-food"))
 
         model.fillMonth(MonthFillKind.COPY_LAST)
-        await { model.state.value.fillConfirm != null }
+        awaitMain { model.state.value.fillConfirm != null }
         model.confirmFill()
-        await {
+        awaitMain {
             model.state.value.shell
                 ?.category("c-food")
                 ?.budgetedMinor == 200_000L
@@ -123,7 +124,7 @@ class MonthActionContentTest {
             model.state.value.shell!!
                 .month
         model.fillMonth(MonthFillKind.ZERO)
-        await { model.state.value.fillConfirm != null }
+        awaitMain { model.state.value.fillConfirm != null }
         assertEquals(
             MonthFillCopy.ZERO_CONFIRM,
             model.state.value.fillConfirm!!
@@ -131,7 +132,7 @@ class MonthActionContentTest {
         )
         assertEquals(80_000L, budgeted(library, budgetId, month, "c-gas"))
         model.confirmFill()
-        await {
+        awaitMain {
             model.state.value.shell
                 ?.category("c-gas")
                 ?.budgetedMinor == 0L
@@ -152,10 +153,10 @@ class MonthActionContentTest {
             model.state.value.shell!!
                 .headerMinor,
         )
-        await { model.state.value.route == ShellRoute.CategoryBudget("c-food") }
-        await { model.state.value.undoLabel == MonthFillCopy.TO_BUDGET }
+        awaitMain { model.state.value.route == ShellRoute.CategoryBudget("c-food") }
+        awaitMain { model.state.value.undoLabel == MonthFillCopy.TO_BUDGET }
         // The repaint after sync settles the figures; an earlier month load may land in between.
-        await {
+        awaitMain {
             model.state.value.shell
                 ?.category("c-food")
                 ?.budgetedMinor == before.category("c-food")!!.budgetedMinor - 2_500
@@ -180,7 +181,7 @@ class MonthActionContentTest {
         model.openCategoryBudget("c-food")
         model.openToBudget()
         model.submitToBudget("999999")
-        await { model.state.value.editError != null }
+        awaitMain { model.state.value.editError != null }
         assertEquals(
             before.headerMinor,
             model.state.value.shell!!
@@ -243,12 +244,12 @@ class MonthActionContentTest {
         }
         compose.onNodeWithTag("income-budget-amount").assertDoesNotExist()
         compose.onNodeWithTag("auto-hold-on").performClick()
-        await {
+        awaitMain {
             model.state.value.shell
                 ?.incomeCategory("c-sal")
                 ?.autoHold == true
         }
-        await { model.state.value.undoLabel == MonthFillCopy.AUTO_HOLD }
+        awaitMain { model.state.value.undoLabel == MonthFillCopy.AUTO_HOLD }
     }
 
     @Test
@@ -267,7 +268,7 @@ class MonthActionContentTest {
         )
         model.openCategoryBudget("c-sal")
         model.saveCategoryBudget("5000")
-        await {
+        awaitMain {
             model.state.value.shell
                 ?.incomeCategory("c-sal")
                 ?.budgetedMinor == 500_000L
@@ -326,7 +327,7 @@ class MonthActionContentTest {
 
         model.openCategoryBudget("c-food")
         model.saveCategoryBudget("250")
-        await { model.state.value.undoLabel != null }
+        awaitMain { model.state.value.undoLabel != null }
         val undo = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, model.state.value.undoLabel).single { it.id == "undo" }
         assertEquals("undo assign", undo.label)
         assertFalse(undo.primary)
@@ -334,10 +335,10 @@ class MonthActionContentTest {
 
         model.undo()
         // The label clears when the step is popped; the notice follows the write.
-        await { model.state.value.monthNotice == "${MonthActionCopy.UNDONE} ${UndoCopy.ASSIGN}" }
-        await { model.state.value.undoLabel == null }
+        awaitMain { model.state.value.monthNotice == "${MonthActionCopy.UNDONE} ${UndoCopy.ASSIGN}" }
+        awaitMain { model.state.value.undoLabel == null }
         assertEquals(220_000L, budgeted(library, budgetId, month, "c-food"))
-        await {
+        awaitMain {
             model.state.value.shell
                 ?.category("c-food")
                 ?.budgetedMinor == 220_000L
@@ -366,8 +367,8 @@ class MonthActionContentTest {
             }
         }
         val sync = SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System)
-        val model = ShellViewModel(library, sync)
-        await { !model.state.value.loading && model.state.value.shell != null }
+        val model = ShellViewModel(library, sync, io = Dispatchers.Main)
+        awaitMain { !model.state.value.loading && model.state.value.shell != null }
         return model to library
     }
 
@@ -400,19 +401,6 @@ class MonthActionContentTest {
                     IncomeGroupRow("g-inc", "Income", 0, 420_000, listOf(IncomeCategoryRow("c-sal", "Salary", 0, 420_000, false))),
                 ),
         )
-
-    private fun drain() {
-        Shadows.shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    private fun await(predicate: () -> Boolean) {
-        val deadline = System.nanoTime() + 10_000_000_000L
-        while (!predicate()) {
-            if (System.nanoTime() > deadline) error("timed out")
-            drain()
-            Thread.sleep(15)
-        }
-    }
 
     private companion object {
         val USD = Currencies.byCode("USD")!!

@@ -14,7 +14,7 @@ fun ShellViewModel.toggleShowClosedAccounts() {
     val settings = state.value.settings.let { it.copy(showClosedAccounts = !it.showClosedAccounts) }
     mutate { it.copy(settings = settings) }
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { library.updateSettings { it.copy(showClosedAccounts = settings.showClosedAccounts) } }
+        withContext(io) { library.updateSettings { it.copy(showClosedAccounts = settings.showClosedAccounts) } }
         reloadAccounts()
         refresh()
     }
@@ -50,7 +50,7 @@ fun ShellViewModel.submitAddAccount(
             }
         }
     viewModelScope.launch {
-        when (val result = withContext(Dispatchers.IO) { library.createAccount(budgetId, name, offBudget, balance) }) {
+        when (val result = withContext(io) { library.createAccount(budgetId, name, offBudget, balance) }) {
             is AccountWriteResult.Saved -> afterAccountWrite(budgetId, leave = true)
             is AccountWriteResult.Rejected -> mutate { it.copy(editError = result.reason) }
             is AccountWriteResult.NeedsConfirm -> Unit
@@ -74,7 +74,7 @@ fun ShellViewModel.submitEditAccount(
     val accountId = (state.value.route as? ShellRoute.EditAccount)?.accountId ?: return
     viewModelScope.launch {
         val result =
-            withContext(Dispatchers.IO) {
+            withContext(io) {
                 val detail = library.readAccount(budgetId, accountId)
                 val renamed =
                     if (detail?.name ==
@@ -109,7 +109,7 @@ fun ShellViewModel.openCloseAccount() {
     reloadAccounts()
     val budgetId = state.value.settings.openBudgetId ?: return
     viewModelScope.launch {
-        val categories = withContext(Dispatchers.IO) { sync.categories(budgetId) }
+        val categories = withContext(io) { sync.categories(budgetId) }
         mutate { it.copy(categories = categories) }
     }
 }
@@ -133,7 +133,7 @@ fun ShellViewModel.submitCloseAccount(
     }
     viewModelScope.launch {
         val result =
-            withContext(Dispatchers.IO) { library.closeAccount(budgetId, accountId, destinationId, categoryId, forced, confirmed) }
+            withContext(io) { library.closeAccount(budgetId, accountId, destinationId, categoryId, forced, confirmed) }
         when (result) {
             is AccountWriteResult.Saved -> {
                 mutate { it.copy(accountForceConfirm = null) }
@@ -158,7 +158,7 @@ fun ShellViewModel.reopenAccount(accountId: String) {
     val budgetId = state.value.settings.openBudgetId ?: return
     mutate { current -> current.copy(accountsList = current.accountsList.map { if (it.id == accountId) it.copy(closed = false) else it }) }
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { library.reopenAccount(budgetId, accountId) }
+        withContext(io) { library.reopenAccount(budgetId, accountId) }
         afterAccountWrite(budgetId, leave = false)
     }
 }
@@ -196,7 +196,7 @@ fun ShellViewModel.moveAccount(
     moved.add(to, account)
     mutate { it.copy(shell = shell.copy(accounts = moved)) }
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { library.moveAccount(budgetId, accountId, targetId) }
+        withContext(io) { library.moveAccount(budgetId, accountId, targetId) }
         afterAccountWrite(budgetId, leave = false)
     }
 }
@@ -215,7 +215,7 @@ private fun ShellViewModel.currentAccountId(): String? =
 internal fun ShellViewModel.reloadAccounts() {
     val budgetId = state.value.settings.openBudgetId ?: return
     viewModelScope.launch {
-        val list = withContext(Dispatchers.IO) { library.readAccounts(budgetId, includeClosed = true) }
+        val list = withContext(io) { library.readAccounts(budgetId, includeClosed = true) }
         mutate { it.copy(accountsList = list) }
     }
 }
@@ -223,7 +223,7 @@ internal fun ShellViewModel.reloadAccounts() {
 private fun ShellViewModel.loadAccountDetail(accountId: String) {
     val budgetId = state.value.settings.openBudgetId ?: return
     viewModelScope.launch {
-        val detail = withContext(Dispatchers.IO) { library.readAccount(budgetId, accountId) }
+        val detail = withContext(io) { library.readAccount(budgetId, accountId) }
         mutate { it.copy(accountDetail = detail) }
     }
 }
@@ -244,7 +244,7 @@ private fun ShellViewModel.afterAccountWrite(
     reloadAccounts()
     refresh()
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
+        withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
         refresh()
     }
 }

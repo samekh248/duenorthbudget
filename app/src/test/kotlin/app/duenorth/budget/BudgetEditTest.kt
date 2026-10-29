@@ -16,6 +16,7 @@ import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.UndoCopy
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -52,8 +53,8 @@ class BudgetEditTest {
 
         model.endBudgetEdit()
         assertNull(model.state.value.budgetEdit)
-        await { model.saved().category("c-food")?.budgetedMinor == food }
-        await { model.saved().headerMinor == before.headerMinor - 2_500 }
+        awaitMain { model.saved().category("c-food")?.budgetedMinor == food }
+        awaitMain { model.saved().headerMinor == before.headerMinor - 2_500 }
     }
 
     @Test
@@ -90,7 +91,7 @@ class BudgetEditTest {
         assertTrue(model.back())
         assertNull(model.state.value.budgetEdit)
         assertEquals(ShellRoute.Home, model.state.value.route)
-        settle(model)
+        settleMain()
         assertEquals(before.groups, model.saved().groups)
         assertEquals(before.headerMinor, model.saved().headerMinor)
     }
@@ -114,7 +115,7 @@ class BudgetEditTest {
         assertEquals(ShellRoute.Home, model.state.value.route)
         model.cancelBudgetEdit()
         assertNull(model.state.value.budgetEdit)
-        settle(model)
+        settleMain()
         assertEquals(before.groups, model.saved().groups)
         assertEquals(undo, model.state.value.undoLabel)
     }
@@ -164,14 +165,14 @@ class BudgetEditTest {
         model.focusBudgetBox(other.id)
         listOf("+", "5").forEach(model::typeBudgetKey)
         model.endBudgetEdit()
-        await { model.saved().category(to.id)?.budgetedMinor == to.budgetedMinor + 1_000 }
-        await { model.saved().category(other.id)?.budgetedMinor == other.budgetedMinor + 500 }
+        awaitMain { model.saved().category(to.id)?.budgetedMinor == to.budgetedMinor + 1_000 }
+        awaitMain { model.saved().category(other.id)?.budgetedMinor == other.budgetedMinor + 500 }
         assertEquals(from.budgetedMinor - 1_000, model.saved().category(from.id)!!.budgetedMinor)
-        await { model.state.value.undoLabel != null }
+        awaitMain { model.state.value.undoLabel != null }
 
         // One undo takes the whole edit back.
         model.undo()
-        await { model.saved().groups == before.groups }
+        awaitMain { model.saved().groups == before.groups }
     }
 
     @Test
@@ -201,7 +202,7 @@ class BudgetEditTest {
         assertEquals(ShellRoute.Home, model.state.value.route)
         assertEquals(before.headerMinor + 1_000, model.editing().headerMinor)
         model.endBudgetEdit()
-        await { model.saved().headerMinor == before.headerMinor + 1_000 }
+        awaitMain { model.saved().headerMinor == before.headerMinor + 1_000 }
     }
 
     @Test
@@ -210,7 +211,7 @@ class BudgetEditTest {
         val before = model.state.value.shell!!
         model.startBudgetEdit()
         model.fillMonth(MonthFillKind.ZERO)
-        await {
+        awaitMain {
             model.state.value.budgetEdit
                 ?.budgeted
                 ?.isNotEmpty() == true
@@ -227,7 +228,7 @@ class BudgetEditTest {
         assertEquals(before.groups, model.saved().groups)
 
         model.endBudgetEdit()
-        await {
+        awaitMain {
             model
                 .saved()
                 .groups
@@ -241,31 +242,31 @@ class BudgetEditTest {
         val model = household("templates")
         model.setExperimental(true)
         model.setGoalTemplates(true)
-        await { model.state.value.formatPrefs.templatesOn }
+        awaitMain { model.state.value.formatPrefs.templatesOn }
         // The screen shows the switch at once, but the file is written after; templates read the file.
-        await { library.readFormatPrefs(model.state.value.settings.openBudgetId!!).templatesOn }
+        awaitMain { library.readFormatPrefs(model.state.value.settings.openBudgetId!!).templatesOn }
         model.openCategoryBudget("c-gas")
-        await { model.state.value.categoryNote != null }
+        awaitMain { model.state.value.categoryNote != null }
         model.saveCategoryNote("#template 123")
-        await { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }
+        awaitMain { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }
         model.back()
         val before = model.state.value.shell!!
         model.startBudgetEdit()
         model.openTemplates()
         assertEquals(ShellRoute.Templates, model.state.value.route)
         model.applyTemplates(overwrite = true)
-        await { model.state.value.templateResult is TemplateResult.Applied }
+        awaitMain { model.state.value.templateResult is TemplateResult.Applied }
         assertNull(model.state.value.templateConfirm)
         assertEquals(12_300L, model.edit().budgeted["c-gas"])
-        settle(model)
+        settleMain()
         assertEquals(before.category("c-gas")!!.budgetedMinor, model.saved().category("c-gas")!!.budgetedMinor)
         assertEquals(UndoCopy.CATEGORY_NOTE, model.state.value.undoLabel)
 
         model.back()
         assertEquals(ShellRoute.Home, model.state.value.route)
         model.endBudgetEdit()
-        await { model.saved().category("c-gas")?.budgetedMinor == 12_300L }
-        await { model.state.value.undoLabel == UndoCopy.BUDGET_EDIT }
+        awaitMain { model.saved().category("c-gas")?.budgetedMinor == 12_300L }
+        awaitMain { model.state.value.undoLabel == UndoCopy.BUDGET_EDIT }
     }
 
     @Test
@@ -277,7 +278,7 @@ class BudgetEditTest {
         listOf("1").forEach(model::typeBudgetKey)
         model.selectHomeSection(ScreenBar.HOME_ACCOUNTS)
         assertNull(model.state.value.budgetEdit)
-        settle(model)
+        settleMain()
         assertEquals(before.groups, model.saved().groups)
     }
 
@@ -291,8 +292,8 @@ class BudgetEditTest {
         library = BudgetLibrary(root, AndroidSessionOpener(), BudgetClock.System)
         library.createFromMock(MockBudgets.HOUSEHOLD) as CreateResult.Created
         val sync = SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System)
-        val model = ShellViewModel(library, sync)
-        await { !model.state.value.loading && model.state.value.shell != null }
+        val model = ShellViewModel(library, sync, io = Dispatchers.Main)
+        awaitMain { !model.state.value.loading && model.state.value.shell != null }
         return model
     }
 
@@ -302,22 +303,5 @@ class BudgetEditTest {
 
     private fun ShellViewModel.saved(): MonthShell = state.value.shell!!
 
-    // Gives any write a chance to land, so a test that expects none would see it.
-    private fun settle(model: ShellViewModel) {
-        repeat(20) {
-            Shadows.shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(10)
-        }
-    }
-
     private fun MonthShell.category(id: String): CategoryRow? = groups.flatMap { it.categories }.firstOrNull { it.id == id }
-
-    private fun await(predicate: () -> Boolean) {
-        val deadline = System.nanoTime() + 10_000_000_000L
-        while (!predicate()) {
-            if (System.nanoTime() > deadline) error("timed out")
-            Shadows.shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(15)
-        }
-    }
 }

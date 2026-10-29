@@ -84,7 +84,7 @@ fun ShellViewModel.fillBudgetEdit(kind: MonthFillKind) {
     val budgetId = edit.budgetId ?: return
     val month = edit.month ?: return
     viewModelScope.launch {
-        val targets = withContext(Dispatchers.IO) { sync.fillTargets(budgetId, month, kind) }
+        val targets = withContext(io) { sync.fillTargets(budgetId, month, kind) }
         mutate { current ->
             val open = current.budgetEdit?.takeIf { it.budgetId == budgetId && it.month == month } ?: return@mutate current
             if (targets.isNullOrEmpty()) {
@@ -104,7 +104,7 @@ fun ShellViewModel.applyTemplatesInBudgetEdit(overwrite: Boolean) {
     mutate { it.copy(templateBusy = true, templateConfirm = null) }
     viewModelScope.launch {
         val (result, amounts) =
-            withContext(Dispatchers.IO) { library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
+            withContext(io) { library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
         mutate { current ->
             val open = current.budgetEdit?.takeIf { it.budgetId == budgetId && it.month == month }
             if (open == null || result !is TemplateResult.Applied) {
