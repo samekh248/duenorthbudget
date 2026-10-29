@@ -2238,9 +2238,11 @@ class ShellViewModel(
     }
 
     fun submitTransaction(draft: TransactionDraft) {
+        // Saving goes back to the page that opened the form, even when the form moved the transaction to another account.
+        val from = (_state.value.route as? ShellRoute.EditTransaction)?.accountId ?: draft.accountId
         launchWrite { id ->
             val result = withContext(Dispatchers.IO) { library.saveTransaction(id, draft) }
-            publish(result, draft.accountId, stayOnRegister = true)
+            publish(result, from, stayOnRegister = true)
         }
     }
 
