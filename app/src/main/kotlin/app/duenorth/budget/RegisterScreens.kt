@@ -91,6 +91,7 @@ import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
+import app.duenorth.budget.design.components.LayerCheckBox
 import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
@@ -288,7 +289,7 @@ private fun RegisterList(
                         Modifier.padding(top = 16.dp, bottom = 8.dp).testTag("register-day-${day.first().date}"),
                         color = Metro.accent.text,
                     )
-                    LedgerGroup(Modifier.padding(bottom = 4.dp), heading = {}) {
+                    LedgerGroup(Modifier.padding(bottom = 4.dp), bottomAir = false, heading = {}) {
                         day.forEach { row ->
                             RegisterLine(
                                 row,
@@ -297,6 +298,8 @@ private fun RegisterList(
                                 picked = selection?.let { row.id in it },
                                 onPress = { onPress(row.id) },
                                 onLongPress = { onLongPress(row.id) },
+                                // The last row holds the panel's bottom air, so a picked one is tinted to the edge.
+                                extraAir = if (row === day.last()) MetroDimens.Row else 0.dp,
                             )
                         }
                     }
@@ -408,6 +411,8 @@ internal fun RegisterLine(
     onLongPress: () -> Unit,
     detail: String = registerDetail(row),
     modifier: Modifier = Modifier,
+    /** Air under the row inside its tint: the panel's bottom air, on a day panel's last row. */
+    extraAir: Dp = 0.dp,
 ) {
     val accent = Metro.accent.text
     val fill =
@@ -439,7 +444,7 @@ internal fun RegisterLine(
             .drawBehind {
                 if (relief) {
                     val side = CLEARED_KEY.toPx()
-                    val topLeft = Offset(size.width - side, (size.height - side) / 2)
+                    val topLeft = Offset(size.width - side, (size.height - extraAir.toPx() - side) / 2)
                     // Mica rounds the key into a dot, a hairline ring until it is cleared.
                     drawRelief(
                         surface,
@@ -464,11 +469,12 @@ internal fun RegisterLine(
                 val gutter = MetroDimens.Gutter.toPx()
                 val inset = 6.dp.toPx()
                 val left = size.width + gutter - CLEARED_BAR_INSET.toPx() - CLEARED_BAR.toPx()
-                drawRect(bar, Offset(left, inset), Size(CLEARED_BAR.toPx(), size.height - 2 * inset))
+                val height = size.height - extraAir.toPx()
+                drawRect(bar, Offset(left, inset), Size(CLEARED_BAR.toPx(), height - 2 * inset))
                 val c = measurer.measure(RegisterCopy.CLEARED_MARK, mark)
-                drawText(c, topLeft = Offset(left + (CLEARED_BAR.toPx() - c.size.width) / 2, (size.height - c.size.height) / 2))
+                drawText(c, topLeft = Offset(left + (CLEARED_BAR.toPx() - c.size.width) / 2, (height - c.size.height) / 2))
             }.metroPress(onPress, onLongPress)
-            .padding(vertical = REGISTER_ROW_AIR)
+            .padding(top = REGISTER_ROW_AIR, bottom = REGISTER_ROW_AIR + extraAir)
             .padding(
                 end =
                     if (relief) {
@@ -540,12 +546,16 @@ internal fun RegisterLine(
     }
 }
 
-/** A square checkbox: accent with a check when [on], an outline when not. */
+/** A square checkbox: accent with a check when [on], an outline when not. Mica draws Windows 11's instead. */
 @Composable
 private fun SelectBox(
     on: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    if (Metro.style.layers) {
+        Box(modifier) { LayerCheckBox(on, Modifier.size(20.dp)) }
+        return
+    }
     val accent = Metro.accent.text
     val outline = Metro.colors.secondary
     val mark = Metro.colors.background

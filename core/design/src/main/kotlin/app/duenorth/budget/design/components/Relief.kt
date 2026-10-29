@@ -3,6 +3,7 @@ package app.duenorth.budget.design.components
 import android.graphics.BlurMaskFilter
 import android.graphics.Paint
 import android.graphics.RectF
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -14,6 +15,8 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -208,6 +211,47 @@ fun Modifier.layerFocusLine(on: Boolean): Modifier {
             val line = 2.dp.toPx()
             val inset = LayerCorner.Control.toPx() / 2
             drawRect(accent, Offset(inset, size.height - line), Size(size.width - 2 * inset, line))
+        }
+    }
+}
+
+/**
+ * Mica's check box, as Windows 11 draws one: a square rounded by 4dp, a faint fill edged by a strong 1dp line
+ * when clear, the accent with a tick when [checked]. No underline: that marks a field, not a check box.
+ */
+@Composable
+fun LayerCheckBox(
+    checked: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val dark = Metro.colors.isDark
+    val accent = Metro.accent.fill
+    val tick = Metro.accent.onFill
+    val wash = if (dark) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.02f)
+    val edge = if (dark) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.6f)
+    Canvas(modifier) {
+        val corner = CornerRadius(4.dp.toPx())
+        if (checked) {
+            drawRoundRect(accent, cornerRadius = corner)
+            val w = size.width
+            val h = size.height
+            val path =
+                ComposePath().apply {
+                    moveTo(w * 0.26f, h * 0.52f)
+                    lineTo(w * 0.43f, h * 0.68f)
+                    lineTo(w * 0.75f, h * 0.34f)
+                }
+            drawPath(path, tick, style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        } else {
+            val hair = 1.dp.toPx()
+            drawRoundRect(wash, cornerRadius = corner)
+            drawRoundRect(
+                edge,
+                Offset(hair / 2, hair / 2),
+                Size(size.width - hair, size.height - hair),
+                CornerRadius(4.dp.toPx() - hair / 2),
+                style = Stroke(hair),
+            )
         }
     }
 }
