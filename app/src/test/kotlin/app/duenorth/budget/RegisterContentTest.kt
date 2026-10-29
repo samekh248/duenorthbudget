@@ -222,6 +222,17 @@ class RegisterContentTest {
 
     @Test
     @Config(sdk = [33], qualifiers = "w411dp-h891dp")
+    fun aRefusedSaveSitsUnderItsFieldAndScrollsToIt() {
+        form(error = RegisterCopy.CHOOSE_CATEGORY, height = 300)
+        compose
+            .onNodeWithTag("transaction-error-category", useUnmergedTree = true)
+            .assertTextEquals(RegisterCopy.CHOOSE_CATEGORY)
+            .assertIsDisplayed()
+        compose.onNodeWithTag("transaction-error-note", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    @Config(sdk = [33], qualifiers = "w411dp-h891dp")
     fun titleAreaAndLabelsWithNoBodyButtons() {
         form()
         compose.onNodeWithTag("transaction-account", useUnmergedTree = true).assertTextEquals("Checking")
@@ -744,17 +755,19 @@ class RegisterContentTest {
         hideFraction: Boolean = false,
         onSave: (TransactionDraft) -> Unit = {},
         chooseAccount: Boolean = false,
+        error: String? = null,
+        height: Int = 780,
     ): FormSaveHost {
         val host = FormSaveHost()
         compose.setContent {
             MetroTheme {
                 CompositionLocalProvider(LocalFormSaveHost provides host) {
-                    Box(Modifier.width(390.dp).height(780.dp)) {
+                    Box(Modifier.width(390.dp).height(height.dp)) {
                         TransactionForm(
                             page = page,
                             row = row,
                             initialDate = "2026-10-07",
-                            error = null,
+                            error = error,
                             onSave = onSave,
                             dateFormat = dateFormat,
                             numberFormat = numberFormat,

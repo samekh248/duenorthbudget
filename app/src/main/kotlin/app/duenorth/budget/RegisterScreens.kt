@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -38,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -736,7 +739,8 @@ fun TransactionForm(
     RememberFormSave(commit)
 
     fun errorFor(field: TransactionField): String? =
-        fieldError?.takeIf { it.first == field }?.second ?: error?.takeIf { field == TransactionField.NOTE && fieldError == null }
+        // A save the budget refused names its field too, so the message sits under the box it is about.
+        fieldError?.takeIf { it.first == field }?.second ?: error?.takeIf { TransactionField.of(it) == field && fieldError == null }
     Box(modifier.background(Metro.colors.background).testTag("transaction-form")) {
         Column(
             Modifier
@@ -1259,19 +1263,41 @@ private fun LabeledField(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    Column(modifier.fillMaxWidth()) {
-        MetroText(label, Metro.typography.caption, Modifier.padding(bottom = MetroDimens.FieldLabelGap), color = Metro.colors.secondary)
+    // A field with a problem scrolls into view, so a save that did not go through never looks like nothing happened.
+    val inView = remember { BringIntoViewRequester() }
+    LaunchedEffect(error) {
+        if (error != null) {
+            // After the message is laid out, so the whole of it comes into view.
+            withFrameNanos {}
+            inView.bringIntoView()
+        }
+    }
+    Column(modifier.fillMaxWidth().bringIntoViewRequester(inView)) {
+        MetroText(
+            label,
+            Metro.typography.caption,
+            Modifier.padding(bottom = MetroDimens.FieldLabelGap),
+            color = if (error != null) Metro.colors.error else Metro.colors.secondary,
+        )
         content()
         if (error != null) {
-            MetroText(
-                error,
-                Metro.typography.body,
+            // The message on the red swatch, right under the box, so it can't pass for a hint.
+            Row(
                 Modifier
-                    .padding(
-                        top = MetroDimens.FieldLabelGap,
-                    ).testTag("transaction-error-${TransactionField.of(error).name.lowercase()}"),
-                color = Metro.accent.text,
-            )
+                    .padding(top = MetroDimens.FieldLabelGap)
+                    .fillMaxWidth()
+                    .background(Metro.colors.errorFill)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MetroText("!", Metro.typography.body, Modifier.padding(end = 10.dp), color = Metro.colors.onErrorFill)
+                MetroText(
+                    error,
+                    Metro.typography.body,
+                    Modifier.testTag("transaction-error-${TransactionField.of(error).name.lowercase()}"),
+                    color = Metro.colors.onErrorFill,
+                )
+            }
         }
     }
 }
