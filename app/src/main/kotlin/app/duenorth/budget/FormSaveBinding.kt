@@ -11,7 +11,6 @@ class FormSaveHost {
     private val handler = mutableStateOf<(() -> Unit)?>(null)
     private val barOverrides = mutableStateOf<List<Pair<Int, List<ScreenAction>>>>(emptyList())
     private var overrideCount = 0
-    private val actions = mutableMapOf<String, () -> Unit>()
 
     /** Actions a form's own page (a picker over the form) puts on the bar in place of the route's. */
     val bar: List<ScreenAction>? get() = barOverrides.value.maxByOrNull { it.first }?.second
@@ -42,18 +41,6 @@ class FormSaveHost {
     fun save() {
         handler.value?.invoke()
     }
-
-    /** A bar action the form itself carries out, such as adding a split line. */
-    fun bindAction(
-        id: String,
-        run: (() -> Unit)?,
-    ) {
-        if (run == null) actions.remove(id) else actions[id] = run
-    }
-
-    fun run(id: String) {
-        actions[id]?.invoke()
-    }
 }
 
 val LocalFormSaveHost = staticCompositionLocalOf<FormSaveHost?> { null }
@@ -64,19 +51,6 @@ fun RememberFormSave(save: () -> Unit) {
     DisposableEffect(host, save) {
         host?.bind(save)
         onDispose { host?.clear() }
-    }
-}
-
-/** While composed, the bar action [id] runs [run] on the form. */
-@Composable
-fun RememberFormAction(
-    id: String,
-    run: () -> Unit,
-) {
-    val host = LocalFormSaveHost.current
-    DisposableEffect(host, id, run) {
-        host?.bindAction(id, run)
-        onDispose { host?.bindAction(id, null) }
     }
 }
 

@@ -95,8 +95,6 @@ class EnvelopeMonthTest {
                     .first { it.id == "c-fun" }
                     .hidden,
             )
-            assertEquals(EnvelopeEditResult.Saved, book.moveCategoryLater("c-food"))
-            assertEquals(EnvelopeEditResult.Saved, book.moveGroupEarlier("g-exp"))
             session.exec(
                 """
                 INSERT INTO category_groups (id, name, is_income, sort_order, tombstone)

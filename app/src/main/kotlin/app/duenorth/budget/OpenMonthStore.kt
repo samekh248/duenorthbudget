@@ -44,13 +44,6 @@ class OpenMonthStore(
         rebuildWindow(YearMonth.now())
     }
 
-    fun clearCache() {
-        cache.clear()
-        shell = null
-        review = null
-        pendingMonth = null
-    }
-
     /** Forgets every cached month but keeps what is on screen; the next select reloads. */
     fun invalidate() {
         cache.clear()

@@ -25,33 +25,13 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.time.YearMonth
 
-/** Spec 010 T027: the breakdown and the fill confirm in light and dark. */
+/** Spec 010 T027: the fill confirm in light and dark. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [33], qualifiers = "w411dp-h891dp-xxhdpi")
 class MonthActionScreenshotTest {
     private val october = YearMonth.of(2026, 10)
     private val usd = Currencies.byCode("USD")!!
-    private val parts = ActualMonthMath.MonthBreakdown(420_000, 35_000, -4_800, -375_000, -20_000, 55_200)
-
-    @Test
-    fun breakdownLight() = snap("breakdown_light", dark = false) { SectionTitled("BUDGET") { BreakdownScreen(october, parts, usd) } }
-
-    @Test
-    fun breakdownDark() = snap("breakdown_dark", dark = true) { SectionTitled("BUDGET") { BreakdownScreen(october, parts, usd) } }
-
-    private val withPlans = parts.copy(ahead = ActualMonthMath.FuturePlans(15_200, 202612))
-
-    @Test
-    fun breakdownPlansLight() =
-        snap(
-            "breakdown_plans_light",
-            dark = false,
-        ) { SectionTitled("BUDGET") { BreakdownScreen(october, withPlans, usd, showAhead = true) } }
-
-    @Test
-    fun breakdownPlansDark() =
-        snap("breakdown_plans_dark", dark = true) { SectionTitled("BUDGET") { BreakdownScreen(october, withPlans, usd, showAhead = true) } }
 
     @Test
     fun fillConfirmLight() = snap("fill_confirm_light", dark = false) { FillConfirm() }

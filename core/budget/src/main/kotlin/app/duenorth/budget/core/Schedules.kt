@@ -392,18 +392,6 @@ class SchedulesBook(
         return ScheduleWriteResult.Posted
     }
 
-    fun updateAmount(
-        scheduleId: String,
-        amountMinor: Long,
-    ): ScheduleWriteResult {
-        val schedule =
-            loadSchedules().firstOrNull { it.id == scheduleId }
-                ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
-        val updated = replaceAmountCondition(schedule.conditionsJson, amountMinor)
-        rules.updateConditions(schedule.ruleId, updated)
-        return ScheduleWriteResult.Posted
-    }
-
     fun delete(scheduleId: String): ScheduleWriteResult {
         val schedule =
             loadSchedules().firstOrNull { it.id == scheduleId }
@@ -950,28 +938,6 @@ private fun buildRecurDate(
                 }
             },
         )
-    }
-
-private fun replaceAmountCondition(
-    conditions: JsonArray,
-    amountMinor: Long,
-): JsonArray =
-    buildJsonArray {
-        conditions.forEach { element ->
-            val obj = element.jsonObject
-            if (obj["field"]?.jsonPrimitive?.contentOrNull == "amount") {
-                add(
-                    buildJsonObject {
-                        put("op", "is")
-                        put("field", "amount")
-                        put("value", amountMinor)
-                        put("type", "number")
-                    },
-                )
-            } else {
-                add(obj)
-            }
-        }
     }
 
 private fun extractField(

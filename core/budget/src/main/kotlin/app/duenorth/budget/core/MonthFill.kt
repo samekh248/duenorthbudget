@@ -16,7 +16,6 @@ object MonthFillCopy {
     const val COPY_LAST = "copy last month"
     const val AVERAGE = "3 month average"
     const val ZERO = "set to zero"
-    const val BREAKDOWN = "to budget breakdown"
     const val TO_BUDGET = "to budget"
     const val AUTO_HOLD = "auto-hold"
     const val NOTHING_TO_COPY = "nothing to copy"

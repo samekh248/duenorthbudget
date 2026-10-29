@@ -42,7 +42,6 @@ object AccountScreenCopy {
     const val DONE = "done"
     const val ON_BUDGET = "on budget"
     const val OFF_BUDGET = "off budget"
-    const val CLOSED = "closed"
     const val REOPEN = "reopen"
     const val EDIT = "edit account"
     const val CLOSE = "close account"

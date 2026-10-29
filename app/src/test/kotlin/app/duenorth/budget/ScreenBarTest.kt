@@ -329,7 +329,6 @@ class ScreenBarTest {
         val routes =
             listOf(
                 ShellRoute.Create,
-                ShellRoute.Assign,
                 ShellRoute.HoldMonth,
                 ShellRoute.CategoryBudget("c"),
                 ShellRoute.ImportPreviewRoute("a"),

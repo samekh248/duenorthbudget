@@ -108,8 +108,6 @@ sealed interface ShellRoute {
 
     data object BudgetPassword : ShellRoute
 
-    data object Assign : ShellRoute
-
     data object Conflicts : ShellRoute
 
     data object ConfirmReplace : ShellRoute
@@ -154,8 +152,6 @@ sealed interface ShellRoute {
     ) : ShellRoute
 
     data object HoldMonth : ShellRoute
-
-    data object Breakdown : ShellRoute
 
     data class ToBudget(
         val categoryId: String,
@@ -366,7 +362,6 @@ data class ShellUiState(
     val switchReturnRoute: ShellRoute = ShellRoute.Home,
     /** The phone's budgets that picking [pendingFile] clears. */
     val replaceBudgets: List<BudgetSummary> = emptyList(),
-    val breakdown: ActualMonthMath.MonthBreakdown? = null,
     val fillConfirm: FillConfirm? = null,
     val monthNotice: String? = null,
     /** How the inbox's own sync went, shown under its totals until the pivot moves on. */
@@ -623,11 +618,6 @@ class ShellViewModel(
         _state.update { it.copy(register = registerGate.visible ?: it.register) }
     }
 
-    fun showCreate() {
-        history.clear()
-        _state.update { it.copy(route = ShellRoute.Create, settingsReturn = false, createError = null, confirm = null) }
-    }
-
     fun showSampleBudgets() {
         if (!developerMode) return
         history.clear()
@@ -752,28 +742,6 @@ class ShellViewModel(
             if (id != null) withContext(Dispatchers.IO) { sync.markConflictsSeen(id) }
             _state.update { it.copy(route = ShellRoute.Conflicts, conflicts = conflicts) }
         }
-    }
-
-    fun showAssign() {
-        val id = _state.value.shell?.budgetId
-        viewModelScope.launch {
-            val categories = if (id == null) emptyList() else withContext(Dispatchers.IO) { sync.categories(id) }
-            _state.update { it.copy(route = ShellRoute.Assign, categories = categories, editError = null) }
-        }
-    }
-
-    fun previousBudgetMonth() {
-        val previous = months.window.previous(months.openMonth) ?: return
-        selectOpenMonth(previous)
-    }
-
-    fun nextBudgetMonth() {
-        val next = months.window.next(months.openMonth) ?: return
-        selectOpenMonth(next)
-    }
-
-    fun goToCurrentMonth() {
-        selectOpenMonth(YearMonth.now())
     }
 
     fun selectOpenMonth(month: YearMonth) {
@@ -2204,10 +2172,6 @@ class ShellViewModel(
         }
     }
 
-    fun previousReviewMonth() {
-        previousBudgetMonth()
-    }
-
     fun openReviewCategory(categoryId: String) {
         push(ShellRoute.ReviewCategory(categoryId))
         loadCategoryMonth(categoryId)
@@ -2638,25 +2602,6 @@ class ShellViewModel(
         }
     }
 
-    fun assign(
-        categoryId: String,
-        amountText: String,
-    ) {
-        val shell = _state.value.shell ?: return
-        viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { sync.assign(shell.budgetId, categoryId, shell.month, amountText) }
-            when (result) {
-                is EditResult.Rejected -> _state.update { it.copy(editError = result.reason) }
-                EditResult.Saved -> {
-                    _state.update { it.copy(editError = null, route = ShellRoute.Home) }
-                    reload()
-                    withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(shell.budgetId) } }
-                    reload()
-                }
-            }
-        }
-    }
-
     fun setTheme(mode: String) {
         saveSettings(_state.value.settings.copy(themeMode = mode))
     }
@@ -2803,15 +2748,6 @@ class ShellViewModel(
         viewModelScope.launch {
             val page = withContext(Dispatchers.IO) { library.readReconcile(budgetId, accountId) }
             _state.update { it.copy(reconcile = page, reconcileError = null) }
-        }
-    }
-
-    private fun refreshReview() {
-        val budgetId = _state.value.settings.openBudgetId ?: return
-        val month = _state.value.openMonth
-        viewModelScope.launch {
-            val review = withContext(Dispatchers.IO) { library.readMonthReview(budgetId, month) }
-            _state.update { it.copy(monthReview = review) }
         }
     }
 
@@ -3083,21 +3019,7 @@ class ShellViewModel(
         this is ShellRoute.CategoryBudget ||
             this is ShellRoute.MoveCategory ||
             this is ShellRoute.HoldMonth ||
-            this is ShellRoute.Breakdown ||
             this is ShellRoute.ToBudget
-
-    private fun refreshBudgetShell() {
-        val budgetId = _state.value.settings.openBudgetId ?: return
-        if (_state.value.locked) return
-        viewModelScope.launch {
-            val month = editorMonth()
-            val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) } ?: return@launch
-            shellGate.offer(shell)
-            _state.update { current ->
-                current.copy(shell = if (shellGate.gestureActive) current.shell else shell)
-            }
-        }
-    }
 
     private fun applyEnvelopeEdit(
         stayOnRoute: Boolean = true,

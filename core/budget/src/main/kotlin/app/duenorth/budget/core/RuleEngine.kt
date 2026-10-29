@@ -153,13 +153,6 @@ class RulesBook(
         return id
     }
 
-    fun updateConditions(
-        ruleId: String,
-        conditions: JsonArray,
-    ) {
-        SyncSchema.write(session, "rules", ruleId, "conditions", conditions.toString())
-    }
-
     fun delete(ruleId: String) {
         SyncSchema.write(session, "rules", ruleId, "tombstone", 1)
     }
@@ -562,11 +555,6 @@ object ScheduleDates {
         } catch (_: Exception) {
             null
         }
-
-    fun addDays(
-        iso: String,
-        days: Long,
-    ): String = parseIso(iso)?.plusDays(days)?.toString() ?: iso
 
     /** `schedules_next_date` dates as Actual stores them: an integer `20261013`. */
     fun toStored(value: String?): String? {

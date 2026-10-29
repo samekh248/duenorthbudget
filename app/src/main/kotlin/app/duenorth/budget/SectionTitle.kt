@@ -59,8 +59,6 @@ object SectionTitle {
                 is ShellRoute.MoveCategory,
                 is ShellRoute.ToBudget,
                 ShellRoute.HoldMonth,
-                ShellRoute.Breakdown,
-                ShellRoute.Assign,
                 ShellRoute.StarterCategories,
                 -> HomeSections.BUDGET
                 is ShellRoute.RuleEditor -> return SectionTitleCopy.RULES
