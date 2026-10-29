@@ -1370,7 +1370,7 @@ private fun CategoryListPage(
                     CategoryRow.None ->
                         CategoryListRow(RegisterCopy.NO_CATEGORY, options.current == null, "transaction-category-none") { onPick(null) }
                     is CategoryRow.Group ->
-                        CategoryGroupLabel(entry.name, "transaction-category-group-${entry.key}")
+                        CategoryGroupLabel(entry.name, "transaction-category-group-${entry.key}", afterSuggestions = entry.key == "all")
                     is CategoryRow.Choice -> {
                         val tag = if (entry.suggested) "transaction-category-suggested-${entry.id}" else "transaction-category-${entry.id}"
                         CategoryListRow(options.label(entry.id), entry.id == options.current, tag) { onPick(entry.id) }
@@ -1396,18 +1396,25 @@ private sealed interface CategoryRow {
     ) : CategoryRow
 }
 
-/** The caption over a run of categories: a group's name, or the suggested group's. */
+/**
+ * The caption over a run of categories: a group's name, or the suggested group's. The caption that follows the suggestions
+ * opens with a wider gap, so the suggestions read as their own block above the full list.
+ */
 @Composable
 private fun CategoryGroupLabel(
     name: String,
     tag: String,
+    afterSuggestions: Boolean = false,
 ) {
     // Windows 10 Mobile heads each group as its list views do: body type, semibold, in the accent.
     val mobile10 = Metro.style.mobile10
     MetroText(
         name.ifBlank { " " },
         if (mobile10) Metro.typography.body.copy(fontWeight = MetroWeights.Semibold) else Metro.typography.caption,
-        Modifier.padding(top = MetroDimens.Gutter).testTag(tag),
+        Modifier
+            .padding(top = if (afterSuggestions) MetroDimens.Grid + MetroDimens.Gutter else MetroDimens.Gutter)
+            .then(if (mobile10) Modifier.padding(horizontal = MetroDimens.Gutter) else Modifier)
+            .testTag(tag),
         color = if (mobile10) Metro.accent.text else Metro.colors.secondary,
     )
 }
@@ -1417,6 +1424,24 @@ private val choiceStyle: TextStyle
     @Composable
     @ReadOnlyComposable
     get() = if (Metro.style.mobile10) Metro.typography.body else Metro.typography.subheader
+
+/**
+ * How a category choice shows it is the current one. Metro colours the choice in the accent; Windows 10 Mobile, whose
+ * group captions already wear the accent, marks it as its list views do, with an accent-tinted band behind foreground text.
+ */
+@Composable
+private fun Modifier.choiceSelection(selected: Boolean): Modifier =
+    if (!Metro.style.mobile10) {
+        this
+    } else {
+        val band = if (selected) background(Metro.accent.fill.copy(alpha = 0.4f)) else this
+        band.padding(horizontal = MetroDimens.Gutter)
+    }
+
+/** A choice's ink: the accent for the current one, except under Windows 10 Mobile, whose band marks it instead. */
+@Composable
+@ReadOnlyComposable
+private fun choiceColor(selected: Boolean) = if (selected && !Metro.style.mobile10) Metro.accent.text else Metro.colors.foreground
 
 @Composable
 private fun CategoryListRow(
@@ -1432,9 +1457,10 @@ private fun CategoryListRow(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick)
+            .choiceSelection(selected)
             .padding(vertical = MetroDimens.Row)
             .testTag(tag),
-        color = if (selected) Metro.accent.text else Metro.colors.foreground,
+        color = choiceColor(selected),
         maxLines = 2,
     )
 }
@@ -1665,7 +1691,7 @@ fun CategoryPickerScreen(
                         onPick(category.id)
                     }
                 }
-                item(key = "all") { CategoryGroupLabel(RegisterCopy.ALL_CATEGORIES, "category-group-all") }
+                item(key = "all") { CategoryGroupLabel(RegisterCopy.ALL_CATEGORIES, "category-group-all", afterSuggestions = true) }
             }
             if (query.isBlank()) {
                 item { ChoiceLine(RegisterCopy.NO_CATEGORY, current == null) { onPick(null) } }
@@ -1725,8 +1751,9 @@ private fun ChoiceLine(
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick)
+            .choiceSelection(selected)
             .padding(vertical = MetroDimens.Row),
-        color = if (selected) Metro.accent.text else Metro.colors.foreground,
+        color = choiceColor(selected),
         maxLines = 2,
     )
 }
