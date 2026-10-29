@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -105,6 +106,7 @@ import app.duenorth.budget.design.components.drawRelief
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import app.duenorth.budget.design.theme.MetroWeights
 import app.duenorth.budget.design.theme.Relief
 import java.time.LocalDate
 import java.time.Month
@@ -1390,13 +1392,21 @@ private fun CategoryGroupLabel(
     name: String,
     tag: String,
 ) {
+    // Windows 10 Mobile heads each group as its list views do: body type, semibold, in the accent.
+    val mobile10 = Metro.style.mobile10
     MetroText(
         name.ifBlank { " " },
-        Metro.typography.caption,
+        if (mobile10) Metro.typography.body.copy(fontWeight = MetroWeights.Semibold) else Metro.typography.caption,
         Modifier.padding(top = MetroDimens.Gutter).testTag(tag),
-        color = Metro.colors.secondary,
+        color = if (mobile10) Metro.accent.text else Metro.colors.secondary,
     )
 }
+
+/** A category choice: Metro's subheader, or under Windows 10 Mobile the body type of a W10M list view. */
+private val choiceStyle: TextStyle
+    @Composable
+    @ReadOnlyComposable
+    get() = if (Metro.style.mobile10) Metro.typography.body else Metro.typography.subheader
 
 @Composable
 private fun CategoryListRow(
@@ -1407,7 +1417,7 @@ private fun CategoryListRow(
 ) {
     MetroText(
         label,
-        Metro.typography.subheader,
+        choiceStyle,
         Modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
@@ -1700,7 +1710,7 @@ private fun ChoiceLine(
 ) {
     MetroText(
         label,
-        Metro.typography.subheader,
+        choiceStyle,
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
