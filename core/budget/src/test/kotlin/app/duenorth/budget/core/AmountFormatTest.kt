@@ -82,4 +82,13 @@ class AmountFormatTest {
         assertEquals("12.50", MoneyParse.canonical("12.50", FormatOptions.NUMBER_DOT_COMMA))
         assertEquals("abc", MoneyParse.canonical("abc", FormatOptions.NUMBER_DOT_COMMA))
     }
+
+    // The toggle is the only sign: a leading minus comes off the box and means expense; one inside a sum stays.
+    @Test
+    fun leadingMinusComesOffTheBox() {
+        assertEquals("20" to true, RegisterEntry.leadingMinus("-20"))
+        assertEquals("" to true, RegisterEntry.leadingMinus("-"))
+        assertEquals("120-45" to false, RegisterEntry.leadingMinus("120-45"))
+        assertEquals("12.50" to false, RegisterEntry.leadingMinus("12.50"))
+    }
 }

@@ -816,7 +816,11 @@ fun TransactionForm(
             LabeledField(TransactionFormCopy.AMOUNT, errorFor(TransactionField.AMOUNT), Modifier.padding(top = MetroDimens.FieldGroupGap)) {
                 AmountLine(
                     amount = amount,
-                    onAmount = { amount = it },
+                    onAmount = { text ->
+                        val (rest, minus) = RegisterEntry.leadingMinus(text)
+                        amount = rest
+                        if (minus) expense = true
+                    },
                     expense = expense,
                     onExpense = { expense = it },
                     sample = amountSample(page, numberFormat),
@@ -853,7 +857,12 @@ fun TransactionForm(
                                 splits.sumOf { splitAmount(it) ?: 0L },
                         expense = expense,
                         format = { MoneyFormat.format(it, page.currency, FormatOptions(hideFraction, numberFormat)) },
-                        onLine = { index, line -> splits = splits.mapIndexed { i, old -> if (i == index) line else old } },
+                        onLine = { index, line ->
+                            // A line takes the transaction's sign, so a minus on one turns the whole of it to expense.
+                            val (rest, minus) = RegisterEntry.leadingMinus(line.amount)
+                            if (minus) expense = true
+                            splits = splits.mapIndexed { i, old -> if (i == index) line.copy(amount = rest) else old }
+                        },
                         onRemove = { index ->
                             val rest = splits.filterIndexed { i, _ -> i != index }
                             // One line left is no split: it becomes the category again.
