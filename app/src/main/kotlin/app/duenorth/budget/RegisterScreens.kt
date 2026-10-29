@@ -666,7 +666,9 @@ fun TransactionForm(
     }
     val splitting = splits.isNotEmpty() && transferTo == null
     val showCategories = !splitting && (transferTo == null || mixed)
-    val options = remember(page.categories, categoryId) { CategoryOptions.of(page.categories, categoryId) }
+    // The full-screen list leads with what this payee is usually filed under, or failing that what was used last.
+    val suggested = remember(page.suggestions, payee, expense) { page.suggestions.forPayee(payee, income = !expense) }
+    val options = remember(page.categories, categoryId, suggested) { CategoryOptions.of(page.categories, categoryId, suggested) }
     RememberFormAction(FORM_ADD_SPLIT) {
         // A transfer has no split; the first tap turns the category into the first line.
         if (transferTo == null) {
@@ -890,7 +892,14 @@ fun TransactionForm(
             FormOverlay.None -> Unit
             is FormOverlay.CategoryList ->
                 CategoryListPage(
-                    options = open.line?.let { CategoryOptions.of(page.categories, splits.getOrNull(it)?.categoryId) } ?: options,
+                    options =
+                        open.line?.let {
+                            CategoryOptions.of(
+                                page.categories,
+                                splits.getOrNull(it)?.categoryId,
+                                suggested,
+                            )
+                        } ?: options,
                     onPick = { picked ->
                         val line = open.line
                         if (line == null) {
@@ -1147,6 +1156,8 @@ sealed interface FormOverlay {
 class CategoryOptions private constructor(
     val groups: List<Pair<String, List<CategoryChoice>>>,
     val current: String?,
+    /** Category ids the full-screen list shows first, in their own group. */
+    val suggested: List<String> = emptyList(),
 ) {
     /** Category ids in list order, `null` standing for "no category". */
     val choices: List<String?> = listOf<String?>(null) + groups.flatMap { (_, rows) -> rows.map { it.id } }
@@ -1169,13 +1180,15 @@ class CategoryOptions private constructor(
         fun of(
             categories: List<CategoryChoice>,
             current: String?,
+            suggested: List<String> = emptyList(),
         ): CategoryOptions {
             val shown = categories.filter { !it.hidden || it.id == current }
             val groups =
                 shown
                     .groupBy { it.groupName }
                     .map { (name, rows) -> name to rows }
-            return CategoryOptions(groups, current)
+            val visible = categories.filter { !it.hidden }.map { it.id }.toSet()
+            return CategoryOptions(groups, current, suggested.filter { it in visible })
         }
     }
 }
@@ -1291,27 +1304,43 @@ private fun CategoryListPage(
     val query = filter.query
     val rows =
         remember(options, query) {
-            buildList<Pair<String, String?>?> {
-                if (query.isBlank()) add(null)
-                options.groups.forEach { (name, choices) ->
+            buildList {
+                if (query.isBlank() && options.suggested.isNotEmpty()) {
+                    add(CategoryRow.Group(RegisterCopy.SUGGESTED, "suggested"))
+                    options.suggested.forEach { add(CategoryRow.Choice(it, suggested = true)) }
+                    add(CategoryRow.Group(RegisterCopy.ALL_CATEGORIES, "all"))
+                }
+                if (query.isBlank()) add(CategoryRow.None)
+                options.groups.forEachIndexed { index, (name, choices) ->
                     val shown = CategoryFilter.choices(choices, query)
                     if (shown.isNotEmpty()) {
-                        add(name to null)
-                        shown.forEach { add("" to it.id) }
+                        add(CategoryRow.Group(name, "$index"))
+                        shown.forEach { add(CategoryRow.Choice(it.id)) }
                     }
                 }
-                if (query.isNotBlank() && CategoryFilter.showsNone(query)) add(null)
+                if (query.isNotBlank() && CategoryFilter.showsNone(query)) add(CategoryRow.None)
             }
         }
-    val start = remember(options) { rows.indexOfFirst { it?.second != null && it.second == options.current }.coerceAtLeast(0) }
+    // The list opens on the current category, or at the top when the suggested group leads it.
+    val start =
+        remember(options) {
+            if (options.suggested.isNotEmpty()) {
+                0
+            } else {
+                rows.indexOfFirst { it is CategoryRow.Choice && it.id == options.current }.coerceAtLeast(0)
+            }
+        }
     val state = rememberLazyListState(initialFirstVisibleItemIndex = start)
     LaunchedEffect(query) { if (filter.typed) state.scrollToItem(0) }
     val enter = {
         if (!filter.typed) {
             onPick(options.current)
         } else {
-            val top = rows.indexOfFirst { it == null || it.second != null }
-            if (top >= 0) onPick(rows[top]?.second)
+            when (val top = rows.firstOrNull { it !is CategoryRow.Group }) {
+                CategoryRow.None -> onPick(null)
+                is CategoryRow.Choice -> onPick(top.id)
+                else -> Unit
+            }
         }
     }
     Column(
@@ -1325,25 +1354,48 @@ private fun CategoryListPage(
         CategoryFilterField(filter, enter, Modifier.padding(top = MetroDimens.Gutter))
         LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Gutter), state = state) {
             items(rows.size) { index ->
-                val entry = rows[index]
-                when {
-                    entry == null ->
+                when (val entry = rows[index]) {
+                    CategoryRow.None ->
                         CategoryListRow(RegisterCopy.NO_CATEGORY, options.current == null, "transaction-category-none") { onPick(null) }
-                    entry.second == null ->
-                        MetroText(
-                            entry.first.ifBlank { " " },
-                            Metro.typography.caption,
-                            Modifier.padding(top = MetroDimens.Gutter).testTag("transaction-category-group-$index"),
-                            color = Metro.colors.secondary,
-                        )
-                    else -> {
-                        val id = entry.second!!
-                        CategoryListRow(options.label(id), id == options.current, "transaction-category-$id") { onPick(id) }
+                    is CategoryRow.Group ->
+                        CategoryGroupLabel(entry.name, "transaction-category-group-${entry.key}")
+                    is CategoryRow.Choice -> {
+                        val tag = if (entry.suggested) "transaction-category-suggested-${entry.id}" else "transaction-category-${entry.id}"
+                        CategoryListRow(options.label(entry.id), entry.id == options.current, tag) { onPick(entry.id) }
                     }
                 }
             }
         }
     }
+}
+
+/** A line of the full-screen category list: "no category", a group's caption, or a category to pick. */
+private sealed interface CategoryRow {
+    data object None : CategoryRow
+
+    data class Group(
+        val name: String,
+        val key: String,
+    ) : CategoryRow
+
+    data class Choice(
+        val id: String,
+        val suggested: Boolean = false,
+    ) : CategoryRow
+}
+
+/** The caption over a run of categories: a group's name, or the suggested group's. */
+@Composable
+private fun CategoryGroupLabel(
+    name: String,
+    tag: String,
+) {
+    MetroText(
+        name.ifBlank { " " },
+        Metro.typography.caption,
+        Modifier.padding(top = MetroDimens.Gutter).testTag(tag),
+        color = Metro.colors.secondary,
+    )
 }
 
 @Composable
@@ -1580,7 +1632,21 @@ fun CategoryPickerScreen(
         CategoryFilterField(filter, enter, Modifier.padding(top = MetroDimens.Grid))
         val list = rememberLazyListState()
         LaunchedEffect(query) { if (filter.typed) list.scrollToItem(0) }
+        val suggested =
+            remember(target.categories, target.suggested) {
+                val byId = target.categories.associateBy { it.id }
+                target.suggested.mapNotNull(byId::get)
+            }
         LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Gutter), state = list) {
+            if (query.isBlank() && suggested.isNotEmpty()) {
+                item(key = "suggested") { CategoryGroupLabel(RegisterCopy.SUGGESTED, "category-group-suggested") }
+                items(suggested, key = { "suggested-${it.id}" }) { category ->
+                    ChoiceLine(category.name, category.id == current?.id, Modifier.testTag("category-suggested-${category.id}")) {
+                        onPick(category.id)
+                    }
+                }
+                item(key = "all") { CategoryGroupLabel(RegisterCopy.ALL_CATEGORIES, "category-group-all") }
+            }
             if (query.isBlank()) {
                 item { ChoiceLine(RegisterCopy.NO_CATEGORY, current == null) { onPick(null) } }
             }
@@ -1629,12 +1695,13 @@ private fun DirectionChoice(
 private fun ChoiceLine(
     label: String,
     selected: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     MetroText(
         label,
         Metro.typography.subheader,
-        Modifier
+        modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick)
