@@ -110,19 +110,19 @@ data class MetroTypography(
         val Default: MetroTypography = create()
 
         /**
-         * The Windows 10 Mobile type ramp: Title 24 for the pivot's headers, Subheader 34, Subtitle 20, Base and
-         * Body 15, Caption 12.
+         * The Windows 10 Mobile type ramp, raised for an Android phone (owner, 2026-10-29: the desktop-pixel sizes read
+         * too small): pivot headers 30, subheader 42, subtitle 24, group headers 22, body 17, controls 18, caption 14.
          */
         val Mobile10: MetroTypography =
             Default.copy(
-                sectionHeader = Default.sectionHeader.copy(fontSize = 24.sp),
-                pageTitle = Default.pageTitle.copy(fontSize = 14.sp),
-                header = Default.header.copy(fontSize = 34.sp),
-                subheader = Default.subheader.copy(fontSize = 20.sp, lineHeight = 24.sp),
-                groupHeader = Default.groupHeader.copy(fontWeight = MetroWeights.Regular),
-                body = Default.body.copy(fontSize = 15.sp, lineHeight = 20.sp),
-                control = Default.control.copy(fontSize = 15.sp),
-                caption = Default.caption.copy(fontWeight = MetroWeights.Regular, fontSize = 12.sp, lineHeight = 16.sp),
+                sectionHeader = Default.sectionHeader.copy(fontSize = 30.sp),
+                pageTitle = Default.pageTitle.copy(fontSize = 15.sp),
+                header = Default.header.copy(fontSize = 42.sp),
+                subheader = Default.subheader.copy(fontSize = 24.sp, lineHeight = 28.sp),
+                groupHeader = Default.groupHeader.copy(fontWeight = MetroWeights.Regular, fontSize = 22.sp),
+                body = Default.body.copy(fontSize = 17.sp, lineHeight = 23.sp),
+                control = Default.control.copy(fontSize = 18.sp),
+                caption = Default.caption.copy(fontWeight = MetroWeights.Regular, fontSize = 14.sp, lineHeight = 18.sp),
             )
     }
 }
