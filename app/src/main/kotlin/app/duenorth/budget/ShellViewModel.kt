@@ -78,6 +78,7 @@ import app.duenorth.budget.core.withHold
 import app.duenorth.budget.core.withMoveAvailable
 import app.duenorth.budget.core.withReleaseHold
 import app.duenorth.budget.design.MonthWindow
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -427,6 +428,8 @@ class ShellViewModel(
     internal val probe: ServerProbe = ServerProbe(),
     /** Reschedules the background job when its interval changes in settings. */
     private val onBackgroundSyncHours: (Int) -> Unit = {},
+    /** Where file and network work runs. Tests pass the main thread, so idling its looper runs that work to the end. */
+    internal val io: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     internal val shellGate = RefreshGate<MonthShell>()
     private val registerGate = RefreshGate<RegisterPage>()
@@ -461,7 +464,7 @@ class ShellViewModel(
     internal var onboardingJob: Job? = null
 
     /** `onboarding.json` writes, one at a time and in order. */
-    internal val onboardingWrites = Dispatchers.IO.limitedParallelism(1)
+    internal val onboardingWrites = io.limitedParallelism(1)
 
     /** When the last sync the screen started without being asked began, in epoch millis; launch syncs at start. */
     private var lastScreenSync = System.currentTimeMillis()
@@ -524,7 +527,7 @@ class ShellViewModel(
     ) {
         _state.update { it.copy(bankSyncing = true) }
         val banks =
-            withContext(Dispatchers.IO) {
+            withContext(io) {
                 runCatching {
                     sync.syncBanks(
                         id,
@@ -543,7 +546,7 @@ class ShellViewModel(
                     )
                 }
             }
-        withContext(Dispatchers.IO) { runCatching { sync.sync(id) } }
+        withContext(io) { runCatching { sync.sync(id) } }
         val summary = banks.getOrNull()
         val error =
             when {
@@ -579,7 +582,7 @@ class ShellViewModel(
         if (now - lastScreenSync < RETURN_SYNC_GAP_MS) return
         lastScreenSync = now
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { runCatching { sync.sync(id) } }
+            withContext(io) { runCatching { sync.sync(id) } }
             if (_state.value.settings.openBudgetId == id) reload()
         }
     }
@@ -634,7 +637,7 @@ class ShellViewModel(
     internal fun loadPayees() {
         viewModelScope.launch {
             val budgetId = _state.value.settings.openBudgetId ?: return@launch
-            val rows = withContext(Dispatchers.IO) { library.listPayees(budgetId) }
+            val rows = withContext(io) { library.listPayees(budgetId) }
             _state.update { it.copy(payees = rows) }
         }
     }
@@ -656,7 +659,7 @@ class ShellViewModel(
     fun skipSchedule(scheduleId: String) {
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
-            when (withContext(Dispatchers.IO) { library.skipSchedule(budgetId, scheduleId) }) {
+            when (withContext(io) { library.skipSchedule(budgetId, scheduleId) }) {
                 is ScheduleWriteResult.Skipped,
                 is ScheduleWriteResult.Posted,
                 -> refresh()
@@ -670,7 +673,7 @@ class ShellViewModel(
         val budgetId = _state.value.settings.openBudgetId ?: return
         val next = _state.value.today
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(io) {
                 library.createScheduleFromTransaction(budgetId, transactionId, "monthly", next)
             }
             refresh()
@@ -687,12 +690,12 @@ class ShellViewModel(
         viewModelScope.launch {
             when (
                 val result =
-                    withContext(Dispatchers.IO) {
+                    withContext(io) {
                         library.renamePayee(budgetId, payeeId, name, confirmMerge, rememberRule)
                     }
             ) {
                 is PayeeWriteResult.Saved -> {
-                    val rows = withContext(Dispatchers.IO) { library.listPayees(budgetId) }
+                    val rows = withContext(io) { library.listPayees(budgetId) }
                     _state.update { it.copy(payees = rows, writeError = null, payeeMergeTarget = null) }
                 }
                 is PayeeWriteResult.Rejected ->
@@ -718,7 +721,7 @@ class ShellViewModel(
         viewModelScope.launch {
             val result =
                 if (sync.signedIn()) {
-                    withContext(Dispatchers.IO) { sync.refreshRemote() }
+                    withContext(io) { sync.refreshRemote() }
                 } else {
                     null
                 }
@@ -738,8 +741,8 @@ class ShellViewModel(
     fun showConflicts() {
         val id = _state.value.settings.openBudgetId
         viewModelScope.launch {
-            val conflicts = if (id == null) emptyList() else withContext(Dispatchers.IO) { sync.conflicts(id) }
-            if (id != null) withContext(Dispatchers.IO) { sync.markConflictsSeen(id) }
+            val conflicts = if (id == null) emptyList() else withContext(io) { sync.conflicts(id) }
+            if (id != null) withContext(io) { sync.markConflictsSeen(id) }
             _state.update { it.copy(route = ShellRoute.Conflicts, conflicts = conflicts) }
         }
     }
@@ -874,8 +877,8 @@ class ShellViewModel(
     ) {
         viewModelScope.launch {
             _state.update { it.copy(serverError = null, syncing = true, syncProgress = 0f) }
-            val result = withContext(Dispatchers.IO) { sync.connect(address, password) }
-            val settings = withContext(Dispatchers.IO) { library.settings() }
+            val result = withContext(io) { sync.connect(address, password) }
+            val settings = withContext(io) { library.settings() }
             _state.update {
                 it.copy(
                     syncing = false,
@@ -900,7 +903,7 @@ class ShellViewModel(
         viewModelScope.launch {
             _state.update { it.copy(serverError = null) }
             val redirect =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     sync.beginOpenId(address, OPEN_ID_RETURN)
                 }
             if (redirect.isNullOrBlank()) {
@@ -933,13 +936,13 @@ class ShellViewModel(
             // After a restart the pending address lives only in onboarding.json (spec 011 R5).
             val saved =
                 _state.value.onboarding?.progress
-                    ?: withContext(Dispatchers.IO) { library.onboarding().read() }
+                    ?: withContext(io) { library.onboarding().read() }
             val onboarding = saved?.openIdPendingAddress != null
             val address = _state.value.openIdPendingAddress ?: saved?.openIdPendingAddress ?: return@launch
             val label = if (onboarding) saved?.instanceLabel else null
             _state.update { it.copy(syncing = true, syncProgress = 0f, serverError = null) }
-            val result = withContext(Dispatchers.IO) { sync.completeOpenId(address, token, label) }
-            val settings = withContext(Dispatchers.IO) { library.settings() }
+            val result = withContext(io) { sync.completeOpenId(address, token, label) }
+            val settings = withContext(io) { library.settings() }
             _state.update {
                 it.copy(
                     syncing = false,
@@ -980,8 +983,8 @@ class ShellViewModel(
     fun confirmInstanceSwitch(instanceId: String? = null) {
         val id = instanceId ?: _state.value.switchInstanceTarget?.id ?: return
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { sync.makeActive(id) }
-            val settings = withContext(Dispatchers.IO) { library.settings() }
+            withContext(io) { sync.makeActive(id) }
+            val settings = withContext(io) { library.settings() }
             _state.update {
                 it.copy(
                     settings = settings,
@@ -1012,8 +1015,8 @@ class ShellViewModel(
 
     fun removeInstance(instanceId: String) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { sync.removeInstance(instanceId) }
-            val settings = withContext(Dispatchers.IO) { library.settings() }
+            withContext(io) { sync.removeInstance(instanceId) }
+            val settings = withContext(io) { library.settings() }
             _state.update {
                 it.copy(
                     settings = settings,
@@ -1093,8 +1096,8 @@ class ShellViewModel(
      * screen, so the answer lands on the budget just opened.
      */
     private suspend fun offerExperimental(always: Boolean = false) {
-        val budgetId = withContext(Dispatchers.IO) { library.settings().openBudgetId } ?: return
-        val prefs = withContext(Dispatchers.IO) { library.readFormatPrefs(budgetId) }
+        val budgetId = withContext(io) { library.settings().openBudgetId } ?: return
+        val prefs = withContext(io) { library.readFormatPrefs(budgetId) }
         if (prefs.experimentalAsked && !always) return
         val current = prefs.experimental.takeIf { prefs.experimentalAsked }
         _state.update {
@@ -1111,7 +1114,7 @@ class ShellViewModel(
                 ?.name
                 .orEmpty()
         viewModelScope.launch {
-            val bytes = withContext(Dispatchers.IO) { library.exportZip(budgetId) } ?: return@launch
+            val bytes = withContext(io) { library.exportZip(budgetId) } ?: return@launch
             val fileName = library.exportFileName(name)
             _state.update { it.copy(pendingExport = PendingExport(fileName, bytes)) }
         }
@@ -1138,7 +1141,7 @@ class ShellViewModel(
     fun setEncryptionPassword(password: String) {
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
-            when (val result = withContext(Dispatchers.IO) { sync.setEncryptionPassword(budgetId, password) }) {
+            when (val result = withContext(io) { sync.setEncryptionPassword(budgetId, password) }) {
                 is UnlockResult.Failed -> _state.update { it.copy(encryptionError = result.reason) }
                 UnlockResult.Unlocked -> encryptionSaved()
             }
@@ -1153,7 +1156,7 @@ class ShellViewModel(
         viewModelScope.launch {
             when (
                 val result =
-                    withContext(Dispatchers.IO) {
+                    withContext(io) {
                         sync.changeEncryptionPassword(budgetId, current, next)
                     }
             ) {
@@ -1166,7 +1169,7 @@ class ShellViewModel(
     fun removeEncryptionPassword(password: String) {
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
-            when (val result = withContext(Dispatchers.IO) { sync.removeEncryptionPassword(budgetId, password) }) {
+            when (val result = withContext(io) { sync.removeEncryptionPassword(budgetId, password) }) {
                 is UnlockResult.Failed -> _state.update { it.copy(encryptionError = result.reason) }
                 UnlockResult.Unlocked -> encryptionSaved()
             }
@@ -1183,7 +1186,7 @@ class ShellViewModel(
         currency: String,
     ) {
         viewModelScope.launch {
-            when (val result = withContext(Dispatchers.IO) { createBudget(name, currency) }) {
+            when (val result = withContext(io) { createBudget(name, currency) }) {
                 is CreateResult.Created -> {
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
@@ -1203,7 +1206,7 @@ class ShellViewModel(
         if (_state.value.locked) return
         viewModelScope.launch {
             val snapshot =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     val shell = library.readShell(budgetId, month) ?: return@withContext null
                     val review = library.readMonthReview(budgetId, month)
                     MonthSnapshot(month, shell, review)
@@ -1228,7 +1231,7 @@ class ShellViewModel(
         if (_state.value.locked) return
         months.rebuildWindow(YearMonth.now())
         val windowMonths = months.window.months
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(io) {
             for (month in windowMonths) {
                 if (_state.value.settings.openBudgetId != budgetId) return@launch
                 if (months.cached(month) != null) continue
@@ -1271,7 +1274,7 @@ class ShellViewModel(
         val budgetId = _state.value.shell?.budgetId ?: _state.value.settings.openBudgetId
         if (budgetId == null) return
         viewModelScope.launch {
-            val page = withContext(Dispatchers.IO) { sync.readCategoryManage(budgetId) }
+            val page = withContext(io) { sync.readCategoryManage(budgetId) }
             _state.update { it.copy(editError = null, categoryManage = page) }
         }
     }
@@ -1631,7 +1634,7 @@ class ShellViewModel(
             }
         }
         leaving.launch {
-            withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(id) } }
+            withContext(io) { runCatching { sync.sendUnsent(id) } }
             if (screenVisits == visit) sync.lock(id)
         }
     }
@@ -1650,7 +1653,7 @@ class ShellViewModel(
             try {
                 do {
                     sendAgain = false
-                    val sent = withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) }.getOrNull() }
+                    val sent = withContext(io) { runCatching { sync.sendUnsent(budgetId) }.getOrNull() }
                     // A send also brings back what other devices changed; budget edit mode repaints itself.
                     val current = _state.value
                     if (sent != null && current.settings.openBudgetId == budgetId && !current.locked && current.budgetEdit == null) {
@@ -1683,7 +1686,7 @@ class ShellViewModel(
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
             val (bundle, error) =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     library.previewImportFile(budgetId, accountId, bytes, fileName)
                 }
             if (bundle == null) {
@@ -1706,7 +1709,7 @@ class ShellViewModel(
         val preview = _state.value.importPreview ?: return
         val candidates = _state.value.importCandidates
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
+            withContext(io) {
                 val book = library
                 val toAdd =
                     preview.rows
@@ -1741,7 +1744,7 @@ class ShellViewModel(
         _state.update { it.copy(importFetchPending = true, importError = null, syncProgress = 0.1f) }
         viewModelScope.launch {
             val (bundle, error) =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     library.previewBankFetch(
                         budgetId,
                         accountId,
@@ -1775,7 +1778,7 @@ class ShellViewModel(
         val accountId = _state.value.importReview?.accountId ?: return
         viewModelScope.launch {
             val result =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     library.setImportReviewCategory(budgetId, transactionId, categoryId)
                 }
             when (result) {
@@ -1790,7 +1793,7 @@ class ShellViewModel(
         val budgetId = _state.value.settings.openBudgetId ?: return
         val accountId = _state.value.importReview?.accountId ?: openAccountId() ?: return
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { library.finishImportReview(budgetId) }
+            withContext(io) { library.finishImportReview(budgetId) }
             _state.update {
                 it.copy(
                     importReview = null,
@@ -1806,7 +1809,7 @@ class ShellViewModel(
 
     private suspend fun reloadReview(accountId: String) {
         val budgetId = _state.value.settings.openBudgetId ?: return
-        val review = withContext(Dispatchers.IO) { library.readImportReview(budgetId) }
+        val review = withContext(io) { library.readImportReview(budgetId) }
         _state.update { it.copy(importReview = review, importError = null) }
     }
 
@@ -1834,7 +1837,7 @@ class ShellViewModel(
                 ?.inbox
                 ?.firstOrNull { it.id == transactionId } ?: return
         launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.deleteTransaction(id, transactionId, false) }
+            val result = withContext(io) { library.deleteTransaction(id, transactionId, false) }
             publish(result, row.accountId, stayOnRegister = false)
         }
     }
@@ -1848,7 +1851,7 @@ class ShellViewModel(
         stayOnRegister: Boolean,
     ) {
         launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.matchTransactions(id, pair.bank.id, pair.entered.id) }
+            val result = withContext(io) { library.matchTransactions(id, pair.bank.id, pair.entered.id) }
             if (result is WriteResult.Saved) _state.update { it.copy(inboxLead = pair.bank.id) }
             publish(result, pair.bank.accountId, stayOnRegister)
         }
@@ -1859,7 +1862,7 @@ class ShellViewModel(
         stayOnRegister: Boolean,
     ) {
         launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.notAMatch(id, pair.bank.id, pair.entered.id) }
+            val result = withContext(io) { library.notAMatch(id, pair.bank.id, pair.entered.id) }
             publish(result, pair.bank.accountId, stayOnRegister)
         }
     }
@@ -1941,7 +1944,7 @@ class ShellViewModel(
         if (rows.isEmpty() || writing) return
         _state.update { it.copy(inboxSelection = null) }
         launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.deleteTransactions(id, rows.map { it.id }, false) }
+            val result = withContext(io) { library.deleteTransactions(id, rows.map { it.id }, false) }
             publish(result, rows.first().accountId, stayOnRegister = false)
         }
     }
@@ -1981,7 +1984,7 @@ class ShellViewModel(
         launchWrite { id ->
             val result =
                 try {
-                    withContext(Dispatchers.IO) {
+                    withContext(io) {
                         if (assignments.size == 1) {
                             val (txn, category) = assignments.entries.single()
                             library.setTransactionCategory(id, txn, category, false)
@@ -2045,7 +2048,7 @@ class ShellViewModel(
                 .orEmpty()
                 .filter { it.id == transactionId || it.id in others }
         viewModelScope.launch {
-            val target = withContext(Dispatchers.IO) { library.readCategoryTarget(budgetId, transactionId) }
+            val target = withContext(io) { library.readCategoryTarget(budgetId, transactionId) }
             val shown =
                 if (others.isEmpty()) {
                     target
@@ -2093,7 +2096,7 @@ class ShellViewModel(
         viewModelScope.launch {
             when (
                 val result =
-                    withContext(Dispatchers.IO) {
+                    withContext(io) {
                         library.startReconcile(budgetId, accountId, balanceText, dateText)
                     }
             ) {
@@ -2110,7 +2113,7 @@ class ShellViewModel(
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
             val page =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     library.toggleReconcileCleared(budgetId, accountId, transactionId)
                 }
             if (page != null) _state.update { it.copy(reconcile = page) }
@@ -2126,7 +2129,7 @@ class ShellViewModel(
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
             val page =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     library.setReconcileCleared(budgetId, accountId, transactionIds, cleared)
                 }
             if (page != null) _state.update { it.copy(reconcile = page) }
@@ -2137,7 +2140,7 @@ class ShellViewModel(
         val accountId = reconcileAccountId() ?: return
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
-            when (val result = withContext(Dispatchers.IO) { library.finishReconcile(budgetId, accountId, adjust) }) {
+            when (val result = withContext(io) { library.finishReconcile(budgetId, accountId, adjust) }) {
                 ReconcileFinishResult.Finished -> {
                     history.clear()
                     history.addLast(ShellRoute.Home)
@@ -2160,7 +2163,7 @@ class ShellViewModel(
         val accountId = reconcileAccountId() ?: return
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { library.cancelReconcile(budgetId, accountId) }
+            withContext(io) { library.cancelReconcile(budgetId, accountId) }
             history.removeLastOrNull()
             _state.update {
                 it.copy(
@@ -2182,7 +2185,7 @@ class ShellViewModel(
         val budgetId = _state.value.settings.openBudgetId ?: return
         val month = _state.value.openMonth
         viewModelScope.launch {
-            val page = withContext(Dispatchers.IO) { library.readCategoryMonth(budgetId, categoryId, month) }
+            val page = withContext(io) { library.readCategoryMonth(budgetId, categoryId, month) }
             _state.update { it.copy(categoryMonth = page) }
         }
     }
@@ -2196,7 +2199,7 @@ class ShellViewModel(
         // Saving goes back to the page that opened the form, even when the form moved the transaction to another account.
         val from = (_state.value.route as? ShellRoute.EditTransaction)?.accountId ?: draft.accountId
         launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.saveTransaction(id, draft) }
+            val result = withContext(io) { library.saveTransaction(id, draft) }
             publish(result, from, stayOnRegister = true)
         }
     }
@@ -2232,7 +2235,7 @@ class ShellViewModel(
         }
         launchWrite { id ->
             val result =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     library.setTransactionCategory(id, target.transactionId, categoryId, false)
                 }
             publish(result, target.accountId, stayOnRegister = false)
@@ -2275,7 +2278,7 @@ class ShellViewModel(
         val accountId = openAccountId() ?: return
         val picked = _state.value.registerSelection?.toList() ?: return
         launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.setTransactionsCleared(id, picked, cleared, false) }
+            val result = withContext(io) { library.setTransactionsCleared(id, picked, cleared, false) }
             publish(result, accountId, stayOnRegister = true)
         }
     }
@@ -2283,7 +2286,7 @@ class ShellViewModel(
     fun deleteTransaction(transactionId: String) {
         val accountId = openAccountId() ?: return
         launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.deleteTransaction(id, transactionId, false) }
+            val result = withContext(io) { library.deleteTransaction(id, transactionId, false) }
             publish(result, accountId, stayOnRegister = true)
         }
     }
@@ -2307,7 +2310,7 @@ class ShellViewModel(
         val stay = _state.value.route !is ShellRoute.PickCategory && _state.value.route !is ShellRoute.Home
         launchWrite { id ->
             val result =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     when (val retry = pending.retry) {
                         is ForcedWrite.Save -> library.saveTransaction(id, retry.draft)
                         is ForcedWrite.Delete -> library.deleteTransaction(id, retry.transactionId, true)
@@ -2334,7 +2337,7 @@ class ShellViewModel(
         currency: String,
     ) {
         viewModelScope.launch {
-            when (val result = withContext(Dispatchers.IO) { createBudget(name, currency) }) {
+            when (val result = withContext(io) { createBudget(name, currency) }) {
                 is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
                 is CreateResult.Created -> {
                     // A budget made on the server path is sent to that server in the background (spec 011 US5).
@@ -2378,7 +2381,7 @@ class ShellViewModel(
     fun createSample(datasetId: String) {
         if (!developerMode) return
         viewModelScope.launch {
-            when (val result = withContext(Dispatchers.IO) { library.createFromMock(datasetId) }) {
+            when (val result = withContext(io) { library.createFromMock(datasetId) }) {
                 is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
                 is CreateResult.Created -> {
                     val settingUp = _state.value.onboarding != null
@@ -2426,7 +2429,7 @@ class ShellViewModel(
         }
         val target = _state.value.switchTarget ?: return
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { library.switchTo(target.id) }
+            withContext(io) { library.switchTo(target.id) }
             _state.update { it.copy(route = ShellRoute.Home, switchTarget = null) }
             reload()
             offerExperimental()
@@ -2443,8 +2446,8 @@ class ShellViewModel(
     fun signOut(preferSettings: Boolean = false) {
         // Non-blocking: detach token on IO while UI stays responsive even if sync is running.
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { sync.signOut() }
-            val settings = withContext(Dispatchers.IO) { library.settings() }
+            withContext(io) { sync.signOut() }
+            val settings = withContext(io) { library.settings() }
             _state.update { current ->
                 current.copy(
                     remoteFiles = emptyList(),
@@ -2506,7 +2509,7 @@ class ShellViewModel(
         val openId = _state.value.settings.openBudgetId
         viewModelScope.launch {
             if (file != null) {
-                when (val result = withContext(Dispatchers.IO) { sync.unlock(file, password, askEachTime) }) {
+                when (val result = withContext(io) { sync.unlock(file, password, askEachTime) }) {
                     is UnlockResult.Failed -> _state.update { it.copy(passwordError = result.reason) }
                     UnlockResult.Unlocked -> confirmOrOpen(file)
                 }
@@ -2522,7 +2525,7 @@ class ShellViewModel(
                                 .orEmpty(),
                         encryptKeyId = "local",
                     )
-                when (val result = withContext(Dispatchers.IO) { sync.unlock(remote, password, askEachTime) }) {
+                when (val result = withContext(io) { sync.unlock(remote, password, askEachTime) }) {
                     is UnlockResult.Failed -> _state.update { it.copy(passwordError = result.reason) }
                     UnlockResult.Unlocked -> {
                         _state.update { it.copy(locked = false, passwordError = null, route = ShellRoute.Home) }
@@ -2541,7 +2544,7 @@ class ShellViewModel(
         val id = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
             _state.update { it.copy(syncing = true, syncProgress = 0.08f) }
-            withContext(Dispatchers.IO) { runCatching { sync.sync(id) } }
+            withContext(io) { runCatching { sync.sync(id) } }
             _state.update { it.copy(syncing = false, syncProgress = null) }
             reload()
         }
@@ -2553,7 +2556,7 @@ class ShellViewModel(
         if (_state.value.syncing) return
         viewModelScope.launch {
             _state.update { it.copy(syncing = true, syncProgress = 0.08f, inboxSyncNotice = null) }
-            val result = withContext(Dispatchers.IO) { runCatching { sync.sync(id) }.getOrNull() }
+            val result = withContext(io) { runCatching { sync.sync(id) }.getOrNull() }
             val notice = result?.status?.takeIf { it.isNotBlank() } ?: SyncCopy.LAST_FAILED
             _state.update { it.copy(syncing = false, syncProgress = null, inboxSyncNotice = notice) }
             reload()
@@ -2564,7 +2567,7 @@ class ShellViewModel(
         val id = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
             _state.update { it.copy(syncing = true, syncProgress = 0.08f, serverError = null) }
-            val result = withContext(Dispatchers.IO) { sync.uploadNew(id) }
+            val result = withContext(io) { sync.uploadNew(id) }
             _state.update {
                 it.copy(
                     syncing = false,
@@ -2589,7 +2592,7 @@ class ShellViewModel(
         val file = _state.value.replaceFile ?: return
         val id = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { sync.uploadOnto(id, file) }
+            val result = withContext(io) { sync.uploadOnto(id, file) }
             _state.update {
                 it.copy(
                     route = ShellRoute.Server,
@@ -2627,7 +2630,7 @@ class ShellViewModel(
      */
     private fun confirmOrOpen(file: RemoteFile) {
         viewModelScope.launch {
-            val cleared = withContext(Dispatchers.IO) { library.list() }.filter { it.id != file.fileId }
+            val cleared = withContext(io) { library.list() }.filter { it.id != file.fileId }
             if (cleared.isEmpty()) {
                 beginOpen(file)
                 return@launch
@@ -2649,7 +2652,7 @@ class ShellViewModel(
         viewModelScope.launch {
             _state.update { it.copy(syncing = true, syncProgress = 0f, serverError = null) }
             val result =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     sync.open(file, replace = true) { received, total ->
                         _state.update { it.copy(syncing = true, syncProgress = syncFraction(received, total)) }
                     }
@@ -2697,7 +2700,7 @@ class ShellViewModel(
 
     private fun saveSettings(settings: PhoneSettings) {
         _state.update { it.copy(settings = settings) }
-        viewModelScope.launch(Dispatchers.IO) { library.save(settings) }
+        viewModelScope.launch(io) { library.save(settings) }
     }
 
     private suspend fun reload() {
@@ -2746,7 +2749,7 @@ class ShellViewModel(
     private fun reloadReconcile(accountId: String) {
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
-            val page = withContext(Dispatchers.IO) { library.readReconcile(budgetId, accountId) }
+            val page = withContext(io) { library.readReconcile(budgetId, accountId) }
             _state.update { it.copy(reconcile = page, reconcileError = null) }
         }
     }
@@ -2755,7 +2758,7 @@ class ShellViewModel(
         val budgetId = _state.value.settings.openBudgetId ?: return
         val include = _state.value.settings.netWorthIncludeOffBudget
         viewModelScope.launch {
-            val page = withContext(Dispatchers.IO) { library.readNetWorth(budgetId, include) }
+            val page = withContext(io) { library.readNetWorth(budgetId, include) }
             _state.update { it.copy(netWorth = page) }
         }
     }
@@ -2832,7 +2835,7 @@ class ShellViewModel(
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
             when (
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     library.postSchedule(budgetId, scheduleId, forceDuplicate)
                 }
             ) {
@@ -2846,7 +2849,7 @@ class ShellViewModel(
     }
 
     private suspend fun load(accountId: String?): Loaded =
-        withContext(Dispatchers.IO) {
+        withContext(io) {
             val settings = library.settings()
             val budgets = library.list()
             val budgetId = settings.openBudgetId
@@ -3032,14 +3035,14 @@ class ShellViewModel(
             _state.update { it.copy(shell = optimistic(previousShell), editError = null) }
         }
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { block() }
+            val result = withContext(io) { block() }
             _state.update { it.copy(undoLabel = library.undoLabel(budgetId)) }
             when (result) {
                 is EditResult.Rejected -> {
                     // Puts back anything the page showed before the write was refused, such as a rename.
                     refreshCategoryManage(budgetId)
                     val month = editorMonth()
-                    val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
+                    val shell = withContext(io) { library.readShell(budgetId, month) }
                     _state.update { current ->
                         current.copy(
                             editError = result.reason,
@@ -3057,7 +3060,7 @@ class ShellViewModel(
                     // The categories page first: it reads in a moment, while the month can take a while.
                     refreshCategoryManage(budgetId)
                     val month = editorMonth()
-                    val shell = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
+                    val shell = withContext(io) { library.readShell(budgetId, month) }
                     if (shell != null) {
                         shellGate.offer(shell)
                         _state.update { current ->
@@ -3065,8 +3068,8 @@ class ShellViewModel(
                         }
                     }
                     if (!stayOnRoute) back()
-                    withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
-                    val refreshed = withContext(Dispatchers.IO) { library.readShell(budgetId, month) }
+                    withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
+                    val refreshed = withContext(io) { library.readShell(budgetId, month) }
                     if (refreshed != null) {
                         shellGate.offer(refreshed)
                         _state.update { current ->
@@ -3080,32 +3083,32 @@ class ShellViewModel(
 
     private suspend fun refreshCategoryManage(budgetId: String) {
         if (_state.value.route !is ShellRoute.ManageCategories) return
-        val manage = withContext(Dispatchers.IO) { sync.readCategoryManage(budgetId) }
+        val manage = withContext(io) { sync.readCategoryManage(budgetId) }
         _state.update { it.copy(categoryManage = manage) }
     }
 
     private fun refreshSettingsSections() {
         viewModelScope.launch {
-            val settings = withContext(Dispatchers.IO) { library.settings() }
+            val settings = withContext(io) { library.settings() }
             val budgetId = settings.openBudgetId
             val prefs =
                 if (budgetId == null) {
                     FormatPrefs()
                 } else {
-                    withContext(Dispatchers.IO) { library.readFormatPrefs(budgetId) }
+                    withContext(io) { library.readFormatPrefs(budgetId) }
                 }
             val cloud =
                 if (budgetId == null) {
                     null
                 } else {
-                    withContext(Dispatchers.IO) {
+                    withContext(io) {
                         library.useDatabase(budgetId) { session ->
                             app.duenorth.budget.core.SyncSchema
                                 .state(session, "cloudFileId")
                         }
                     }
                 }
-            val encrypted = budgetId != null && withContext(Dispatchers.IO) { sync.isEncrypted(budgetId) }
+            val encrypted = budgetId != null && withContext(io) { sync.isEncrypted(budgetId) }
             _state.update {
                 it.copy(
                     budgetEncrypted = encrypted,
@@ -3163,7 +3166,7 @@ class ShellViewModel(
                 )
             }
         }
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(io) {
             preferenceWrites.withLock { library.setPreference(budgetId, id, value) }
         }
     }
@@ -3175,7 +3178,7 @@ class ShellViewModel(
         if (_state.value.confirmAdvanced != kind) return
         val budgetId = _state.value.settings.openBudgetId ?: return
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { block(budgetId) }
+            withContext(io) { block(budgetId) }
             _state.update { it.copy(confirmAdvanced = null) }
             reload()
             refreshSettingsSections()
@@ -3185,7 +3188,7 @@ class ShellViewModel(
     private fun probeOpenId(address: String) {
         if (address.isBlank()) return
         viewModelScope.launch {
-            val methods = withContext(Dispatchers.IO) { sync.loginMethods(address) }
+            val methods = withContext(io) { sync.loginMethods(address) }
             _state.update { it.copy(openIdAvailable = methods.any { method -> method.equals("openid", ignoreCase = true) }) }
         }
     }
@@ -3194,7 +3197,7 @@ class ShellViewModel(
         val address = _state.value.activeInstance?.address ?: return
         viewModelScope.launch {
             val reachable =
-                withContext(Dispatchers.IO) {
+                withContext(io) {
                     val parsed = ServerAddress.parse(address) ?: return@withContext false
                     runCatching { probe.check(parsed) is ServerCheck.Ready }.getOrElse { false }
                 }

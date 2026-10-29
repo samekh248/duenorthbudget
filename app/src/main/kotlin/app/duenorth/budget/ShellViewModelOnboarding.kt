@@ -49,7 +49,7 @@ internal fun ShellViewModel.onboardingRoute(progress: OnboardingProgress?): Shel
 /** Reads `onboarding.json` before the first load. A phone that already has a budget drops it. */
 internal suspend fun ShellViewModel.restoreOnboarding() {
     val stored =
-        withContext(Dispatchers.IO) {
+        withContext(io) {
             val store = library.onboarding()
             val progress = store.read() ?: return@withContext null
             // An add-server path started in settings resumes even with budgets on the phone (spec 012).
@@ -185,7 +185,7 @@ fun ShellViewModel.onboardingCheck() {
     updateOnboarding { it.copy(checking = true, addressError = null) }
     onboardingJob =
         viewModelScope.launch {
-            val check = withContext(Dispatchers.IO) { probe.check(parsed) }
+            val check = withContext(io) { probe.check(parsed) }
             if (check is ServerCheck.Ready && !check.secure && parsed.candidates.size > 1) {
                 // Only http:// answered a bare address. Say so, and let the person choose it, instead of
                 // sending the password unencrypted without asking.
@@ -229,8 +229,8 @@ fun ShellViewModel.onboardingSignIn(password: String) {
     updateOnboarding { it.copy(checking = true, signInError = null) }
     onboardingJob =
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { sync.connect(address, password, ui.progress.instanceLabel) }
-            val settings = withContext(Dispatchers.IO) { library.settings() }
+            val result = withContext(io) { sync.connect(address, password, ui.progress.instanceLabel) }
+            val settings = withContext(io) { library.settings() }
             // From first run or from settings, a signed-in server goes on to picking its budget.
             if (result.error == null) {
                 updateOnboarding {
@@ -292,7 +292,7 @@ internal fun ShellViewModel.finishBrowserSignIn(
 fun ShellViewModel.onboardingRefresh() {
     viewModelScope.launch {
         mutate { it.copy(remoteRefreshing = true) }
-        val result = withContext(Dispatchers.IO) { sync.refreshRemote() }
+        val result = withContext(io) { sync.refreshRemote() }
         mutate {
             it.copy(remoteFiles = result.files, serverError = result.error, signedIn = sync.signedIn(), remoteRefreshing = false)
         }

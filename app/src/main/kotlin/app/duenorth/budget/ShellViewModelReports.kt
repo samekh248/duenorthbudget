@@ -9,7 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
-// Spec 010 US4 (T054): reports, computed on Dispatchers.IO. See contracts/reports.md.
+// Spec 010 US4 (T054): reports, computed on io. See contracts/reports.md.
 
 /** Reports → month review, what the review pivot item used to show. */
 fun ShellViewModel.openMonthReview() {
@@ -57,7 +57,7 @@ internal fun ShellViewModel.loadReports() {
     val groupBy = current.reportGroupBy
     mutate { it.copy(reportsLoading = true) }
     viewModelScope.launch {
-        val page = withContext(Dispatchers.IO) { library.readReports(budgetId, range, include, groupBy) }
+        val page = withContext(io) { library.readReports(budgetId, range, include, groupBy) }
         mutate {
             // A later change may have asked for another range or grouping; keep the newest.
             if (it.reportPreset.range(today, it.reportCustom) != range || it.reportGroupBy != groupBy) {

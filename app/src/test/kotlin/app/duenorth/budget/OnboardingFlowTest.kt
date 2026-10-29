@@ -18,6 +18,7 @@ import app.duenorth.budget.core.SyncAuthException
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.activeInstance
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -56,7 +57,7 @@ class OnboardingFlowTest {
                 .OnboardingProgress(step = OnboardingStep.ADDRESS),
         )
         val model = model(root)
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         assertEquals(ShellRoute.Home, model.state.value.route)
         assertNull(model.state.value.onboarding)
         assertNull(library(root).onboarding().read())
@@ -72,17 +73,17 @@ class OnboardingFlowTest {
         assertEquals(ShellRoute.Welcome, model.state.value.route)
         model.onboardingChoosePhone()
         model.create("", "USD")
-        await { model.state.value.createError != null }
+        awaitMain { model.state.value.createError != null }
         assertTrue(library.list().isEmpty())
         model.create("Home", "EUR")
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         assertEquals(
             "Home",
             model.state.value.shell!!
                 .budgetName,
         )
         assertNull(model.state.value.onboarding)
-        await { library.onboarding().read() == null }
+        awaitMain { library.onboarding().read() == null }
         assertTrue(transport.logins.isEmpty())
     }
 
@@ -93,7 +94,7 @@ class OnboardingFlowTest {
         assertEquals(ShellRoute.OnboardingAddress, model.state.value.route)
         model.onboardingAddress("budget.example.com")
         model.onboardingCheck()
-        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingSignIn }
         val progress =
             model.state.value.onboarding!!
                 .progress
@@ -103,7 +104,7 @@ class OnboardingFlowTest {
 
         model.onboardingLabel("home server")
         model.onboardingSignIn("wrong")
-        await {
+        awaitMain {
             model.state.value.onboarding
                 ?.signInError != null
         }
@@ -115,7 +116,7 @@ class OnboardingFlowTest {
         assertEquals(ShellRoute.OnboardingSignIn, model.state.value.route)
 
         model.onboardingSignIn(FakeTransport.PASSWORD)
-        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         val active = library.settings().activeInstance()!!
         assertEquals("home server", active.label)
         assertEquals("https://budget.example.com", active.address)
@@ -123,8 +124,8 @@ class OnboardingFlowTest {
         model.onboardingNewBudget()
         assertEquals(ShellRoute.Create, model.state.value.route)
         model.create("Household", "USD")
-        await { model.state.value.shell != null }
-        await { transport.uploads.isNotEmpty() }
+        awaitMain { model.state.value.shell != null }
+        awaitMain { transport.uploads.isNotEmpty() }
         assertEquals("Household", transport.uploads.single())
         assertNull(model.state.value.onboarding)
     }
@@ -135,7 +136,7 @@ class OnboardingFlowTest {
         model.onboardingChooseServer()
         model.onboardingAddress("nowhere.example")
         model.onboardingCheck()
-        await {
+        awaitMain {
             model.state.value.onboarding
                 ?.addressError != null
         }
@@ -159,15 +160,15 @@ class OnboardingFlowTest {
         first.onboardingChooseServer()
         first.onboardingAddress("budget.example.com")
         first.onboardingCheck()
-        await { first.state.value.route == ShellRoute.OnboardingSignIn }
+        awaitMain { first.state.value.route == ShellRoute.OnboardingSignIn }
         first.onboardingLabel("home")
-        await { library(root).onboarding().read()?.instanceLabel == "home" }
+        awaitMain { library(root).onboarding().read()?.instanceLabel == "home" }
         val saved = File(root, "onboarding.json").readText()
         assertFalse(saved.contains(FakeTransport.PASSWORD))
 
         // A new view model over the same files is the app after a force stop.
         val second = model(root)
-        await { second.state.value.route == ShellRoute.OnboardingSignIn }
+        awaitMain { second.state.value.route == ShellRoute.OnboardingSignIn }
         val progress =
             second.state.value.onboarding!!
                 .progress
@@ -191,7 +192,7 @@ class OnboardingFlowTest {
         val root = root("settings-add")
         library(root).create("Home", "USD")
         val model = model(root)
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         model.showSettings()
         model.selectSettingsPage(SettingsPage.SERVER)
 
@@ -212,18 +213,18 @@ class OnboardingFlowTest {
         model.onboardingAddServer()
         model.onboardingAddress("budget.example.com")
         model.onboardingCheck()
-        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingSignIn }
         model.onboardingLabel("home server")
         model.onboardingSignIn(FakeTransport.PASSWORD)
         // Signing in goes on to the budget picker; back from it leaves the phone's budget alone.
-        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         assertEquals("home server", library(root).settings().activeInstance()?.label)
         assertTrue(model.back())
         assertEquals(ShellRoute.Settings, model.state.value.route)
         assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
         assertEquals(listOf("Home"), library(root).list().map { it.name })
         assertNull(model.state.value.onboarding)
-        await { library(root).onboarding().read() == null }
+        awaitMain { library(root).onboarding().read() == null }
     }
 
     @Test
@@ -239,7 +240,7 @@ class OnboardingFlowTest {
             ),
         )
         val model = model(root)
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         assertEquals(ShellRoute.OnboardingAddress, model.state.value.route)
         assertEquals(
             "budget.example.com",
@@ -256,7 +257,7 @@ class OnboardingFlowTest {
         val root = root("settings-return")
         library(root).create("Home", "USD")
         val model = model(root)
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         model.showSettings()
         assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
 
@@ -270,7 +271,7 @@ class OnboardingFlowTest {
         // Setting a password returns to advanced and shows the budget as encrypted.
         model.showEncryption(EncryptionMode.SET)
         model.setEncryptionPassword("secret")
-        await { model.state.value.route == ShellRoute.Settings && model.state.value.budgetEncrypted }
+        awaitMain { model.state.value.route == ShellRoute.Settings && model.state.value.budgetEncrypted }
         assertEquals(SettingsPage.ADVANCED, model.state.value.settingsPage)
 
         model.showSettingsPayees()
@@ -281,7 +282,7 @@ class OnboardingFlowTest {
         // New budget from settings opens it and comes back to the budget item.
         model.showSettingsCreate()
         model.create("Trip", "EUR")
-        await {
+        awaitMain {
             model.state.value.shell
                 ?.budgetName == "Trip"
         }
@@ -302,14 +303,14 @@ class OnboardingFlowTest {
         val root = root("settings-remove")
         library(root).create("Home", "USD")
         val model = model(root)
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         model.showSettings()
         model.onboardingAddServer()
         model.onboardingAddress("budget.example.com")
         model.onboardingCheck()
-        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingSignIn }
         model.onboardingSignIn(FakeTransport.PASSWORD)
-        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         assertTrue(model.back())
         val id =
             library(root)
@@ -324,7 +325,7 @@ class OnboardingFlowTest {
 
         model.requestRemoveInstance(id)
         model.confirmRemoveInstance()
-        await { library(root).settings().instances.isEmpty() }
+        awaitMain { library(root).settings().instances.isEmpty() }
         assertEquals(ShellRoute.Settings, model.state.value.route)
         assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
     }
@@ -336,15 +337,15 @@ class OnboardingFlowTest {
         transport.files += RemoteFile(fileId = "server-household", groupId = "g-1", name = "Household", encryptKeyId = null)
         transport.downloads["server-household"] = budgetBytes("Household")
         val model = model(root)
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         model.showSettings()
         model.selectSettingsPage(SettingsPage.SERVER)
         model.onboardingAddServer()
         model.onboardingAddress("budget.example.com")
         model.onboardingCheck()
-        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingSignIn }
         model.onboardingSignIn(FakeTransport.PASSWORD)
-        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         assertEquals(
             listOf("Household"),
             model.state.value.remoteFiles
@@ -356,7 +357,7 @@ class OnboardingFlowTest {
             model.state.value.remoteFiles
                 .single(),
         )
-        await { model.state.value.route == ShellRoute.ConfirmReplaceBudget }
+        awaitMain { model.state.value.route == ShellRoute.ConfirmReplaceBudget }
         assertEquals(
             listOf("Home"),
             model.state.value.replaceBudgets
@@ -370,20 +371,20 @@ class OnboardingFlowTest {
             model.state.value.remoteFiles
                 .single(),
         )
-        await { model.state.value.route == ShellRoute.ConfirmReplaceBudget }
+        awaitMain { model.state.value.route == ShellRoute.ConfirmReplaceBudget }
         model.confirmReplaceBudget()
-        await {
+        awaitMain {
             model.state.value.shell
                 ?.budgetName == "Household"
         }
         // A budget with no experimental choice yet asks first, then shows its home.
-        await { model.state.value.route is ShellRoute.ExperimentalOffer }
+        awaitMain { model.state.value.route is ShellRoute.ExperimentalOffer }
         model.declineExperimentalOffer()
         assertEquals(ShellRoute.Home, model.state.value.route)
         assertEquals(listOf("Household"), library(root).list().map { it.name })
         assertEquals("server-household", library(root).settings().openBudgetId)
         assertNull(model.state.value.onboarding)
-        await { library(root).onboarding().read() == null }
+        awaitMain { library(root).onboarding().read() == null }
     }
 
     @Test
@@ -391,14 +392,14 @@ class OnboardingFlowTest {
         val root = root("settings-switch")
         library(root).create("Home", "USD")
         val model = model(root)
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         model.showSettings()
         model.onboardingAddServer()
         model.onboardingAddress("budget.example.com")
         model.onboardingCheck()
-        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingSignIn }
         model.onboardingSignIn(FakeTransport.PASSWORD)
-        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         assertTrue(model.back())
         val id =
             library(root)
@@ -407,7 +408,7 @@ class OnboardingFlowTest {
                 .id
 
         model.confirmInstanceSwitch(id)
-        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         assertTrue(model.back())
         assertEquals(ShellRoute.Settings, model.state.value.route)
         assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
@@ -421,20 +422,20 @@ class OnboardingFlowTest {
         model.onboardingChooseServer()
         model.onboardingAddress("budget.example.com")
         model.onboardingCheck()
-        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingSignIn }
         model.onboardingSignIn(FakeTransport.PASSWORD)
-        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         model.onboardingOpen(
             model.state.value.remoteFiles
                 .single(),
         )
-        await {
+        awaitMain {
             model.state.value.shell
                 ?.budgetName == "Household"
         }
         assertEquals(listOf("Household"), library.list().map { it.name })
         // The budget just picked offers its experimental features before its home.
-        await { model.state.value.route is ShellRoute.ExperimentalOffer }
+        awaitMain { model.state.value.route is ShellRoute.ExperimentalOffer }
         assertNull((model.state.value.route as ShellRoute.ExperimentalOffer).current)
     }
 
@@ -448,19 +449,19 @@ class OnboardingFlowTest {
         model.onboardingChooseServer()
         model.onboardingAddress("budget.example.com")
         model.onboardingCheck()
-        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingSignIn }
         model.onboardingSignIn(FakeTransport.PASSWORD)
-        await { model.state.value.route == ShellRoute.OnboardingFiles }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         model.onboardingOpen(
             model.state.value.remoteFiles
                 .single(),
         )
-        await { model.state.value.route is ShellRoute.ExperimentalOffer }
+        awaitMain { model.state.value.route is ShellRoute.ExperimentalOffer }
         assertEquals(true, (model.state.value.route as ShellRoute.ExperimentalOffer).current)
         // Turning them off here saves off on the budget.
         model.declineExperimentalOffer()
         assertEquals(ShellRoute.Home, model.state.value.route)
-        await { !library.readFormatPrefs("server-household").experimental }
+        awaitMain { !library.readFormatPrefs("server-household").experimental }
     }
 
     @Test
@@ -474,7 +475,7 @@ class OnboardingFlowTest {
         model.onboardingChooseServer()
         model.onboardingAddress("budget.lan")
         model.onboardingCheck()
-        await {
+        awaitMain {
             model.state.value.onboarding
                 ?.addressError != null
         }
@@ -486,7 +487,7 @@ class OnboardingFlowTest {
 
         // `next` again is the person choosing http://.
         model.onboardingCheck()
-        await { model.state.value.route == ShellRoute.OnboardingSignIn }
+        awaitMain { model.state.value.route == ShellRoute.OnboardingSignIn }
         assertEquals(
             "http://budget.lan",
             model.state.value.onboarding!!
@@ -519,8 +520,8 @@ class OnboardingFlowTest {
     ): ShellViewModel {
         val library = library(root)
         val sync = SyncCoordinator(library, transport, MemorySecretStore(), clock)
-        val model = ShellViewModel(library, sync, probe = ServerProbe(http))
-        await { !model.state.value.loading }
+        val model = ShellViewModel(library, sync, probe = ServerProbe(http), io = Dispatchers.Main)
+        awaitMain { !model.state.value.loading }
         return model
     }
 
@@ -542,15 +543,6 @@ class OnboardingFlowTest {
                 ProbeResponse(404, "")
             }
         }
-
-    private fun await(predicate: () -> Boolean) {
-        val deadline = System.nanoTime() + 5_000_000_000L
-        while (!predicate()) {
-            Shadows.shadowOf(Looper.getMainLooper()).idle()
-            check(System.nanoTime() < deadline) { "timed out" }
-            Thread.sleep(10)
-        }
-    }
 
     private class FakeTransport : ActualTransport {
         val logins = mutableListOf<String>()

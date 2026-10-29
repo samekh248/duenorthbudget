@@ -34,7 +34,7 @@ fun ShellViewModel.openScheduleDetails(scheduleId: String) {
     push(ShellRoute.ScheduleDetails(scheduleId))
     mutate { it.copy(scheduleDetails = null) }
     viewModelScope.launch {
-        val details = withContext(Dispatchers.IO) { library.readScheduleDetails(budgetId, scheduleId) }
+        val details = withContext(io) { library.readScheduleDetails(budgetId, scheduleId) }
         mutate { current ->
             if ((current.route as? ShellRoute.ScheduleDetails)?.scheduleId ==
                 scheduleId
@@ -90,7 +90,7 @@ fun ShellViewModel.openSchedule(scheduleId: String) {
     mutate { it.copy(editError = null, scheduleDraft = null) }
     loadRuleCategories()
     viewModelScope.launch {
-        val draft = withContext(Dispatchers.IO) { library.readScheduleDraft(budgetId, scheduleId) }
+        val draft = withContext(io) { library.readScheduleDraft(budgetId, scheduleId) }
         mutate { it.copy(scheduleDraft = draft) }
     }
 }
@@ -108,7 +108,7 @@ fun ShellViewModel.submitSchedule(form: ScheduleForm) {
             return
         }
     viewModelScope.launch {
-        when (val result = withContext(Dispatchers.IO) { library.saveSchedule(budgetId, draft) }) {
+        when (val result = withContext(io) { library.saveSchedule(budgetId, draft) }) {
             is ScheduleWriteResult.Rejected -> mutate { it.copy(editError = result.reason) }
             else -> afterRuleWrite(budgetId, leave = true)
         }
@@ -119,7 +119,7 @@ fun ShellViewModel.deleteOpenSchedule() {
     val budgetId = state.value.settings.openBudgetId ?: return
     val scheduleId = openScheduleId() ?: return
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { library.deleteSchedule(budgetId, scheduleId) }
+        withContext(io) { library.deleteSchedule(budgetId, scheduleId) }
         afterRuleWrite(budgetId, leave = true)
         // Deleted from the editor: the schedule's page under it is gone too.
         if ((state.value.route as? ShellRoute.ScheduleDetails)?.scheduleId == scheduleId) back()
@@ -144,7 +144,7 @@ fun ShellViewModel.openRule(ruleId: String) {
     push(ShellRoute.RuleEditor(ruleId))
     mutate { it.copy(editError = null, ruleDraft = null) }
     viewModelScope.launch {
-        val draft = withContext(Dispatchers.IO) { library.readRuleDraft(budgetId, ruleId) }
+        val draft = withContext(io) { library.readRuleDraft(budgetId, ruleId) }
         mutate { it.copy(ruleDraft = draft) }
     }
 }
@@ -152,7 +152,7 @@ fun ShellViewModel.openRule(ruleId: String) {
 fun ShellViewModel.submitRule(draft: RuleDraft) {
     val budgetId = state.value.settings.openBudgetId ?: return
     viewModelScope.launch {
-        when (val result = withContext(Dispatchers.IO) { library.saveRule(budgetId, draft) }) {
+        when (val result = withContext(io) { library.saveRule(budgetId, draft) }) {
             is RuleSaveResult.Saved -> afterRuleWrite(budgetId, leave = true)
             is RuleSaveResult.Rejected -> mutate { it.copy(editError = result.reason) }
         }
@@ -163,7 +163,7 @@ fun ShellViewModel.deleteOpenRule() {
     val budgetId = state.value.settings.openBudgetId ?: return
     val ruleId = (state.value.route as? ShellRoute.RuleEditor)?.ruleId ?: return
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { library.deleteRule(budgetId, ruleId) }
+        withContext(io) { library.deleteRule(budgetId, ruleId) }
         afterRuleWrite(budgetId, leave = true)
     }
 }
@@ -183,7 +183,7 @@ fun ShellViewModel.ruleNames(): RuleNames =
 private fun ShellViewModel.reloadRules() {
     val budgetId = state.value.settings.openBudgetId ?: return
     viewModelScope.launch {
-        val rules = withContext(Dispatchers.IO) { library.listRules(budgetId) }
+        val rules = withContext(io) { library.listRules(budgetId) }
         mutate { it.copy(rulesList = rules) }
     }
 }
@@ -192,7 +192,7 @@ private fun ShellViewModel.loadRuleCategories() {
     val budgetId = state.value.settings.openBudgetId ?: return
     viewModelScope.launch {
         val (categories, payees) =
-            withContext(Dispatchers.IO) { sync.categories(budgetId) to library.listPayees(budgetId).filter { !it.transfer } }
+            withContext(io) { sync.categories(budgetId) to library.listPayees(budgetId).filter { !it.transfer } }
         mutate { it.copy(categories = categories, payees = payees) }
     }
 }
@@ -207,7 +207,7 @@ private fun ShellViewModel.afterRuleWrite(
     reloadRules()
     refresh()
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
+        withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
         refresh()
     }
 }

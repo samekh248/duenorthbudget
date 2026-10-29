@@ -13,6 +13,7 @@ import app.duenorth.budget.core.OnboardingProgress
 import app.duenorth.budget.core.OnboardingStep
 import app.duenorth.budget.core.SignInMethod
 import app.duenorth.budget.core.SyncCoordinator
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -41,10 +42,10 @@ class StartupLaunchTest {
     @Test
     fun launchWithABudgetOnThePhone() {
         val app = RuntimeEnvironment.getApplication() as DueNorthApplication
-        val model = ShellViewModel(app.library, app.sync, developerMode = true)
-        await { !model.state.value.loading }
+        val model = ShellViewModel(app.library, app.sync, developerMode = true, io = Dispatchers.Main)
+        awaitMain { !model.state.value.loading }
         model.create("Home", "USD")
-        await { model.state.value.shell != null }
+        awaitMain { model.state.value.shell != null }
         launchAndSettle()
     }
 
@@ -52,11 +53,11 @@ class StartupLaunchTest {
     fun launchWithAnAddServerPathLeftOpenInSettings() {
         for (step in listOf(OnboardingStep.ADDRESS, OnboardingStep.SIGN_IN, OnboardingStep.FILES)) {
             val app = RuntimeEnvironment.getApplication() as DueNorthApplication
-            val model = ShellViewModel(app.library, app.sync, developerMode = true)
-            await { !model.state.value.loading }
+            val model = ShellViewModel(app.library, app.sync, developerMode = true, io = Dispatchers.Main)
+            awaitMain { !model.state.value.loading }
             if (model.state.value.shell == null) {
                 model.create("Home", "USD")
-                await { model.state.value.shell != null }
+                awaitMain { model.state.value.shell != null }
             }
             app.library.onboarding().write(
                 OnboardingProgress(
@@ -80,15 +81,6 @@ class StartupLaunchTest {
                 Thread.sleep(20)
             }
             assertEquals(Lifecycle.State.RESUMED, scenario.state)
-        }
-    }
-
-    private fun await(predicate: () -> Boolean) {
-        val deadline = System.nanoTime() + 5_000_000_000L
-        while (!predicate()) {
-            Shadows.shadowOf(Looper.getMainLooper()).idle()
-            check(System.nanoTime() < deadline) { "timed out" }
-            Thread.sleep(10)
         }
     }
 }

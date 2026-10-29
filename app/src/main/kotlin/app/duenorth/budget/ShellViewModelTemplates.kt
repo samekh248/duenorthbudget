@@ -27,7 +27,7 @@ fun ShellViewModel.checkTemplates() {
     val budgetId = state.value.settings.openBudgetId ?: return
     mutate { it.copy(templateBusy = true) }
     viewModelScope.launch {
-        val result = withContext(Dispatchers.IO) { library.checkTemplates(budgetId) }
+        val result = withContext(io) { library.checkTemplates(budgetId) }
         mutate { it.copy(templateResult = result, templateBusy = false) }
     }
 }
@@ -46,7 +46,7 @@ fun ShellViewModel.applyTemplates(
     val month = editorMonth()
     mutate { it.copy(templateBusy = true, templateConfirm = null) }
     viewModelScope.launch {
-        val result = withContext(Dispatchers.IO) { library.applyTemplates(budgetId, month, overwrite, confirmed) }
+        val result = withContext(io) { library.applyTemplates(budgetId, month, overwrite, confirmed) }
         when (result) {
             is TemplateResult.NeedsConfirm -> mutate { it.copy(templateConfirm = result.reason, templateBusy = false) }
             is TemplateResult.Applied -> {
@@ -68,7 +68,7 @@ internal fun ShellViewModel.loadCategoryNote(categoryId: String) {
     val budgetId = state.value.settings.openBudgetId ?: return
     if (!state.value.formatPrefs.templatesOn) return
     viewModelScope.launch {
-        val note = withContext(Dispatchers.IO) { library.readCategoryNote(budgetId, categoryId) }
+        val note = withContext(io) { library.readCategoryNote(budgetId, categoryId) }
         mutate { current ->
             if ((current.route as? ShellRoute.CategoryBudget)?.categoryId == categoryId) current.copy(categoryNote = note) else current
         }
@@ -91,9 +91,9 @@ fun ShellViewModel.saveCategoryNote(note: String) {
     mutate { it.copy(categoryNote = note) }
     viewModelScope.launch {
         // Tiles can change faster than a write lands (drag, then remove); the last change must win.
-        noteWrites.withLock { withContext(Dispatchers.IO) { library.saveCategoryNote(budgetId, categoryId, note) } }
+        noteWrites.withLock { withContext(io) { library.saveCategoryNote(budgetId, categoryId, note) } }
         mutate { it.copy(undoLabel = library.undoLabel(budgetId)) }
-        withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
+        withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
     }
 }
 
@@ -114,7 +114,7 @@ fun ShellViewModel.refreshTemplateAmounts() {
     val month = editorMonth()
     viewModelScope.launch {
         val templates = entries.mapNotNull { it.template }
-        val asks = withContext(Dispatchers.IO) { library.previewCategoryTemplates(budgetId, categoryId, month, templates) }.iterator()
+        val asks = withContext(io) { library.previewCategoryTemplates(budgetId, categoryId, month, templates) }.iterator()
         val amounts = entries.map { entry -> if (entry.template != null && asks.hasNext()) asks.next() else null }
         mutate { if (it.categoryNote == note) it.copy(categoryTemplateAmounts = amounts) else it }
     }
@@ -195,7 +195,7 @@ fun ShellViewModel.previewTemplate(template: Template) {
     viewModelScope.launch {
         val amount =
             withContext(
-                Dispatchers.IO,
+                io,
             ) { library.previewCategoryTemplates(budgetId, categoryId, month, listOf(template)) }.firstOrNull()
         mutate { it.copy(templatePreview = template to amount) }
     }
@@ -205,7 +205,7 @@ private fun ShellViewModel.loadTemplateSchedules() {
     val budgetId = state.value.settings.openBudgetId ?: return
     viewModelScope.launch {
         val names =
-            withContext(Dispatchers.IO) { library.readSchedules(budgetId) }
+            withContext(io) { library.readSchedules(budgetId) }
                 .filter { !it.completed && it.name.isNotBlank() }
                 .map { it.name }
                 .distinct()
@@ -224,7 +224,7 @@ fun ShellViewModel.refreshTemplatePlan() {
     if (!state.value.formatPrefs.templatesOn) return
     val month = templatesMonth()
     viewModelScope.launch {
-        val plan = withContext(Dispatchers.IO) { library.templatePlan(budgetId, month) }
+        val plan = withContext(io) { library.templatePlan(budgetId, month) }
         mutate { it.copy(templatePlan = plan) }
     }
 }
@@ -233,7 +233,7 @@ fun ShellViewModel.refreshTemplatePlan() {
 fun ShellViewModel.openTemplateChip(chip: TemplateChip) {
     val budgetId = state.value.settings.openBudgetId ?: return
     viewModelScope.launch {
-        val note = withContext(Dispatchers.IO) { library.readCategoryNote(budgetId, chip.categoryId) }
+        val note = withContext(io) { library.readCategoryNote(budgetId, chip.categoryId) }
         val template =
             TemplateNote
                 .parse(note)
@@ -260,7 +260,7 @@ fun ShellViewModel.moveTemplateToPriority(
     val budgetId = state.value.settings.openBudgetId ?: return
     viewModelScope.launch {
         noteWrites.withLock {
-            withContext(Dispatchers.IO) {
+            withContext(io) {
                 val split = TemplateNote.parse(library.readCategoryNote(budgetId, chip.categoryId))
                 val template = split.entries.getOrNull(chip.index)?.template ?: return@withContext
                 library.saveCategoryNote(budgetId, chip.categoryId, split.replace(chip.index, template.withPriority(priority)))
@@ -268,7 +268,7 @@ fun ShellViewModel.moveTemplateToPriority(
         }
         mutate { it.copy(undoLabel = library.undoLabel(budgetId)) }
         refreshTemplatePlan()
-        withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
+        withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
     }
 }
 
@@ -280,7 +280,7 @@ fun ShellViewModel.previewApplyTemplates(overwrite: Boolean) {
     val month = edit.month ?: return
     mutate { it.copy(templateBusy = true, templateConfirm = null) }
     viewModelScope.launch {
-        val (result, amounts) = withContext(Dispatchers.IO) { library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
+        val (result, amounts) = withContext(io) { library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
         mutate { now ->
             if (result !is TemplateResult.Applied) return@mutate now.copy(templateResult = result, templateBusy = false)
             val categories =

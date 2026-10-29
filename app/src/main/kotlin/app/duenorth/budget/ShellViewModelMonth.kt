@@ -21,7 +21,7 @@ fun ShellViewModel.toggleShowHiddenCategories() {
     val settings = state.value.settings.let { it.copy(showHiddenCategories = !it.showHiddenCategories) }
     mutate { it.copy(settings = settings) }
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { library.updateSettings { it.copy(showHiddenCategories = settings.showHiddenCategories) } }
+        withContext(io) { library.updateSettings { it.copy(showHiddenCategories = settings.showHiddenCategories) } }
         refresh()
     }
 }
@@ -40,7 +40,7 @@ fun ShellViewModel.fillMonth(
     val month = editorMonth()
     mutate { it.copy(monthNotice = null, fillConfirm = null) }
     viewModelScope.launch {
-        val result = withContext(Dispatchers.IO) { sync.fillMonth(shell.budgetId, month, kind, confirmed) }
+        val result = withContext(io) { sync.fillMonth(shell.budgetId, month, kind, confirmed) }
         when (result) {
             MonthFillResult.Filled -> afterMonthWrite(shell.budgetId)
             MonthFillResult.NothingToCopy -> mutate { it.copy(monthNotice = MonthFillCopy.NOTHING_TO_COPY) }
@@ -95,7 +95,7 @@ fun ShellViewModel.transferToBudget(
         }
     }
     viewModelScope.launch {
-        val result = withContext(Dispatchers.IO) { sync.transferToBudget(shell.budgetId, categoryId, month, amountText) }
+        val result = withContext(io) { sync.transferToBudget(shell.budgetId, categoryId, month, amountText) }
         when (result) {
             MonthFillResult.Filled -> {
                 back()
@@ -113,7 +113,7 @@ fun ShellViewModel.chooseAutoHold(choice: AutoHoldChoice) {
     val categoryId = (state.value.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
     val month = editorMonth()
     viewModelScope.launch {
-        when (val result = withContext(Dispatchers.IO) { sync.setAutoHold(budgetId, categoryId, month, choice) }) {
+        when (val result = withContext(io) { sync.setAutoHold(budgetId, categoryId, month, choice) }) {
             MonthFillResult.Filled -> {
                 mutate { it.copy(editError = null) }
                 afterMonthWrite(budgetId)
@@ -129,7 +129,7 @@ fun ShellViewModel.undo() {
     val budgetId = state.value.settings.openBudgetId ?: return
     val accountId = (state.value.route as? ShellRoute.Register)?.accountId
     viewModelScope.launch {
-        val result = withContext(Dispatchers.IO) { sync.undo(budgetId) }
+        val result = withContext(io) { sync.undo(budgetId) }
         val notice =
             when (result) {
                 is UndoResult.Undone -> "${MonthActionCopy.UNDONE} ${result.label}"
@@ -139,13 +139,13 @@ fun ShellViewModel.undo() {
         mutate { it.copy(monthNotice = notice) }
         if (result is UndoResult.Conflict) {
             // The changed cell is listed with the server's value (contracts/undo.md).
-            val conflicts = withContext(Dispatchers.IO) { sync.conflicts(budgetId) }
+            val conflicts = withContext(io) { sync.conflicts(budgetId) }
             push(ShellRoute.Conflicts)
             mutate { it.copy(conflicts = conflicts) }
         }
         if (result is UndoResult.Undone) {
             if (accountId != null) {
-                val register = withContext(Dispatchers.IO) { library.readRegister(budgetId, accountId) }
+                val register = withContext(io) { library.readRegister(budgetId, accountId) }
                 if (register != null) mutate { it.copy(register = register) }
             }
             afterMonthWrite(budgetId)
@@ -161,14 +161,14 @@ fun ShellViewModel.undo() {
  */
 internal suspend fun ShellViewModel.afterMonthWrite(budgetId: String) {
     repaintMonth(budgetId)
-    withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
+    withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
     repaintMonth(budgetId)
 }
 
 private suspend fun ShellViewModel.repaintMonth(budgetId: String) {
     val month = editorMonth()
     val loaded =
-        withContext(Dispatchers.IO) {
+        withContext(io) {
             val shell = library.readShell(budgetId, month) ?: return@withContext null
             MonthSnapshot(month, shell, library.readMonthReview(budgetId, month))
         }

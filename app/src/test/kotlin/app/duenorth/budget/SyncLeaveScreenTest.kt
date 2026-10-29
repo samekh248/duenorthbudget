@@ -50,16 +50,17 @@ class SyncLeaveScreenTest {
                 MemorySecretStore(),
                 BudgetClock { LocalDate.of(2026, 10, 7) },
             )
+        // The download must hold on a thread of its own while the test leaves the screen, so this model keeps Dispatchers.IO.
         val model = ShellViewModel(library, sync)
-        await { !model.state.value.loading }
+        awaitMain { !model.state.value.loading }
         model.showServer()
-        await { model.state.value.route == ShellRoute.Server }
+        awaitMain { model.state.value.route == ShellRoute.Server }
         model.connect("http://127.0.0.1:9", "server-secret")
-        await { model.state.value.signedIn && !model.state.value.syncing }
+        awaitMain { model.state.value.signedIn && !model.state.value.syncing }
         model.requestRemote(RemoteFile("file-home", "group-1", "Home", null))
         // The phone's budgets are read off the main thread before the download starts.
-        await { transport.started.count == 0L }
-        drain()
+        awaitMain { transport.started.count == 0L }
+        idleMain()
         val progress = model.state.value.syncProgress
         assertNotNull(progress)
         assertTrue(progress!! > 0f)
@@ -69,21 +70,8 @@ class SyncLeaveScreenTest {
         assertEquals(progress, model.state.value.syncProgress)
         assertTrue(model.state.value.syncing)
         transport.release.countDown()
-        await { !model.state.value.syncing }
+        awaitMain { !model.state.value.syncing }
         assertEquals(ShellRoute.Home, model.state.value.route)
-    }
-
-    private fun drain() {
-        Shadows.shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    private fun await(predicate: () -> Boolean) {
-        val deadline = System.nanoTime() + 5_000_000_000L
-        while (!predicate()) {
-            if (System.nanoTime() > deadline) error("timed out")
-            drain()
-            Thread.sleep(15)
-        }
     }
 
     private class HoldingDownload(

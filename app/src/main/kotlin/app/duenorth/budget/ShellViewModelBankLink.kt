@@ -11,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-// Spec 010 US6 (T068): bank link from the register. Provider calls run on Dispatchers.IO. See contracts/bank-link.md.
+// Spec 010 US6 (T068): bank link from the register. Provider calls run on io. See contracts/bank-link.md.
 
 /** Register `•••` → bank link. */
 fun ShellViewModel.openBankLink() {
@@ -46,8 +46,8 @@ private fun ShellViewModel.refreshBankLink() {
     val budgetId = state.value.settings.openBudgetId ?: return
     val accountId = state.value.bankLink?.accountId ?: return
     viewModelScope.launch {
-        val linked = withContext(Dispatchers.IO) { sync.bankLinkOf(budgetId, accountId) }
-        val configured = withContext(Dispatchers.IO) { sync.bankCall { it.configured() } }
+        val linked = withContext(io) { sync.bankLinkOf(budgetId, accountId) }
+        val configured = withContext(io) { sync.bankCall { it.configured() } }
         updateBankLink {
             it.copy(
                 loading = false,
@@ -84,7 +84,7 @@ fun ShellViewModel.replaceSimpleFinToken() {
 
 private fun ShellViewModel.loadBankAccounts(provider: BankProvider) {
     viewModelScope.launch {
-        val accounts = withContext(Dispatchers.IO) { sync.bankCall { it.accounts(provider) } }
+        val accounts = withContext(io) { sync.bankCall { it.accounts(provider) } }
         updateBankLink { it.copy(accounts = accounts.getOrNull(), error = accounts.exceptionOrNull()?.message) }
     }
 }
@@ -92,7 +92,7 @@ private fun ShellViewModel.loadBankAccounts(provider: BankProvider) {
 /** Sends the SimpleFIN setup token to the server; the phone keeps no copy. */
 fun ShellViewModel.sendSimpleFinToken(token: String) {
     viewModelScope.launch {
-        val sent = withContext(Dispatchers.IO) { sync.bankCall { it.saveSimpleFinToken(token) } }
+        val sent = withContext(io) { sync.bankCall { it.saveSimpleFinToken(token) } }
         if (sent.isFailure) {
             updateBankLink { it.copy(error = sent.exceptionOrNull()?.message) }
             return@launch
@@ -105,14 +105,14 @@ fun ShellViewModel.sendSimpleFinToken(token: String) {
 fun ShellViewModel.findGoCardlessBanks(country: String) {
     if (country.isBlank()) return
     viewModelScope.launch {
-        val banks = withContext(Dispatchers.IO) { sync.bankCall { it.goCardlessBanks(country) } }
+        val banks = withContext(io) { sync.bankCall { it.goCardlessBanks(country) } }
         updateBankLink { it.copy(goCardlessBanks = banks.getOrDefault(emptyList()), error = banks.exceptionOrNull()?.message) }
     }
 }
 
 fun ShellViewModel.startGoCardless(institutionId: String) {
     viewModelScope.launch {
-        val link = withContext(Dispatchers.IO) { sync.bankCall { it.goCardlessStart(institutionId) } }
+        val link = withContext(io) { sync.bankCall { it.goCardlessStart(institutionId) } }
         updateBankLink { it.copy(goCardless = link.getOrNull(), error = link.exceptionOrNull()?.message) }
     }
 }
@@ -124,7 +124,7 @@ fun ShellViewModel.checkGoCardless() {
             ?.goCardless
             ?.requisitionId ?: return
     viewModelScope.launch {
-        val accounts = withContext(Dispatchers.IO) { sync.bankCall { it.goCardlessAccounts(requisition) } }
+        val accounts = withContext(io) { sync.bankCall { it.goCardlessAccounts(requisition) } }
         val list = accounts.getOrNull()
         updateBankLink {
             it.copy(
@@ -140,7 +140,7 @@ fun ShellViewModel.linkBank(external: ExternalAccount) {
     val ui = state.value.bankLink ?: return
     val provider = ui.provider ?: return
     viewModelScope.launch {
-        when (val result = withContext(Dispatchers.IO) { sync.linkBankAccount(budgetId, ui.accountId, provider, external) }) {
+        when (val result = withContext(io) { sync.linkBankAccount(budgetId, ui.accountId, provider, external) }) {
             BankLinkResult.Saved -> afterBankLinkWrite(budgetId, leave = true)
             is BankLinkResult.Rejected -> updateBankLink { it.copy(error = result.reason) }
         }
@@ -151,7 +151,7 @@ fun ShellViewModel.removeBankLink() {
     val budgetId = state.value.settings.openBudgetId ?: return
     val accountId = state.value.bankLink?.accountId ?: return
     viewModelScope.launch {
-        when (val result = withContext(Dispatchers.IO) { sync.unlinkBankAccount(budgetId, accountId) }) {
+        when (val result = withContext(io) { sync.unlinkBankAccount(budgetId, accountId) }) {
             BankLinkResult.Saved -> afterBankLinkWrite(budgetId, leave = false)
             is BankLinkResult.Rejected -> updateBankLink { it.copy(error = result.reason) }
         }
@@ -164,7 +164,7 @@ private suspend fun ShellViewModel.afterBankLinkWrite(
 ) {
     mutate { it.copy(undoLabel = library.undoLabel(budgetId)) }
     if (leave) back() else refreshBankLink()
-    withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
+    withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
 }
 
 private fun ShellViewModel.updateBankLink(transform: (BankLinkUi) -> BankLinkUi) {

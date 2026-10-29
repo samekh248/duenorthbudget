@@ -42,14 +42,14 @@ fun ShellViewModel.hideGetStarted() {
 fun ShellViewModel.addStarterCategories(groups: List<StarterGroup>) {
     val budgetId = state.value.settings.openBudgetId ?: return
     viewModelScope.launch {
-        when (val result = withContext(Dispatchers.IO) { sync.addStarterCategories(budgetId, groups) }) {
+        when (val result = withContext(io) { sync.addStarterCategories(budgetId, groups) }) {
             is EditResult.Rejected -> mutate { it.copy(editError = result.reason) }
             else -> {
                 back()
                 months.invalidate()
                 mutate { it.copy(editError = null, undoLabel = library.undoLabel(budgetId)) }
                 refresh()
-                withContext(Dispatchers.IO) { runCatching { sync.sendUnsent(budgetId) } }
+                withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
             }
         }
     }
@@ -57,7 +57,7 @@ fun ShellViewModel.addStarterCategories(groups: List<StarterGroup>) {
 
 /** A budget just made on this phone starts its get started list, and opens on the budget item where it shows. */
 internal suspend fun ShellViewModel.startGetStarted(budgetId: String) {
-    withContext(Dispatchers.IO) {
+    withContext(io) {
         library.updateSettings { it.copy(getStarted = (it.getStarted - budgetId) + budgetId) }
     }
     mutate { it.copy(homeSection = ScreenBar.HOME_BUDGET) }
@@ -74,6 +74,6 @@ internal fun ShellViewModel.retireFinishedGetStarted() {
 private fun ShellViewModel.retireGetStarted(budgetId: String) {
     mutate { it.copy(settings = it.settings.copy(getStarted = it.settings.getStarted - budgetId)) }
     viewModelScope.launch {
-        withContext(Dispatchers.IO) { library.updateSettings { it.copy(getStarted = it.getStarted - budgetId) } }
+        withContext(io) { library.updateSettings { it.copy(getStarted = it.getStarted - budgetId) } }
     }
 }

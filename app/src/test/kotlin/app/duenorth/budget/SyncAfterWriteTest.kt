@@ -10,6 +10,7 @@ import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncNetworkException
 import app.duenorth.budget.core.SyncProto
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,58 +43,38 @@ class SyncAfterWriteTest {
         val clock = BudgetClock { LocalDate.of(2026, 10, 7) }
         val library = BudgetLibrary(root, AndroidSessionOpener(), clock)
         val sync = SyncCoordinator(library, transport, MemorySecretStore(), clock, retryDelays = emptyList())
-        val model = ShellViewModel(library, sync)
-        await { !model.state.value.loading }
+        val model = ShellViewModel(library, sync, io = Dispatchers.Main)
+        awaitMain { !model.state.value.loading }
         model.showServer()
-        await { model.state.value.route == ShellRoute.Server }
+        awaitMain { model.state.value.route == ShellRoute.Server }
         model.connect("http://127.0.0.1:9", "server-secret")
-        await { model.state.value.signedIn && !model.state.value.syncing }
+        awaitMain { model.state.value.signedIn && !model.state.value.syncing }
         model.requestRemote(RemoteFile("file-home", "group-1", "Home", null))
-        await { model.state.value.settings.openBudgetId == "file-home" && !model.state.value.syncing }
-        settle()
+        awaitMain { model.state.value.settings.openBudgetId == "file-home" && !model.state.value.syncing }
+        settleMain()
         val opened = transport.syncs.get()
 
         library.saveCategoryNote("file-home", "c-food", "#template 50")
-        await { transport.syncs.get() > opened }
-        settle()
+        awaitMain { transport.syncs.get() > opened }
+        settleMain()
         val sent = transport.syncs.get()
 
         transport.online = false
         library.saveCategoryNote("file-home", "c-food", "#template 60")
-        await { transport.syncs.get() > sent }
-        settle()
+        awaitMain { transport.syncs.get() > sent }
+        settleMain()
         transport.online = true
         val failed = transport.syncs.get()
         model.onScreenLocked()
-        await { transport.syncs.get() > failed }
-        settle()
+        awaitMain { transport.syncs.get() > failed }
+        settleMain()
         val closed = transport.syncs.get()
         model.onScreenLocked()
-        settle()
+        settleMain()
         assertEquals(closed, transport.syncs.get())
     }
 
     /** Lets sends already started finish, so counts read afterwards are final. */
-    private fun settle() {
-        repeat(10) {
-            drain()
-            Thread.sleep(30)
-        }
-    }
-
-    private fun drain() {
-        Shadows.shadowOf(Looper.getMainLooper()).idle()
-    }
-
-    private fun await(predicate: () -> Boolean) {
-        val deadline = System.nanoTime() + 5_000_000_000L
-        while (!predicate()) {
-            if (System.nanoTime() > deadline) error("timed out")
-            drain()
-            Thread.sleep(15)
-        }
-    }
-
     private class CountingServer(
         private val bytes: ByteArray,
     ) : ActualTransport {

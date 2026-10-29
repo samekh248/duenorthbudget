@@ -9,6 +9,7 @@ import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.MemorySecretStore
 import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.SyncCoordinator
+import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,7 +37,7 @@ class CategoryRenameTest {
         model.renameEnvelopeCategory(id, "Dining out ")
         // Nothing has run on the main thread yet, so this is the page before the write lands.
         assertEquals("Dining out", model.category(id))
-        settle()
+        settleMain()
         assertEquals("Dining out", model.category(id))
     }
 
@@ -58,7 +59,7 @@ class CategoryRenameTest {
                 .first { it.id == id }
                 .name,
         )
-        settle()
+        settleMain()
         assertEquals(
             "Everyday",
             model
@@ -81,7 +82,7 @@ class CategoryRenameTest {
                 .first()
         model.renameEnvelopeCategory(category.id, "  ")
         assertEquals(category.name, model.category(category.id))
-        settle()
+        settleMain()
         assertEquals(category.name, model.category(category.id))
         assertEquals(EnvelopeCopy.ENTER_NAME, model.state.value.editError)
     }
@@ -105,26 +106,10 @@ class CategoryRenameTest {
         val library = BudgetLibrary(root, AndroidSessionOpener(), BudgetClock.System)
         library.createFromMock(MockBudgets.HOUSEHOLD) as CreateResult.Created
         val sync = SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System)
-        val model = ShellViewModel(library, sync)
-        await { !model.state.value.loading && model.state.value.shell != null }
+        val model = ShellViewModel(library, sync, io = Dispatchers.Main)
+        awaitMain { !model.state.value.loading && model.state.value.shell != null }
         model.showManageCategories()
-        await { model.state.value.categoryManage != null }
+        awaitMain { model.state.value.categoryManage != null }
         return model
-    }
-
-    private fun settle() {
-        repeat(20) {
-            Shadows.shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(15)
-        }
-    }
-
-    private fun await(predicate: () -> Boolean) {
-        val deadline = System.nanoTime() + 10_000_000_000L
-        while (!predicate()) {
-            if (System.nanoTime() > deadline) error("timed out")
-            Shadows.shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(15)
-        }
     }
 }
