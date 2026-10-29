@@ -103,8 +103,6 @@ object ScreenBar {
         accountClosed: Boolean = false,
         /** The close page is asking again before a force close; the question puts its own answers on the bar. */
         accountForceConfirm: Boolean = false,
-        /** The split page's transaction is already split, so it can go back to one category. */
-        splitParent: Boolean = false,
         /** An open account is linked through SimpleFIN and the budget lives on a server, so the accounts bar can bank sync. */
         accountsBankSync: Boolean = false,
     ): List<ScreenBarSpec> =
@@ -305,17 +303,9 @@ object ScreenBar {
             ShellRoute.Create,
             ShellRoute.Assign,
             -> saveCancel()
+            // Splitting starts in the form, under the category box, so the bar keeps to save and cancel.
             is ShellRoute.EditTransaction ->
-                when (transaction) {
-                    // Add split sits between save and cancel; each tap adds one split line to the form.
-                    TransactionMenu.NEW, TransactionMenu.ORDINARY ->
-                        listOf(
-                            spec("save", AppGlyph.Save, "save"),
-                            spec("add-split", AppGlyph.Categories, RegisterCopy.ADD_SPLIT),
-                            spec("cancel", AppGlyph.Cancel, "cancel"),
-                        )
-                    TransactionMenu.TRANSFER -> saveCancel()
-                } +
+                saveCancel() +
                     when (transaction) {
                         TransactionMenu.NEW -> emptyList()
                         TransactionMenu.ORDINARY ->
@@ -325,14 +315,6 @@ object ScreenBar {
                             )
                         TransactionMenu.TRANSFER -> listOf(menu("delete-transaction", AppGlyph.Cancel, RegisterCopy.DELETE))
                     }
-            // The split page from the inbox: add split between save and cancel, as on a transaction's details;
-            // a transaction already split can go back to one category from the menu.
-            is ShellRoute.SplitTransaction ->
-                listOf(
-                    spec("save", AppGlyph.Save, "save"),
-                    spec("add-split", AppGlyph.Categories, RegisterCopy.ADD_SPLIT),
-                    spec("cancel", AppGlyph.Cancel, "cancel"),
-                ) + if (splitParent) listOf(menu("unsplit", AppGlyph.Undo, RegisterCopy.ONE_CATEGORY)) else emptyList()
             ShellRoute.HoldMonth,
             is ShellRoute.ToBudget,
             is ShellRoute.MoveCategory,
@@ -389,7 +371,6 @@ object ScreenBar {
                 ?.account
                 ?.closed == true,
             state.accountForceConfirm != null,
-            splitParent = splitParent(state),
             state.signedIn &&
                 !state.cloudFileId.isNullOrBlank() &&
                 state.shell
@@ -420,14 +401,6 @@ object ScreenBar {
             "refresh" -> state.remoteRefreshing
             else -> false
         }
-
-    private fun splitParent(state: ShellUiState): Boolean {
-        val route = state.route as? ShellRoute.SplitTransaction ?: return false
-        return state.register
-            ?.rows
-            ?.firstOrNull { it.id == route.transactionId }
-            ?.parent == true
-    }
 
     private fun transactionMenu(state: ShellUiState): TransactionMenu {
         val route = state.route as? ShellRoute.EditTransaction ?: return TransactionMenu.NEW
@@ -567,8 +540,6 @@ class ScreenBarHandlers(
     val onEndInboxSelecting: () -> Unit = {},
     val onDeleteSelected: () -> Unit = {},
     val onSyncServer: () -> Unit = {},
-    val onAddSplit: () -> Unit = {},
-    val onUnsplit: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
     val onEditBudget: () -> Unit = {},
@@ -641,8 +612,6 @@ class ScreenBarHandlers(
             "categorize-selected" -> onCategorizeSelected
             "end-inbox-selecting" -> onEndInboxSelecting
             "delete-selected" -> onDeleteSelected
-            "add-split" -> onAddSplit
-            "unsplit" -> onUnsplit
             "schedule-transaction" -> onScheduleTransaction
             "delete-transaction" -> onDeleteTransaction
             "edit-budget" -> onEditBudget

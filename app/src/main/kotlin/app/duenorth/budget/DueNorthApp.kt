@@ -337,8 +337,6 @@ fun DueNorthApp(model: ShellViewModel) {
                     onServerBudgets = model::showServerBudgets,
                     onSignOut = model::signOutInstance,
                     onExport = model::exportBudget,
-                    onAddSplit = { formSaveHost.run(FORM_ADD_SPLIT) },
-                    onUnsplit = { (state.route as? ShellRoute.SplitTransaction)?.transactionId?.let(model::unsplit) },
                     onScheduleTransaction = {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
                     },
@@ -401,7 +399,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                     remember(model) {
                                         InboxActions(
                                             onDetails = model::openInboxDetails,
-                                            onSplit = model::openInboxSplit,
                                             onSchedule = model::createScheduleFromTransaction,
                                             onDelete = model::deleteInbox,
                                             onOpenAccount = model::openAccount,
@@ -755,22 +752,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                     numberFormat = state.formatPrefs.numberFormat,
                                     hideFraction = state.formatPrefs.hideFraction,
                                     payees = PayeeTypeAhead.names(state.payees),
-                                )
-                            }
-                        }
-                        is ShellRoute.SplitTransaction -> {
-                            val page = state.register
-                            val row = page?.rows?.firstOrNull { it.id == route.transactionId }
-                            if (page == null || row == null) {
-                                Placeholder()
-                            } else {
-                                SplitForm(
-                                    page = page,
-                                    row = row,
-                                    error = state.writeError,
-                                    onSave = model::submitSplit,
-                                    onUnsplit = model::unsplit,
-                                    modifier = fill,
                                 )
                             }
                         }

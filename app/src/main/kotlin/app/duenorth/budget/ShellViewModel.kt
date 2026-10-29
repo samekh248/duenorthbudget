@@ -123,11 +123,6 @@ sealed interface ShellRoute {
         val transactionId: String?,
     ) : ShellRoute
 
-    data class SplitTransaction(
-        val accountId: String,
-        val transactionId: String,
-    ) : ShellRoute
-
     /** The category picker for [transactionId], plus [others] when several inbox rows are filed together. */
     data class PickCategory(
         val transactionId: String,
@@ -1865,10 +1860,6 @@ class ShellViewModel(
         openFromInbox(transactionId) { accountId -> ShellRoute.EditTransaction(accountId, transactionId) }
     }
 
-    fun openInboxSplit(transactionId: String) {
-        openFromInbox(transactionId) { accountId -> ShellRoute.SplitTransaction(accountId, transactionId) }
-    }
-
     fun deleteInbox(transactionId: String) {
         val row =
             _state.value.shell
@@ -2246,17 +2237,6 @@ class ShellViewModel(
         }
     }
 
-    fun submitSplit(
-        transactionId: String,
-        parts: List<SplitPart>,
-    ) {
-        val accountId = openAccountId() ?: return
-        launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.splitTransaction(id, transactionId, parts, false) }
-            publish(result, accountId, stayOnRegister = true)
-        }
-    }
-
     fun submitCategory(categoryId: String?) {
         val target = _state.value.categoryTarget ?: return
         val inbox = shownInbox().orEmpty()
@@ -2292,14 +2272,6 @@ class ShellViewModel(
                     library.setTransactionCategory(id, target.transactionId, categoryId, false)
                 }
             publish(result, target.accountId, stayOnRegister = false)
-        }
-    }
-
-    fun unsplit(transactionId: String) {
-        val accountId = openAccountId() ?: return
-        launchWrite { id ->
-            val result = withContext(Dispatchers.IO) { library.unsplitTransaction(id, transactionId, false) }
-            publish(result, accountId, stayOnRegister = true)
         }
     }
 
@@ -2813,7 +2785,6 @@ class ShellViewModel(
         when (val route = _state.value.route) {
             is ShellRoute.Register -> route.accountId
             is ShellRoute.EditTransaction -> route.accountId
-            is ShellRoute.SplitTransaction -> route.accountId
             is ShellRoute.Reconcile -> route.accountId
             else ->
                 _state.value.register
@@ -3096,7 +3067,6 @@ class ShellViewModel(
     private fun ShellRoute.isRegisterFlow(): Boolean =
         this is ShellRoute.Register ||
             this is ShellRoute.EditTransaction ||
-            this is ShellRoute.SplitTransaction ||
             this is ShellRoute.PickCategory ||
             this is ShellRoute.Reconcile ||
             this is ShellRoute.ImportPreviewRoute ||
