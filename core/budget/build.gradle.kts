@@ -19,4 +19,5 @@ dependencies {
     implementation(libs.serialization.json)
     testImplementation(libs.sqlite.jdbc)
     testImplementation(libs.junit4)
+    testImplementation(project(":core:samples"))
 }

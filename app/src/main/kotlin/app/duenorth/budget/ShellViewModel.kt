@@ -24,7 +24,6 @@ import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.ManageGroupRow
 import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MockBudgetDataset
-import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
@@ -51,6 +50,7 @@ import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsPage
 import app.duenorth.budget.core.RuleDraft
 import app.duenorth.budget.core.RuleSummary
+import app.duenorth.budget.core.SampleBudgets
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.ScheduleDetails
 import app.duenorth.budget.core.ScheduleDraft
@@ -430,7 +430,11 @@ class ShellViewModel(
     private val onBackgroundSyncHours: (Int) -> Unit = {},
     /** Where file and network work runs. Tests pass the main thread, so idling its looper runs that work to the end. */
     internal val io: CoroutineDispatcher = Dispatchers.IO,
+    /** The sample budgets of this build: [buildSamples], which is null in release builds. */
+    sampleSource: SampleBudgets? = buildSamples,
 ) : ViewModel() {
+    /** The samples developer mode offers; none outside it, or in a build without them. */
+    private val samples: SampleBudgets? = sampleSource?.takeIf { developerMode }
     internal val shellGate = RefreshGate<MonthShell>()
     private val registerGate = RefreshGate<RegisterPage>()
     internal val months = OpenMonthStore()
@@ -445,8 +449,8 @@ class ShellViewModel(
         MutableStateFlow(
             ShellUiState(
                 developerMode = developerMode,
-                sampleBudgets = if (developerMode) MockBudgets.all else emptyList(),
-                defaultBudgetName = if (developerMode) MockBudgets.WALKTHROUGH_NAME else "",
+                sampleBudgets = samples?.all.orEmpty(),
+                defaultBudgetName = samples?.walkthroughName.orEmpty(),
             ),
         )
     val state: StateFlow<ShellUiState> = _state.asStateFlow()
@@ -2348,7 +2352,7 @@ class ShellViewModel(
                     val settingUp = _state.value.onboarding != null
                     finishOnboarding()
                     // Debug builds fill the file from a sample, so only release builds have steps left to do.
-                    if (!developerMode) startGetStarted(result.id)
+                    if (samples == null) startGetStarted(result.id)
                     val toSettings = _state.value.settingsReturn
                     _state.update {
                         it.copy(
@@ -2371,22 +2375,20 @@ class ShellViewModel(
     private fun createBudget(
         name: String,
         currency: String,
-    ): CreateResult =
-        if (developerMode) {
-            library.createFromMock(MockBudgets.WALKTHROUGH, name.ifBlank { MockBudgets.WALKTHROUGH_NAME })
-        } else {
-            library.create(name, currency)
-        }
+    ): CreateResult {
+        val samples = samples ?: return library.create(name, currency)
+        return samples.create(library, samples.walkthrough, name.ifBlank { samples.walkthroughName })
+    }
 
     fun createSample(datasetId: String) {
-        if (!developerMode) return
+        val samples = samples ?: return
         viewModelScope.launch {
-            when (val result = withContext(io) { library.createFromMock(datasetId) }) {
+            when (val result = withContext(io) { samples.create(library, datasetId) }) {
                 is CreateResult.Rejected -> _state.update { it.copy(createError = result.reason) }
                 is CreateResult.Created -> {
                     val settingUp = _state.value.onboarding != null
                     finishOnboarding()
-                    if (datasetId == MockBudgets.BRAND_NEW) startGetStarted(result.id)
+                    if (datasetId == samples.brandNew) startGetStarted(result.id)
                     _state.update { it.copy(createError = null, route = ShellRoute.Home) }
                     reload()
                     offerExperimental(always = settingUp)

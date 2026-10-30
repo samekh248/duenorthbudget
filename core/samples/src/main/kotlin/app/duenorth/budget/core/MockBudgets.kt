@@ -7,16 +7,25 @@ import java.time.LocalDate
 import java.time.YearMonth
 
 /**
+ * Creates a local budget filled from a [MockBudgets] dataset (debug tooling).
+ * Uses the dataset title as the budget name and USD unless the seed overrides currency.
+ */
+fun BudgetLibrary.createFromMock(
+    datasetId: String,
+    name: String? = null,
+): CreateResult {
+    val dataset = MockBudgets.byId(datasetId) ?: return CreateResult.Rejected(ShellCopy.UNKNOWN_SAMPLE)
+    val budgetName = name?.trim()?.ifEmpty { null } ?: dataset.title
+    // The brand new sample is the file a release build makes, so its get started list can be tried.
+    if (dataset.id == MockBudgets.BRAND_NEW) return create(budgetName, "USD")
+    return createSeeded(budgetName) { session, today -> MockBudgets.seed(session, dataset.id, today) }
+}
+
+/**
  * Catalog of seed budgets for debug builds. Dates are anchored to [today] so the
  * open month, inbox, due schedules, and review always have something to show.
  */
-data class MockBudgetDataset(
-    val id: String,
-    val title: String,
-    val summary: String,
-)
-
-object MockBudgets {
+object MockBudgets : SampleBudgets {
     const val HOUSEHOLD = "household"
     const val FULL_TOUR = "full-tour"
     const val WIDE = "wide"
@@ -30,7 +39,7 @@ object MockBudgets {
     /** Name pre-filled on the new budget forms in debug builds. */
     const val WALKTHROUGH_NAME = "Walkthrough"
 
-    val all: List<MockBudgetDataset> =
+    override val all: List<MockBudgetDataset> =
         listOf(
             MockBudgetDataset(
                 id = HOUSEHOLD,
@@ -53,6 +62,18 @@ object MockBudgets {
                 summary = "an empty budget as release builds make it, with the get started list",
             ),
         )
+
+    override val walkthrough: String get() = WALKTHROUGH
+
+    override val walkthroughName: String get() = WALKTHROUGH_NAME
+
+    override val brandNew: String get() = BRAND_NEW
+
+    override fun create(
+        library: BudgetLibrary,
+        datasetId: String,
+        name: String?,
+    ): CreateResult = library.createFromMock(datasetId, name)
 
     fun byId(id: String): MockBudgetDataset? = all.firstOrNull { it.id == id }
 

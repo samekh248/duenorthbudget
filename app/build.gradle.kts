@@ -97,6 +97,7 @@ kotlin {
 dependencies {
     implementation(project(":core:budget"))
     implementation(project(":core:design"))
+    debugImplementation(project(":core:samples"))
     implementation(platform(libs.compose.bom))
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
