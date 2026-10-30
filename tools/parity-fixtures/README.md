@@ -20,6 +20,9 @@ npm ci
 npm run generate
 ```
 
+`node generate.mjs <area> [<area> ...]` regenerates only those areas and
+leaves the other areas' ids alone.
+
 Output goes to `core/budget/src/test/resources/parity/<area>/`:
 
 | File | Contents |
@@ -40,4 +43,5 @@ close transfers, averages, and schedules are reproducible.
 | `schedules-rules` | checking with Cafe and Corner Shop history | payee→category rule, a rule with parts the phone does not edit, auto-post schedule run twice, schedule with a pattern, learning on and off |
 | `reports` | four months of income, bills, a split, transfers on→on and on→off, a deleted transaction | raw results of desktop's cash flow, net worth, and custom-report queries for a range and an empty range |
 | `templates` | categories with each template kind in notes, `flags.goalTemplatesEnabled` on | check valid, check invalid, apply, overwrite |
+| `automations` | every template type as budget automations (`source: ui`), the newer note forms, Jul–Oct 2026 budgets and spending, `flags.goalTemplatesUIEnabled` on | how desktop parses 70-odd note lines and writes automations back as notes, overwrite, overwrite with `hideFraction`, the automations editor's dry run per category |
 | `undo` | the month base | one assignment, to undo back to the base |

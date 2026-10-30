@@ -933,7 +933,7 @@ class BudgetLibrary(
     fun migrateCategoryAutomations(
         budgetId: String,
         categoryId: String,
-    ): CategoryAutomations? = edit(budgetId, UndoCopy.TO_AUTOMATIONS) { CategoryNotes.migrate(it, categoryId) }
+    ): CategoryAutomations? = edit(budgetId, UndoCopy.TO_AUTOMATIONS) { CategoryNotes.migrate(it, categoryId, clock.today()) }
 
     /** Write a category's automations back into its note; false when one cannot be written as a line. */
     fun unmigrateCategoryAutomations(

@@ -18,32 +18,37 @@ class TemplateParserTest {
     fun simpleAndUpTo() {
         assertEquals(Template.Simple(n("50"), null, 0), parse("#template 50"))
         assertEquals(Template.Simple(n("12.50"), null, 0), parse("#template \$12.50"))
-        assertEquals(Template.Simple(null, n("200"), 0), parse("#template up to 200"))
-        assertEquals(Template.Simple(n("50"), n("300"), 0), parse("#template 50 up to 300"))
-        assertEquals(Template.Simple(n("1500"), null, 0), parse("#template 1,500"))
+        assertEquals(Template.Simple(null, TemplateLimit(n("200")), 0), parse("#template up to 200"))
+        assertEquals(Template.Simple(n("50"), TemplateLimit(n("300")), 0), parse("#template 50 up to 300"))
+        // Desktop reads `1,500` as 1 and then stops at the comma.
+        assertNull(parse("#template 1,500"))
     }
 
     @Test
     fun byWithRepeats() {
         val december = YearMonth.of(2026, 12)
-        assertEquals(Template.By(n("600"), december, null, annual = false, repeat = null, priority = 0), parse("#template 600 by 2026-12"))
+        assertEquals(Template.By(n("600"), december, annual = null, repeat = null, priority = 0), parse("#template 600 by 2026-12"))
         assertEquals(
-            Template.By(n("600"), december, 12, annual = true, repeat = null, priority = 0),
+            Template.By(n("600"), december, annual = true, repeat = null, priority = 0),
             parse("#template 600 by 2026-12 repeat every year"),
         )
         assertEquals(
-            Template.By(n("600"), december, 1, annual = false, repeat = 1, priority = 0),
+            Template.By(n("600"), december, annual = false, repeat = null, priority = 0),
             parse("#template 600 by 2026-12 repeat every month"),
         )
         assertEquals(
-            Template.By(n("600"), december, 3, annual = false, repeat = 3, priority = 0),
+            Template.By(n("600"), december, annual = false, repeat = 3, priority = 0),
             parse("#template 600 by 2026-12 repeat every 3 months"),
         )
         assertEquals(
-            Template.By(n("600"), december, 24, annual = true, repeat = 2, priority = 0),
+            Template.By(n("600"), december, annual = true, repeat = 2, priority = 0),
             parse("#template 600 by 2026-12 repeat every 2 years"),
         )
-        assertNull(parse("#template 600 by 2026-12 repeat every 1 years"))
+        assertEquals(
+            Template.By(n("600"), december, annual = true, repeat = 1, priority = 0),
+            parse("#template 600 by 2026-12 repeat every 1 years"),
+        )
+        assertNull(parse("#template 600 by 2026-12 repeat every 1 year"))
         assertNull(parse("#template 600 by December"))
     }
 
@@ -51,7 +56,8 @@ class TemplateParserTest {
     fun scheduleWithAndWithoutFull() {
         assertEquals(Template.Schedule("Rent", false, 0), parse("#template schedule Rent"))
         assertEquals(Template.Schedule("Car Loan", true, 0), parse("#template schedule full Car Loan"))
-        assertEquals(Template.Schedule("Car Loan", true, 0), parse("#template schedule Car Loan full"))
+        // Desktop reads a trailing `full` as part of the name.
+        assertEquals(Template.Schedule("Car Loan full", false, 0), parse("#template schedule Car Loan full"))
         assertNull(parse("#template schedule"))
     }
 

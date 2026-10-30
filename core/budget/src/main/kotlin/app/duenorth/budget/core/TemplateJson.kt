@@ -9,6 +9,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.YearMonth
 
 /**
@@ -68,31 +69,38 @@ object TemplateJson {
         val priority = obj.int("priority") ?: 0
         return when (obj.text("type")) {
             "simple" -> {
-                val limit = obj["limit"] as? JsonObject
-                if (limit != null && !plainLimit(limit)) return null
                 val monthly = obj.number("monthly")
-                val cap = limit?.number("amount")
-                if (monthly == null && cap == null) return null
-                Template.Simple(monthly, cap, priority)
+                val limit = limit(obj["limit"])
+                if (monthly == null && limit == null) return null
+                Template.Simple(monthly, limit, priority)
             }
-            "by" -> {
-                if (obj.text("from") != null) return null
-                val annual = obj.bool("annual") == true
-                val repeat = obj.int("repeat")
-                val repeatMonths = if (annual) (repeat ?: 1) * 12 else repeat
-                Template.By(
+            "periodic" -> {
+                val period = obj["period"] as? JsonObject ?: return null
+                Template.Periodic(
                     amount = obj.number("amount") ?: return null,
-                    month = YearMonth.parse(obj.text("month") ?: return null),
-                    repeatMonths = repeatMonths,
-                    annual = annual,
-                    repeat = repeat,
+                    every = period.int("amount") ?: return null,
+                    unit = RepeatUnit.of(period.text("period")) ?: return null,
+                    starting = LocalDate.parse(obj.text("starting") ?: return null),
+                    limit = limit(obj["limit"]),
                     priority = priority,
                 )
             }
+            "by", "spend" -> {
+                val amount = obj.number("amount") ?: return null
+                val month = YearMonth.parse(obj.text("month") ?: return null)
+                val annual = obj.bool("annual")
+                val repeat = obj.int("repeat")
+                val from = obj.text("from")?.let { YearMonth.parse(it) }
+                if (from != null) {
+                    Template.Spend(amount, month, from, annual, repeat, priority)
+                } else {
+                    Template.By(amount, month, annual, repeat, priority)
+                }
+            }
             "schedule" -> {
-                if (obj.number("adjustment") != null) return null
-                val name = obj.text("scheduleId")?.let(scheduleName) ?: obj.text("name") ?: return null
-                Template.Schedule(name, full = obj.bool("full") == true, priority = priority)
+                val id = obj.text("scheduleId")
+                val name = id?.let(scheduleName) ?: obj.text("name") ?: return null
+                Template.Schedule(name, full = obj.bool("full") == true, priority = priority, scheduleId = id, adjustment = adjustment(obj))
             }
             "percentage" ->
                 Template.Percentage(
@@ -101,22 +109,32 @@ object TemplateJson {
                     category = obj.text("category") ?: return null,
                     priority = priority,
                 )
-            "average" -> {
-                if (obj.number("adjustment") != null) return null
-                Template.Average(obj.int("numMonths")?.takeIf { it > 0 } ?: return null, priority)
-            }
-            "remainder" -> {
-                if (obj["limit"].let { it != null && it !is JsonNull }) return null
-                Template.Remainder(obj.number("weight") ?: BigDecimal.ONE)
-            }
+            "average" -> Template.Average(obj.int("numMonths")?.takeIf { it > 0 } ?: return null, priority, adjustment(obj))
+            "copy" -> Template.Copy(obj.int("lookBack") ?: return null, priority, limit(obj["limit"]))
+            "remainder" -> Template.Remainder(obj.number("weight") ?: BigDecimal.ONE, limit(obj["limit"]))
+            "refill" -> Template.Refill(priority)
+            "limit" -> Template.Limit(limit(obj) ?: return null)
             "goal" -> Template.Goal(obj.number("amount") ?: return null)
             else -> null
         }
     }
 
-    /** A cap as note templates write it (`up to N`): monthly and not held over; anything else is newer. */
-    private fun plainLimit(limit: JsonObject): Boolean =
-        limit.bool("hold") != true && (limit.text("period") ?: "monthly") == "monthly" && limit.text("start") == null
+    /** A nested `limit` (or a limit automation itself); null when there is none. An unknown period does not read. */
+    private fun limit(element: kotlinx.serialization.json.JsonElement?): TemplateLimit? {
+        val obj = element as? JsonObject ?: return null
+        val amount = obj.number("amount") ?: return null
+        val period = obj.text("period")?.let { LimitPeriod.of(it) ?: throw IllegalArgumentException(it) } ?: LimitPeriod.MONTHLY
+        return TemplateLimit(amount, obj.bool("hold") == true, period, obj.text("start")?.let { LocalDate.parse(it) })
+    }
+
+    private fun adjustment(obj: JsonObject): TemplateAdjustment? {
+        val amount = obj.number("adjustment") ?: return null
+        return when (obj.text("adjustmentType")) {
+            "percent" -> TemplateAdjustment(amount, percent = true)
+            "fixed" -> TemplateAdjustment(amount, percent = false)
+            else -> null
+        }
+    }
 
     private fun JsonObject.text(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
@@ -163,6 +181,67 @@ data class CategoryAutomations(
                 if (priority == template.priority) entry else TemplateJson.Stored.of(template.withPriority(priority))
             },
         )
+    }
+
+    companion object {
+        /**
+         * `migrateTemplatesToAutomations`, desktop's switch to automations: a fixed amount becomes a monthly
+         * repeating one from the start of this month, a cap becomes a limit automation (with a refill when nothing
+         * else funds it), a repeating amount or remainder hands its cap to a limit of its own, and a schedule gains
+         * its id. [schedules] are (id, name) of the budget's live schedules.
+         */
+        fun fromNote(
+            templates: List<Template>,
+            schedules: List<Pair<String, String?>>,
+            today: LocalDate,
+        ): CategoryAutomations {
+            val out = mutableListOf<Template>()
+            for (template in templates) {
+                when (template) {
+                    is Template.Schedule -> {
+                        val schedule =
+                            schedules.firstOrNull { (id, _) -> id == template.scheduleId }
+                                ?: schedules.firstOrNull { (_, name) -> name?.trim() == template.name.trim() }
+                        out +=
+                            if (schedule ==
+                                null
+                            ) {
+                                template
+                            } else {
+                                template.copy(scheduleId = schedule.first, name = schedule.second ?: template.name)
+                            }
+                    }
+                    is Template.Simple -> {
+                        val monthly = template.monthly
+                        val hasMonthly = monthly != null && monthly.signum() != 0
+                        template.limit?.let { limit ->
+                            out += Template.Limit(limit)
+                            if (monthly == null) out += Template.Refill(template.priority)
+                        }
+                        val contribution = if (hasMonthly || (monthly != null && template.limit == null)) monthly else null
+                        if (contribution != null) {
+                            out += Template.Periodic(contribution, 1, RepeatUnit.MONTH, today.withDayOfMonth(1), null, template.priority)
+                        }
+                    }
+                    is Template.Periodic ->
+                        if (template.limit != null) {
+                            out += template.copy(limit = null)
+                            out += Template.Limit(template.limit)
+                        } else {
+                            out += template
+                        }
+                    is Template.Remainder ->
+                        if (template.limit != null) {
+                            out += template.copy(limit = null)
+                            out += Template.Limit(template.limit)
+                        } else {
+                            out += template
+                        }
+                    else -> out += template
+                }
+            }
+            return CategoryAutomations(out.map { TemplateJson.Stored.of(it) })
+        }
     }
 
     /** `goal_def` as desktop stores it; null with no automations left. */

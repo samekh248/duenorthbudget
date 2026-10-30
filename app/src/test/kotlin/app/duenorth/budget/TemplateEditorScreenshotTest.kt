@@ -36,6 +36,19 @@ class TemplateEditorScreenshotTest {
     fun automationTiles() = every("automation_tiles") { Automations() }
 
     @Test
+    fun newerAutomationTiles() =
+        every("automation_tiles_newer") {
+            Box(Modifier.background(Metro.colors.background).padding(MetroDimens.Gutter)) {
+                AutomationTiles(
+                    TemplateSamples.newerAutomations,
+                    TemplateSamples.newerAmounts,
+                    TemplateSamples.shell.currency,
+                    editable = true,
+                )
+            }
+        }
+
+    @Test
     fun kinds() = every("template_kinds") { TemplateKindsScreen("Food", null, {}, {}) }
 
     @Test
@@ -89,7 +102,7 @@ class TemplateEditorScreenshotTest {
 
     @Composable
     private fun Form() {
-        val by = Template.By(BigDecimal("1200"), YearMonth.of(2026, 12), 12, annual = true, repeat = null, priority = 2)
+        val by = Template.By(BigDecimal("1200"), YearMonth.of(2026, 12), annual = true, repeat = null, priority = 2)
         TemplateEditorScreen(
             categoryName = "Food",
             kind = TemplateKind.BY_DATE,

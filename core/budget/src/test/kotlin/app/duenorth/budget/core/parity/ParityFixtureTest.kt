@@ -12,7 +12,7 @@ class ParityFixtureTest {
     @Test
     fun everyScenarioLoadsAndItsBaseOpensOnThePhone() {
         val areas = ParityFixture.areas()
-        assertEquals(listOf("accounts", "month", "reports", "schedules-rules", "templates", "undo"), areas)
+        assertEquals(listOf("accounts", "automations", "month", "reports", "schedules-rules", "templates", "undo"), areas)
         for (area in areas) {
             val scenarios = ParityFixture.scenarios(area)
             assertTrue("$area has no scenarios", scenarios.isNotEmpty())

@@ -7,6 +7,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.YearMonth
 
 /** Categories desktop's budget automations own (`template_settings.source = ui`) run from `goal_def`, never the note. */
@@ -52,7 +53,7 @@ class TemplateAutomationsTest {
                         "categories",
                         fixed,
                         "goal_def",
-                        """[{"type":"refill","priority":0,"directive":"template"}]""",
+                        """[{"type":"someday","priority":0,"directive":"template"}]""",
                     )
                     SyncSchema.write(session, "categories", fixed, "template_settings", ui)
                 }
@@ -99,10 +100,10 @@ class TemplateAutomationsTest {
             ) { id -> if (id == "s1") "Rent" else null }
         assertEquals(
             listOf(
-                Template.Simple(BigDecimal("50"), BigDecimal("200"), 1),
-                Template.By(BigDecimal("1200"), YearMonth.of(2027, 6), 12, annual = true, repeat = null, priority = 2),
-                Template.By(BigDecimal("300"), YearMonth.of(2027, 1), 3, annual = false, repeat = 3, priority = 2),
-                Template.Schedule("Rent", full = true, priority = 3),
+                Template.Simple(BigDecimal("50"), TemplateLimit(BigDecimal("200")), 1),
+                Template.By(BigDecimal("1200"), YearMonth.of(2027, 6), annual = true, repeat = null, priority = 2),
+                Template.By(BigDecimal("300"), YearMonth.of(2027, 1), annual = false, repeat = 3, priority = 2),
+                Template.Schedule("Rent", full = true, priority = 3, scheduleId = "s1"),
                 Template.Percentage(BigDecimal("10"), previous = true, category = "all income", priority = 4),
                 Template.Average(3, 5),
                 Template.Remainder(BigDecimal("2")),
@@ -113,18 +114,33 @@ class TemplateAutomationsTest {
     }
 
     @Test
-    fun newerFormsComeBackUnsupported() {
+    fun newerFormsReadAsTheirOwnKinds() {
         val read =
             TemplateJson.parse(
                 """
                 [{"type":"periodic","amount":10,"period":{"period":"week","amount":1},"starting":"2026-10-01","priority":0,"directive":"template"},
                  {"type":"simple","limit":{"amount":200,"hold":true,"period":"monthly"},"priority":0,"directive":"template"},
                  {"type":"average","numMonths":3,"adjustment":10,"adjustmentType":"percent","priority":0,"directive":"template"},
-                 {"type":"limit","amount":500,"hold":false,"period":"monthly","priority":null,"directive":"template"}]
+                 {"type":"limit","amount":500,"hold":false,"period":"weekly","start":"2026-10-05","priority":null,"directive":"template"},
+                 {"type":"refill","priority":2,"directive":"template"},
+                 {"type":"copy","lookBack":3,"priority":1,"directive":"template"},
+                 {"type":"spend","amount":1200,"month":"2027-03","from":"2026-08","priority":0,"directive":"template"},
+                 {"type":"someday","priority":0,"directive":"template"}]
                 """.trimIndent(),
             )
-        assertEquals(4, read.size)
-        read.forEach { assertNull(it) }
+        assertEquals(
+            listOf(
+                Template.Periodic(BigDecimal("10"), 1, RepeatUnit.WEEK, LocalDate.of(2026, 10, 1), null, 0),
+                Template.Simple(null, TemplateLimit(BigDecimal("200"), hold = true), 0),
+                Template.Average(3, 0, TemplateAdjustment(BigDecimal("10"), percent = true)),
+                Template.Limit(TemplateLimit(BigDecimal("500"), period = LimitPeriod.WEEKLY, start = LocalDate.of(2026, 10, 5))),
+                Template.Refill(2),
+                Template.Copy(3, 1),
+                Template.Spend(BigDecimal("1200"), YearMonth.of(2027, 3), YearMonth.of(2026, 8), null, null, 0),
+                null,
+            ),
+            read,
+        )
         assertEquals(listOf(null), TemplateJson.parse("not json"))
         assertTrue(TemplateJson.parse(null).isEmpty())
         assertTrue(TemplateJson.managed(ui))
@@ -144,13 +160,13 @@ class TemplateAutomationsTest {
                         "categories",
                         fixed,
                         "goal_def",
-                        """[{"type":"simple","monthly":123,"priority":0,"directive":"template"},{"type":"copy","lookBack":3,"priority":1,"directive":"template"}]""",
+                        """[{"type":"simple","monthly":123,"priority":0,"directive":"template"},{"type":"someday","lookBack":3,"priority":1,"directive":"template"}]""",
                     )
                     SyncSchema.write(session, "categories", fixed, "template_settings", ui)
                 }
             }
             val automations = opened.library.readCategoryAutomations(opened.budgetId, fixed)!!
-            assertEquals(listOf("simple", "copy"), automations.entries.map { it.type })
+            assertEquals(listOf("simple", "someday"), automations.entries.map { it.type })
             assertEquals(listOf(Template.Simple(BigDecimal("123"), null, 0)), automations.templates)
             assertFalse(automations.runnable)
         }
@@ -183,9 +199,13 @@ class TemplateAutomationsTest {
         fixture.open().use { opened ->
             val fixed = fixture.id("categories", "Fixed")
             val note = opened.library.readCategoryNote(opened.budgetId, fixed)
-            val before = TemplateNote.parse(note).entries.mapNotNull { it.template }
+            assertEquals("#template 50", note)
             val automations = opened.library.migrateCategoryAutomations(opened.budgetId, fixed)!!
-            assertEquals(before, automations.templates)
+            // As desktop's migration does, a fixed amount becomes a monthly repeating one from the start of this month.
+            assertEquals(
+                listOf(Template.Periodic(BigDecimal("50"), 1, RepeatUnit.MONTH, fixture.today.withDayOfMonth(1), null, 0)),
+                automations.templates,
+            )
             assertEquals(note, opened.library.readCategoryNote(opened.budgetId, fixed))
             assertEquals(automations.templates, opened.library.readCategoryAutomations(opened.budgetId, fixed)!!.templates)
             opened.db { session ->
@@ -206,7 +226,7 @@ class TemplateAutomationsTest {
     }
 
     @Test
-    fun editsKeepAnAutomationThePhoneCannotRunAsDesktopWroteIt() {
+    fun editsKeepAnAutomationAsDesktopWroteItAndARefillAloneCannotGoBackToNotes() {
         fixture.open().use { opened ->
             val fixed = fixture.id("categories", "Fixed")
             val refill = """{"type":"refill","priority":2,"directive":"template","description":"top up"}"""
@@ -243,7 +263,11 @@ class TemplateAutomationsTest {
             val automations = opened.library.migrateCategoryAutomations(opened.budgetId, fixed)!!
             opened.library.saveCategoryAutomations(opened.budgetId, fixed, automations.add(Template.Goal(BigDecimal("900"))))
             assertTrue(opened.library.unmigrateCategoryAutomations(opened.budgetId, fixed))
-            assertEquals("rent\n#template 50\n#goal 900", opened.library.readCategoryNote(opened.budgetId, fixed))
+            // As desktop writes it back, the migrated fixed amount comes home as a monthly repeating one.
+            assertEquals(
+                "rent\n#template 50 repeat every 1 months starting 2026-10-01\n#goal 900",
+                opened.library.readCategoryNote(opened.budgetId, fixed),
+            )
             assertNull(opened.library.readCategoryAutomations(opened.budgetId, fixed))
         }
     }

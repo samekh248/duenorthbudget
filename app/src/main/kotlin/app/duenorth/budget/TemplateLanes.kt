@@ -40,6 +40,7 @@ import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.core.TemplateLane
 import app.duenorth.budget.core.TemplatePlan
+import app.duenorth.budget.core.look
 import app.duenorth.budget.design.components.LayerCorner
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.PillCorner
@@ -297,7 +298,7 @@ private fun LaneChip(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(Modifier.size(18.dp)) {
-            TemplateGlyph(chip.template?.let { TemplateKind.of(it) }, Metro.accent.text, Modifier.size(18.dp))
+            TemplateGlyph(chip.template?.look, Metro.accent.text, Modifier.size(18.dp))
         }
         MetroText(chip.categoryName, Metro.typography.body, maxLines = 1, softWrap = false)
         val amount = chip.given ?: chip.asks

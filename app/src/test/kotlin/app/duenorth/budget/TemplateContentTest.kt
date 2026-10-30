@@ -18,6 +18,7 @@ import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.UndoCopy
+import app.duenorth.budget.core.monthlyFixed
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -263,11 +264,13 @@ class TemplateContentTest {
         await { model.state.value.formatPrefs.automationsOn }
         model.templates.switchToAutomations()
         await { model.state.value.templates.automations != null }
-        assertEquals(
-            listOf(Template.Simple(BigDecimal("50"), null, 0)),
+        // As desktop's switch does, the fixed amount becomes a monthly repeating one from the start of this month.
+        val monthly =
             model.state.value.templates.automations!!
-                .templates,
-        )
+                .templates
+                .single() as Template.Periodic
+        assertEquals(BigDecimal("50"), monthly.amount)
+        assertTrue(monthly.monthlyFixed)
         assertEquals(UndoCopy.TO_AUTOMATIONS, library.undoLabel(budgetId))
         assertTrue(
             "to-notes" in
@@ -286,15 +289,18 @@ class TemplateContentTest {
 
         model.templates.openTemplate(0)
         assertEquals(ShellRoute.TemplateEditor("c-gas", 0, TemplateKind.MONTHLY), model.state.value.route)
-        model.templates.save(Template.Simple(BigDecimal("75"), null, 0))
+        model.templates.save(monthly.copy(amount = BigDecimal("75")))
         assertEquals(ShellRoute.CategoryBudget("c-gas"), model.state.value.route)
-        await { library.readCategoryAutomations(budgetId, "c-gas")?.templates == listOf(Template.Simple(BigDecimal("75"), null, 0)) }
+        await { library.readCategoryAutomations(budgetId, "c-gas")?.templates == listOf(monthly.copy(amount = BigDecimal("75"))) }
         // The note is left as it was; the automations are what run.
         assertEquals("fill up on fridays\n#template 50", library.readCategoryNote(budgetId, "c-gas"))
 
         model.templates.switchToNotes()
         await { model.state.value.templates.automations == null }
-        assertEquals("fill up on fridays\n#template 75", library.readCategoryNote(budgetId, "c-gas"))
+        assertEquals(
+            "fill up on fridays\n#template 75 repeat every 1 months starting ${monthly.starting}",
+            library.readCategoryNote(budgetId, "c-gas"),
+        )
     }
 
     @Test

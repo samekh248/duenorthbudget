@@ -47,11 +47,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.FormatOptions
+import app.duenorth.budget.core.LimitPeriod
 import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.core.RepeatUnit
 import app.duenorth.budget.core.Template
+import app.duenorth.budget.core.TemplateAdjustment
 import app.duenorth.budget.core.TemplateKind
+import app.duenorth.budget.core.TemplateLimit
 import app.duenorth.budget.core.TemplateLines
 import app.duenorth.budget.core.TemplateNote
+import app.duenorth.budget.core.look
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.LayerCorner
 import app.duenorth.budget.design.components.MetroButton
@@ -106,12 +111,25 @@ object TemplateWords {
         return when (template) {
             is Template.Simple ->
                 template.monthly.let { monthly ->
-                    if (monthly == null) "top up to ${money(template.limit ?: BigDecimal.ZERO)}" else "${money(monthly)} every month"
+                    if (monthly ==
+                        null
+                    ) {
+                        "top up to ${money(template.limit?.amount ?: BigDecimal.ZERO)}"
+                    } else {
+                        "${money(monthly)} every month"
+                    }
                 }
+            is Template.Periodic -> "${money(template.amount)} every ${every(template.every, template.unit)}"
             is Template.By -> "${money(template.amount)} by ${monthLabel(template.month)}"
-            is Template.Schedule -> template.name
+            is Template.Spend -> "${money(template.amount)} to spend by ${monthLabel(template.month)}"
+            is Template.Copy -> "copy from ${template.lookBack} ${if (template.lookBack == 1) "month" else "months"} ago"
+            is Template.Refill -> "refill to the limit"
+            is Template.Limit -> "limit of ${money(template.limit.amount)}${limitPeriod(template.limit)}"
+            is Template.Schedule -> template.name + adjustment(template.adjustment)
             is Template.Percentage -> "${plain(template.percent)}% of ${template.category}"
-            is Template.Average -> "average of ${template.months} ${if (template.months == 1) "month" else "months"}"
+            is Template.Average -> "average of ${template.months} ${if (template.months == 1) "month" else "months"}${adjustment(
+                template.adjustment,
+            )}"
             is Template.Remainder -> "what's left"
             is Template.Goal -> "goal of ${money(template.amount)}"
         }
@@ -126,12 +144,21 @@ object TemplateWords {
             is Template.Simple -> {
                 val limit = template.limit
                 when {
-                    template.monthly == null -> "cap a balance"
-                    limit != null -> "held up to ${MoneyFormat.format(minor(limit, currency), currency, options)}"
+                    template.monthly == null -> "cap a balance${limitPeriod(limit)}${if (limit?.hold == true) ", held" else ""}"
+                    limit != null -> "held up to ${MoneyFormat.format(
+                        minor(limit.amount, currency),
+                        currency,
+                        options,
+                    )}${limitPeriod(limit)}"
                     else -> "same each month"
                 }
             }
+            is Template.Periodic -> "repeats from ${template.starting}"
             is Template.By -> "save by a date, ${repeatLabel(template)}"
+            is Template.Spend -> "saved since ${monthLabel(template.from)} counts, even if spent"
+            is Template.Copy -> "what was budgeted then"
+            is Template.Refill -> "tops the balance up to the limit"
+            is Template.Limit -> if (template.limit.hold) "caps the balance, keeps anything over" else "caps the balance"
             is Template.Schedule -> if (template.full) "pay a schedule, only when it's due" else "pay a schedule, saving up ahead"
             is Template.Percentage -> if (template.previous) "share of last month" else "share of this month"
             is Template.Average -> "like before"
@@ -146,11 +173,29 @@ object TemplateWords {
             is Template.Goal -> "shows progress, budgets nothing"
         }
 
+    private fun every(
+        n: Int,
+        unit: RepeatUnit,
+    ): String = if (n == 1) unit.json else "$n ${unit.json}s"
+
+    private fun limitPeriod(limit: TemplateLimit?): String =
+        when (limit?.period) {
+            LimitPeriod.DAILY -> " a day"
+            LimitPeriod.WEEKLY -> " a week"
+            else -> ""
+        }
+
+    private fun adjustment(adjustment: TemplateAdjustment?): String {
+        if (adjustment == null) return ""
+        val sign = if (adjustment.amount.signum() >= 0) "+" else "−"
+        return " $sign${plain(adjustment.amount.abs())}${if (adjustment.percent) "%" else ""}"
+    }
+
     fun repeatLabel(template: Template.By): String {
         val step = template.repeatMonths ?: return "once"
         return when {
-            template.annual && step == 12 -> "every year"
-            template.annual -> "every ${step / 12} years"
+            template.annual == true && step == 12 -> "every year"
+            template.annual == true -> "every ${step / 12} years"
             step == 1 -> "every month"
             else -> "every $step months"
         }
@@ -277,7 +322,7 @@ private fun TemplateTile(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Grip(Modifier.padding(end = 4.dp))
-        TemplateGlyph(template?.let { TemplateKind.of(it) }, Metro.accent.text, Modifier.padding(end = 10.dp))
+        TemplateGlyph(template?.look, Metro.accent.text, Modifier.padding(end = 10.dp))
         Column(Modifier.weight(1f)) {
             MetroText(
                 if (template == null) TemplateEditorCopy.UNREADABLE else TemplateWords.title(template, currency, options),
@@ -313,6 +358,7 @@ internal fun PriorityBadge(
         when (template) {
             is Template.Remainder -> "last"
             is Template.Goal -> "goal"
+            is Template.Limit -> "cap"
             else -> priority.toString()
         }
     val filled = priority != null
@@ -549,14 +595,25 @@ fun TemplateEditorScreen(
     var amount by remember(initial) {
         mutableStateOf(
             when (initial) {
-                is Template.Simple -> edit(initial.monthly ?: initial.limit)
+                is Template.Simple -> edit(initial.monthly ?: initial.limit?.amount)
+                is Template.Periodic -> edit(initial.amount)
                 is Template.By -> edit(initial.amount)
                 is Template.Goal -> edit(initial.amount)
                 else -> ""
             }.let { if (it == edit(BigDecimal.ZERO)) "" else it },
         )
     }
-    var cap by remember(initial) { mutableStateOf(if (initial is Template.Simple && initial.monthly != null) edit(initial.limit) else "") }
+    var cap by remember(initial) {
+        mutableStateOf(
+            if (initial is Template.Simple &&
+                initial.monthly != null
+            ) {
+                edit(initial.limit?.amount)
+            } else {
+                ""
+            },
+        )
+    }
     var byMonth by remember(initial) { mutableStateOf((initial as? Template.By)?.month ?: month.plusMonths(11)) }
     val repeats = listOf("once", "every month", "every year", "every … months", "every … years")
     var repeat by remember(initial) {
@@ -565,8 +622,8 @@ fun TemplateEditorScreen(
                 val step = by.repeatMonths
                 when {
                     step == null -> 0
-                    by.annual && step == 12 -> 2
-                    by.annual -> 4
+                    by.annual == true && step == 12 -> 2
+                    by.annual == true -> 4
                     step == 1 -> 1
                     else -> 3
                 }
@@ -575,7 +632,19 @@ fun TemplateEditorScreen(
     }
     var count by remember(initial) {
         mutableStateOf(
-            (initial as? Template.By)?.let { by -> by.repeatMonths?.let { if (by.annual) it / 12 else it } }?.takeIf { it >= 2 }?.toString()
+            (initial as? Template.By)
+                ?.let { by ->
+                    by.repeatMonths?.let {
+                        if (by.annual ==
+                            true
+                        ) {
+                            it / 12
+                        } else {
+                            it
+                        }
+                    }
+                }?.takeIf { it >= 2 }
+                ?.toString()
                 ?: "2",
         )
     }
@@ -593,18 +662,23 @@ fun TemplateEditorScreen(
             TemplateKind.MONTHLY ->
                 read(amount)?.takeIf { it.signum() > 0 }?.let { monthly ->
                     val limit = read(cap)
-                    if (cap.isNotBlank() && limit == null) null else Template.Simple(monthly, limit, priority)
+                    when {
+                        cap.isNotBlank() && limit == null -> null
+                        // A monthly repeating automation stays one, keeping the day it started from.
+                        initial is Template.Periodic && limit == null -> initial.copy(amount = monthly, priority = priority)
+                        else -> Template.Simple(monthly, limit?.let { TemplateLimit(it) }, priority)
+                    }
                 }
-            TemplateKind.CAP -> read(amount)?.takeIf { it.signum() > 0 }?.let { Template.Simple(null, it, priority) }
+            TemplateKind.CAP -> read(amount)?.takeIf { it.signum() > 0 }?.let { Template.Simple(null, TemplateLimit(it), priority) }
             TemplateKind.BY_DATE ->
                 read(amount)?.takeIf { it.signum() > 0 }?.let { total ->
                     val n = count.toIntOrNull()?.takeIf { it >= 2 }
                     when (repeat) {
-                        0 -> Template.By(total, byMonth, null, annual = false, repeat = null, priority = priority)
-                        1 -> Template.By(total, byMonth, 1, annual = false, repeat = 1, priority = priority)
-                        2 -> Template.By(total, byMonth, 12, annual = true, repeat = null, priority = priority)
-                        3 -> n?.let { Template.By(total, byMonth, it, annual = false, repeat = it, priority = priority) }
-                        else -> n?.let { Template.By(total, byMonth, 12 * it, annual = true, repeat = it, priority = priority) }
+                        0 -> Template.By(total, byMonth, annual = null, repeat = null, priority = priority)
+                        1 -> Template.By(total, byMonth, annual = false, repeat = 1, priority = priority)
+                        2 -> Template.By(total, byMonth, annual = true, repeat = null, priority = priority)
+                        3 -> n?.let { Template.By(total, byMonth, annual = false, repeat = it, priority = priority) }
+                        else -> n?.let { Template.By(total, byMonth, annual = true, repeat = it, priority = priority) }
                     }
                 }
             TemplateKind.SCHEDULE -> schedule.takeIf { it.isNotBlank() }?.let { Template.Schedule(it, full, priority) }
