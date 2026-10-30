@@ -131,6 +131,15 @@ internal interface ShellHost {
     /** Reads [categoryId]'s note, for its templates. */
     fun loadCategoryNote(categoryId: String)
 
+    /** Edit mode's templates: fill its boxes rather than writing. */
+    fun applyTemplatesInBudgetEdit(overwrite: Boolean)
+
+    /** After a write to the month: repaints it, sends what is unsent, and repaints again. */
+    suspend fun afterMonthWrite(budgetId: String)
+
+    /** Puts [route] in place of the page on top, so back skips the one it replaced. */
+    fun replaceRoute(route: ShellRoute)
+
     /** Edit mode's move: changes the amounts being edited rather than writing. */
     fun moveInBudgetEdit(
         fromCategoryId: String,

@@ -35,7 +35,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.time.YearMonth
 
@@ -60,7 +59,6 @@ class ShellViewModel(
     internal val history = ArrayDeque<ShellRoute>()
 
     /** Category note saves, written in the order they were made. */
-    internal val noteWrites = Mutex()
 
     private val _state =
         MutableStateFlow(
@@ -154,7 +152,13 @@ class ShellViewModel(
 
             override val shellGate get() = this@ShellViewModel.shellGate
 
-            override fun loadCategoryNote(categoryId: String) = this@ShellViewModel.loadCategoryNote(categoryId)
+            override fun loadCategoryNote(categoryId: String) = templates.loadNote(categoryId)
+
+            override fun applyTemplatesInBudgetEdit(overwrite: Boolean) = this@ShellViewModel.applyTemplatesInBudgetEdit(overwrite)
+
+            override suspend fun afterMonthWrite(budgetId: String) = this@ShellViewModel.afterMonthWrite(budgetId)
+
+            override fun replaceRoute(route: ShellRoute) = this@ShellViewModel.replaceRoute(route)
 
             override fun moveInBudgetEdit(
                 fromCategoryId: String,
@@ -214,6 +218,9 @@ class ShellViewModel(
 
     /** The get started list over a budget made on this phone. */
     val getStarted: GetStartedHolder = GetStartedHolder(host, envelopes)
+
+    /** Templates: checking and applying them, the tiles on a category page, and the priority lanes. */
+    val templates: TemplatesHolder = TemplatesHolder(host)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -415,12 +422,12 @@ class ShellViewModel(
             _state.update { it.copy(fillConfirm = null) }
             return true
         }
-        if (current.templateConfirm != null) {
-            _state.update { it.copy(templateConfirm = null) }
+        if (current.templates.confirm != null) {
+            _state.update { it.copy(templates = it.templates.copy(confirm = null)) }
             return true
         }
-        if (current.templateApplyPreview != null && current.route == ShellRoute.Templates) {
-            _state.update { it.copy(templateApplyPreview = null) }
+        if (current.templates.applyPreview != null && current.route == ShellRoute.Templates) {
+            _state.update { it.copy(templates = it.templates.copy(applyPreview = null)) }
             return true
         }
         if (current.accountForceConfirm != null) {

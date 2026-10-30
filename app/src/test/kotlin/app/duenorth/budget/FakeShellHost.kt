@@ -71,6 +71,16 @@ internal class FakeShellHost(
 
     override fun startBudgetEdit() = Unit
 
+    override fun applyTemplatesInBudgetEdit(overwrite: Boolean) = Unit
+
+    override suspend fun afterMonthWrite(budgetId: String) = Unit
+
+    val replaced = mutableListOf<ShellRoute>()
+
+    override fun replaceRoute(route: ShellRoute) {
+        replaced += route
+    }
+
     override fun openNewSchedule() = Unit
 
     override fun forgetMonths() = Unit

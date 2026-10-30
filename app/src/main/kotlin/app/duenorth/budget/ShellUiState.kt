@@ -30,9 +30,6 @@ import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.ScheduleDetails
 import app.duenorth.budget.core.ScheduleDraft
 import app.duenorth.budget.core.ScheduleSummary
-import app.duenorth.budget.core.Template
-import app.duenorth.budget.core.TemplatePlan
-import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.WriteResult
 import app.duenorth.budget.core.activeInstance
 import kotlinx.coroutines.launch
@@ -118,21 +115,7 @@ data class ShellUiState(
     val rulesList: List<RuleSummary> = emptyList(),
     val ruleDraft: RuleDraft? = null,
     val reports: ReportsUi = ReportsUi(),
-    val templateResult: TemplateResult? = null,
-    val templateBusy: Boolean = false,
-    val templateConfirm: String? = null,
-    /** The open category's note while templates are on; null until read. */
-    val categoryNote: String? = null,
-    /** What each of the note's template lines asks for in the open month, in line order (null for none). */
-    val categoryTemplateAmounts: List<Long?> = emptyList(),
-    /** The template being edited and what it would give this month. */
-    val templatePreview: Pair<Template, Long?>? = null,
-    /** Schedule names a schedule template can pay. */
-    val templateSchedules: List<String> = emptyList(),
-    /** Every category's templates in priority lanes, for the templates screen; null until worked out. */
-    val templatePlan: TemplatePlan? = null,
-    /** What apply or overwrite would change, shown before it does. */
-    val templateApplyPreview: TemplateApplyPreview? = null,
+    val templates: TemplatesUi = TemplatesUi(),
     val bankLink: BankLinkUi? = null,
     /** First-run progress while the phone has no budget (spec 011); null otherwise. */
     val onboarding: OnboardingUi? = null,

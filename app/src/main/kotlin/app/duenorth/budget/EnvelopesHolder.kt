@@ -30,7 +30,7 @@ class EnvelopesHolder internal constructor(
 
     fun openBudget(categoryId: String) {
         host.push(ShellRoute.CategoryBudget(categoryId))
-        host.mutate { it.copy(editError = null, categoryNote = null) }
+        host.mutate { it.copy(editError = null, templates = it.templates.copy(note = null)) }
         host.loadCategoryNote(categoryId)
     }
 

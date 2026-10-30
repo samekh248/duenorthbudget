@@ -247,17 +247,17 @@ class BudgetEditTest {
         // The screen shows the switch at once, but the file is written after; templates read the file.
         awaitMain { library.readFormatPrefs(model.state.value.settings.openBudgetId!!).templatesOn }
         model.envelopes.openBudget("c-gas")
-        awaitMain { model.state.value.categoryNote != null }
-        model.saveCategoryNote("#template 123")
+        awaitMain { model.state.value.templates.note != null }
+        model.templates.saveNote("#template 123")
         awaitMain { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }
         model.back()
         val before = model.state.value.shell!!
         model.startBudgetEdit()
-        model.openTemplates()
+        model.templates.open()
         assertEquals(ShellRoute.Templates, model.state.value.route)
-        model.applyTemplates(overwrite = true)
-        awaitMain { model.state.value.templateResult is TemplateResult.Applied }
-        assertNull(model.state.value.templateConfirm)
+        model.templates.apply(overwrite = true)
+        awaitMain { model.state.value.templates.result is TemplateResult.Applied }
+        assertNull(model.state.value.templates.confirm)
         assertEquals(12_300L, model.edit().budgeted["c-gas"])
         settleMain()
         assertEquals(before.category("c-gas")!!.budgetedMinor, model.saved().category("c-gas")!!.budgetedMinor)

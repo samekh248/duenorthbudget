@@ -50,15 +50,15 @@ internal fun CategoryBudgetRoute(
                 onToggleCarryover = model.envelopes::toggleCarryover,
                 modifier = inner,
                 showName = false,
-                note = state.categoryNote.takeIf { state.formatPrefs.templatesOn },
-                onSaveNote = model::saveCategoryNoteText,
-                templateAmounts = state.categoryTemplateAmounts,
-                onOpenTemplate = model::openTemplate,
-                onMoveTemplate = model::moveTemplate,
+                note = state.templates.note.takeIf { state.formatPrefs.templatesOn },
+                onSaveNote = model.templates::saveNoteText,
+                templateAmounts = state.templates.amounts,
+                onOpenTemplate = model.templates::openTemplate,
+                onMoveTemplate = model.templates::move,
                 recent = state.categoryMonth,
                 onSeeAll = { model.openReviewCategory(route.categoryId) },
             )
-            LaunchedEffect(state.categoryNote, shell.month) { model.refreshTemplateAmounts() }
+            LaunchedEffect(state.templates.note, shell.month) { model.templates.refreshAmounts() }
             // Read again whenever the month's figures change, so a saved transaction shows.
             LaunchedEffect(route.categoryId, shell) { model.loadCategoryMonth(route.categoryId) }
         }
@@ -145,7 +145,7 @@ internal fun TemplateKindsRoute(
             categoryName = category.name,
             line =
                 route.index?.let { index ->
-                    state.categoryNote?.let {
+                    state.templates.note?.let {
                         TemplateNote
                             .parse(it)
                             .entries
@@ -153,8 +153,8 @@ internal fun TemplateKindsRoute(
                             ?.line
                     }
                 },
-            onPick = model::pickTemplateKind,
-            onRemove = model::removeTemplate,
+            onPick = model.templates::pickKind,
+            onRemove = model.templates::remove,
             modifier = modifier,
         )
     }
@@ -179,16 +179,16 @@ internal fun TemplateEditorRoute(
             isNew = route.index == null,
             month = shell.month,
             currency = shell.currency,
-            schedules = state.templateSchedules,
+            schedules = state.templates.schedules,
             sources =
                 listOf(
                     PercentSource(TemplateLines.ALL_INCOME, TemplateLines.ALL_INCOME),
                     PercentSource(TemplateLines.AVAILABLE_FUNDS, TemplateLines.AVAILABLE_FUNDS),
                 ) + shell.incomeGroups.flatMap { it.categories }.map { PercentSource(it.name, it.name) },
-            preview = state.templatePreview,
-            onPreview = model::previewTemplate,
-            onSave = model::saveTemplate,
-            onRemove = model::removeTemplate,
+            preview = state.templates.preview,
+            onPreview = model.templates::preview,
+            onSave = model.templates::save,
+            onRemove = model.templates::remove,
             modifier = modifier,
         )
     }
@@ -201,28 +201,28 @@ internal fun TemplatesRoute(
     modifier: Modifier,
 ) {
     // A note saved from a chip's form (or a chip moved) changes the lanes.
-    LaunchedEffect(state.undoLabel) { model.refreshTemplatePlan() }
+    LaunchedEffect(state.undoLabel) { model.templates.refreshPlan() }
     TemplatesScreen(
         month = state.budgetEdit?.month ?: state.pinnedMonth ?: state.openMonth,
-        result = state.templateResult,
-        busy = state.templateBusy,
-        confirm = state.templateConfirm,
+        result = state.templates.result,
+        busy = state.templates.busy,
+        confirm = state.templates.confirm,
         onCheck = {
-            model.checkTemplates()
-            model.refreshTemplatePlan()
+            model.templates.check()
+            model.templates.refreshPlan()
         },
-        onApply = { model.previewApplyTemplates(overwrite = false) },
-        onOverwrite = { model.previewApplyTemplates(overwrite = true) },
-        onConfirm = model::confirmTemplateOverwrite,
-        onKeep = model::keepTemplates,
+        onApply = { model.templates.previewApply(overwrite = false) },
+        onOverwrite = { model.templates.previewApply(overwrite = true) },
+        onConfirm = model.templates::confirmOverwrite,
+        onKeep = model.templates::keep,
         modifier = modifier,
-        plan = state.templatePlan,
+        plan = state.templates.plan,
         currency = state.shell?.currency,
-        applyPreview = state.templateApplyPreview,
-        onOpenChip = model::openTemplateChip,
-        onMoveChip = model::moveTemplateToPriority,
-        onConfirmPreview = model::confirmApplyPreview,
-        onKeepPreview = model::keepApplyPreview,
+        applyPreview = state.templates.applyPreview,
+        onOpenChip = model.templates::openChip,
+        onMoveChip = model.templates::moveToPriority,
+        onConfirmPreview = model.templates::confirmApplyPreview,
+        onKeepPreview = model.templates::keepApplyPreview,
     )
 }
 

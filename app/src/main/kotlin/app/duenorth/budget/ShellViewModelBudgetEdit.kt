@@ -101,19 +101,18 @@ fun ShellViewModel.applyTemplatesInBudgetEdit(overwrite: Boolean) {
     val edit = state.value.budgetEdit ?: return
     val budgetId = edit.budgetId ?: return
     val month = edit.month ?: return
-    mutate { it.copy(templateBusy = true, templateConfirm = null) }
+    mutate { it.copy(templates = it.templates.copy(busy = true, confirm = null)) }
     viewModelScope.launch {
         val (result, amounts) =
             withContext(io) { library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
         mutate { current ->
             val open = current.budgetEdit?.takeIf { it.budgetId == budgetId && it.month == month }
             if (open == null || result !is TemplateResult.Applied) {
-                current.copy(templateResult = result, templateBusy = false)
+                current.copy(templates = current.templates.copy(result = result, busy = false))
             } else {
                 current.copy(
                     budgetEdit = open.copy(budgeted = open.budgeted + amounts, templates = (open.templates ?: false) || overwrite),
-                    templateResult = result,
-                    templateBusy = false,
+                    templates = current.templates.copy(result = result, busy = false),
                 )
             }
         }
