@@ -275,6 +275,8 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSearch = model.register::toggleSearch,
                     onRemoveTemplate = model.templates::remove,
                     onAddTemplate = { model.templates.openKinds() },
+                    onToAutomations = model.templates::switchToAutomations,
+                    onToNotes = model.templates::switchToNotes,
                     onMoveCategory = model.envelopes::openMove,
                     onAutoHold = model.month::chooseAutoHold,
                     onSelectInbox = model.inbox::startSelecting,

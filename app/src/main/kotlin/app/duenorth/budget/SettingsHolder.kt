@@ -135,6 +135,8 @@ class SettingsHolder internal constructor(
     ) {
         val preference = feature.preference
         if (preference == null) setPhoneFeature(feature, enabled) else setOpenBudgetPreference(preference, if (enabled) "true" else "false")
+        // As desktop does, turning a feature off turns off the ones that sit under it.
+        if (!enabled) ExperimentalFeature.entries.filter { it.parent == feature }.forEach { setExperimentalFeature(it, false) }
     }
 
     /** A feature with no Actual flag is this phone's setting; nothing goes into the budget file. */
@@ -144,7 +146,7 @@ class SettingsHolder internal constructor(
     ) {
         when (feature) {
             ExperimentalFeature.FREE_AFTER_PLANS -> save(state.settings.copy(freeAfterPlans = enabled))
-            ExperimentalFeature.TEMPLATES -> Unit
+            ExperimentalFeature.TEMPLATES, ExperimentalFeature.AUTOMATIONS -> Unit
         }
     }
 
@@ -369,6 +371,7 @@ class SettingsHolder internal constructor(
                 "flags.experimental" -> state.formatPrefs.copy(experimental = value == "true", experimentalAsked = true)
                 "learn-categories" -> state.formatPrefs.copy(learnCategories = value == "true")
                 "flags.goalTemplatesEnabled" -> state.formatPrefs.copy(goalTemplates = value == "true")
+                "flags.goalTemplatesUIEnabled" -> state.formatPrefs.copy(goalTemplatesUI = value == "true")
                 else -> state.formatPrefs
             }
         if (showing) {

@@ -195,7 +195,7 @@ class TemplatesHolder internal constructor(
     /** Category page → add template, or (with [index]) a line that does not read: the grid of kinds. */
     fun openKinds(index: Int? = null) {
         val categoryId = openCategoryId() ?: return
-        if (state.templates.automations != null) return
+        if (!editable()) return
         host.push(ShellRoute.TemplateKinds(categoryId, index))
         loadSchedules()
     }
@@ -203,9 +203,16 @@ class TemplatesHolder internal constructor(
     /** A tile tapped: its form, or the kinds grid for a line that does not read. */
     fun openTemplate(index: Int) {
         val categoryId = openCategoryId() ?: return
-        if (state.templates.automations != null) return
-        val entry = state.templates.note?.let { TemplateNote.parse(it).entries.getOrNull(index) } ?: return
-        val template = entry.template ?: return openKinds(index)
+        if (!editable()) return
+        val automations = state.templates.automations
+        val template =
+            if (automations != null) {
+                // One the phone cannot run stays as desktop wrote it.
+                automations.entries.getOrNull(index)?.template ?: return
+            } else {
+                val entry = state.templates.note?.let { TemplateNote.parse(it).entries.getOrNull(index) } ?: return
+                entry.template ?: return openKinds(index)
+            }
         host.mutate { it.copy(templates = it.templates.copy(preview = null)) }
         host.push(ShellRoute.TemplateEditor(categoryId, index, TemplateKind.of(template)))
         loadSchedules()
@@ -221,6 +228,12 @@ class TemplatesHolder internal constructor(
     /** Saves the form's template into the note (as a new line or in place of the one edited) and goes back. */
     fun save(template: Template) {
         val route = state.route as? ShellRoute.TemplateEditor ?: return
+        state.templates.automations?.let { automations ->
+            val index = route.index?.takeIf { it in automations.entries.indices }
+            saveAutomations(if (index == null) automations.add(template) else automations.replace(index, template))
+            host.back()
+            return
+        }
         val split = TemplateNote.parse(state.templates.note ?: return)
         val index = route.index?.takeIf { it in split.entries.indices }
         saveNote(if (index == null) split.add(template) else split.replace(index, template))
@@ -235,6 +248,12 @@ class TemplatesHolder internal constructor(
                 is ShellRoute.TemplateKinds -> route.index
                 else -> null
             } ?: return
+        state.templates.automations?.let { automations ->
+            if (index !in automations.entries.indices) return
+            saveAutomations(automations.remove(index))
+            host.back()
+            return
+        }
         val split = TemplateNote.parse(state.templates.note ?: return)
         if (index !in split.entries.indices) return
         saveNote(split.remove(index))
@@ -246,9 +265,59 @@ class TemplatesHolder internal constructor(
         from: Int,
         to: Int,
     ) {
+        state.templates.automations?.let { automations ->
+            if (from in automations.entries.indices && editable()) saveAutomations(automations.move(from, to))
+            return
+        }
         val split = TemplateNote.parse(state.templates.note ?: return)
         if (from !in split.entries.indices) return
         saveNote(split.move(from, to))
+    }
+
+    /** A notes category's templates can always change here; budget automations only while they are on for the budget. */
+    private fun editable(): Boolean = state.templates.automations == null || state.formatPrefs.automationsOn
+
+    /** Saves the open category's automations as one undo step; they run from `goal_def` on the next fill. */
+    private fun saveAutomations(automations: CategoryAutomations) {
+        val budgetId = state.settings.openBudgetId ?: return
+        val categoryId = openCategoryId() ?: return
+        host.mutate { it.copy(templates = it.templates.copy(automations = automations)) }
+        host.scope.launch {
+            noteWrites.withLock { withContext(host.io) { host.library.saveCategoryAutomations(budgetId, categoryId, automations) } }
+            host.mutate { it.copy(undoLabel = host.library.undoLabel(budgetId)) }
+            withContext(host.io) { runCatching { host.sync.sendUnsent(budgetId) } }
+        }
+    }
+
+    /** Category page ••• → switch to automations: its note's template lines become its automations; the note stays. */
+    fun switchToAutomations() = switchSource(toAutomations = true)
+
+    /** Category page ••• → back to notes: its automations are written into the note, which owns the category again. */
+    fun switchToNotes() = switchSource(toAutomations = false)
+
+    private fun switchSource(toAutomations: Boolean) {
+        val budgetId = state.settings.openBudgetId ?: return
+        val categoryId = (state.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
+        if (!state.formatPrefs.automationsOn) return
+        host.scope.launch {
+            val switched =
+                noteWrites.withLock {
+                    withContext(host.io) {
+                        if (toAutomations) {
+                            host.library.migrateCategoryAutomations(budgetId, categoryId) != null
+                        } else {
+                            host.library.unmigrateCategoryAutomations(budgetId, categoryId)
+                        }
+                    }
+                }
+            if (!switched) {
+                host.mutate { it.copy(editError = if (toAutomations) AutomationCopy.CANT_SWITCH else AutomationCopy.CANT_RETURN) }
+                return@launch
+            }
+            host.mutate { it.copy(editError = null, undoLabel = host.library.undoLabel(budgetId)) }
+            loadNote(categoryId)
+            withContext(host.io) { runCatching { host.sync.sendUnsent(budgetId) } }
+        }
     }
 
     /** What the form's template would give this month, shown under the form. */
@@ -386,7 +455,9 @@ class TemplatesHolder internal constructor(
 
 /** The template a form starts from: the line being edited, or a new one of its kind after the category's others. */
 fun ShellUiState.templateDraftStart(route: ShellRoute.TemplateEditor): Template {
-    val entries = templates.note?.let { TemplateNote.parse(it).entries }.orEmpty()
+    val entries =
+        templates.automations?.entries?.map { TemplateNote.Entry(it.type.orEmpty(), it.template) }
+            ?: templates.note?.let { TemplateNote.parse(it).entries }.orEmpty()
     val current = route.index?.let { entries.getOrNull(it)?.template }
     if (current != null && TemplateKind.of(current) == route.kind) return current
     val priorities = entries.mapNotNull { it.template?.priority }

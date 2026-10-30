@@ -42,7 +42,7 @@ object TemplateJson {
         val array = runCatching { Json.parseToJsonElement(goalDef) }.getOrNull() as? JsonArray ?: return listOf(Stored(null, null))
         return array.map { element ->
             val obj = element as? JsonObject
-            Stored(obj?.text("type"), obj?.let { runCatching { template(it, scheduleName) }.getOrNull() })
+            Stored(obj?.text("type"), obj?.let { runCatching { template(it, scheduleName) }.getOrNull() }, obj)
         }
     }
 
@@ -50,7 +50,15 @@ object TemplateJson {
     data class Stored(
         val type: String?,
         val template: Template?,
-    )
+        /** The object as stored, written back unchanged while the phone has not edited it (it may hold more than [template]). */
+        val raw: JsonObject? = null,
+    ) {
+        fun toJson(): JsonObject = raw ?: template?.toJson() ?: JsonObject(emptyMap())
+
+        companion object {
+            fun of(template: Template) = Stored(template.toJson().text("type"), template)
+        }
+    }
 
     private fun template(
         obj: JsonObject,
@@ -128,4 +136,35 @@ data class CategoryAutomations(
     val runnable: Boolean get() = entries.all { it.template != null }
 
     val templates: List<Template> get() = entries.mapNotNull { it.template }
+
+    fun add(template: Template) = CategoryAutomations(entries + TemplateJson.Stored.of(template))
+
+    fun replace(
+        index: Int,
+        template: Template,
+    ) = CategoryAutomations(entries.toMutableList().also { it[index] = TemplateJson.Stored.of(template) })
+
+    fun remove(index: Int) = CategoryAutomations(entries.filterIndexed { i, _ -> i != index })
+
+    /** As [TemplateNote.move]: the category's priorities stay the same numbers, handed out again in the new order. */
+    fun move(
+        from: Int,
+        to: Int,
+    ): CategoryAutomations {
+        if (from == to) return this
+        val moved = entries.toMutableList().apply { add(to.coerceIn(0, size - 1), removeAt(from)) }
+        val priorities = moved.mapNotNull { it.template?.priority }.sorted()
+        var next = 0
+        return CategoryAutomations(
+            moved.map { entry ->
+                val template = entry.template
+                if (template?.priority == null) return@map entry
+                val priority = priorities[next++]
+                if (priority == template.priority) entry else TemplateJson.Stored.of(template.withPriority(priority))
+            },
+        )
+    }
+
+    /** `goal_def` as desktop stores it; null with no automations left. */
+    fun goalDef(): String? = if (entries.isEmpty()) null else JsonArray(entries.map { it.toJson() }).toString()
 }

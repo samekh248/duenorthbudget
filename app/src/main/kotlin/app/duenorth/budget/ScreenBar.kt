@@ -105,8 +105,10 @@ object ScreenBar {
         accountForceConfirm: Boolean = false,
         /** An open account is linked through SimpleFIN and the budget lives on a server, so the accounts bar can bank sync. */
         accountsBankSync: Boolean = false,
-        /** The open category's templates are desktop's budget automations, which the phone does not add to yet. */
+        /** The open category's templates are its budget automations (`goal_def`), not lines in its note. */
         categoryAutomations: Boolean = false,
+        /** Budget automations are on for the budget, so a category can be switched to them and back, and edited. */
+        automationsOn: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -298,7 +300,18 @@ object ScreenBar {
                     buildList {
                         addAll(saveCancel())
                         add(spec("move", AppGlyph.Transfer, EnvelopeCopy.MOVE))
-                        if (templates && !categoryAutomations) add(menu("add-template", AppGlyph.Add, TemplateEditorCopy.ADD))
+                        if (templates &&
+                            (!categoryAutomations || automationsOn)
+                        ) {
+                            add(menu("add-template", AppGlyph.Add, TemplateEditorCopy.ADD))
+                        }
+                        if (templates && automationsOn) {
+                            if (categoryAutomations) {
+                                add(menu("to-notes", AppGlyph.Cancel, AutomationCopy.TO_NOTES))
+                            } else {
+                                add(menu("to-automations", AppGlyph.Average, AutomationCopy.TO_AUTOMATIONS))
+                            }
+                        }
                         if (mode != BudgetMode.TRACKING) add(menu("to-budget", AppGlyph.Transfer, MonthActionCopy.TRANSFER))
                     }
                 }
@@ -381,6 +394,7 @@ object ScreenBar {
                     .orEmpty()
                     .any { it.bankSync && !it.closed },
             categoryAutomations = state.templates.automations != null,
+            automationsOn = state.formatPrefs.automationsOn,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -552,6 +566,8 @@ class ScreenBarHandlers(
     val onSearch: () -> Unit = {},
     val onRemoveTemplate: () -> Unit = {},
     val onAddTemplate: () -> Unit = {},
+    val onToAutomations: () -> Unit = {},
+    val onToNotes: () -> Unit = {},
     val onMoveCategory: () -> Unit = {},
     val onAutoHold: (AutoHoldChoice) -> Unit = {},
 ) {
@@ -623,6 +639,8 @@ class ScreenBarHandlers(
             "cancel-budget-edit" -> onCancelBudgetEdit
             "remove-template" -> onRemoveTemplate
             "add-template" -> onAddTemplate
+            "to-automations" -> onToAutomations
+            "to-notes" -> onToNotes
             "move" -> onMoveCategory
             "auto-hold-on" -> ({ onAutoHold(AutoHoldChoice.ON) })
             "auto-hold-off-month" -> ({ onAutoHold(AutoHoldChoice.OFF_THIS_MONTH) })

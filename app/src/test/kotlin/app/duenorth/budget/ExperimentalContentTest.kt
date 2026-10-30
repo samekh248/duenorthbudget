@@ -107,4 +107,27 @@ class ExperimentalContentTest {
         compose.onNodeWithTag("experimental-templates-switch-on", useUnmergedTree = true).performClick()
         assertEquals(ExperimentalFeature.TEMPLATES to true, flipped)
     }
+
+    @Test
+    fun budgetAutomationsSitUnderBudgetTemplates() {
+        compose.setContent {
+            MetroTheme { ExperimentalItem(FormatPrefs(experimental = true), {}, { _, _ -> }) }
+        }
+        compose.onNodeWithTag("experimental-automations-switch").assertDoesNotExist()
+        compose.onAllNodesWithText(ExperimentalCopy.NEEDS_PARENT).assertCountEquals(1)
+    }
+
+    @Test
+    fun turningTemplatesOffTurnsAutomationsOff() {
+        val (model, library) = household("experimental-automations")
+        val budgetId = model.state.value.settings.openBudgetId!!
+        model.settingsUi.setExperimental(true)
+        model.settingsUi.setExperimentalFeature(ExperimentalFeature.TEMPLATES, true)
+        model.settingsUi.setExperimentalFeature(ExperimentalFeature.AUTOMATIONS, true)
+        assertTrue(model.state.value.formatPrefs.automationsOn)
+        await { library.readFormatPrefs(budgetId).automationsOn }
+        model.settingsUi.setExperimentalFeature(ExperimentalFeature.TEMPLATES, false)
+        assertFalse(model.state.value.formatPrefs.goalTemplatesUI)
+        await { !library.readFormatPrefs(budgetId).goalTemplatesUI }
+    }
 }

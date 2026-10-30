@@ -142,6 +142,7 @@ class BudgetLibrary(
                 budgetType = value("budgetType") ?: "envelope",
                 learnCategories = value("learn-categories") != "false",
                 goalTemplates = value("flags.goalTemplatesEnabled") == "true",
+                goalTemplatesUI = value("flags.goalTemplatesUIEnabled") == "true",
             )
         } ?: FormatPrefs()
 
@@ -921,6 +922,24 @@ class BudgetLibrary(
         budgetId: String,
         categoryId: String,
     ): CategoryAutomations? = open(budgetId) { CategoryNotes.automations(it, categoryId) }
+
+    fun saveCategoryAutomations(
+        budgetId: String,
+        categoryId: String,
+        automations: CategoryAutomations,
+    ): Boolean = edit(budgetId, UndoCopy.AUTOMATIONS) { CategoryNotes.saveAutomations(it, categoryId, automations) } != null
+
+    /** Switch a notes category to budget automations; null when a template line does not read, so nothing moved. */
+    fun migrateCategoryAutomations(
+        budgetId: String,
+        categoryId: String,
+    ): CategoryAutomations? = edit(budgetId, UndoCopy.TO_AUTOMATIONS) { CategoryNotes.migrate(it, categoryId) }
+
+    /** Write a category's automations back into its note; false when one cannot be written as a line. */
+    fun unmigrateCategoryAutomations(
+        budgetId: String,
+        categoryId: String,
+    ): Boolean = edit(budgetId, UndoCopy.TO_NOTES) { CategoryNotes.unmigrate(it, categoryId) } == true
 
     fun saveCategoryNote(
         budgetId: String,
