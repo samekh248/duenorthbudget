@@ -23,3 +23,4 @@ rootProject.name = "DueNorthBudget"
 include(":app")
 include(":core:budget")
 include(":core:design")
+include(":core:samples")

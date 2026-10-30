@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.time.LocalDate
 import java.time.YearMonth
 import java.util.UUID
 import java.util.zip.ZipEntry
@@ -405,17 +406,13 @@ class BudgetLibrary(
     }
 
     /**
-     * Creates a local budget filled from a [MockBudgets] dataset (debug tooling).
-     * Uses the dataset title as the budget name and USD unless the seed overrides currency.
+     * Creates a local budget named [budgetName] and fills it with [seed], given the new file's session and today
+     * (the sample budgets debug builds offer, see [SampleBudgets]).
      */
-    fun createFromMock(
-        datasetId: String,
-        name: String? = null,
+    fun createSeeded(
+        budgetName: String,
+        seed: (SqlSession, LocalDate) -> Unit,
     ): CreateResult {
-        val dataset = MockBudgets.byId(datasetId) ?: return CreateResult.Rejected(ShellCopy.UNKNOWN_SAMPLE)
-        val budgetName = name?.trim()?.ifEmpty { null } ?: dataset.title
-        // The brand new sample is the file a release build makes, so its get started list can be tried.
-        if (dataset.id == MockBudgets.BRAND_NEW) return create(budgetName, "USD")
         val id = ids()
         val dir = File(root, id)
         dir.mkdirs()
@@ -428,7 +425,7 @@ class BudgetLibrary(
                 ActualSchema.create(session)
                 ActualSchema.ensure(session)
                 SyncSchema.ensure(session)
-                MockBudgets.seed(session, dataset.id, clock.today())
+                seed(session, clock.today())
             }
             save(settings().copy(openBudgetId = id))
             CreateResult.Created(id)

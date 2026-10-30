@@ -9,6 +9,7 @@ import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.MemorySecretStore
 import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.SyncCoordinator
+import app.duenorth.budget.core.createFromMock
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Test

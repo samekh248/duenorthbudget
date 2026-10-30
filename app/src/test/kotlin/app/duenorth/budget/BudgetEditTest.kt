@@ -16,6 +16,7 @@ import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.UndoCopy
+import app.duenorth.budget.core.createFromMock
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

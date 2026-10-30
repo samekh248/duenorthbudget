@@ -36,6 +36,10 @@ jobs:
       - name: Debug APK
         run: ./gradlew :app:assembleDebug
 
+      # Release builds have their own source set (no sample budgets), so compile it too.
+      - name: Release compile
+        run: ./gradlew :app:compileReleaseKotlin
+
       - name: Upload screenshot diffs
         if: failure()
         uses: actions/upload-artifact@v4
