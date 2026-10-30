@@ -3,14 +3,19 @@ package app.duenorth.budget
 import app.duenorth.budget.core.CashFlowMonth
 import app.duenorth.budget.core.CashFlowReport
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.NetWorthHistory
 import app.duenorth.budget.core.NetWorthMonth
+import app.duenorth.budget.core.NetWorthPoint
 import app.duenorth.budget.core.NetWorthReport
+import app.duenorth.budget.core.NetWorthSpan
 import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsPage
 import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.core.SpendingReport
 import app.duenorth.budget.core.SpendingRow
+import java.time.LocalDate
 import java.time.YearMonth
+import java.time.temporal.ChronoUnit
 
 /** A four-month report like the `parity/reports` fixture, for the report screen tests. */
 internal object ReportSamples {
@@ -72,5 +77,25 @@ internal object ReportSamples {
             netWorth = NetWorthReport(months.map { NetWorthMonth(it, 0, 0) }, includeOffBudget = true),
             spending = SpendingReport(SpendingGroupBy.CATEGORY, emptyList()),
         )
+    }
+
+    /**
+     * Six months to 2026-10-07, a point every day and a half: a paycheck every two weeks against daily spending,
+     * a car repair in late june, and an off budget savings account opened in july.
+     */
+    fun history(): NetWorthHistory {
+        val today = LocalDate.of(2026, 10, 7)
+        val start = today.minusMonths(6)
+        val days = ChronoUnit.DAYS.between(start, today)
+        val points =
+            (0L..119L).map { step ->
+                val day = days * step / 119
+                val paychecks = day / 14 + 1
+                val repair = if (day >= 80) 95_000L else 0L
+                val on = 180_000 + paychecks * 140_000 - day * 8_500 - repair
+                val off = if (day >= 95) 70_000 + (day - 95) * 150 else 0L
+                NetWorthPoint(start.plusDays(day), on, off)
+            }
+        return NetWorthHistory(NetWorthSpan.SIX_MONTHS, usd, points)
     }
 }

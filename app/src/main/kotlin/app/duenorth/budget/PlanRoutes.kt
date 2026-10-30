@@ -114,10 +114,11 @@ internal fun NetWorthRoute(
     model: ShellViewModel,
     modifier: Modifier,
 ) {
-    NetWorthSection(
-        page = state.netWorth,
-        loading = state.loading,
-        onIncludeOffBudget = model::setNetWorthIncludeOffBudget,
+    NetWorthGraphScreen(
+        ui = state.netWorthGraph,
+        includeOffBudget = state.settings.netWorthIncludeOffBudget,
+        onSpan = model.netWorthGraph::setSpan,
+        onIncludeOffBudget = model.netWorthGraph::setIncludeOffBudget,
         modifier = modifier,
     )
 }
@@ -134,13 +135,12 @@ internal fun ReportPivotRoute(
         loading = state.reports.loading,
         preset = state.reports.preset,
         groupBy = state.reports.groupBy,
-        includeOffBudget = state.settings.netWorthIncludeOffBudget,
         onPreset = model.reports::setPreset,
         onCustom = model.reports::setRange,
         onGroupBy = model.reports::setGroupBy,
-        onIncludeOffBudget = model.reports::setIncludeOffBudget,
         modifier = modifier,
-        initialItem = route.item,
+        // A pivot saved before net worth became its own graph may point past the last item.
+        initialItem = route.item.coerceIn(0, ReportItems.headers.lastIndex),
     )
 }
 

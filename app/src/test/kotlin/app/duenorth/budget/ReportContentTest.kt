@@ -52,8 +52,6 @@ class ReportContentTest {
                     false,
                     ReportPreset.CUSTOM,
                     SpendingGroupBy.CATEGORY,
-                    true,
-                    {},
                     {},
                     {},
                     {},
@@ -75,10 +73,8 @@ class ReportContentTest {
                     false,
                     ReportPreset.CUSTOM,
                     SpendingGroupBy.CATEGORY,
-                    true,
                     {},
                     { picked += it },
-                    {},
                     {},
                 )
             }
@@ -108,11 +104,9 @@ class ReportContentTest {
                     false,
                     ReportPreset.LAST_6,
                     groupBy.value,
-                    true,
                     {},
                     {},
                     { groupBy.value = it },
-                    {},
                     initialItem = ReportItems.SPENDING,
                 )
             }
@@ -127,7 +121,7 @@ class ReportContentTest {
     @Test
     fun loadingShowsPlaceholdersNotASpinner() {
         compose.setContent {
-            MetroTheme { ReportsScreen(null, true, ReportPreset.LAST_6, SpendingGroupBy.CATEGORY, true, {}, {}, {}, {}) }
+            MetroTheme { ReportsScreen(null, true, ReportPreset.LAST_6, SpendingGroupBy.CATEGORY, {}, {}, {}) }
         }
         compose.onNodeWithTag("report-cashflow").assertExists()
         compose.onNodeWithTag("report-cashflow-totals").assertDoesNotExist()
@@ -196,8 +190,6 @@ class ReportContentTest {
         assertTrue(review.value)
         compose.onNodeWithTag("reports-hub-cashflow").performClick()
         assertEquals(ReportItems.CASH_FLOW, opened.value)
-        compose.onNodeWithTag("reports-hub-networth-months").performClick()
-        assertEquals(ReportItems.NET_WORTH, opened.value)
         compose.onNodeWithTag("reports-hub-spending").performClick()
         assertEquals(ReportItems.SPENDING, opened.value)
     }
@@ -205,7 +197,7 @@ class ReportContentTest {
     @Test
     fun reportPagesGoBackToHome() {
         val (model, _) = household("networth")
-        model.reports.openNetWorth()
+        model.netWorthGraph.open()
         assertEquals(ShellRoute.NetWorth, model.state.value.route)
         model.back()
         assertEquals(ShellRoute.Home, model.state.value.route)

@@ -102,6 +102,8 @@ data class ShellUiState(
     /** The rules' own state, kept by [RulesHolder]. */
     val rules: RulesUi = RulesUi(),
     val reports: ReportsUi = ReportsUi(),
+    /** The net worth graph's own state, kept by [NetWorthHolder]. */
+    val netWorthGraph: NetWorthUi = NetWorthUi(),
     val templates: TemplatesUi = TemplatesUi(),
     val bankLink: BankLinkUi? = null,
     /** First-run progress while the phone has no budget (spec 011); null otherwise. */

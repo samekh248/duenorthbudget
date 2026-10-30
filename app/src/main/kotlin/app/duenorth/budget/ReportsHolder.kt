@@ -19,7 +19,7 @@ data class ReportsUi(
 
 // Spec 010 US4 (T054): reports, computed on io. See contracts/reports.md.
 
-/** Reports: the hub's pages, and the cash flow, net worth by month and spending pivot over one shared range. */
+/** Reports: the hub's pages, and the cash flow and spending pivot over one shared range. */
 class ReportsHolder internal constructor(
     private val host: ShellHost,
 ) {
@@ -32,12 +32,7 @@ class ReportsHolder internal constructor(
         host.push(ShellRoute.MonthReview)
     }
 
-    /** Reports → net worth, the totals that used to sit on home. */
-    fun openNetWorth() {
-        host.push(ShellRoute.NetWorth)
-    }
-
-    /** Reports → cash flow, net worth by month, or spending: one pivot over a shared range. */
+    /** Reports → cash flow or spending: one pivot over a shared range. */
     fun open(item: Int) {
         host.push(ShellRoute.ReportPivot(item))
         load()
@@ -56,12 +51,6 @@ class ReportsHolder internal constructor(
     fun setGroupBy(groupBy: SpendingGroupBy) {
         update { it.copy(groupBy = groupBy) }
         load()
-    }
-
-    /** The same include choice as reports → net worth (spec 006). */
-    fun setIncludeOffBudget(include: Boolean) {
-        host.setNetWorthIncludeOffBudget(include)
-        update { reports -> reports.copy(page = reports.page?.let { it.copy(netWorth = it.netWorth.copy(includeOffBudget = include)) }) }
     }
 
     private fun load() {
