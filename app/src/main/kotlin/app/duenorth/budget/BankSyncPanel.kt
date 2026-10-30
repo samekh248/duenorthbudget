@@ -33,6 +33,7 @@ import app.duenorth.budget.core.BankSyncFix
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.syncSpin
 import app.duenorth.budget.design.metroTilt
@@ -73,8 +74,6 @@ object BankSyncCopy {
     const val FIX_TOKEN = "new setup token"
     const val FIX_RELINK = "link again"
     const val UNLINK = "unlink"
-    const val UNLINK_LINK = "unlink this account"
-    const val TAP_FOR_OPTIONS = "tap to fix or unlink"
 
     /** The unlink question's title, naming the account. */
     fun unlinkTitle(accountName: String) = "$UNLINK $accountName"
@@ -165,15 +164,6 @@ fun BankSyncPanel(
             }
             failures.forEach { line ->
                 MetroText(line, Metro.typography.caption, Modifier.testTag("bank-sync-error"), color = on, maxLines = 1)
-            }
-            if (failed && ui.failures.any { it.accountId.isNotEmpty() }) {
-                MetroText(
-                    BankSyncCopy.TAP_FOR_OPTIONS,
-                    Metro.typography.caption,
-                    Modifier.testTag("bank-sync-hint"),
-                    color = on.copy(alpha = 0.85f),
-                    maxLines = 1,
-                )
             }
         }
         if (failed) {
@@ -319,20 +309,10 @@ private fun ReportLine(
         if (detail != null) {
             MetroText(detail, Metro.typography.caption, color = if (error) Metro.colors.error else Metro.colors.secondary, maxLines = 2)
         }
-        if (fix != null) {
-            MetroButton(fix, Modifier.padding(top = 8.dp, bottom = 4.dp).testTag("bank-sync-fix-$name"), onFix)
-        }
-        // Unlink gives up on the bank, so it sits under the fix as a quieter link, not a second button.
-        if (onUnlink != null) {
-            Box(
-                Modifier
-                    .heightIn(min = MetroDimens.TouchTarget)
-                    .metroTilt()
-                    .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onUnlink)
-                    .testTag("bank-sync-unlink-$name"),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                MetroText(BankSyncCopy.UNLINK_LINK, Metro.typography.body, color = Metro.accent.text)
+        if (fix != null || onUnlink != null) {
+            MetroButtonGrid(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
+                if (fix != null) MetroButton(fix, Modifier.testTag("bank-sync-fix-$name"), onFix)
+                if (onUnlink != null) MetroButton(BankSyncCopy.UNLINK, Modifier.testTag("bank-sync-unlink-$name"), onUnlink)
             }
         }
     }
