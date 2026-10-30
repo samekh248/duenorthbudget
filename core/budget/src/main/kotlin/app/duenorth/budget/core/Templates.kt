@@ -372,6 +372,10 @@ class TemplateEngine(
         val errors: List<String>,
         /** The note's template lines in order, for pointing back at one line. */
         val entries: List<TemplateNote.Entry> = emptyList(),
+        /** Desktop's budget automations own it (`template_settings.source = ui`): `goal_def` is the truth, not the note. */
+        val managed: Boolean = false,
+        /** A managed category holding an automation this port cannot run yet; runs leave it exactly as it is. */
+        val unsupported: Boolean = false,
     )
 
     /** Lists bad lines; writes nothing. */
@@ -396,7 +400,8 @@ class TemplateEngine(
         val applied = mutableListOf<Category>()
         session.transaction {
             storeDefinitions(categories)
-            val candidates = categories.filter { it.visible && !it.income }
+            // A category holding an automation this port cannot run is left untouched, its goal included.
+            val candidates = categories.filter { it.visible && !it.income && !it.unsupported }
             val targets =
                 candidates.filter { category ->
                     category.templates.isNotEmpty() && (overwrite || (stats[category.id]?.budgetedMinor ?: 0L) == 0L)
@@ -531,7 +536,7 @@ class TemplateEngine(
      * by weight, then goals, which budget nothing. Lines that do not read are listed apart. Writes nothing.
      */
     fun plan(month: YearMonth): TemplatePlan {
-        val categories = categories().filter { it.visible && !it.income }
+        val categories = categories().filter { it.visible && !it.income && !it.unsupported }
         val detailed = ShellReader.loadDetailed(session, month)
         val stats = detailed.categories
         val templated = categories.filter { it.templates.isNotEmpty() }
@@ -712,33 +717,61 @@ class TemplateEngine(
             session
                 .query("SELECT id, note FROM notes")
                 .associate { it.str("id").orEmpty() to it.str("note").orEmpty() }
+        val schedules by lazy {
+            session
+                .query("SELECT id, name FROM schedules WHERE IFNULL(tombstone, 0) = 0")
+                .associate { it.str("id").orEmpty() to it.str("name") }
+        }
         return session
             .query(
                 """
-                SELECT c.id, c.name, IFNULL(c.hidden, 0) AS hidden, IFNULL(g.hidden, 0) AS group_hidden, IFNULL(c.is_income, 0) AS is_income
+                SELECT c.id, c.name, IFNULL(c.hidden, 0) AS hidden, IFNULL(g.hidden, 0) AS group_hidden, IFNULL(c.is_income, 0) AS is_income,
+                       c.goal_def, c.template_settings
                 FROM categories c LEFT JOIN category_groups g ON g.id = c.cat_group
                 WHERE IFNULL(c.tombstone, 0) = 0
                 ORDER BY g.sort_order, c.sort_order, c.id
                 """.trimIndent(),
             ).map { row ->
                 val id = row.str("id").orEmpty()
-                val entries = TemplateNote.parse(notes[id].orEmpty()).entries
-                Category(
-                    id = id,
-                    name = row.str("name").orEmpty(),
-                    visible = !row.bool("hidden") && !row.bool("group_hidden"),
-                    income = row.bool("is_income"),
-                    templates = entries.mapNotNull { it.template },
-                    errors = entries.filter { it.template == null }.map { it.line },
-                    entries = entries,
-                )
+                val name = row.str("name").orEmpty()
+                val visible = !row.bool("hidden") && !row.bool("group_hidden")
+                if (TemplateJson.managed(row.str("template_settings"))) {
+                    val read = TemplateJson.parse(row.str("goal_def")) { scheduleId -> schedules[scheduleId] }
+                    val templates = read.filterNotNull()
+                    Category(
+                        id = id,
+                        name = name,
+                        visible = visible,
+                        income = row.bool("is_income"),
+                        templates = if (read.any { it == null }) emptyList() else templates,
+                        errors = emptyList(),
+                        entries = if (read.any { it == null }) emptyList() else templates.map { TemplateNote.Entry.of(it) },
+                        managed = true,
+                        unsupported = read.any { it == null },
+                    )
+                } else {
+                    val entries = TemplateNote.parse(notes[id].orEmpty()).entries
+                    Category(
+                        id = id,
+                        name = name,
+                        visible = visible,
+                        income = row.bool("is_income"),
+                        templates = entries.mapNotNull { it.template },
+                        errors = entries.filter { it.template == null }.map { it.line },
+                        entries = entries,
+                    )
+                }
             }
     }
 
-    /** `goal_def` and `template_settings` as desktop stores them before a run. */
+    /**
+     * `goal_def` and `template_settings` as desktop stores them before a run. A category the budget automations own
+     * keeps its `goal_def`: its note may still hold the `#template` lines it was migrated from, and writing those back
+     * would undo every change made since and hand the category back to notes.
+     */
     private fun storeDefinitions(categories: List<Category>) {
         for (category in categories) {
-            if (category.templates.isEmpty()) continue
+            if (category.managed || category.templates.isEmpty()) continue
             SyncSchema.write(session, "categories", category.id, "goal_def", JsonArray(category.templates.map { it.toJson() }).toString())
             SyncSchema.write(session, "categories", category.id, "template_settings", """{"source":"notes"}""")
         }
