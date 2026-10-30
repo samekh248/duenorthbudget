@@ -299,7 +299,7 @@ fun ShellViewModel.onboardingRefresh() {
 
 fun ShellViewModel.onboardingOpen(file: RemoteFile) {
     mutate { it.copy(serverError = null) }
-    requestRemote(file)
+    budgetFiles.requestRemote(file)
 }
 
 fun ShellViewModel.onboardingNewBudget() {
@@ -343,7 +343,14 @@ internal fun ShellViewModel.onboardingBack(): Boolean? {
         updateOnboarding {
             it.copy(progress = it.progress.copy(step = to), checking = false, addressError = null, signInError = null)
         }
-        mutate { it.copy(route = route, createError = null, passwordError = null, pendingFile = null, serverError = null) }
+        mutate {
+            it.copy(
+                route = route,
+                createError = null,
+                serverError = null,
+                budgetFiles = it.budgetFiles.copy(passwordError = null, pendingFile = null),
+            )
+        }
         return true
     }
     return when (current.route) {
@@ -370,7 +377,7 @@ internal fun ShellViewModel.onboardingBack(): Boolean? {
                 step(OnboardingStep.WELCOME, ShellRoute.Welcome)
             }
         ShellRoute.BudgetPassword ->
-            if (current.pendingFile != null && !current.locked) step(OnboardingStep.FILES, ShellRoute.OnboardingFiles) else null
+            if (current.budgetFiles.pendingFile != null && !current.locked) step(OnboardingStep.FILES, ShellRoute.OnboardingFiles) else null
         else -> null
     }
 }

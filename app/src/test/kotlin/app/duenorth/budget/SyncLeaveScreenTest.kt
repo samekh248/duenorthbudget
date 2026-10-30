@@ -55,9 +55,9 @@ class SyncLeaveScreenTest {
         awaitMain { !model.state.value.loading }
         model.servers.show()
         awaitMain { model.state.value.route == ShellRoute.Server }
-        model.connect("http://127.0.0.1:9", "server-secret")
+        model.servers.connect("http://127.0.0.1:9", "server-secret")
         awaitMain { model.state.value.signedIn && !model.state.value.syncing }
-        model.requestRemote(RemoteFile("file-home", "group-1", "Home", null))
+        model.budgetFiles.requestRemote(RemoteFile("file-home", "group-1", "Home", null))
         // The phone's budgets are read off the main thread before the download starts.
         awaitMain { transport.started.count == 0L }
         idleMain()

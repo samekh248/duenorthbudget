@@ -68,7 +68,6 @@ data class ShellUiState(
     val createError: String? = null,
     val writeError: String? = null,
     val confirm: WriteResult.Confirm? = null,
-    val switchTarget: BudgetSummary? = null,
     val today: String = RegisterEntry.todayIso(),
     val openMonth: YearMonth = YearMonth.now(),
     val pinnedMonth: YearMonth? = null,
@@ -96,11 +95,7 @@ data class ShellUiState(
     val conflicts: List<BudgetConflict> = emptyList(),
     val categories: List<CategoryChoice> = emptyList(),
     val locked: Boolean = false,
-    val passwordError: String? = null,
-    val pendingFile: RemoteFile? = null,
-    val replaceFile: RemoteFile? = null,
     val editError: String? = null,
-    val askEachTime: Boolean = true,
     val signedIn: Boolean = false,
     /** Importing's own state, kept by [ImportHolder]. */
     val import: ImportState = ImportState(),
@@ -116,9 +111,6 @@ data class ShellUiState(
     val cloudFileId: String? = null,
     /** The servers' own state, kept by [ServersHolder]. */
     val servers: ServersState = ServersState(),
-    val switchReturnRoute: ShellRoute = ShellRoute.Home,
-    /** The phone's budgets that picking [pendingFile] clears. */
-    val replaceBudgets: List<BudgetSummary> = emptyList(),
     val fillConfirm: FillConfirm? = null,
     val monthNotice: String? = null,
     val undoLabel: String? = null,
@@ -166,6 +158,8 @@ data class ShellUiState(
     val settingsPage: SettingsPage = SettingsPage.BUDGET,
     /** True while a page opened from settings is showing; back and finish return to settings. */
     val settingsReturn: Boolean = false,
+    /** The budget files' own state, kept by [BudgetFilesHolder]. */
+    val budgetFiles: BudgetFilesUi = BudgetFilesUi(),
     /** The settings screen's own state, kept by [SettingsHolder]. */
     val settingsUi: SettingsUi = SettingsUi(),
 ) {

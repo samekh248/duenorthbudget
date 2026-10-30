@@ -122,6 +122,10 @@ class ShellViewModel(
 
             override fun openAddAccount() = this@ShellViewModel.openAddAccount()
 
+            override fun finishOnboarding() = this@ShellViewModel.finishOnboarding()
+
+            override suspend fun startGetStarted(budgetId: String) = this@ShellViewModel.startGetStarted(budgetId)
+
             override fun openFromSettings(
                 route: ShellRoute,
                 page: SettingsPage,
@@ -134,7 +138,7 @@ class ShellViewModel(
             override fun createBudget(
                 name: String,
                 currency: String,
-            ) = this@ShellViewModel.createBudget(name, currency)
+            ) = budgetFiles.createBudget(name, currency)
 
             override fun onBackgroundSyncHours(hours: Int) = this@ShellViewModel.onBackgroundSyncHours(hours)
 
@@ -155,7 +159,7 @@ class ShellViewModel(
                 amountText: String,
             ) = this@ShellViewModel.transferToBudget(categoryId, amountText)
 
-            override fun signOut(preferSettings: Boolean) = this@ShellViewModel.signOut(preferSettings)
+            override fun signOut(preferSettings: Boolean) = budgetFiles.signOut(preferSettings)
 
             override fun refreshOnboardingFiles() = onboardingRefresh()
 
@@ -193,6 +197,9 @@ class ShellViewModel(
 
     /** Reconcile: matching an account's cleared transactions to a statement. */
     val reconcile: ReconcileHolder = ReconcileHolder(host, register)
+
+    /** Budget files: creating, opening, switching and replacing a budget, unlocking it, signing out and syncing it. */
+    val budgetFiles: BudgetFilesHolder = BudgetFilesHolder(host, samples, developerMode, settingsUi)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -409,7 +416,7 @@ class ShellViewModel(
         if (current.route == ShellRoute.Home) return false
         if (current.route == ShellRoute.BudgetPassword && current.locked) return false
         if (current.route == ShellRoute.ConfirmReplaceBudget) {
-            cancelReplaceBudget()
+            budgetFiles.cancelReplaceBudget()
             return true
         }
         onboardingBack()?.let { return it }
@@ -443,11 +450,10 @@ class ShellViewModel(
                 // unless a download is opening one.
                 route = if (it.shell == null && it.onboarding != null && !it.syncing) ShellRoute.Welcome else ShellRoute.Home,
                 createError = null,
-                switchTarget = null,
                 writeError = null,
-                passwordError = null,
                 editError = null,
                 serverError = null,
+                budgetFiles = it.budgetFiles.copy(switchTarget = null, passwordError = null),
             )
         }
         return true
@@ -464,7 +470,13 @@ class ShellViewModel(
         if (sync.locksWhenAway(id) || sync.needsPassword(id)) {
             history.clear()
             _state.update {
-                it.copy(locked = true, shell = null, register = null, route = ShellRoute.BudgetPassword, passwordError = null)
+                it.copy(
+                    locked = true,
+                    shell = null,
+                    register = null,
+                    route = ShellRoute.BudgetPassword,
+                    budgetFiles = it.budgetFiles.copy(passwordError = null),
+                )
             }
         }
         leaving.launch {

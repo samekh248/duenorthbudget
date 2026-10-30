@@ -39,7 +39,7 @@ internal fun SettingsRoute(
         onPage = model.settingsUi::selectPage,
         onMakeActive = model.servers::requestSwitch,
         onRemoveInstance = model.servers::requestRemove,
-        onOpenBudget = model::requestSwitch,
+        onOpenBudget = model.budgetFiles::requestSwitch,
         onTheme = model.settingsUi::setTheme,
         onAccent = model.settingsUi::setAccent,
         onStyle = model.settingsUi::setStyle,
@@ -146,7 +146,7 @@ internal fun SampleBudgetsRoute(
     SampleBudgetsScreen(
         samples = state.sampleBudgets,
         error = state.createError,
-        onChoose = model::createSample,
+        onChoose = model.budgetFiles::createSample,
         modifier = modifier,
     )
 }
@@ -160,7 +160,7 @@ internal fun CreateRoute(
     val draft = state.onboarding?.progress
     CreateBudgetScreen(
         error = state.createError,
-        onCreate = model::create,
+        onCreate = model.budgetFiles::create,
         modifier = modifier,
         defaultName = draft?.createName?.ifBlank { null } ?: state.defaultBudgetName,
         defaultCurrency = draft?.createCurrency ?: Currencies.forLocale(Locale.getDefault()),
@@ -256,12 +256,12 @@ internal fun ConfirmReplaceBudgetRoute(
 ) {
     ConfirmReplaceBudgetScreen(
         opening =
-            state.pendingFile
+            state.budgetFiles.pendingFile
                 ?.name
                 .orEmpty(),
-        clearing = state.replaceBudgets.map { it.name },
-        onUse = model::confirmReplaceBudget,
-        onKeep = model::cancelReplaceBudget,
+        clearing = state.budgetFiles.replaceBudgets.map { it.name },
+        onUse = model.budgetFiles::confirmReplaceBudget,
+        onKeep = model.budgetFiles::cancelReplaceBudget,
         modifier = modifier,
     )
 }
@@ -273,10 +273,13 @@ internal fun ConfirmSwitchRoute(
     modifier: Modifier,
 ) {
     ConfirmSwitchScreen(
-        opening = state.switchTarget?.name.orEmpty(),
+        opening =
+            state.budgetFiles.switchTarget
+                ?.name
+                .orEmpty(),
         leaving = state.openBudgetName(),
-        onOpen = model::confirmSwitch,
-        onStay = model::cancelSwitch,
+        onOpen = model.budgetFiles::confirmSwitch,
+        onStay = model.budgetFiles::cancelSwitch,
         modifier = modifier,
     )
 }
@@ -312,12 +315,12 @@ internal fun ServerRoute(
         error = state.serverError,
         conflictCount = state.conflicts.size,
         onConflicts = model.servers::showConflicts,
-        onConnect = model::connect,
-        onOpen = model::requestRemote,
-        onReplace = model::requestReplace,
-        onUpload = model::uploadNew,
-        onSync = model::syncNow,
-        onSignOut = model::signOut,
+        onConnect = model.servers::connect,
+        onOpen = model.budgetFiles::requestRemote,
+        onReplace = model.budgetFiles::requestReplace,
+        onUpload = model.budgetFiles::uploadNew,
+        onSync = model.budgetFiles::syncNow,
+        onSignOut = model.budgetFiles::signOut,
         modifier = modifier,
     )
 }
@@ -329,10 +332,10 @@ internal fun BudgetPasswordRoute(
     modifier: Modifier,
 ) {
     BudgetPasswordScreen(
-        error = state.passwordError,
-        askEachTime = state.askEachTime,
-        onAskEachTime = model::setAskEachTime,
-        onSubmit = { password -> model.submitPassword(password, state.askEachTime) },
+        error = state.budgetFiles.passwordError,
+        askEachTime = state.budgetFiles.askEachTime,
+        onAskEachTime = model.budgetFiles::setAskEachTime,
+        onSubmit = { password -> model.budgetFiles.submitPassword(password, state.budgetFiles.askEachTime) },
         modifier = modifier,
     )
 }
@@ -356,10 +359,13 @@ internal fun ConfirmReplaceRoute(
     modifier: Modifier,
 ) {
     ConfirmReplaceScreen(
-        serverName = state.replaceFile?.name.orEmpty(),
+        serverName =
+            state.budgetFiles.replaceFile
+                ?.name
+                .orEmpty(),
         phoneName = state.openBudgetName(),
-        onReplace = model::confirmReplace,
-        onKeep = model::cancelReplace,
+        onReplace = model.budgetFiles::confirmReplace,
+        onKeep = model.budgetFiles::cancelReplace,
         modifier = modifier,
     )
 }

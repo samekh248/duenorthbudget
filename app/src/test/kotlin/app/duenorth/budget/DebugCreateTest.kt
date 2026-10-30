@@ -29,7 +29,7 @@ class DebugCreateTest {
     fun debugCreateSeedsTheWalkthroughUnderTheDefaultName() {
         val (library, model) = model("debug-create", developerMode = true)
         assertEquals(MockBudgets.WALKTHROUGH_NAME, model.state.value.defaultBudgetName)
-        model.create(MockBudgets.WALKTHROUGH_NAME, "USD")
+        model.budgetFiles.create(MockBudgets.WALKTHROUGH_NAME, "USD")
         awaitMain { model.state.value.shell != null }
         val shell = model.state.value.shell!!
         assertEquals(MockBudgets.WALKTHROUGH_NAME, shell.budgetName)
@@ -41,7 +41,7 @@ class DebugCreateTest {
     fun releaseCreateStaysEmptyWithNoDefaultName() {
         val (_, model) = model("release-create", developerMode = false)
         assertEquals("", model.state.value.defaultBudgetName)
-        model.create("Home", "USD")
+        model.budgetFiles.create("Home", "USD")
         awaitMain { model.state.value.shell != null }
         val shell = model.state.value.shell!!
         assertEquals("Home", shell.budgetName)
@@ -51,7 +51,7 @@ class DebugCreateTest {
     @Test
     fun releaseCreateOpensOnTheGetStartedList() {
         val (library, model) = model("release-get-started", developerMode = false)
-        model.create("Home", "USD")
+        model.budgetFiles.create("Home", "USD")
         // A first budget asks about experimental features first, then shows its home.
         awaitMain { model.state.value.route is ShellRoute.ExperimentalOffer }
         model.settingsUi.declineExperimentalOffer()
@@ -87,7 +87,7 @@ class DebugCreateTest {
     @Test
     fun debugBrandNewSampleHasTheGetStartedList() {
         val (_, model) = model("debug-brand-new", developerMode = true)
-        model.createSample(MockBudgets.BRAND_NEW)
+        model.budgetFiles.createSample(MockBudgets.BRAND_NEW)
         awaitMain { model.state.value.shell != null }
         assertTrue(
             model.state.value.shell!!

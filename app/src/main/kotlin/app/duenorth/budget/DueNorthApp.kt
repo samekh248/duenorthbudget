@@ -282,7 +282,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onCategorizeSelected = model.inbox::categorizeSelected,
                     onEndInboxSelecting = model.inbox::endSelecting,
                     onDeleteSelected = model.inbox::deleteSelected,
-                    onSyncServer = model::syncInbox,
+                    onSyncServer = model.budgetFiles::syncInbox,
                     onCancel = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.import.cancel()
@@ -314,7 +314,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onBankLink = model::openBankLink,
                     onNext = model::onboardingCheck,
                     onRefresh = model::onboardingRefresh,
-                    onSamples = model::showSampleBudgets,
+                    onSamples = model.budgetFiles::showSamples,
                     onNewBudget = model::onboardingNewBudget,
                     onSettingsNew = model.settingsUi::showCreate,
                     onSettingsPayees = model.settingsUi::showPayees,

@@ -72,10 +72,10 @@ class OnboardingFlowTest {
         assertTrue(model.back())
         assertEquals(ShellRoute.Welcome, model.state.value.route)
         model.onboardingChoosePhone()
-        model.create("", "USD")
+        model.budgetFiles.create("", "USD")
         awaitMain { model.state.value.createError != null }
         assertTrue(library.list().isEmpty())
-        model.create("Home", "EUR")
+        model.budgetFiles.create("Home", "EUR")
         awaitMain { model.state.value.shell != null }
         assertEquals(
             "Home",
@@ -123,7 +123,7 @@ class OnboardingFlowTest {
 
         model.onboardingNewBudget()
         assertEquals(ShellRoute.Create, model.state.value.route)
-        model.create("Household", "USD")
+        model.budgetFiles.create("Household", "USD")
         awaitMain { model.state.value.shell != null }
         awaitMain { transport.uploads.isNotEmpty() }
         assertEquals("Household", transport.uploads.single())
@@ -281,7 +281,7 @@ class OnboardingFlowTest {
 
         // New budget from settings opens it and comes back to the budget item.
         model.settingsUi.showCreate()
-        model.create("Trip", "EUR")
+        model.budgetFiles.create("Trip", "EUR")
         awaitMain {
             model.state.value.shell
                 ?.budgetName == "Trip"
@@ -360,7 +360,7 @@ class OnboardingFlowTest {
         awaitMain { model.state.value.route == ShellRoute.ConfirmReplaceBudget }
         assertEquals(
             listOf("Home"),
-            model.state.value.replaceBudgets
+            model.state.value.budgetFiles.replaceBudgets
                 .map { it.name },
         )
         assertTrue(model.back())
@@ -372,7 +372,7 @@ class OnboardingFlowTest {
                 .single(),
         )
         awaitMain { model.state.value.route == ShellRoute.ConfirmReplaceBudget }
-        model.confirmReplaceBudget()
+        model.budgetFiles.confirmReplaceBudget()
         awaitMain {
             model.state.value.shell
                 ?.budgetName == "Household"

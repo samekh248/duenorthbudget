@@ -55,6 +55,12 @@ internal interface ShellHost {
     /** The add account page, or its first step. */
     fun openAddAccount()
 
+    /** Ends first run, once a budget is made or opened. */
+    fun finishOnboarding()
+
+    /** Starts the get started list for a budget made empty. */
+    suspend fun startGetStarted(budgetId: String)
+
     /** Runs [block] with the open budget's id as the one write in flight, unless one already runs. */
     fun launchWrite(block: suspend (String) -> Unit)
 

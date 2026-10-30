@@ -44,7 +44,7 @@ class StartupLaunchTest {
         val app = RuntimeEnvironment.getApplication() as DueNorthApplication
         val model = ShellViewModel(app.library, app.sync, developerMode = true, io = Dispatchers.Main)
         awaitMain { !model.state.value.loading }
-        model.create("Home", "USD")
+        model.budgetFiles.create("Home", "USD")
         awaitMain { model.state.value.shell != null }
         launchAndSettle()
     }
@@ -56,7 +56,7 @@ class StartupLaunchTest {
             val model = ShellViewModel(app.library, app.sync, developerMode = true, io = Dispatchers.Main)
             awaitMain { !model.state.value.loading }
             if (model.state.value.shell == null) {
-                model.create("Home", "USD")
+                model.budgetFiles.create("Home", "USD")
                 awaitMain { model.state.value.shell != null }
             }
             app.library.onboarding().write(

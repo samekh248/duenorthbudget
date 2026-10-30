@@ -61,6 +61,18 @@ internal class FakeShellHost(
 
     override fun openAddAccount() = push(ShellRoute.AddAccount)
 
+    var onboardingFinished = 0
+
+    override fun finishOnboarding() {
+        onboardingFinished++
+    }
+
+    val getStarted = mutableListOf<String>()
+
+    override suspend fun startGetStarted(budgetId: String) {
+        getStarted += budgetId
+    }
+
     override fun launchWrite(block: suspend (String) -> Unit) {
         val id = state.value.settings.openBudgetId ?: return
         writing = true

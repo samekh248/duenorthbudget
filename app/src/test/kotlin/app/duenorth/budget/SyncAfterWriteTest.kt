@@ -47,9 +47,9 @@ class SyncAfterWriteTest {
         awaitMain { !model.state.value.loading }
         model.servers.show()
         awaitMain { model.state.value.route == ShellRoute.Server }
-        model.connect("http://127.0.0.1:9", "server-secret")
+        model.servers.connect("http://127.0.0.1:9", "server-secret")
         awaitMain { model.state.value.signedIn && !model.state.value.syncing }
-        model.requestRemote(RemoteFile("file-home", "group-1", "Home", null))
+        model.budgetFiles.requestRemote(RemoteFile("file-home", "group-1", "Home", null))
         awaitMain { model.state.value.settings.openBudgetId == "file-home" && !model.state.value.syncing }
         settleMain()
         val opened = transport.syncs.get()
