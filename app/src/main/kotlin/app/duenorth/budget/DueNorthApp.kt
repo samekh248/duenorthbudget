@@ -36,19 +36,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import app.duenorth.budget.core.BankSyncFix
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
-import app.duenorth.budget.core.Currencies
-import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.HttpActualTransport
-import app.duenorth.budget.core.OnboardingOrigin
-import app.duenorth.budget.core.RegisterEntry
-import app.duenorth.budget.core.ServerAddress
-import app.duenorth.budget.core.SimpleFinError
 import app.duenorth.budget.core.SyncCoordinator
-import app.duenorth.budget.core.TemplateLines
-import app.duenorth.budget.core.TemplateNote
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.MotionPolicy
 import app.duenorth.budget.design.components.LocalFieldSubmit
@@ -61,7 +52,6 @@ import app.duenorth.budget.design.theme.MetroTheme
 import app.duenorth.budget.design.turnstileIn
 import java.io.File
 import java.time.YearMonth
-import java.util.Locale
 
 open class DueNorthApplication : Application() {
     lateinit var library: BudgetLibrary
@@ -246,11 +236,6 @@ fun DueNorthApp(model: ShellViewModel) {
         style = MetroStyle.fromId(state.settings.style),
         animationsEnabled = MotionPolicy.enabled(scale),
     ) {
-        val openName =
-            state.budgets
-                .find { it.id == state.settings.openBudgetId }
-                ?.name
-                .orEmpty()
         val handlers =
             remember(state.route, importAccountId) {
                 ScreenBarHandlers(
@@ -371,793 +356,61 @@ fun DueNorthApp(model: ShellViewModel) {
                 // Each new page turns in; a route that only updates in place keeps its class and stays put.
                 SectionTitled(SectionTitle.of(state), modifier.turnstileIn(state.route::class)) {
                     val fill = Modifier.fillMaxSize()
+                    val onImportFile: (String) -> Unit = { accountId ->
+                        importAccountId = accountId
+                        importLauncher.launch("*/*")
+                    }
                     when (val route = state.route) {
-                        ShellRoute.Home ->
-                            HomePivot(
-                                shell = state.editingShell(),
-                                loading = state.loading,
-                                openMonth = state.openMonth,
-                                monthWindow = model.monthWindow(),
-                                initialSection = state.homeSection,
-                                onGesture = model::setGesture,
-                                onSection = model::selectHomeSection,
-                                onAccount = model::openAccount,
-                                accountsReorder = state.accountsReorder,
-                                onMoveAccount = model::moveAccount,
-                                getStarted = state.getStarted(),
-                                onGetStarted = model::openGetStarted,
-                                onHideGetStarted = model::hideGetStarted,
-                                onInbox = model::openInbox,
-                                onAcceptInbox = model::acceptInbox,
-                                inboxFiled = state.inboxFiled,
-                                onInboxFiledShown = model::inboxFiledShown,
-                                inboxSelection = state.inboxSelection,
-                                onInboxToggle = model::toggleInboxSelected,
-                                inboxLead = state.inboxLead,
-                                inboxNotice = state.inboxSyncNotice,
-                                inboxActions =
-                                    remember(model) {
-                                        InboxActions(
-                                            onDetails = model::openInboxDetails,
-                                            onSchedule = model::createScheduleFromTransaction,
-                                            onDelete = model::deleteInbox,
-                                            onOpenAccount = model::openAccount,
-                                            onMatch = { model.matchTransactions(it, stayOnRegister = false) },
-                                            onNotAMatch = { model.notAMatch(it, stayOnRegister = false) },
-                                        )
-                                    },
-                                netWorth = state.netWorth,
-                                onNetWorth = model::openNetWorth,
-                                onMonthReview = model::openMonthReview,
-                                onReport = model::openReport,
-                                modifier = fill,
-                                onSelectMonth = model::selectOpenMonth,
-                                onBudgetCategory = if (state.shell == null) null else model::openCategoryBudget,
-                                // Tapping to budget opens edit mode; in edit mode it opens the breakdown.
-                                onToBudget = if (state.shell == null) null else model::startBudgetEdit,
-                                showAhead = state.freeAfterPlansOn,
-                                budgetEdit = state.budgetEdit,
-                                budgetEditActions =
-                                    remember(model) {
-                                        BudgetEditActions(
-                                            onFocus = model::focusBudgetBox,
-                                            onKey = model::typeBudgetKey,
-                                            onCover = model::coverBudgetBox,
-                                            onAll = model::allToBudgetBox,
-                                            onDone = model::doneBudgetBox,
-                                            onAvailable = { id ->
-                                                if (model.doneBudgetBox()) model.openMoveFrom(id)
-                                            },
-                                            // The breakdown reads the saved month, not edit mode's changes.
-                                            onToBudget = null,
-                                        )
-                                    },
-                                editError = state.editError,
-                                notice = state.monthNotice,
-                                formatOptions =
-                                    FormatOptions(
-                                        hideFraction = state.formatPrefs.hideFraction,
-                                        numberFormat = state.formatPrefs.numberFormat,
-                                    ),
-                            )
-                        ShellRoute.Settings -> {
-                            var launcherIcon by remember { mutableStateOf(LauncherIcons.current(context)) }
-                            SettingsScreen(
-                                page = state.settingsPage,
-                                instances = state.instances,
-                                activeInstance = state.activeInstance,
-                                instanceReachable = state.instanceReachable,
-                                signedIn = state.signedIn,
-                                budgets = state.budgets,
-                                openBudgetId = state.settings.openBudgetId,
-                                themeMode = state.settings.themeMode,
-                                accentId = state.settings.accent,
-                                styleId = state.settings.style,
-                                formatPrefs = state.formatPrefs,
-                                cloudFileId = state.cloudFileId,
-                                encrypted = state.budgetEncrypted,
-                                onPage = model::selectSettingsPage,
-                                onMakeActive = model::requestInstanceSwitch,
-                                onRemoveInstance = model::requestRemoveInstance,
-                                onOpenBudget = model::requestSwitch,
-                                onTheme = model::setTheme,
-                                onAccent = model::setAccent,
-                                onStyle = model::setStyle,
-                                launcherIcon = launcherIcon,
-                                onLauncherIcon = {
-                                    LauncherIcons.set(context, it)
-                                    launcherIcon = it
-                                },
-                                onPayees = model::showSettingsPayees,
-                                onDateFormat = model::setDateFormat,
-                                onNumberFormat = model::setNumberFormat,
-                                onFirstDay = model::setFirstDay,
-                                onHideFraction = model::setHideFraction,
-                                onExperimental = model::setExperimental,
-                                onExperimentalFeature = model::setExperimentalFeature,
-                                onLearning = model::setLearning,
-                                onExport = model::exportBudget,
-                                onEncryption = model::showEncryption,
-                                onRequestAdvanced = model::requestAdvanced,
-                                phoneSettings = state.settings,
-                                onBackgroundSyncHours = model::setBackgroundSyncHours,
-                                scroll = state.settingsScroll,
-                                onScroll = model::saveSettingsScroll,
-                                modifier = fill,
-                            )
-                        }
-                        is ShellRoute.ExperimentalOffer ->
-                            ExperimentalOfferScreen(
-                                budgetName = state.budgets.find { it.id == route.budgetId }?.name ?: openName,
-                                onTurnOn = model::acceptExperimentalOffer,
-                                onKeepOff = model::declineExperimentalOffer,
-                                current = route.current,
-                                modifier = fill,
-                            )
-                        is ShellRoute.EncryptionPassword ->
-                            EncryptionPasswordScreen(
-                                mode = route.mode,
-                                error = state.encryptionError,
-                                onSet = model::setEncryptionPassword,
-                                onChange = model::changeEncryptionPassword,
-                                onRemove = model::removeEncryptionPassword,
-                                modifier = fill,
-                            )
-                        is ShellRoute.ConfirmRemoveInstance -> {
-                            val instance = state.instances.find { it.id == route.instanceId }
-                            ConfirmRemoveInstanceScreen(
-                                name = instance?.label ?: instance?.address.orEmpty(),
-                                onRemove = model::confirmRemoveInstance,
-                                onKeep = { model.back() },
-                                modifier = fill,
-                            )
-                        }
-                        ShellRoute.ConfirmInstanceSwitch ->
-                            ConfirmInstanceSwitchScreen(
-                                leaving =
-                                    state.activeInstance?.label
-                                        ?: state.activeInstance?.address.orEmpty(),
-                                opening =
-                                    state.switchInstanceTarget?.label
-                                        ?: state.switchInstanceTarget?.address.orEmpty(),
-                                onOpen = { model.confirmInstanceSwitch() },
-                                onStay = model::cancelInstanceSwitch,
-                                modifier = fill,
-                            )
-                        ShellRoute.SampleBudgets ->
-                            SampleBudgetsScreen(
-                                samples = state.sampleBudgets,
-                                error = state.createError,
-                                onChoose = model::createSample,
-                                modifier = fill,
-                            )
-                        ShellRoute.Create -> {
-                            val draft = state.onboarding?.progress
-                            CreateBudgetScreen(
-                                error = state.createError,
-                                onCreate = model::create,
-                                modifier = fill,
-                                defaultName = draft?.createName?.ifBlank { null } ?: state.defaultBudgetName,
-                                defaultCurrency = draft?.createCurrency ?: Currencies.forLocale(Locale.getDefault()),
-                                onDraft = if (draft == null) null else model::onboardingCreateDraft,
-                            )
-                        }
-                        ShellRoute.Welcome ->
-                            WelcomeScreen(
-                                onServer = model::onboardingChooseServer,
-                                onPhone = model::onboardingChoosePhone,
-                                modifier = fill,
-                            )
-                        ShellRoute.OnboardingAddress -> {
-                            val onboarding = state.onboarding
-                            OnboardingAddressScreen(
-                                address = onboarding?.progress?.addressText.orEmpty(),
-                                checking = onboarding?.checking == true,
-                                error = onboarding?.addressError,
-                                onAddress = model::onboardingAddress,
-                                onNext = model::onboardingCheck,
-                                onPhone = model::onboardingChoosePhone,
-                                modifier = fill,
-                                offerPhone = onboarding?.progress?.origin != OnboardingOrigin.SETTINGS,
-                            )
-                        }
-                        ShellRoute.OnboardingSignIn -> {
-                            val onboarding = state.onboarding
-                            val ready = onboarding?.progress?.readyAddress.orEmpty()
-                            val host = ServerAddress.parse(ready)?.host ?: ready
-                            OnboardingSignInScreen(
-                                host = host,
-                                methods = onboarding?.progress?.methods.orEmpty(),
-                                label = onboarding?.progress?.instanceLabel.orEmpty(),
-                                checking = onboarding?.checking == true || state.syncing,
-                                error = onboarding?.signInError,
-                                onLabel = model::onboardingLabel,
-                                onSignIn = model::onboardingSignIn,
-                                onBrowser = model::onboardingBrowser,
-                                modifier = fill,
-                                secure = ready.isEmpty() || ServerAddress.isSecure(ready),
-                                replacing =
-                                    state.activeInstance
-                                        ?.takeIf { onboarding?.progress?.origin == OnboardingOrigin.SETTINGS }
-                                        ?.let { it.label ?: it.address },
-                            )
-                        }
-                        ShellRoute.OnboardingFiles ->
-                            OnboardingFilesScreen(
-                                label =
-                                    state.activeInstance?.label
-                                        ?: state.onboarding
-                                            ?.progress
-                                            ?.instanceLabel
-                                            .orEmpty(),
-                                files = state.remoteFiles,
-                                error = state.serverError,
-                                onOpen = model::onboardingOpen,
-                                modifier = fill,
-                                replacing = state.budgets.map { it.name },
-                            )
-                        ShellRoute.ConfirmReplaceBudget ->
-                            ConfirmReplaceBudgetScreen(
-                                opening =
-                                    state.pendingFile
-                                        ?.name
-                                        .orEmpty(),
-                                clearing = state.replaceBudgets.map { it.name },
-                                onUse = model::confirmReplaceBudget,
-                                onKeep = model::cancelReplaceBudget,
-                                modifier = fill,
-                            )
-                        ShellRoute.ConfirmSwitch ->
-                            ConfirmSwitchScreen(
-                                opening = state.switchTarget?.name.orEmpty(),
-                                leaving = openName,
-                                onOpen = model::confirmSwitch,
-                                onStay = model::cancelSwitch,
-                                modifier = fill,
-                            )
-                        ShellRoute.BankSyncReport ->
-                            BankSyncReportScreen(state.bankSync, fill) { failure ->
-                                // The bank's own sign-in lives at SimpleFIN Bridge; the rest is mended on the bank link.
-                                if (failure.fix == BankSyncFix.SIMPLEFIN) {
-                                    openWebPage(context, SimpleFinError.BRIDGE_URL)
-                                } else {
-                                    model.repairBankLink(failure)
-                                }
-                            }
-                        ShellRoute.Payees ->
-                            PayeesScreen(
-                                payees = state.payees,
-                                error = state.writeError,
-                                mergeTarget = state.payeeMergeTarget,
-                                onRename = model::renamePayee,
-                                onConfirmMerge = model::confirmPayeeMerge,
-                                onCancelMerge = model::cancelPayeeMerge,
-                                modifier = fill,
-                            )
-                        ShellRoute.Server ->
-                            ServerScreen(
-                                address = state.settings.serverAddress.orEmpty(),
-                                signedIn = state.signedIn,
-                                files = state.remoteFiles,
-                                status = state.syncStatus,
-                                error = state.serverError,
-                                conflictCount = state.conflicts.size,
-                                onConflicts = model::showConflicts,
-                                onConnect = model::connect,
-                                onOpen = model::requestRemote,
-                                onReplace = model::requestReplace,
-                                onUpload = model::uploadNew,
-                                onSync = model::syncNow,
-                                onSignOut = model::signOut,
-                                modifier = fill,
-                            )
-                        ShellRoute.BudgetPassword ->
-                            BudgetPasswordScreen(
-                                error = state.passwordError,
-                                askEachTime = state.askEachTime,
-                                onAskEachTime = model::setAskEachTime,
-                                onSubmit = { password -> model.submitPassword(password, state.askEachTime) },
-                                modifier = fill,
-                            )
-                        ShellRoute.Conflicts ->
-                            ConflictScreen(
-                                conflicts = state.conflicts,
-                                modifier = fill,
-                            )
-                        ShellRoute.ConfirmReplace ->
-                            ConfirmReplaceScreen(
-                                serverName = state.replaceFile?.name.orEmpty(),
-                                phoneName = openName,
-                                onReplace = model::confirmReplace,
-                                onKeep = model::cancelReplace,
-                                modifier = fill,
-                            )
-                        is ShellRoute.Register -> {
-                            val page = state.register
-                            if (page == null) {
-                                if (state.loading) Placeholder()
-                            } else {
-                                RegisterScreen(
-                                    page = page,
-                                    onGesture = model::setRegisterGesture,
-                                    onOpen = model::openEdit,
-                                    selection = state.registerSelection,
-                                    onSelect = model::startSelecting,
-                                    onToggleSelected = model::toggleSelected,
-                                    onAdd = model::openNewTransaction,
-                                    onReconcile = model::openReconcile,
-                                    onImportFile = {
-                                        importAccountId = route.accountId
-                                        importLauncher.launch("*/*")
-                                    },
-                                    modifier = fill,
-                                    onMatch = { model.matchTransactions(it, stayOnRegister = true) },
-                                    onNotAMatch = { model.notAMatch(it, stayOnRegister = true) },
-                                    search = state.registerSearch,
-                                    onSearch = model::setRegisterSearch,
-                                )
-                            }
-                        }
-                        is ShellRoute.ImportPreviewRoute -> {
-                            val preview = state.importPreview
-                            if (preview == null) {
-                                Placeholder()
-                            } else {
-                                ImportPreviewScreen(
-                                    preview = preview,
-                                    error = state.importError,
-                                    onConfirm = model::confirmImport,
-                                    onCancel = model::cancelImport,
-                                    modifier = fill,
-                                )
-                            }
-                        }
-                        is ShellRoute.ImportReviewRoute -> {
-                            val review = state.importReview
-                            if (review == null) {
-                                Placeholder()
-                            } else {
-                                ImportReviewScreen(
-                                    page = review,
-                                    error = state.importError,
-                                    onCategory = model::setImportReviewCategory,
-                                    onDone = model::finishImportReview,
-                                    modifier = fill,
-                                )
-                            }
-                        }
-                        is ShellRoute.EditTransaction -> {
-                            val page = state.register
-                            if (page == null) {
-                                Placeholder()
-                            } else {
-                                val prefill = state.newTransactionPrefill.takeIf { route.transactionId == null }
-                                TransactionForm(
-                                    page = page,
-                                    row = page.rows.firstOrNull { it.id == route.transactionId },
-                                    initialDate = prefill?.dateIso ?: state.today,
-                                    initialAmountMinor = prefill?.amountMinor,
-                                    chooseAccount = state.editFromHome,
-                                    error = state.writeError,
-                                    onSave = model::submitTransaction,
-                                    modifier = fill,
-                                    dateFormat = state.formatPrefs.dateFormat,
-                                    numberFormat = state.formatPrefs.numberFormat,
-                                    hideFraction = state.formatPrefs.hideFraction,
-                                    payees = PayeeTypeAhead.names(state.payees),
-                                )
-                            }
-                        }
-                        is ShellRoute.PickCategory -> {
-                            val target = state.categoryTarget
-                            if (target == null) {
-                                if (state.loading) Placeholder()
-                            } else {
-                                CategoryPickerScreen(
-                                    target = target,
-                                    error = state.writeError,
-                                    onPick = model::submitCategory,
-                                    modifier = fill,
-                                )
-                            }
-                        }
-                        is ShellRoute.Reconcile -> {
-                            val register = state.register
-                            if (register == null) {
-                                Placeholder()
-                            } else {
-                                ReconcileRegisterScreen(
-                                    register = register,
-                                    page = state.reconcile,
-                                    error = state.reconcileError,
-                                    onGesture = model::setRegisterGesture,
-                                    onStart = model::startReconcile,
-                                    onToggle = model::toggleReconcileCleared,
-                                    onSetCleared = model::setReconcileCleared,
-                                    onOpen = model::openEdit,
-                                    onAddMissing = model::addMissingForReconcile,
-                                    onFinish = model::finishReconcile,
-                                    onCancel = model::cancelReconcile,
-                                    modifier = fill,
-                                    today = RegisterEntry.parseDate(state.today) ?: RegisterEntry.parseDate(RegisterEntry.todayIso())!!,
-                                )
-                            }
-                        }
-                        is ShellRoute.ReviewCategory -> {
-                            val page = state.categoryMonth
-                            if (page == null) {
-                                Placeholder()
-                            } else {
-                                CategoryReviewScreen(
-                                    page = page,
-                                    onGesture = model::setGesture,
-                                    modifier = fill,
-                                )
-                            }
-                        }
-                        is ShellRoute.CategoryBudget -> {
-                            val shell = state.shell
-                            if (shell == null) {
-                                Placeholder()
-                            } else {
-                                val income = shell.incomeCategory(route.categoryId)
-                                val categories = shell.groups.flatMap { it.categories }
-                                val name = income?.name ?: categories.firstOrNull { it.id == route.categoryId }?.name
-                                EditorWithMonth(
-                                    openMonth = state.openMonth,
-                                    monthWindow = model.monthWindow(),
-                                    onSelectMonth = model::selectOpenMonth,
-                                    modifier = fill,
-                                    title = name,
-                                ) { inner ->
-                                    if (income != null) {
-                                        IncomeCategoryScreen(
-                                            shell = shell,
-                                            category = income,
-                                            error = state.editError,
-                                            onSave = model::saveCategoryBudget,
-                                            onAutoHold = model::chooseAutoHold,
-                                            modifier = inner,
-                                            showName = false,
-                                        )
-                                        return@EditorWithMonth
-                                    }
-                                    CategoryBudgetScreen(
-                                        shell = shell,
-                                        categoryId = route.categoryId,
-                                        error = state.editError,
-                                        onSave = model::saveCategoryBudget,
-                                        onMove = model::openMoveCategory,
-                                        onToggleCarryover = model::toggleCategoryCarryover,
-                                        modifier = inner,
-                                        showName = false,
-                                        note = state.categoryNote.takeIf { state.formatPrefs.templatesOn },
-                                        onSaveNote = model::saveCategoryNoteText,
-                                        templateAmounts = state.categoryTemplateAmounts,
-                                        onOpenTemplate = model::openTemplate,
-                                        onMoveTemplate = model::moveTemplate,
-                                        recent = state.categoryMonth,
-                                        onSeeAll = { model.openReviewCategory(route.categoryId) },
-                                    )
-                                    LaunchedEffect(state.categoryNote, shell.month) { model.refreshTemplateAmounts() }
-                                    // Read again whenever the month's figures change, so a saved transaction shows.
-                                    LaunchedEffect(route.categoryId, shell) { model.loadCategoryMonth(route.categoryId) }
-                                }
-                            }
-                        }
-                        is ShellRoute.MoveCategory -> {
-                            val shell = state.editingShell()
-                            if (shell == null) {
-                                Placeholder()
-                            } else if (state.budgetEdit != null) {
-                                // From edit mode the move lands in its sandbox, on the month being edited.
-                                MoveCategoryScreen(
-                                    shell = shell,
-                                    fromCategoryId = route.fromCategoryId,
-                                    error = state.editError,
-                                    onSave = model::submitMoveCategory,
-                                    modifier = fill,
-                                )
-                            } else {
-                                EditorWithMonth(
-                                    openMonth = state.openMonth,
-                                    monthWindow = model.monthWindow(),
-                                    onSelectMonth = model::selectOpenMonth,
-                                    modifier = fill,
-                                ) { inner ->
-                                    MoveCategoryScreen(
-                                        shell = shell,
-                                        fromCategoryId = route.fromCategoryId,
-                                        error = state.editError,
-                                        onSave = model::submitMoveCategory,
-                                        modifier = inner,
-                                    )
-                                }
-                            }
-                        }
-                        ShellRoute.HoldMonth -> {
-                            val shell = state.shell
-                            if (shell == null) {
-                                Placeholder()
-                            } else {
-                                EditorWithMonth(
-                                    openMonth = state.openMonth,
-                                    monthWindow = model.monthWindow(),
-                                    onSelectMonth = model::selectOpenMonth,
-                                    modifier = fill,
-                                ) { inner ->
-                                    HoldMonthScreen(
-                                        shell = shell,
-                                        error = state.editError,
-                                        onSave = model::submitHold,
-                                        onRelease = model::releaseHold,
-                                        modifier = inner,
-                                    )
-                                }
-                            }
-                        }
+                        ShellRoute.Home -> HomeRoute(state, model, fill)
+                        ShellRoute.Settings -> SettingsRoute(state, model, fill)
+                        is ShellRoute.ExperimentalOffer -> ExperimentalOfferRoute(route, state, model, fill)
+                        is ShellRoute.EncryptionPassword -> EncryptionPasswordRoute(route, state, model, fill)
+                        is ShellRoute.ConfirmRemoveInstance -> ConfirmRemoveInstanceRoute(route, state, model, fill)
+                        ShellRoute.ConfirmInstanceSwitch -> ConfirmInstanceSwitchRoute(state, model, fill)
+                        ShellRoute.SampleBudgets -> SampleBudgetsRoute(state, model, fill)
+                        ShellRoute.Create -> CreateRoute(state, model, fill)
+                        ShellRoute.Welcome -> WelcomeRoute(state, model, fill)
+                        ShellRoute.OnboardingAddress -> OnboardingAddressRoute(state, model, fill)
+                        ShellRoute.OnboardingSignIn -> OnboardingSignInRoute(state, model, fill)
+                        ShellRoute.OnboardingFiles -> OnboardingFilesRoute(state, model, fill)
+                        ShellRoute.ConfirmReplaceBudget -> ConfirmReplaceBudgetRoute(state, model, fill)
+                        ShellRoute.ConfirmSwitch -> ConfirmSwitchRoute(state, model, fill)
+                        ShellRoute.BankSyncReport -> BankSyncReportRoute(state, model, fill)
+                        ShellRoute.Payees -> PayeesRoute(state, model, fill)
+                        ShellRoute.Server -> ServerRoute(state, model, fill)
+                        ShellRoute.BudgetPassword -> BudgetPasswordRoute(state, model, fill)
+                        ShellRoute.Conflicts -> ConflictsRoute(state, model, fill)
+                        ShellRoute.ConfirmReplace -> ConfirmReplaceRoute(state, model, fill)
+                        is ShellRoute.Register -> RegisterRoute(route, state, model, onImportFile, fill)
+                        is ShellRoute.ImportPreviewRoute -> ImportFilePreviewRoute(state, model, fill)
+                        is ShellRoute.ImportReviewRoute -> ImportedReviewRoute(state, model, fill)
+                        is ShellRoute.EditTransaction -> EditTransactionRoute(route, state, model, fill)
+                        is ShellRoute.PickCategory -> PickCategoryRoute(state, model, fill)
+                        is ShellRoute.Reconcile -> ReconcileRoute(state, model, fill)
+                        is ShellRoute.ReviewCategory -> ReviewCategoryRoute(state, model, fill)
+                        is ShellRoute.CategoryBudget -> CategoryBudgetRoute(route, state, model, fill)
+                        is ShellRoute.MoveCategory -> MoveCategoryRoute(route, state, model, fill)
+                        ShellRoute.HoldMonth -> HoldMonthRoute(state, model, fill)
                         ShellRoute.StarterCategories ->
                             StarterCategoriesScreen(error = state.editError, onAdd = model::addStarterCategories, modifier = fill)
                         ShellRoute.AddAccount ->
                             AddAccountScreen(error = state.editError, onSave = model::submitAddAccount, modifier = fill)
-                        is ShellRoute.EditAccount -> {
-                            val detail = state.accountDetail
-                            if (detail == null || detail.id != route.accountId) {
-                                Placeholder()
-                            } else {
-                                EditAccountScreen(detail, state.editError, model::submitEditAccount, fill)
-                            }
-                        }
-                        is ShellRoute.CloseAccount -> {
-                            val detail = state.accountDetail
-                            val shell = state.shell
-                            val force = state.accountForceConfirm
-                            when {
-                                detail == null || shell == null || detail.id != route.accountId -> Placeholder()
-                                force != null ->
-                                    ForceCloseConfirmScreen(force, model::confirmForceClose, model::keepAccount, fill)
-                                else ->
-                                    CloseAccountScreen(
-                                        account = detail,
-                                        others = state.accountsList,
-                                        categories = state.categories,
-                                        currency = shell.currency,
-                                        error = state.editError,
-                                        onClose = { destination, category -> model.submitCloseAccount(destination, category) },
-                                        onForceClose = { model.submitCloseAccount(null, null, forced = true) },
-                                        modifier = fill,
-                                    )
-                            }
-                        }
-                        is ShellRoute.ScheduleEditor -> {
-                            val draft = state.scheduleDraft
-                            val shell = state.shell
-                            if (draft == null || shell == null || draft.id != route.scheduleId) {
-                                Placeholder()
-                            } else {
-                                ScheduleEditorScreen(
-                                    draft = draft,
-                                    accounts = shell.accounts,
-                                    categories = state.categories.filter { !it.income || draft.amountMinor > 0 },
-                                    decimals = shell.currency.decimals,
-                                    error = state.editError,
-                                    onSave = model::submitSchedule,
-                                    modifier = fill,
-                                    payees = PayeeTypeAhead.names(state.payees),
-                                )
-                            }
-                        }
+                        is ShellRoute.EditAccount -> EditAccountRoute(route, state, model, fill)
+                        is ShellRoute.CloseAccount -> CloseAccountRoute(route, state, model, fill)
+                        is ShellRoute.ScheduleEditor -> ScheduleEditorRoute(route, state, model, fill)
                         ShellRoute.Rules -> RulesScreen(state.rulesList, model::openRule, fill)
-                        ShellRoute.Schedules -> {
-                            val shell = state.shell
-                            if (shell == null) {
-                                Placeholder()
-                            } else {
-                                SchedulesScreen(
-                                    schedules = state.schedules,
-                                    currency = shell.currency,
-                                    today = RegisterEntry.parseDate(state.today) ?: 0,
-                                    section = state.schedulesSection,
-                                    calendar = state.schedulesCalendar,
-                                    onSection = model::setSchedulesSection,
-                                    onOpen = model::openScheduleDetails,
-                                    onPost = model::postSchedule,
-                                    onSkip = model::skipSchedule,
-                                    onGesture = model::setGesture,
-                                    modifier = fill,
-                                )
-                            }
-                        }
-                        is ShellRoute.ScheduleDetails -> {
-                            val details = state.scheduleDetails
-                            val shell = state.shell
-                            if (details == null || shell == null || details.summary.id != route.scheduleId) {
-                                Placeholder()
-                            } else {
-                                ScheduleDetailsScreen(details, shell.currency, fill)
-                            }
-                        }
-                        ShellRoute.MonthReview ->
-                            MonthReviewSection(
-                                review = state.monthReview,
-                                loading = state.loading,
-                                onListGesture = model::setGesture,
-                                onCategory = model::openReviewCategory,
-                                modifier = fill.background(Metro.colors.background),
-                            )
-                        ShellRoute.NetWorth ->
-                            NetWorthSection(
-                                page = state.netWorth,
-                                loading = state.loading,
-                                onIncludeOffBudget = model::setNetWorthIncludeOffBudget,
-                                modifier = fill,
-                            )
-                        is ShellRoute.ReportPivot ->
-                            ReportsScreen(
-                                page = state.reports,
-                                loading = state.reportsLoading,
-                                preset = state.reportPreset,
-                                groupBy = state.reportGroupBy,
-                                includeOffBudget = state.settings.netWorthIncludeOffBudget,
-                                onPreset = model::setReportPreset,
-                                onCustom = model::setReportRange,
-                                onGroupBy = model::setReportGroupBy,
-                                onIncludeOffBudget = model::setReportIncludeOffBudget,
-                                modifier = fill,
-                                initialItem = route.item,
-                            )
-                        is ShellRoute.BankLink -> {
-                            val ui = state.bankLink
-                            val shell = state.shell
-                            if (ui == null || shell == null || ui.accountId != route.accountId) {
-                                Placeholder()
-                            } else {
-                                BankLinkScreen(
-                                    ui = ui,
-                                    currency = shell.currency,
-                                    onProvider = model::pickBankProvider,
-                                    onToken = model::sendSimpleFinToken,
-                                    onCountry = model::findGoCardlessBanks,
-                                    onInstitution = model::startGoCardless,
-                                    onOpenBank = { url -> openWebPage(context, url) },
-                                    onSignedIn = model::checkGoCardless,
-                                    onLink = model::linkBank,
-                                    onRemove = model::removeBankLink,
-                                    modifier = fill,
-                                    onNewToken = model::replaceSimpleFinToken,
-                                )
-                            }
-                        }
-                        is ShellRoute.TemplateKinds -> {
-                            val shell = state.shell
-                            val category = shell?.groups?.flatMap { it.categories }?.firstOrNull { it.id == route.categoryId }
-                            if (category == null) {
-                                Placeholder()
-                            } else {
-                                TemplateKindsScreen(
-                                    categoryName = category.name,
-                                    line =
-                                        route.index?.let { index ->
-                                            state.categoryNote?.let {
-                                                TemplateNote
-                                                    .parse(it)
-                                                    .entries
-                                                    .getOrNull(index)
-                                                    ?.line
-                                            }
-                                        },
-                                    onPick = model::pickTemplateKind,
-                                    onRemove = model::removeTemplate,
-                                    modifier = fill,
-                                )
-                            }
-                        }
-                        is ShellRoute.TemplateEditor -> {
-                            val shell = state.shell
-                            val category = shell?.groups?.flatMap { it.categories }?.firstOrNull { it.id == route.categoryId }
-                            if (shell == null || category == null) {
-                                Placeholder()
-                            } else {
-                                TemplateEditorScreen(
-                                    categoryName = category.name,
-                                    kind = route.kind,
-                                    initial = state.templateDraftStart(route),
-                                    isNew = route.index == null,
-                                    month = shell.month,
-                                    currency = shell.currency,
-                                    schedules = state.templateSchedules,
-                                    sources =
-                                        listOf(
-                                            PercentSource(TemplateLines.ALL_INCOME, TemplateLines.ALL_INCOME),
-                                            PercentSource(TemplateLines.AVAILABLE_FUNDS, TemplateLines.AVAILABLE_FUNDS),
-                                        ) + shell.incomeGroups.flatMap { it.categories }.map { PercentSource(it.name, it.name) },
-                                    preview = state.templatePreview,
-                                    onPreview = model::previewTemplate,
-                                    onSave = model::saveTemplate,
-                                    onRemove = model::removeTemplate,
-                                    modifier = fill,
-                                )
-                            }
-                        }
-                        ShellRoute.Templates -> {
-                            // A note saved from a chip's form (or a chip moved) changes the lanes.
-                            LaunchedEffect(state.undoLabel) { model.refreshTemplatePlan() }
-                            TemplatesScreen(
-                                month = state.budgetEdit?.month ?: state.pinnedMonth ?: state.openMonth,
-                                result = state.templateResult,
-                                busy = state.templateBusy,
-                                confirm = state.templateConfirm,
-                                onCheck = {
-                                    model.checkTemplates()
-                                    model.refreshTemplatePlan()
-                                },
-                                onApply = { model.previewApplyTemplates(overwrite = false) },
-                                onOverwrite = { model.previewApplyTemplates(overwrite = true) },
-                                onConfirm = model::confirmTemplateOverwrite,
-                                onKeep = model::keepTemplates,
-                                modifier = fill,
-                                plan = state.templatePlan,
-                                currency = state.shell?.currency,
-                                applyPreview = state.templateApplyPreview,
-                                onOpenChip = model::openTemplateChip,
-                                onMoveChip = model::moveTemplateToPriority,
-                                onConfirmPreview = model::confirmApplyPreview,
-                                onKeepPreview = model::keepApplyPreview,
-                            )
-                        }
-                        is ShellRoute.RuleEditor -> {
-                            val draft = state.ruleDraft
-                            val shell = state.shell
-                            if (draft == null || shell == null || draft.id != route.ruleId) {
-                                Placeholder()
-                            } else {
-                                RuleEditorScreen(
-                                    draft = draft,
-                                    names = model.ruleNames(),
-                                    decimals = shell.currency.decimals,
-                                    error = state.editError,
-                                    onSave = model::submitRule,
-                                    modifier = fill,
-                                )
-                            }
-                        }
-                        is ShellRoute.ToBudget -> {
-                            val shell = state.shell
-                            if (shell == null) {
-                                Placeholder()
-                            } else {
-                                ToBudgetScreen(
-                                    shell = shell,
-                                    categoryId = route.categoryId,
-                                    error = state.editError,
-                                    onSave = model::submitToBudget,
-                                    modifier = fill,
-                                )
-                            }
-                        }
-                        ShellRoute.ManageCategories -> {
-                            val manage = state.categoryManage
-                            if (manage == null) {
-                                Placeholder()
-                            } else {
-                                ManageCategoriesScreen(
-                                    manage = manage,
-                                    error = state.editError,
-                                    onAddGroup = model::addCategoryGroup,
-                                    onAddCategory = model::addEnvelopeCategory,
-                                    onRenameGroup = model::renameCategoryGroup,
-                                    onRenameCategory = model::renameEnvelopeCategory,
-                                    onHideCategory = model::hideEnvelopeCategory,
-                                    onHideGroup = model::hideCategoryGroup,
-                                    onMoveToGroup = model::moveCategoryToGroup,
-                                    onDeleteCategory = model::deleteEnvelopeCategory,
-                                    onDeleteGroup = model::deleteCategoryGroup,
-                                    onPlaceGroup = model::placeCategoryGroup,
-                                    onPlaceCategory = model::placeEnvelopeCategory,
-                                    modifier = fill,
-                                )
-                            }
-                        }
+                        ShellRoute.Schedules -> SchedulesRoute(state, model, fill)
+                        is ShellRoute.ScheduleDetails -> ScheduleDetailsRoute(route, state, model, fill)
+                        ShellRoute.MonthReview -> MonthReviewRoute(state, model, fill)
+                        ShellRoute.NetWorth -> NetWorthRoute(state, model, fill)
+                        is ShellRoute.ReportPivot -> ReportPivotRoute(route, state, model, fill)
+                        is ShellRoute.BankLink -> BankLinkRoute(route, state, model, fill)
+                        is ShellRoute.TemplateKinds -> TemplateKindsRoute(route, state, model, fill)
+                        is ShellRoute.TemplateEditor -> TemplateEditorRoute(route, state, model, fill)
+                        ShellRoute.Templates -> TemplatesRoute(state, model, fill)
+                        is ShellRoute.RuleEditor -> RuleEditorRoute(route, state, model, fill)
+                        is ShellRoute.ToBudget -> ToBudgetRoute(route, state, model, fill)
+                        ShellRoute.ManageCategories -> ManageCategoriesRoute(state, model, fill)
                     }
                     if (state.confirm != null) {
                         ReconcileWarningScreen(
@@ -1203,6 +456,13 @@ fun DueNorthApp(model: ShellViewModel) {
         }
     }
 }
+
+/** The name of the budget open on the phone, or empty when none is. */
+internal fun ShellUiState.openBudgetName(): String =
+    budgets
+        .find { it.id == settings.openBudgetId }
+        ?.name
+        .orEmpty()
 
 /** An editor under the month control; a [title] (the category being edited) heads the page above it. */
 @Composable
