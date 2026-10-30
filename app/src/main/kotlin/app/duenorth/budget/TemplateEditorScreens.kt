@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -54,18 +53,18 @@ import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.core.TemplateLines
 import app.duenorth.budget.core.TemplateNote
 import app.duenorth.budget.core.monthLabel
+import app.duenorth.budget.design.components.LayerCorner
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroComboBox
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroSegmentedToggle
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.layerShape
 import app.duenorth.budget.design.components.metroPress
-import app.duenorth.budget.design.components.relief
+import app.duenorth.budget.design.components.styleCard
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
-import app.duenorth.budget.design.theme.Relief
-import app.duenorth.budget.design.theme.mobile10Card
 import java.math.BigDecimal
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
@@ -163,29 +162,6 @@ object TemplateWords {
     ): Long = value.movePointRight(currency.decimals).toDouble().roundToLong()
 
     private fun plain(value: BigDecimal): String = value.stripTrailingZeros().toPlainString()
-}
-
-/** A tile's face: raised under tile relief, a layer card under mica, a faint card under Windows 10 Mobile, a hairline box under Metro. */
-@Composable
-private fun Modifier.templateTile(selected: Boolean = false): Modifier {
-    val style = Metro.style
-    val accent = Metro.accent.fill
-    return this
-        .then(
-            when {
-                style.relief -> relief(Relief.Raised)
-                // Windows 10 Mobile: a faint card, edged in the accent only once chosen.
-                style.mobile10 ->
-                    background(Metro.colors.mobile10Card).then(if (selected) Modifier.border(2.dp, accent) else Modifier)
-                else -> border(MetroDimens.Stroke, if (selected) accent else Metro.colors.secondary.copy(alpha = 0.5f))
-            },
-        ).then(
-            if (selected && style.relief) {
-                Modifier.border(MetroDimens.Stroke, accent, if (style.layers) RoundedCornerShape(8.dp) else RoundedCornerShape(0.dp))
-            } else {
-                Modifier
-            },
-        )
 }
 
 /**
@@ -295,7 +271,7 @@ private fun TemplateTile(
     Row(
         modifier
             .fillMaxWidth()
-            .templateTile(selected = template == null)
+            .styleCard(selected = template == null)
             .metroPress(onClick)
             .padding(start = 4.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -332,7 +308,7 @@ private fun PriorityBadge(
     modifier: Modifier = Modifier,
 ) {
     val priority = template.priority
-    val shape = if (Metro.style.layers) RoundedCornerShape(12.dp) else RoundedCornerShape(0.dp)
+    val shape = layerShape(LayerCorner.Badge)
     val label =
         when (template) {
             is Template.Remainder -> "last"
@@ -501,7 +477,7 @@ fun TemplateKindsScreen(
                         Modifier
                             .weight(1f)
                             .heightIn(min = 112.dp)
-                            .templateTile()
+                            .styleCard()
                             .metroPress { onPick(kind) }
                             .padding(10.dp)
                             .testTag("template-kind-${kind.name.lowercase()}"),
@@ -750,7 +726,7 @@ private fun Stepper(
     Box(
         Modifier
             .size(MetroDimens.TouchTarget)
-            .templateTile()
+            .styleCard()
             .metroPress(onClick)
             .testTag(tag),
         contentAlignment = Alignment.Center,
@@ -772,7 +748,7 @@ private fun TemplatePreview(
     Column(
         Modifier
             .fillMaxWidth()
-            .templateTile()
+            .styleCard()
             .padding(12.dp)
             .testTag("template-preview"),
         verticalArrangement = Arrangement.spacedBy(6.dp),

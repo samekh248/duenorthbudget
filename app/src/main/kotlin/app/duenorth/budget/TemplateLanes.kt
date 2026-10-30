@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
@@ -41,15 +40,15 @@ import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.core.TemplateLane
 import app.duenorth.budget.core.TemplatePlan
-import app.duenorth.budget.design.components.MetroButton
-import app.duenorth.budget.design.components.MetroButtonGrid
+import app.duenorth.budget.design.components.LayerCorner
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.PillCorner
+import app.duenorth.budget.design.components.layerClip
+import app.duenorth.budget.design.components.layerShape
 import app.duenorth.budget.design.components.metroPress
-import app.duenorth.budget.design.components.relief
+import app.duenorth.budget.design.components.styleCard
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
-import app.duenorth.budget.design.theme.Relief
-import app.duenorth.budget.design.theme.mobile10Card
 
 // The templates screen, option D of the template editor design (priority waterfall): every category's templates as
 // chips in priority lanes, with a meter of what is left to share after each lane.
@@ -185,12 +184,8 @@ fun TemplateLanes(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .then(if (Metro.style.relief) Modifier.relief(Relief.Raised) else Modifier)
-                        .border(
-                            MetroDimens.Stroke,
-                            Metro.accent.fill,
-                            if (Metro.style.layers) RoundedCornerShape(8.dp) else RoundedCornerShape(0.dp),
-                        ).metroPress { onOpen(chip) }
+                        .styleCard(selected = true)
+                        .metroPress { onOpen(chip) }
                         .padding(10.dp)
                         .testTag("template-unreadable-$index"),
                     verticalAlignment = Alignment.CenterVertically,
@@ -210,7 +205,7 @@ fun TemplateLanes(
 @Composable
 private fun LaneHeading(lane: TemplateLane) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        val shape = if (Metro.style.layers) RoundedCornerShape(12.dp) else RoundedCornerShape(0.dp)
+        val shape = layerShape(LayerCorner.Badge)
         val filled = lane.kind == TemplateLane.Kind.PRIORITY
         Box(
             Modifier
@@ -268,18 +263,8 @@ private fun LaneChip(
                     scaleX = 1.05f
                     scaleY = 1.05f
                 }
-            }.then(
-                when {
-                    Metro.style.relief -> Modifier.relief(Relief.Raised, small = true)
-                    Metro.style.mobile10 ->
-                        Modifier
-                            .background(
-                                Metro.colors.mobile10Card,
-                            ).then(if (lifted) Modifier.border(2.dp, Metro.accent.fill) else Modifier)
-                    else ->
-                        Modifier.border(MetroDimens.Stroke, if (lifted) Metro.accent.fill else Metro.colors.secondary.copy(alpha = 0.5f))
-                },
-            ).then(
+            }.styleCard(selected = lifted, small = true)
+            .then(
                 if (draggable) {
                     Modifier.pointerInput(chip) {
                         detectDragGesturesAfterLongPress(
@@ -342,7 +327,7 @@ private fun Meter(
             Modifier
                 .weight(1f)
                 .height(6.dp)
-                .then(if (Metro.style.layers) Modifier.clip(RoundedCornerShape(3.dp)) else Modifier)
+                .layerClip(PillCorner)
                 .background(Metro.colors.secondary.copy(alpha = 0.25f)),
         ) {
             if (fraction > 0f) Box(Modifier.weight(fraction).fillMaxHeight().background(Metro.accent.fill))
