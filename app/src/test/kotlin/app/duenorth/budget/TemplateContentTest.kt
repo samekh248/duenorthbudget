@@ -118,27 +118,27 @@ class TemplateContentTest {
     @Test
     fun noteThenOverwriteBudgetsTheCategoryAsOneUndoStep() {
         val (model, library) = household("templates")
-        model.openTemplates()
+        model.templates.open()
         assertEquals(ShellRoute.Home, model.state.value.route)
         model.settingsUi.setExperimental(true)
         model.settingsUi.setGoalTemplates(true)
         await { model.state.value.formatPrefs.templatesOn }
         model.envelopes.openBudget("c-gas")
-        await { model.state.value.categoryNote != null }
-        model.saveCategoryNote("#template 123")
+        await { model.state.value.templates.note != null }
+        model.templates.saveNote("#template 123")
         await { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }
-        model.openTemplates()
+        model.templates.open()
         assertEquals(ShellRoute.Templates, model.state.value.route)
-        await { model.state.value.templateResult == TemplateResult.Valid }
-        model.applyTemplates(overwrite = true)
-        await { model.state.value.templateConfirm != null }
-        model.confirmTemplateOverwrite()
+        await { model.state.value.templates.result == TemplateResult.Valid }
+        model.templates.apply(overwrite = true)
+        await { model.state.value.templates.confirm != null }
+        model.templates.confirmOverwrite()
         await {
             model.state.value.shell
                 ?.category("c-gas")
                 ?.budgetedMinor == 12_300L
         }
-        assertEquals(TemplateResult.Applied(1), model.state.value.templateResult)
+        assertEquals(TemplateResult.Applied(1), model.state.value.templates.result)
         assertEquals(UndoCopy.TEMPLATES, library.undoLabel(model.state.value.settings.openBudgetId!!))
     }
 
@@ -209,37 +209,37 @@ class TemplateContentTest {
         model.settingsUi.setGoalTemplates(true)
         await { model.state.value.formatPrefs.templatesOn }
         model.envelopes.openBudget("c-gas")
-        await { model.state.value.categoryNote != null }
-        model.saveCategoryNote("fill up on fridays")
-        await { model.state.value.categoryNote == "fill up on fridays" }
+        await { model.state.value.templates.note != null }
+        model.templates.saveNote("fill up on fridays")
+        await { model.state.value.templates.note == "fill up on fridays" }
 
-        model.openTemplateKinds()
+        model.templates.openKinds()
         assertEquals(ShellRoute.TemplateKinds("c-gas"), model.state.value.route)
-        model.pickTemplateKind(TemplateKind.MONTHLY)
+        model.templates.pickKind(TemplateKind.MONTHLY)
         val route = model.state.value.route as ShellRoute.TemplateEditor
         assertEquals(Template.Simple(BigDecimal.ZERO, null, 0), model.state.value.templateDraftStart(route))
-        model.saveTemplate(Template.Simple(BigDecimal("120"), null, 0))
+        model.templates.save(Template.Simple(BigDecimal("120"), null, 0))
         assertEquals(ShellRoute.CategoryBudget("c-gas"), model.state.value.route)
-        assertEquals("fill up on fridays\n#template 120", model.state.value.categoryNote)
+        assertEquals("fill up on fridays\n#template 120", model.state.value.templates.note)
 
-        model.openTemplateKinds()
-        model.pickTemplateKind(TemplateKind.AVERAGE)
+        model.templates.openKinds()
+        model.templates.pickKind(TemplateKind.AVERAGE)
         assertEquals(1, (model.state.value.templateDraftStart(model.state.value.route as ShellRoute.TemplateEditor)).priority)
-        model.saveTemplate(Template.Average(3, 1))
-        assertEquals("fill up on fridays\n#template 120\n#template-1 average 3 months", model.state.value.categoryNote)
+        model.templates.save(Template.Average(3, 1))
+        assertEquals("fill up on fridays\n#template 120\n#template-1 average 3 months", model.state.value.templates.note)
 
-        model.moveTemplate(1, 0)
-        assertEquals("fill up on fridays\n#template average 3 months\n#template-1 120", model.state.value.categoryNote)
+        model.templates.move(1, 0)
+        assertEquals("fill up on fridays\n#template average 3 months\n#template-1 120", model.state.value.templates.note)
 
-        model.openTemplate(1)
+        model.templates.openTemplate(1)
         assertEquals(ShellRoute.TemplateEditor("c-gas", 1, TemplateKind.MONTHLY), model.state.value.route)
-        model.removeTemplate()
+        model.templates.remove()
         assertEquals(ShellRoute.CategoryBudget("c-gas"), model.state.value.route)
-        assertEquals("fill up on fridays\n#template average 3 months", model.state.value.categoryNote)
+        assertEquals("fill up on fridays\n#template average 3 months", model.state.value.templates.note)
 
-        model.refreshTemplateAmounts()
-        await { model.state.value.categoryTemplateAmounts.size == 1 }
-        await { library.readCategoryNote(model.state.value.settings.openBudgetId!!, "c-gas") == model.state.value.categoryNote }
+        model.templates.refreshAmounts()
+        await { model.state.value.templates.amounts.size == 1 }
+        await { library.readCategoryNote(model.state.value.settings.openBudgetId!!, "c-gas") == model.state.value.templates.note }
     }
 
     @Test
@@ -319,53 +319,53 @@ class TemplateContentTest {
         // The flags reach the budget file a moment after the screen shows them.
         await { library.templatePlan(budgetId, model.state.value.openMonth) != null }
         model.startBudgetEdit()
-        model.openTemplates()
+        model.templates.open()
         await {
-            model.state.value.templatePlan
+            model.state.value.templates.plan
                 ?.lanes
                 ?.any { lane -> lane.chips.any { it.categoryId == "c-gas" } } == true
         }
         val chip =
-            model.state.value.templatePlan!!
+            model.state.value.templates.plan!!
                 .lanes
                 .flatMap { it.chips }
                 .first { it.categoryId == "c-gas" }
         assertEquals(0, chip.template?.priority)
 
-        model.moveTemplateToPriority(chip, 3)
+        model.templates.moveToPriority(chip, 3)
         await { library.readCategoryNote(budgetId, "c-gas") == "fill up on fridays\n#template-3 123" }
         await {
-            model.state.value.templatePlan
+            model.state.value.templates.plan
                 ?.lanes
                 ?.firstOrNull { lane -> lane.chips.any { it.categoryId == "c-gas" } }
                 ?.priority == 3
         }
 
         val moved =
-            model.state.value.templatePlan!!
+            model.state.value.templates.plan!!
                 .lanes
                 .flatMap { it.chips }
                 .first { it.categoryId == "c-gas" }
-        model.openTemplateChip(moved)
+        model.templates.openChip(moved)
         await { model.state.value.route == ShellRoute.TemplateEditor("c-gas", 0, TemplateKind.MONTHLY) }
-        model.saveTemplate(Template.Simple(BigDecimal("150"), null, 3))
+        model.templates.save(Template.Simple(BigDecimal("150"), null, 3))
         assertEquals(ShellRoute.Templates, model.state.value.route)
         await { library.readCategoryNote(budgetId, "c-gas") == "fill up on fridays\n#template-3 150" }
 
-        model.previewApplyTemplates(overwrite = true)
-        await { model.state.value.templateApplyPreview != null }
+        model.templates.previewApply(overwrite = true)
+        await { model.state.value.templates.applyPreview != null }
         val row =
-            model.state.value.templateApplyPreview!!
+            model.state.value.templates.applyPreview!!
                 .rows
                 .first { it.categoryId == "c-gas" }
         assertEquals(15_000L, row.after)
-        model.confirmApplyPreview()
+        model.templates.confirmApplyPreview()
         await {
             model.state.value.budgetEdit
                 ?.budgeted
                 ?.get("c-gas") == 15_000L
         }
-        assertEquals(null, model.state.value.templateApplyPreview)
+        assertEquals(null, model.state.value.templates.applyPreview)
     }
 
     private fun MonthShell.category(id: String): CategoryRow? = groups.flatMap { it.categories }.firstOrNull { it.id == id }

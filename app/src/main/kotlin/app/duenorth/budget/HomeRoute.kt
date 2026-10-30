@@ -25,8 +25,8 @@ internal fun HomeRoute(
         accountsReorder = state.accountsReorder,
         onMoveAccount = model::moveAccount,
         getStarted = state.getStarted(),
-        onGetStarted = model::openGetStarted,
-        onHideGetStarted = model::hideGetStarted,
+        onGetStarted = model.getStarted::open,
+        onHideGetStarted = model.getStarted::hide,
         onInbox = model.inbox::openPicker,
         onAcceptInbox = model.inbox::accept,
         inboxFiled = state.inbox.filed,
@@ -39,7 +39,7 @@ internal fun HomeRoute(
             remember(model) {
                 InboxActions(
                     onDetails = model.inbox::openDetails,
-                    onSchedule = model::createScheduleFromTransaction,
+                    onSchedule = model.schedules::createFromTransaction,
                     onDelete = model.inbox::delete,
                     onOpenAccount = model.register::openAccount,
                     onMatch = { model.register.match(it, stayOnRegister = false) },
@@ -47,9 +47,9 @@ internal fun HomeRoute(
                 )
             },
         netWorth = state.netWorth,
-        onNetWorth = model::openNetWorth,
-        onMonthReview = model::openMonthReview,
-        onReport = model::openReport,
+        onNetWorth = model.reports::openNetWorth,
+        onMonthReview = model.reports::openMonthReview,
+        onReport = model.reports::open,
         modifier = modifier,
         onSelectMonth = model::selectOpenMonth,
         onBudgetCategory = if (state.shell == null) null else model.envelopes::openBudget,

@@ -96,9 +96,8 @@ class SettingsHolder internal constructor(
                 settingsReturn = false,
                 createError = null,
                 settingsUi = it.settingsUi.copy(encryptionError = null),
-                switchTarget = null,
                 servers = it.servers.copy(switchTarget = null),
-                pendingFile = null,
+                budgetFiles = it.budgetFiles.copy(switchTarget = null, pendingFile = null),
             )
         }
         refresh()

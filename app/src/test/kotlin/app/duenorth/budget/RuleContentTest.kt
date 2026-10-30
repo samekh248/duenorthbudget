@@ -158,14 +158,16 @@ class RuleContentTest {
     fun scheduleAndRuleThroughTheModel() {
         val (model, library) = household("rules")
         val budgetId = model.state.value.settings.openBudgetId!!
-        model.openNewSchedule()
+        model.schedules.openNew()
         await {
-            model.state.value.scheduleDraft != null &&
+            model.state.value.schedulesUi.draft != null &&
                 model.state.value.categories
                     .isNotEmpty()
         }
-        val base = model.state.value.scheduleDraft!!
-        model.submitSchedule(ScheduleForm.from(base, 2).copy(name = "Gym", payee = "Gym", amount = "-25", repeat = ScheduleRepeat.MONTHLY))
+        val base = model.state.value.schedulesUi.draft!!
+        model.schedules.submit(
+            ScheduleForm.from(base, 2).copy(name = "Gym", payee = "Gym", amount = "-25", repeat = ScheduleRepeat.MONTHLY),
+        )
         await {
             model.state.value.route == ShellRoute.Home &&
                 model.state.value.schedules
@@ -174,35 +176,35 @@ class RuleContentTest {
         val gym =
             model.state.value.schedules
                 .first { it.payee == "Gym" }
-        model.openSchedules()
+        model.schedules.open()
         assertEquals(ShellRoute.Schedules, model.state.value.route)
-        model.toggleSchedulesCalendar()
-        assertTrue(model.state.value.schedulesCalendar)
-        model.openScheduleDetails(gym.id)
+        model.schedules.toggleCalendar()
+        assertTrue(model.state.value.schedulesUi.calendar)
+        model.schedules.openDetails(gym.id)
         await {
-            model.state.value.scheduleDetails
+            model.state.value.schedulesUi.details
                 ?.summary
                 ?.id == gym.id
         }
-        model.editOpenSchedule()
+        model.schedules.editOpen()
         await {
-            model.state.value.scheduleDraft
+            model.state.value.schedulesUi.draft
                 ?.id == gym.id
         }
         assertEquals(
             -2500L,
-            model.state.value.scheduleDraft!!
+            model.state.value.schedulesUi.draft!!
                 .amountMinor,
         )
         model.back()
         assertEquals(ShellRoute.ScheduleDetails(gym.id), model.state.value.route)
         // Deleting from the editor leaves the schedule's page too, back to the list.
-        model.editOpenSchedule()
+        model.schedules.editOpen()
         await {
-            model.state.value.scheduleDraft
+            model.state.value.schedulesUi.draft
                 ?.id == gym.id
         }
-        model.deleteOpenSchedule()
+        model.schedules.deleteOpen()
         await {
             model.state.value.route == ShellRoute.Schedules &&
                 model.state.value.schedules
@@ -210,15 +212,15 @@ class RuleContentTest {
         }
         model.back()
 
-        model.openRules()
+        model.rules.open()
         await {
             model.state.value.route == ShellRoute.Rules &&
                 model.state.value.payees.rows
                     .isNotEmpty()
         }
         val before = library.listRules(budgetId).size
-        model.openNewRule()
-        model.submitRule(RuleDraft(null, null, "and", emptyList(), emptyList()))
+        model.rules.openNew()
+        model.rules.submit(RuleDraft(null, null, "and", emptyList(), emptyList()))
         await { model.state.value.editError != null }
         assertEquals(RuleEditorCopy.NEEDS_CONDITION, model.state.value.editError)
         val payee =
@@ -227,7 +229,7 @@ class RuleContentTest {
         val category =
             model.state.value.categories
                 .first { !it.income }
-        val names = model.ruleNames()
+        val names = model.rules.names()
         val draft =
             RuleDraft(
                 null,
@@ -236,19 +238,19 @@ class RuleContentTest {
                 listOf(RuleValues.part("payee", "is", payee.name, names, 2, action = false)!!),
                 listOf(RuleValues.part("category", "set", category.name, names, 2, action = true)!!),
             )
-        model.submitRule(draft)
-        await { model.state.value.route == ShellRoute.Rules && model.state.value.rulesList.size == before + 1 }
+        model.rules.submit(draft)
+        await { model.state.value.route == ShellRoute.Rules && model.state.value.rules.list.size == before + 1 }
         assertEquals(RuleEditorCopy.SAVE_RULE, model.state.value.undoLabel)
         val ruleId =
-            model.state.value.rulesList
+            model.state.value.rules.list
                 .first { r -> r.conditions.any { payee.name in it } }
                 .id
-        model.openRule(ruleId)
+        model.rules.openEditor(ruleId)
         await {
-            model.state.value.ruleDraft
+            model.state.value.rules.draft
                 ?.id == ruleId
         }
-        model.deleteOpenRule()
+        model.rules.deleteOpen()
         await { library.listRules(budgetId).size == before }
         assertTrue(library.deleteRule(budgetId, ruleId) is RuleSaveResult.Rejected)
     }

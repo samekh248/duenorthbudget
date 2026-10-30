@@ -55,6 +55,21 @@ internal interface ShellHost {
     /** The add account page, or its first step. */
     fun openAddAccount()
 
+    /** Ends first run, once a budget is made or opened. */
+    fun finishOnboarding()
+
+    /** Starts the get started list for a budget made empty. */
+    suspend fun startGetStarted(budgetId: String)
+
+    /** The budget's edit mode, for assigning every category at once. */
+    fun startBudgetEdit()
+
+    /** The new schedule form. */
+    fun openNewSchedule()
+
+    /** Forgets every cached month, after a change that reaches them all; the next select reads again. */
+    fun forgetMonths()
+
     /** Runs [block] with the open budget's id as the one write in flight, unless one already runs. */
     fun launchWrite(block: suspend (String) -> Unit)
 
@@ -67,6 +82,9 @@ internal interface ShellHost {
 
     /** Reads the open budget again and shows it. */
     suspend fun reload()
+
+    /** [reload], started on its own. */
+    fun refresh()
 
     /** Reads the payees, for a transaction form about to open. */
     fun loadPayees()
@@ -104,6 +122,9 @@ internal interface ShellHost {
     /** Reschedules the background sync job for a new interval. */
     fun onBackgroundSyncHours(hours: Int)
 
+    /** Counts off-budget accounts in net worth, or leaves them out, and reads net worth again. */
+    fun setNetWorthIncludeOffBudget(include: Boolean)
+
     /** The month the budget editors write to: the pinned month, or the open one. */
     fun editorMonth(): YearMonth
 
@@ -112,6 +133,15 @@ internal interface ShellHost {
 
     /** Reads [categoryId]'s note, for its templates. */
     fun loadCategoryNote(categoryId: String)
+
+    /** Edit mode's templates: fill its boxes rather than writing. */
+    fun applyTemplatesInBudgetEdit(overwrite: Boolean)
+
+    /** After a write to the month: repaints it, sends what is unsent, and repaints again. */
+    suspend fun afterMonthWrite(budgetId: String)
+
+    /** Puts [route] in place of the page on top, so back skips the one it replaced. */
+    fun replaceRoute(route: ShellRoute)
 
     /** Edit mode's move: changes the amounts being edited rather than writing. */
     fun moveInBudgetEdit(

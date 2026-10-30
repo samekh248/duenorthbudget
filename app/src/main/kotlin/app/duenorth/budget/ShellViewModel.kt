@@ -35,7 +35,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.time.YearMonth
 
@@ -60,7 +59,6 @@ class ShellViewModel(
     internal val history = ArrayDeque<ShellRoute>()
 
     /** Category note saves, written in the order they were made. */
-    internal val noteWrites = Mutex()
 
     private val _state =
         MutableStateFlow(
@@ -122,6 +120,18 @@ class ShellViewModel(
 
             override fun openAddAccount() = this@ShellViewModel.openAddAccount()
 
+            override fun finishOnboarding() = this@ShellViewModel.finishOnboarding()
+
+            override suspend fun startGetStarted(budgetId: String) = getStarted.start(budgetId)
+
+            override fun startBudgetEdit() = this@ShellViewModel.startBudgetEdit()
+
+            override fun openNewSchedule() = schedules.openNew()
+
+            override fun refresh() = this@ShellViewModel.refresh()
+
+            override fun forgetMonths() = months.invalidate()
+
             override fun openFromSettings(
                 route: ShellRoute,
                 page: SettingsPage,
@@ -134,15 +144,23 @@ class ShellViewModel(
             override fun createBudget(
                 name: String,
                 currency: String,
-            ) = this@ShellViewModel.createBudget(name, currency)
+            ) = budgetFiles.createBudget(name, currency)
 
             override fun onBackgroundSyncHours(hours: Int) = this@ShellViewModel.onBackgroundSyncHours(hours)
+
+            override fun setNetWorthIncludeOffBudget(include: Boolean) = this@ShellViewModel.setNetWorthIncludeOffBudget(include)
 
             override fun editorMonth() = this@ShellViewModel.editorMonth()
 
             override val shellGate get() = this@ShellViewModel.shellGate
 
-            override fun loadCategoryNote(categoryId: String) = this@ShellViewModel.loadCategoryNote(categoryId)
+            override fun loadCategoryNote(categoryId: String) = templates.loadNote(categoryId)
+
+            override fun applyTemplatesInBudgetEdit(overwrite: Boolean) = this@ShellViewModel.applyTemplatesInBudgetEdit(overwrite)
+
+            override suspend fun afterMonthWrite(budgetId: String) = this@ShellViewModel.afterMonthWrite(budgetId)
+
+            override fun replaceRoute(route: ShellRoute) = this@ShellViewModel.replaceRoute(route)
 
             override fun moveInBudgetEdit(
                 fromCategoryId: String,
@@ -155,7 +173,7 @@ class ShellViewModel(
                 amountText: String,
             ) = this@ShellViewModel.transferToBudget(categoryId, amountText)
 
-            override fun signOut(preferSettings: Boolean) = this@ShellViewModel.signOut(preferSettings)
+            override fun signOut(preferSettings: Boolean) = budgetFiles.signOut(preferSettings)
 
             override fun refreshOnboardingFiles() = onboardingRefresh()
 
@@ -193,6 +211,24 @@ class ShellViewModel(
 
     /** Reconcile: matching an account's cleared transactions to a statement. */
     val reconcile: ReconcileHolder = ReconcileHolder(host, register)
+
+    /** Budget files: creating, opening, switching and replacing a budget, unlocking it, signing out and syncing it. */
+    val budgetFiles: BudgetFilesHolder = BudgetFilesHolder(host, samples, developerMode, settingsUi)
+
+    /** Reports: the hub's pages, and the pivot over one shared range. */
+    val reports: ReportsHolder = ReportsHolder(host)
+
+    /** The get started list over a budget made on this phone. */
+    val getStarted: GetStartedHolder = GetStartedHolder(host, envelopes)
+
+    /** Templates: checking and applying them, the tiles on a category page, and the priority lanes. */
+    val templates: TemplatesHolder = TemplatesHolder(host)
+
+    /** Rules: the list, the rule editor, and the names and categories the editors pick from. */
+    val rules: RulesHolder = RulesHolder(host)
+
+    /** Schedules: the pivot, a schedule's page and editor, and posting or skipping one. */
+    val schedules: SchedulesHolder = SchedulesHolder(host, rules)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -394,12 +430,12 @@ class ShellViewModel(
             _state.update { it.copy(fillConfirm = null) }
             return true
         }
-        if (current.templateConfirm != null) {
-            _state.update { it.copy(templateConfirm = null) }
+        if (current.templates.confirm != null) {
+            _state.update { it.copy(templates = it.templates.copy(confirm = null)) }
             return true
         }
-        if (current.templateApplyPreview != null && current.route == ShellRoute.Templates) {
-            _state.update { it.copy(templateApplyPreview = null) }
+        if (current.templates.applyPreview != null && current.route == ShellRoute.Templates) {
+            _state.update { it.copy(templates = it.templates.copy(applyPreview = null)) }
             return true
         }
         if (current.accountForceConfirm != null) {
@@ -409,7 +445,7 @@ class ShellViewModel(
         if (current.route == ShellRoute.Home) return false
         if (current.route == ShellRoute.BudgetPassword && current.locked) return false
         if (current.route == ShellRoute.ConfirmReplaceBudget) {
-            cancelReplaceBudget()
+            budgetFiles.cancelReplaceBudget()
             return true
         }
         onboardingBack()?.let { return it }
@@ -443,11 +479,10 @@ class ShellViewModel(
                 // unless a download is opening one.
                 route = if (it.shell == null && it.onboarding != null && !it.syncing) ShellRoute.Welcome else ShellRoute.Home,
                 createError = null,
-                switchTarget = null,
                 writeError = null,
-                passwordError = null,
                 editError = null,
                 serverError = null,
+                budgetFiles = it.budgetFiles.copy(switchTarget = null, passwordError = null),
             )
         }
         return true
@@ -464,7 +499,13 @@ class ShellViewModel(
         if (sync.locksWhenAway(id) || sync.needsPassword(id)) {
             history.clear()
             _state.update {
-                it.copy(locked = true, shell = null, register = null, route = ShellRoute.BudgetPassword, passwordError = null)
+                it.copy(
+                    locked = true,
+                    shell = null,
+                    register = null,
+                    route = ShellRoute.BudgetPassword,
+                    budgetFiles = it.budgetFiles.copy(passwordError = null),
+                )
             }
         }
         leaving.launch {
@@ -793,10 +834,6 @@ class ShellViewModel(
                 shell = visibleShell,
                 register = register,
                 schedules = loaded.schedules,
-                scheduleDetails =
-                    (route as? ShellRoute.ScheduleDetails)?.let { open ->
-                        (loaded.scheduleDetails ?: current.scheduleDetails)?.takeIf { it.summary.id == open.scheduleId }
-                    },
                 route = route,
                 settingsReturn = current.settingsReturn && route != ShellRoute.Home,
                 openMonth = reviewMonth,
@@ -812,12 +849,19 @@ class ShellViewModel(
                 budgetMethod = loaded.formatPrefs.budgetType,
                 cloudFileId = loaded.cloudFileId,
                 undoLabel = loaded.undoLabel,
+                schedulesUi =
+                    current.schedulesUi.copy(
+                        details =
+                            (route as? ShellRoute.ScheduleDetails)?.let { open ->
+                                (loaded.scheduleDetails ?: current.schedulesUi.details)?.takeIf { it.summary.id == open.scheduleId }
+                            },
+                    ),
             )
         }
         if (!loaded.locked && loaded.shell != null) {
             warmMonthWindow()
         }
-        retireFinishedGetStarted()
+        getStarted.retireFinished()
     }
 
     private fun ShellRoute.isRegisterFlow(): Boolean =

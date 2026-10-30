@@ -360,9 +360,12 @@ object ScreenBar {
             transactionMenu(state),
             state.budgetEdit != null,
             SchedulesBar(
-                section = state.schedulesSection,
-                calendar = state.schedulesCalendar,
-                open = state.scheduleDetails?.summary?.completed != true,
+                section = state.schedulesUi.section,
+                calendar = state.schedulesUi.calendar,
+                open =
+                    state.schedulesUi.details
+                        ?.summary
+                        ?.completed != true,
             ),
             state.accountsReorder,
             state.register

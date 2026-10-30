@@ -273,8 +273,8 @@ fun DueNorthApp(model: ShellViewModel) {
                     onUnclearSelected = { model.register.setSelectedCleared(false) },
                     onEndSelecting = model.register::endSelecting,
                     onSearch = model.register::toggleSearch,
-                    onRemoveTemplate = model::removeTemplate,
-                    onAddTemplate = { model.openTemplateKinds() },
+                    onRemoveTemplate = model.templates::remove,
+                    onAddTemplate = { model.templates.openKinds() },
                     onMoveCategory = model.envelopes::openMove,
                     onAutoHold = model::chooseAutoHold,
                     onSelectInbox = model.inbox::startSelecting,
@@ -282,7 +282,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onCategorizeSelected = model.inbox::categorizeSelected,
                     onEndInboxSelecting = model.inbox::endSelecting,
                     onDeleteSelected = model.inbox::deleteSelected,
-                    onSyncServer = model::syncInbox,
+                    onSyncServer = model.budgetFiles::syncInbox,
                     onCancel = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.import.cancel()
@@ -300,21 +300,21 @@ fun DueNorthApp(model: ShellViewModel) {
                     onEditAccount = model::openEditAccount,
                     onCloseAccount = model::openCloseAccount,
                     onReopenAccount = model::reopenOpenAccount,
-                    onAddSchedule = model::openNewSchedule,
-                    onRules = model::openRules,
-                    onAddRule = model::openNewRule,
-                    onDeleteSchedule = model::deleteOpenSchedule,
-                    onDeleteRule = model::deleteOpenRule,
-                    onSchedules = model::openSchedules,
-                    onSchedulesView = model::toggleSchedulesCalendar,
-                    onPostSchedule = model::postOpenSchedule,
-                    onSkipSchedule = model::skipOpenSchedule,
-                    onEditSchedule = model::editOpenSchedule,
-                    onTemplates = model::openTemplates,
+                    onAddSchedule = model.schedules::openNew,
+                    onRules = model.rules::open,
+                    onAddRule = model.rules::openNew,
+                    onDeleteSchedule = model.schedules::deleteOpen,
+                    onDeleteRule = model.rules::deleteOpen,
+                    onSchedules = model.schedules::open,
+                    onSchedulesView = model.schedules::toggleCalendar,
+                    onPostSchedule = model.schedules::postOpen,
+                    onSkipSchedule = model.schedules::skipOpen,
+                    onEditSchedule = model.schedules::editOpen,
+                    onTemplates = model.templates::open,
                     onBankLink = model::openBankLink,
                     onNext = model::onboardingCheck,
                     onRefresh = model::onboardingRefresh,
-                    onSamples = model::showSampleBudgets,
+                    onSamples = model.budgetFiles::showSamples,
                     onNewBudget = model::onboardingNewBudget,
                     onSettingsNew = model.settingsUi::showCreate,
                     onSettingsPayees = model.settingsUi::showPayees,
@@ -323,7 +323,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSignOut = model.servers::signOut,
                     onExport = model.settingsUi::exportBudget,
                     onScheduleTransaction = {
-                        (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
+                        (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model.schedules::createFromTransaction)
                     },
                     onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model.register::delete) },
                     onEditBudget = model::startBudgetEdit,
@@ -398,13 +398,17 @@ fun DueNorthApp(model: ShellViewModel) {
                         is ShellRoute.MoveCategory -> MoveCategoryRoute(route, state, model, fill)
                         ShellRoute.HoldMonth -> HoldMonthRoute(state, model, fill)
                         ShellRoute.StarterCategories ->
-                            StarterCategoriesScreen(error = state.editError, onAdd = model::addStarterCategories, modifier = fill)
+                            StarterCategoriesScreen(
+                                error = state.editError,
+                                onAdd = model.getStarted::addStarterCategories,
+                                modifier = fill,
+                            )
                         ShellRoute.AddAccount ->
                             AddAccountScreen(error = state.editError, onSave = model::submitAddAccount, modifier = fill)
                         is ShellRoute.EditAccount -> EditAccountRoute(route, state, model, fill)
                         is ShellRoute.CloseAccount -> CloseAccountRoute(route, state, model, fill)
                         is ShellRoute.ScheduleEditor -> ScheduleEditorRoute(route, state, model, fill)
-                        ShellRoute.Rules -> RulesScreen(state.rulesList, model::openRule, fill)
+                        ShellRoute.Rules -> RulesScreen(state.rules.list, model.rules::openEditor, fill)
                         ShellRoute.Schedules -> SchedulesRoute(state, model, fill)
                         is ShellRoute.ScheduleDetails -> ScheduleDetailsRoute(route, state, model, fill)
                         ShellRoute.MonthReview -> MonthReviewRoute(state, model, fill)
@@ -435,10 +439,10 @@ fun DueNorthApp(model: ShellViewModel) {
                             modifier = fill,
                         )
                     }
-                    if (state.scheduleDuplicateId != null) {
+                    if (state.schedulesUi.duplicateId != null) {
                         ScheduleDuplicateScreen(
-                            onPostAnyway = model::confirmScheduleDuplicate,
-                            onCancel = model::cancelScheduleDuplicate,
+                            onPostAnyway = model.schedules::confirmDuplicate,
+                            onCancel = model.schedules::cancelDuplicate,
                             modifier = fill,
                         )
                     }

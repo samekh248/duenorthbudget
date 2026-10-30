@@ -42,8 +42,8 @@ class ExperimentalContentTest {
 
         // The household budget has its own choice, so switching to it asks again.
         await { model.state.value.settings.openBudgetId == tripId }
-        model.requestSwitch(householdId)
-        model.confirmSwitch()
+        model.budgetFiles.requestSwitch(householdId)
+        model.budgetFiles.confirmSwitch()
         await { model.state.value.route is ShellRoute.ExperimentalOffer }
         model.settingsUi.acceptExperimentalOffer()
         assertEquals(ShellRoute.Home, model.state.value.route)
@@ -51,8 +51,8 @@ class ExperimentalContentTest {
 
         // Back on the trip budget, the earlier answer stands.
         await { model.state.value.settings.openBudgetId == householdId }
-        model.requestSwitch(tripId)
-        model.confirmSwitch()
+        model.budgetFiles.requestSwitch(tripId)
+        model.budgetFiles.confirmSwitch()
         await { model.state.value.settings.openBudgetId == tripId && !model.state.value.formatPrefs.templatesOn }
         assertEquals(ShellRoute.Home, model.state.value.route)
     }

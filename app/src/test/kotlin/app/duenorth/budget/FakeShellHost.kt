@@ -61,6 +61,38 @@ internal class FakeShellHost(
 
     override fun openAddAccount() = push(ShellRoute.AddAccount)
 
+    var onboardingFinished = 0
+
+    override fun finishOnboarding() {
+        onboardingFinished++
+    }
+
+    val getStarted = mutableListOf<String>()
+
+    override fun startBudgetEdit() = Unit
+
+    override fun applyTemplatesInBudgetEdit(overwrite: Boolean) = Unit
+
+    override suspend fun afterMonthWrite(budgetId: String) = Unit
+
+    val replaced = mutableListOf<ShellRoute>()
+
+    override fun replaceRoute(route: ShellRoute) {
+        replaced += route
+    }
+
+    override fun openNewSchedule() = Unit
+
+    override fun refresh() {
+        reloads++
+    }
+
+    override fun forgetMonths() = Unit
+
+    override suspend fun startGetStarted(budgetId: String) {
+        getStarted += budgetId
+    }
+
     override fun launchWrite(block: suspend (String) -> Unit) {
         val id = state.value.settings.openBudgetId ?: return
         writing = true
@@ -120,6 +152,10 @@ internal class FakeShellHost(
 
     override fun onBackgroundSyncHours(hours: Int) {
         backgroundSyncHours += hours
+    }
+
+    override fun setNetWorthIncludeOffBudget(include: Boolean) {
+        mutate { it.copy(settings = it.settings.copy(netWorthIncludeOffBudget = include)) }
     }
 
     var month: YearMonth = YearMonth.now()

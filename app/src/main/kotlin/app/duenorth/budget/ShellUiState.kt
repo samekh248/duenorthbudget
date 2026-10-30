@@ -24,19 +24,8 @@ import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterSearch
 import app.duenorth.budget.core.RemoteFile
-import app.duenorth.budget.core.ReportPreset
-import app.duenorth.budget.core.ReportRange
-import app.duenorth.budget.core.ReportsPage
-import app.duenorth.budget.core.RuleDraft
-import app.duenorth.budget.core.RuleSummary
 import app.duenorth.budget.core.SavedInstance
-import app.duenorth.budget.core.ScheduleDetails
-import app.duenorth.budget.core.ScheduleDraft
 import app.duenorth.budget.core.ScheduleSummary
-import app.duenorth.budget.core.SpendingGroupBy
-import app.duenorth.budget.core.Template
-import app.duenorth.budget.core.TemplatePlan
-import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.WriteResult
 import app.duenorth.budget.core.activeInstance
 import kotlinx.coroutines.launch
@@ -68,7 +57,6 @@ data class ShellUiState(
     val createError: String? = null,
     val writeError: String? = null,
     val confirm: WriteResult.Confirm? = null,
-    val switchTarget: BudgetSummary? = null,
     val today: String = RegisterEntry.todayIso(),
     val openMonth: YearMonth = YearMonth.now(),
     val pinnedMonth: YearMonth? = null,
@@ -79,15 +67,8 @@ data class ShellUiState(
     val reconcile: ReconcileUi = ReconcileUi(),
     /** Every schedule, ended ones included, by next date. */
     val schedules: List<ScheduleSummary> = emptyList(),
-    /** The schedule [ShellRoute.ScheduleDetails] shows; null while it loads. */
-    val scheduleDetails: ScheduleDetails? = null,
-    /** The schedules pivot item showing: [SchedulesSection.UPCOMING] or [SchedulesSection.ALL]. */
-    val schedulesSection: Int = 0,
-    /** Upcoming shows a month calendar instead of the list. */
-    val schedulesCalendar: Boolean = false,
     /** The payees' own state, kept by [PayeesHolder]. */
     val payees: PayeesState = PayeesState(),
-    val scheduleDuplicateId: String? = null,
     val serverError: String? = null,
     val remoteFiles: List<RemoteFile> = emptyList(),
     val syncing: Boolean = false,
@@ -96,11 +77,7 @@ data class ShellUiState(
     val conflicts: List<BudgetConflict> = emptyList(),
     val categories: List<CategoryChoice> = emptyList(),
     val locked: Boolean = false,
-    val passwordError: String? = null,
-    val pendingFile: RemoteFile? = null,
-    val replaceFile: RemoteFile? = null,
     val editError: String? = null,
-    val askEachTime: Boolean = true,
     val signedIn: Boolean = false,
     /** Importing's own state, kept by [ImportHolder]. */
     val import: ImportState = ImportState(),
@@ -116,9 +93,6 @@ data class ShellUiState(
     val cloudFileId: String? = null,
     /** The servers' own state, kept by [ServersHolder]. */
     val servers: ServersState = ServersState(),
-    val switchReturnRoute: ShellRoute = ShellRoute.Home,
-    /** The phone's budgets that picking [pendingFile] clears. */
-    val replaceBudgets: List<BudgetSummary> = emptyList(),
     val fillConfirm: FillConfirm? = null,
     val monthNotice: String? = null,
     val undoLabel: String? = null,
@@ -126,29 +100,12 @@ data class ShellUiState(
     val accountDetail: AccountDetail? = null,
     val accountsReorder: Boolean = false,
     val accountForceConfirm: String? = null,
-    val scheduleDraft: ScheduleDraft? = null,
-    val rulesList: List<RuleSummary> = emptyList(),
-    val ruleDraft: RuleDraft? = null,
-    val reports: ReportsPage? = null,
-    val reportsLoading: Boolean = false,
-    val reportPreset: ReportPreset = ReportPreset.LAST_6,
-    val reportCustom: ReportRange? = null,
-    val reportGroupBy: SpendingGroupBy = SpendingGroupBy.CATEGORY,
-    val templateResult: TemplateResult? = null,
-    val templateBusy: Boolean = false,
-    val templateConfirm: String? = null,
-    /** The open category's note while templates are on; null until read. */
-    val categoryNote: String? = null,
-    /** What each of the note's template lines asks for in the open month, in line order (null for none). */
-    val categoryTemplateAmounts: List<Long?> = emptyList(),
-    /** The template being edited and what it would give this month. */
-    val templatePreview: Pair<Template, Long?>? = null,
-    /** Schedule names a schedule template can pay. */
-    val templateSchedules: List<String> = emptyList(),
-    /** Every category's templates in priority lanes, for the templates screen; null until worked out. */
-    val templatePlan: TemplatePlan? = null,
-    /** What apply or overwrite would change, shown before it does. */
-    val templateApplyPreview: TemplateApplyPreview? = null,
+    /** The schedules' own state, kept by [SchedulesHolder]. */
+    val schedulesUi: SchedulesUi = SchedulesUi(),
+    /** The rules' own state, kept by [RulesHolder]. */
+    val rules: RulesUi = RulesUi(),
+    val reports: ReportsUi = ReportsUi(),
+    val templates: TemplatesUi = TemplatesUi(),
     val bankLink: BankLinkUi? = null,
     /** First-run progress while the phone has no budget (spec 011); null otherwise. */
     val onboarding: OnboardingUi? = null,
@@ -166,6 +123,8 @@ data class ShellUiState(
     val settingsPage: SettingsPage = SettingsPage.BUDGET,
     /** True while a page opened from settings is showing; back and finish return to settings. */
     val settingsReturn: Boolean = false,
+    /** The budget files' own state, kept by [BudgetFilesHolder]. */
+    val budgetFiles: BudgetFilesUi = BudgetFilesUi(),
     /** The settings screen's own state, kept by [SettingsHolder]. */
     val settingsUi: SettingsUi = SettingsUi(),
 ) {
