@@ -318,7 +318,7 @@ class TemplateContentTest {
         await { model.state.value.shell != null }
         // The flags reach the budget file a moment after the screen shows them.
         await { library.templatePlan(budgetId, model.state.value.openMonth) != null }
-        model.startBudgetEdit()
+        model.budgetEdit.start()
         model.templates.open()
         await {
             model.state.value.templates.plan

@@ -326,9 +326,9 @@ fun DueNorthApp(model: ShellViewModel) {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model.schedules::createFromTransaction)
                     },
                     onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model.register::delete) },
-                    onEditBudget = model::startBudgetEdit,
-                    onEndBudgetEdit = model::endBudgetEdit,
-                    onCancelBudgetEdit = model::cancelBudgetEdit,
+                    onEditBudget = model.budgetEdit::start,
+                    onEndBudgetEdit = model.budgetEdit::end,
+                    onCancelBudgetEdit = model.budgetEdit::cancel,
                 )
             }
         val actions = formSaveHost.bar ?: ScreenBar.forState(state, handlers)

@@ -125,7 +125,7 @@ class ShellViewModel(
 
             override suspend fun startGetStarted(budgetId: String) = getStarted.start(budgetId)
 
-            override fun startBudgetEdit() = this@ShellViewModel.startBudgetEdit()
+            override fun startBudgetEdit() = budgetEdit.start()
 
             override fun openNewSchedule() = schedules.openNew()
 
@@ -140,9 +140,9 @@ class ShellViewModel(
 
             override fun returnToSettings(page: SettingsPage?) = settingsUi.returnTo(page)
 
-            override fun cancelBudgetEdit() = this@ShellViewModel.cancelBudgetEdit()
+            override fun cancelBudgetEdit() = budgetEdit.cancel()
 
-            override fun fillBudgetEdit(kind: MonthFillKind) = this@ShellViewModel.fillBudgetEdit(kind)
+            override fun fillBudgetEdit(kind: MonthFillKind) = budgetEdit.fill(kind)
 
             override fun createBudget(
                 name: String,
@@ -159,7 +159,7 @@ class ShellViewModel(
 
             override fun loadCategoryNote(categoryId: String) = templates.loadNote(categoryId)
 
-            override fun applyTemplatesInBudgetEdit(overwrite: Boolean) = this@ShellViewModel.applyTemplatesInBudgetEdit(overwrite)
+            override fun applyTemplatesInBudgetEdit(overwrite: Boolean) = budgetEdit.applyTemplates(overwrite)
 
             override suspend fun afterMonthWrite(budgetId: String) = this@ShellViewModel.afterMonthWrite(budgetId)
 
@@ -169,7 +169,7 @@ class ShellViewModel(
                 fromCategoryId: String,
                 toCategoryId: String,
                 amountText: String,
-            ) = this@ShellViewModel.moveInBudgetEdit(fromCategoryId, toCategoryId, amountText)
+            ) = budgetEdit.move(fromCategoryId, toCategoryId, amountText)
 
             override fun transferToBudget(
                 categoryId: String,
@@ -241,6 +241,9 @@ class ShellViewModel(
 
     /** Month actions: fills, moving budget back to to budget, income auto-hold, hidden categories, and undo. */
     val month: MonthHolder = MonthHolder(host)
+
+    /** The budget's edit mode: its boxes and keypad, fills and templates into them, and done or cancel. */
+    val budgetEdit: BudgetEditHolder = BudgetEditHolder(host, envelopes)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -350,7 +353,7 @@ class ShellViewModel(
 
     fun selectHomeSection(index: Int) {
         // Edit mode belongs to the budget item and holds the pivot still; leaving it anyway drops the changes.
-        if (index != ScreenBar.HOME_BUDGET && _state.value.budgetEdit != null) cancelBudgetEdit()
+        if (index != ScreenBar.HOME_BUDGET && _state.value.budgetEdit != null) budgetEdit.cancel()
         // Reorder mode belongs to the accounts item, so leaving it ends reorder too.
         _state.update {
             it.copy(
@@ -431,7 +434,7 @@ class ShellViewModel(
         }
         // Back is edit mode's cancel: it leaves without saving anything changed there.
         if (current.budgetEdit != null && current.route == ShellRoute.Home && current.confirm == null) {
-            cancelBudgetEdit()
+            budgetEdit.cancel()
             return true
         }
         if (current.confirm != null) {

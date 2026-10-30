@@ -54,19 +54,19 @@ internal fun HomeRoute(
         onSelectMonth = model::selectOpenMonth,
         onBudgetCategory = if (state.shell == null) null else model.envelopes::openBudget,
         // Tapping to budget opens edit mode; in edit mode it opens the breakdown.
-        onToBudget = if (state.shell == null) null else model::startBudgetEdit,
+        onToBudget = if (state.shell == null) null else model.budgetEdit::start,
         showAhead = state.freeAfterPlansOn,
         budgetEdit = state.budgetEdit,
         budgetEditActions =
             remember(model) {
                 BudgetEditActions(
-                    onFocus = model::focusBudgetBox,
-                    onKey = model::typeBudgetKey,
-                    onCover = model::coverBudgetBox,
-                    onAll = model::allToBudgetBox,
-                    onDone = model::doneBudgetBox,
+                    onFocus = model.budgetEdit::focusBox,
+                    onKey = model.budgetEdit::typeKey,
+                    onCover = model.budgetEdit::coverBox,
+                    onAll = model.budgetEdit::allToBudgetBox,
+                    onDone = model.budgetEdit::doneBox,
                     onAvailable = { id ->
-                        if (model.doneBudgetBox()) model.envelopes.openMoveFrom(id)
+                        if (model.budgetEdit.doneBox()) model.envelopes.openMoveFrom(id)
                     },
                     // The breakdown reads the saved month, not edit mode's changes.
                     onToBudget = null,
