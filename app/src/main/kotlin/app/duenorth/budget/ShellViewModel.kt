@@ -86,6 +86,7 @@ class ShellViewModel(
             override val scope get() = viewModelScope
             override val library get() = this@ShellViewModel.library
             override val sync get() = this@ShellViewModel.sync
+            override val bankSyncTransport get() = this@ShellViewModel.bankSyncTransport
             override val io get() = this@ShellViewModel.io
             override val writing get() = this@ShellViewModel.writing
 
@@ -111,9 +112,7 @@ class ShellViewModel(
 
             override fun clearHistory() = history.clear()
 
-            override fun loadAccount(accountId: String) {
-                viewModelScope.launch { apply(load(accountId), accountId) }
-            }
+            override suspend fun reloadAccount(accountId: String) = apply(load(accountId), accountId)
         }
 
     /** The inbox: filing, deleting and opening what came in. */
@@ -124,6 +123,9 @@ class ShellViewModel(
 
     /** Payees: the payees page, renaming and merging, and the names payee boxes offer. */
     val payees: PayeesHolder = PayeesHolder(host)
+
+    /** Importing: a file preview, a bank fetch and the review of what came in. */
+    val import: ImportHolder = ImportHolder(host)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null

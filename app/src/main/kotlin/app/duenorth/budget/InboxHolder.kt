@@ -72,7 +72,7 @@ class InboxHolder internal constructor(
         host.push(route(row.accountId))
         host.mutate { it.copy(editFromHome = true, registerSelection = null) }
         host.loadPayees()
-        host.loadAccount(row.accountId)
+        host.scope.launch { host.reloadAccount(row.accountId) }
     }
 
     fun filedShown(transactionId: String) {

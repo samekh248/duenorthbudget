@@ -65,15 +65,15 @@ internal fun ImportFilePreviewRoute(
     model: ShellViewModel,
     modifier: Modifier,
 ) {
-    val preview = state.importPreview
+    val preview = state.import.preview
     if (preview == null) {
         Placeholder()
     } else {
         ImportPreviewScreen(
             preview = preview,
-            error = state.importError,
-            onConfirm = model::confirmImport,
-            onCancel = model::cancelImport,
+            error = state.import.error,
+            onConfirm = model.import::confirm,
+            onCancel = model.import::cancel,
             modifier = modifier,
         )
     }
@@ -85,15 +85,15 @@ internal fun ImportedReviewRoute(
     model: ShellViewModel,
     modifier: Modifier,
 ) {
-    val review = state.importReview
+    val review = state.import.review
     if (review == null) {
         Placeholder()
     } else {
         ImportReviewScreen(
             page = review,
-            error = state.importError,
-            onCategory = model::setImportReviewCategory,
-            onDone = model::finishImportReview,
+            error = state.import.error,
+            onCategory = model.import::setReviewCategory,
+            onDone = model.import::finishReview,
             modifier = modifier,
         )
     }

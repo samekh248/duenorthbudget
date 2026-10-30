@@ -155,7 +155,7 @@ fun DueNorthApp(model: ShellViewModel) {
                 context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     ?: return@rememberLauncherForActivityResult
             val name = uri.lastPathSegment?.substringAfterLast('/') ?: "import.qif"
-            model.previewImportFile(accountId, bytes, name)
+            model.import.previewFile(accountId, bytes, name)
         }
     LaunchedEffect(state.openIdRedirectUrl) {
         val url = state.openIdRedirectUrl ?: return@LaunchedEffect
@@ -258,13 +258,13 @@ fun DueNorthApp(model: ShellViewModel) {
                     onBankSync = {
                         val accountId =
                             (state.route as? ShellRoute.Register)?.accountId ?: return@ScreenBarHandlers
-                        model.fetchBankTransactions(accountId)
+                        model.import.fetchBank(accountId)
                     },
                     onBankSyncAll = model.bankSync::syncAll,
                     onDismissBankSync = model.bankSync::dismiss,
                     onSave = {
                         when (state.route) {
-                            is ShellRoute.ImportPreviewRoute -> model.confirmImport()
+                            is ShellRoute.ImportPreviewRoute -> model.import.confirm()
                             is ShellRoute.Reconcile -> model.finishReconcile()
                             else -> formSaveHost.save()
                         }
@@ -285,7 +285,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSyncServer = model::syncInbox,
                     onCancel = {
                         when (state.route) {
-                            is ShellRoute.ImportPreviewRoute -> model.cancelImport()
+                            is ShellRoute.ImportPreviewRoute -> model.import.cancel()
                             is ShellRoute.Reconcile -> model.cancelReconcile()
                             else -> model.back()
                         }
@@ -335,7 +335,7 @@ fun DueNorthApp(model: ShellViewModel) {
         // The bank sync tile stays over every page while banks fetch or a failure waits.
         ShellChrome(
             actions,
-            syncing = state.syncing || state.importFetchPending,
+            syncing = state.syncing || state.import.fetchPending,
             progress = state.syncProgress,
             bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
             overBar =

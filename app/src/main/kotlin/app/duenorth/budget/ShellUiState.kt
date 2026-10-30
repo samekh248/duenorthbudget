@@ -104,11 +104,8 @@ data class ShellUiState(
     val editError: String? = null,
     val askEachTime: Boolean = true,
     val signedIn: Boolean = false,
-    val importPreview: ImportPreview? = null,
-    val importCandidates: List<ParsedImportRow> = emptyList(),
-    val importReview: ImportReviewPage? = null,
-    val importError: String? = null,
-    val importFetchPending: Boolean = false,
+    /** Importing's own state, kept by [ImportHolder]. */
+    val import: ImportState = ImportState(),
     /** Bank sync's own state, kept by [BankSyncHolder]. */
     val bankSync: BankSyncState = BankSyncState(),
     /** The onboarding files list is asking the server for its budgets again. */

@@ -1,8 +1,10 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.HttpActualTransport
+import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.MemorySecretStore
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.WriteResult
@@ -17,6 +19,7 @@ internal class FakeShellHost(
     override val library: BudgetLibrary,
     start: ShellUiState,
     override val sync: SyncCoordinator = SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System),
+    override val bankSyncTransport: BankSyncTransport = HttpBankSyncTransport(),
 ) : ShellHost {
     override val state = MutableStateFlow(start)
     override val scope = CoroutineScope(Dispatchers.Unconfined)
@@ -65,5 +68,9 @@ internal class FakeShellHost(
 
     override fun loadPayees() = Unit
 
-    override fun loadAccount(accountId: String) = Unit
+    val reloadedAccounts = mutableListOf<String>()
+
+    override suspend fun reloadAccount(accountId: String) {
+        reloadedAccounts += accountId
+    }
 }

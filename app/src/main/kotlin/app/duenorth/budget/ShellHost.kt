@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.WriteResult
@@ -19,6 +20,7 @@ internal interface ShellHost {
     val scope: CoroutineScope
     val library: BudgetLibrary
     val sync: SyncCoordinator
+    val bankSyncTransport: BankSyncTransport
 
     /** Where file and network work runs. */
     val io: CoroutineDispatcher
@@ -54,5 +56,5 @@ internal interface ShellHost {
     fun loadPayees()
 
     /** Reloads the shell with [accountId]'s register, for a page about to show it. */
-    fun loadAccount(accountId: String)
+    suspend fun reloadAccount(accountId: String)
 }
