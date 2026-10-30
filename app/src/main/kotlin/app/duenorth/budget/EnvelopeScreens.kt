@@ -74,6 +74,7 @@ fun CategoryBudgetScreen(
     onSaveNote: (String) -> Unit = {},
     // Desktop's budget automations, when they own the category: shown in place of the note's template lines.
     automations: CategoryAutomations? = null,
+    automationsEditable: Boolean = false,
     templateAmounts: List<Long?> = emptyList(),
     onOpenTemplate: (Int) -> Unit = {},
     onMoveTemplate: (Int, Int) -> Unit = { _, _ -> },
@@ -136,7 +137,14 @@ fun CategoryBudgetScreen(
             }
         }
         if (automations != null) {
-            AutomationTiles(automations, templateAmounts, shell.currency, Modifier.padding(top = 12.dp))
+            AutomationTiles(
+                automations,
+                templateAmounts,
+                shell.currency,
+                Modifier.padding(top = 12.dp),
+                editable = automationsEditable,
+                onOpen = onOpenTemplate,
+            )
         } else if (note != null) {
             TemplateTiles(
                 note,

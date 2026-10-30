@@ -53,6 +53,7 @@ internal fun CategoryBudgetRoute(
                 note = state.templates.note.takeIf { state.formatPrefs.templatesOn },
                 onSaveNote = model.templates::saveNoteText,
                 automations = state.templates.automations.takeIf { state.formatPrefs.templatesOn },
+                automationsEditable = state.formatPrefs.automationsOn,
                 templateAmounts = state.templates.amounts,
                 onOpenTemplate = model.templates::openTemplate,
                 onMoveTemplate = model.templates::move,

@@ -46,6 +46,13 @@ enum class ExperimentalFeature(
         "templates",
         "flags.goalTemplatesEnabled",
     ),
+    AUTOMATIONS(
+        "budget automations",
+        "edit a category's templates here instead of in its note, as Actual's budget automations do",
+        "a category's page ••• → switch to automations · its tiles then edit in place",
+        "automations",
+        "flags.goalTemplatesUIEnabled",
+    ),
     FREE_AFTER_PLANS(
         "free after later plans",
         "under to budget, how much is left once money already budgeted in later months comes out",
@@ -55,12 +62,17 @@ enum class ExperimentalFeature(
     ),
     ;
 
+    /** The feature this one sits under, which must be on before it can be: budget automations need budget templates. */
+    val parent: ExperimentalFeature?
+        get() = if (this == AUTOMATIONS) TEMPLATES else null
+
     fun isOn(
         prefs: FormatPrefs,
         phone: PhoneSettings,
     ): Boolean =
         when (this) {
             TEMPLATES -> prefs.goalTemplates
+            AUTOMATIONS -> prefs.goalTemplatesUI
             FREE_AFTER_PLANS -> phone.freeAfterPlans
         }
 }
@@ -82,6 +94,7 @@ object ExperimentalCopy {
     const val NOW_OFF = "This budget has them off."
     const val LATER = "change this any time in settings → experimental"
     const val NEEDS_MASTER = "turn on experimental features to use this"
+    const val NEEDS_PARENT = "turn on budget templates to use this"
     const val ON = "on"
     const val OFF = "off"
 }
@@ -175,7 +188,8 @@ private fun FeatureRow(
     phone: PhoneSettings,
     onFeature: (ExperimentalFeature, Boolean) -> Unit,
 ) {
-    val usable = prefs.experimental
+    val parentOff = feature.parent?.let { !it.isOn(prefs, phone) } == true
+    val usable = prefs.experimental && !parentOff
     val ink = if (usable) Metro.colors.foreground else Metro.colors.secondary
     Column(
         Modifier.fillMaxWidth().padding(vertical = MetroDimens.Row).testTag("experimental-${feature.tag}"),
@@ -188,7 +202,11 @@ private fun FeatureRow(
         }
         MetroText(feature.hint, Metro.typography.body, color = ink)
         MetroText(
-            if (usable) feature.where else ExperimentalCopy.NEEDS_MASTER,
+            when {
+                usable -> feature.where
+                prefs.experimental -> ExperimentalCopy.NEEDS_PARENT
+                else -> ExperimentalCopy.NEEDS_MASTER
+            },
             Metro.typography.caption,
             Modifier.testTag("experimental-${feature.tag}-note"),
             color = if (usable) Metro.colors.secondary else Metro.accent.text,

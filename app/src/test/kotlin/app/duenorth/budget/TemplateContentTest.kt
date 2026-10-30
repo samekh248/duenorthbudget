@@ -243,6 +243,61 @@ class TemplateContentTest {
     }
 
     @Test
+    fun switchEditAndSwitchBackThroughBudgetAutomations() {
+        val (model, library) = household("template-automations")
+        val budgetId = model.state.value.settings.openBudgetId!!
+        model.settingsUi.setExperimental(true)
+        model.settingsUi.setGoalTemplates(true)
+        await { model.state.value.formatPrefs.templatesOn }
+        model.envelopes.openBudget("c-gas")
+        await { model.state.value.templates.note != null }
+        model.templates.saveNote("fill up on fridays\n#template 50")
+        await { library.readCategoryNote(budgetId, "c-gas") == "fill up on fridays\n#template 50" }
+
+        // Off for the budget, a category cannot be switched.
+        model.templates.switchToAutomations()
+        settleMain()
+        assertEquals(null, library.readCategoryAutomations(budgetId, "c-gas"))
+
+        model.settingsUi.setExperimentalFeature(ExperimentalFeature.AUTOMATIONS, true)
+        await { model.state.value.formatPrefs.automationsOn }
+        model.templates.switchToAutomations()
+        await { model.state.value.templates.automations != null }
+        assertEquals(
+            listOf(Template.Simple(BigDecimal("50"), null, 0)),
+            model.state.value.templates.automations!!
+                .templates,
+        )
+        assertEquals(UndoCopy.TO_AUTOMATIONS, library.undoLabel(budgetId))
+        assertTrue(
+            "to-notes" in
+                ScreenBar
+                    .specsFor(
+                        ShellRoute.CategoryBudget("c-gas"),
+                        true,
+                        BudgetMode.ENVELOPE,
+                        templates = true,
+                        categoryAutomations = true,
+                        automationsOn = true,
+                    ).map {
+                        it.id
+                    },
+        )
+
+        model.templates.openTemplate(0)
+        assertEquals(ShellRoute.TemplateEditor("c-gas", 0, TemplateKind.MONTHLY), model.state.value.route)
+        model.templates.save(Template.Simple(BigDecimal("75"), null, 0))
+        assertEquals(ShellRoute.CategoryBudget("c-gas"), model.state.value.route)
+        await { library.readCategoryAutomations(budgetId, "c-gas")?.templates == listOf(Template.Simple(BigDecimal("75"), null, 0)) }
+        // The note is left as it was; the automations are what run.
+        assertEquals("fill up on fridays\n#template 50", library.readCategoryNote(budgetId, "c-gas"))
+
+        model.templates.switchToNotes()
+        await { model.state.value.templates.automations == null }
+        assertEquals("fill up on fridays\n#template 75", library.readCategoryNote(budgetId, "c-gas"))
+    }
+
+    @Test
     fun lanesShowEveryChipWhatItGetsAndTheLineToFix() {
         var opened: TemplateChip? = null
         compose.setContent {

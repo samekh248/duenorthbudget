@@ -90,8 +90,12 @@ data class FormatPrefs(
     val learnCategories: Boolean = true,
     /** Actual's `flags.goalTemplatesEnabled`; templates also need [experimental] (spec 010 US5). */
     val goalTemplates: Boolean = false,
+    /** Actual's `flags.goalTemplatesUIEnabled`, a sub-switch of [goalTemplates]: categories' budget automations are edited here. */
+    val goalTemplatesUI: Boolean = false,
 ) {
     val templatesOn: Boolean get() = experimental && goalTemplates
+
+    val automationsOn: Boolean get() = templatesOn && goalTemplatesUI
 }
 
 data class PendingExport(

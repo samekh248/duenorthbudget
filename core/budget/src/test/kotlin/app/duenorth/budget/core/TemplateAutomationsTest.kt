@@ -177,4 +177,89 @@ class TemplateAutomationsTest {
             }
         }
     }
+
+    @Test
+    fun switchingToAutomationsKeepsTheNoteAndRunsTheSame() {
+        fixture.open().use { opened ->
+            val fixed = fixture.id("categories", "Fixed")
+            val note = opened.library.readCategoryNote(opened.budgetId, fixed)
+            val before = TemplateNote.parse(note).entries.mapNotNull { it.template }
+            val automations = opened.library.migrateCategoryAutomations(opened.budgetId, fixed)!!
+            assertEquals(before, automations.templates)
+            assertEquals(note, opened.library.readCategoryNote(opened.budgetId, fixed))
+            assertEquals(automations.templates, opened.library.readCategoryAutomations(opened.budgetId, fixed)!!.templates)
+            opened.db { session ->
+                TemplateEngine(session, fixture.today).run(october, overwrite = true, confirmed = true)
+                fixture.assertTable(session, "zero_budgets", where = { it["month"] == 202610L })
+            }
+        }
+    }
+
+    @Test
+    fun aNoteWithALineThatDoesNotReadStaysOnNotes() {
+        fixture.open().use { opened ->
+            val fixed = fixture.id("categories", "Fixed")
+            opened.library.saveCategoryNote(opened.budgetId, fixed, "rent\n#template fifty dollars")
+            assertNull(opened.library.migrateCategoryAutomations(opened.budgetId, fixed))
+            assertNull(opened.library.readCategoryAutomations(opened.budgetId, fixed))
+        }
+    }
+
+    @Test
+    fun editsKeepAnAutomationThePhoneCannotRunAsDesktopWroteIt() {
+        fixture.open().use { opened ->
+            val fixed = fixture.id("categories", "Fixed")
+            val refill = """{"type":"refill","priority":2,"directive":"template","description":"top up"}"""
+            opened.db { session ->
+                session.transaction {
+                    SyncSchema.write(
+                        session,
+                        "categories",
+                        fixed,
+                        "goal_def",
+                        """[{"type":"simple","monthly":123,"priority":0,"directive":"template"},$refill]""",
+                    )
+                    SyncSchema.write(session, "categories", fixed, "template_settings", ui)
+                }
+            }
+            val automations = opened.library.readCategoryAutomations(opened.budgetId, fixed)!!
+            val edited = automations.replace(0, Template.Simple(BigDecimal("150"), null, 0))
+            assertTrue(opened.library.saveCategoryAutomations(opened.budgetId, fixed, edited))
+            val goalDef =
+                opened.db { session ->
+                    session.query("SELECT goal_def FROM categories WHERE id = ?", listOf(fixed)).first().str("goal_def")
+                }!!
+            assertTrue(goalDef, goalDef.endsWith("$refill]"))
+            assertTrue(goalDef, goalDef.contains("\"monthly\":150"))
+            assertFalse(opened.library.unmigrateCategoryAutomations(opened.budgetId, fixed))
+        }
+    }
+
+    @Test
+    fun backToNotesWritesTheAutomationsIntoTheNote() {
+        fixture.open().use { opened ->
+            val fixed = fixture.id("categories", "Fixed")
+            opened.library.saveCategoryNote(opened.budgetId, fixed, "rent\n#template 50")
+            val automations = opened.library.migrateCategoryAutomations(opened.budgetId, fixed)!!
+            opened.library.saveCategoryAutomations(opened.budgetId, fixed, automations.add(Template.Goal(BigDecimal("900"))))
+            assertTrue(opened.library.unmigrateCategoryAutomations(opened.budgetId, fixed))
+            assertEquals("rent\n#template 50\n#goal 900", opened.library.readCategoryNote(opened.budgetId, fixed))
+            assertNull(opened.library.readCategoryAutomations(opened.budgetId, fixed))
+        }
+    }
+
+    @Test
+    fun movingAnAutomationHandsItTheEarlierPriority() {
+        val automations =
+            CategoryAutomations(
+                listOf(
+                    TemplateJson.Stored.of(Template.Simple(BigDecimal("1"), null, 1)),
+                    TemplateJson.Stored.of(Template.Simple(BigDecimal("2"), null, 3)),
+                ),
+            )
+        assertEquals(
+            listOf(Template.Simple(BigDecimal("2"), null, 1), Template.Simple(BigDecimal("1"), null, 3)),
+            automations.move(1, 0).templates,
+        )
+    }
 }

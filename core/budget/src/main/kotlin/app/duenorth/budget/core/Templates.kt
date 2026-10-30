@@ -899,6 +899,51 @@ object CategoryNotes {
         return CategoryAutomations(TemplateJson.read(row.str("goal_def")) { scheduleName(session, it) })
     }
 
+    /** Saves [automations] as the category's `goal_def`, owned by the budget automations from now on. */
+    fun saveAutomations(
+        session: SqlSession,
+        categoryId: String,
+        automations: CategoryAutomations,
+    ) {
+        SyncSchema.write(session, "categories", categoryId, "goal_def", automations.goalDef())
+        SyncSchema.write(session, "categories", categoryId, "template_settings", UI_SOURCE)
+    }
+
+    /**
+     * Hands a notes category to the budget automations, as desktop's migration does: its template lines become its
+     * automations and the note keeps them as they were. Null (nothing written) when a line does not read.
+     */
+    fun migrate(
+        session: SqlSession,
+        categoryId: String,
+    ): CategoryAutomations? {
+        val entries = TemplateNote.parse(read(session, categoryId)).entries
+        if (entries.any { it.template == null }) return null
+        val automations = CategoryAutomations(entries.map { TemplateJson.Stored.of(it.template!!) })
+        saveAutomations(session, categoryId, automations)
+        return automations
+    }
+
+    /**
+     * Back to note templates, as desktop's un-migrate does: the automations are written into the note in place of its
+     * template lines and the note owns the category again. False (nothing written) while it holds an automation that
+     * has no note line the phone can write.
+     */
+    fun unmigrate(
+        session: SqlSession,
+        categoryId: String,
+    ): Boolean {
+        val automations = automations(session, categoryId) ?: return false
+        if (!automations.runnable) return false
+        val note = TemplateNote.parse(read(session, categoryId))
+        write(session, categoryId, note.compose(automations.templates.map { TemplateNote.Entry.of(it) }))
+        SyncSchema.write(session, "categories", categoryId, "template_settings", NOTES_SOURCE)
+        return true
+    }
+
+    private const val UI_SOURCE = """{"source":"ui"}"""
+    private const val NOTES_SOURCE = """{"source":"notes"}"""
+
     private fun scheduleName(
         session: SqlSession,
         scheduleId: String,

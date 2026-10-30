@@ -17,6 +17,7 @@ import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.TemplateJson
 import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.components.styleCard
 import app.duenorth.budget.design.theme.Metro
 
@@ -26,6 +27,11 @@ import app.duenorth.budget.design.theme.Metro
 object AutomationCopy {
     const val SECTION = "budget automations"
     const val OWNER = "set up in Actual's budget automations. change them there for now."
+    const val OWNER_EDIT = "these run instead of the note's template lines. tap one to change it."
+    const val TO_AUTOMATIONS = "switch to automations"
+    const val TO_NOTES = "back to notes"
+    const val CANT_SWITCH = "a template line in the note doesn't read, so it can't become an automation. fix or remove it first."
+    const val CANT_RETURN = "one of these has no note line the phone can write. change it in Actual on a computer first."
     const val EMPTY = "no automations yet."
     const val NOT_RUN = "the phone can't run one of these yet, so filling from templates leaves this category alone."
     const val UNSUPPORTED = "change this one in Actual on a computer"
@@ -58,6 +64,9 @@ fun AutomationTiles(
     amounts: List<Long?>,
     currency: CurrencySpec,
     modifier: Modifier = Modifier,
+    /** Budget automations are on for the budget: a tile the phone can run opens its form. */
+    editable: Boolean = false,
+    onOpen: (Int) -> Unit = {},
 ) {
     val options = formatOptions()
     val asks = amounts.filterNotNull().sum()
@@ -74,9 +83,15 @@ fun AutomationTiles(
                 )
             }
         }
-        MetroText(AutomationCopy.OWNER, Metro.typography.caption, Modifier.testTag("automation-owner"), color = Metro.colors.secondary)
+        MetroText(
+            if (editable) AutomationCopy.OWNER_EDIT else AutomationCopy.OWNER,
+            Metro.typography.caption,
+            Modifier.testTag("automation-owner"),
+            color = Metro.colors.secondary,
+        )
         automations.entries.forEachIndexed { index, entry ->
-            AutomationTile(entry, amounts.getOrNull(index), currency, options, Modifier.testTag("automation-tile-$index"))
+            val open = if (editable && entry.template != null) ({ onOpen(index) }) else null
+            AutomationTile(entry, amounts.getOrNull(index), currency, options, Modifier.testTag("automation-tile-$index"), open)
         }
         if (automations.entries.isEmpty()) {
             MetroText(AutomationCopy.EMPTY, Metro.typography.caption, color = Metro.colors.secondary)
@@ -94,12 +109,14 @@ private fun AutomationTile(
     currency: CurrencySpec,
     options: FormatOptions,
     modifier: Modifier,
+    onClick: (() -> Unit)?,
 ) {
     val template = entry.template
     Row(
         modifier
             .fillMaxWidth()
             .styleCard(selected = template == null)
+            .then(if (onClick != null) Modifier.metroPress(onClick) else Modifier)
             .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
