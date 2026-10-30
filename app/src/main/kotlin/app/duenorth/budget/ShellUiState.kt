@@ -135,8 +135,6 @@ data class ShellUiState(
     val replaceBudgets: List<BudgetSummary> = emptyList(),
     val fillConfirm: FillConfirm? = null,
     val monthNotice: String? = null,
-    /** How the inbox's own sync went, shown under its totals until the pivot moves on. */
-    val inboxSyncNotice: String? = null,
     val undoLabel: String? = null,
     val accountsList: List<AccountDetail> = emptyList(),
     val accountDetail: AccountDetail? = null,
@@ -170,12 +168,8 @@ data class ShellUiState(
     val onboarding: OnboardingUi? = null,
     /** The Home pivot item showing, kept while a page opened from Home is showing. */
     val homeSection: Int = 0,
-    /** Inbox rows just filed, kept on screen while their confirmation plays. */
-    val inboxFiled: List<InboxFiled> = emptyList(),
-    /** Inbox rows checked in the inbox's select mode; null when not selecting. */
-    val inboxSelection: Set<String>? = null,
-    /** A transaction just left by a match, shown first in the inbox so it can be filed next. */
-    val inboxLead: String? = null,
+    /** The inbox's own state, kept by [InboxHolder]. */
+    val inbox: InboxUi = InboxUi(),
     /** The budget's edit mode, with the box being typed into; null when not editing. */
     val budgetEdit: BudgetEdit? = null,
     /** Set while a transaction form was opened from home (the inbox or its add), so saving it goes back home. */

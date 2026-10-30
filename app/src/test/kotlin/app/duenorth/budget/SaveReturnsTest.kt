@@ -58,7 +58,7 @@ class SaveReturnsTest {
             model.state.value.shell!!
                 .inbox
                 .first()
-        model.openInboxDetails(inbox.id)
+        model.inbox.openDetails(inbox.id)
         await {
             model.state.value.register
                 ?.rows

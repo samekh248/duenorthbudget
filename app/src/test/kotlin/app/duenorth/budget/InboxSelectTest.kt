@@ -23,10 +23,10 @@ class InboxSelectTest {
                 .inbox
         assertTrue("the sample needs two inbox rows", inbox.size >= 2)
         val picked = inbox.take(2).map { it.id }
-        model.startInboxSelecting()
-        picked.forEach(model::toggleInboxSelected)
-        assertEquals(picked.toSet(), model.state.value.inboxSelection)
-        model.categorizeSelectedInbox()
+        model.inbox.startSelecting()
+        picked.forEach(model.inbox::toggleSelected)
+        assertEquals(picked.toSet(), model.state.value.inbox.selection)
+        model.inbox.categorizeSelected()
         await { model.state.value.categoryTarget != null }
         val route = model.state.value.route as ShellRoute.PickCategory
         assertEquals(picked, listOf(route.transactionId) + route.others)
@@ -40,7 +40,7 @@ class InboxSelectTest {
                     .inbox
                     .none { it.id in picked }
         }
-        assertEquals(null, model.state.value.inboxSelection)
+        assertEquals(null, model.state.value.inbox.selection)
         assertEquals(UndoCopy.CATEGORIZE, model.state.value.undoLabel)
     }
 
@@ -52,15 +52,15 @@ class InboxSelectTest {
                 .inbox
                 .take(2)
                 .map { it.id }
-        model.startInboxSelecting()
-        picked.forEach(model::toggleInboxSelected)
-        model.deleteSelectedInbox()
+        model.inbox.startSelecting()
+        picked.forEach(model.inbox::toggleSelected)
+        model.inbox.deleteSelected()
         await {
             model.state.value.shell!!
                 .inbox
                 .none { it.id in picked }
         }
-        assertEquals(null, model.state.value.inboxSelection)
+        assertEquals(null, model.state.value.inbox.selection)
         assertEquals(UndoCopy.DELETE_TRANSACTION, model.state.value.undoLabel)
     }
 
@@ -79,8 +79,8 @@ class InboxSelectTest {
     @Test
     fun backLeavesSelectMode() {
         val (model, _) = household("inbox-select-back")
-        model.startInboxSelecting()
+        model.inbox.startSelecting()
         assertTrue(model.back())
-        assertEquals(null, model.state.value.inboxSelection)
+        assertEquals(null, model.state.value.inbox.selection)
     }
 }

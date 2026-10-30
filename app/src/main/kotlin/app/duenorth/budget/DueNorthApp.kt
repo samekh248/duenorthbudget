@@ -277,11 +277,11 @@ fun DueNorthApp(model: ShellViewModel) {
                     onAddTemplate = { model.openTemplateKinds() },
                     onMoveCategory = model::openMoveCategory,
                     onAutoHold = model::chooseAutoHold,
-                    onSelectInbox = model::startInboxSelecting,
-                    onAcceptSelected = model::acceptSelectedInbox,
-                    onCategorizeSelected = model::categorizeSelectedInbox,
-                    onEndInboxSelecting = model::endInboxSelecting,
-                    onDeleteSelected = model::deleteSelectedInbox,
+                    onSelectInbox = model.inbox::startSelecting,
+                    onAcceptSelected = model.inbox::acceptSelected,
+                    onCategorizeSelected = model.inbox::categorizeSelected,
+                    onEndInboxSelecting = model.inbox::endSelecting,
+                    onDeleteSelected = model.inbox::deleteSelected,
                     onSyncServer = model::syncInbox,
                     onCancel = {
                         when (state.route) {
