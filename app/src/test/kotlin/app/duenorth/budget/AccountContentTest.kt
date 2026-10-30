@@ -168,39 +168,39 @@ class AccountContentTest {
     fun addCloseAndReopenThroughTheModel() {
         val (model, library) = household("accounts")
         val budgetId = model.state.value.settings.openBudgetId!!
-        model.reloadAccounts()
+        model.accounts.reloadList()
         await {
-            model.state.value.accountsList
+            model.state.value.accounts.list
                 .isNotEmpty()
         }
-        val before = model.state.value.accountsList.size
-        model.openAddAccount()
+        val before = model.state.value.accounts.list.size
+        model.accounts.openAdd()
         assertEquals(ShellRoute.AddAccount, model.state.value.route)
-        model.submitAddAccount("", offBudget = false, balanceText = "")
+        model.accounts.submitAdd("", offBudget = false, balanceText = "")
         await { model.state.value.editError != null }
         assertEquals(AccountsCopy.ENTER_NAME, model.state.value.editError)
-        model.submitAddAccount("Wallet", offBudget = false, balanceText = "25")
-        await { model.state.value.route == ShellRoute.Home && model.state.value.accountsList.size == before + 1 }
+        model.accounts.submitAdd("Wallet", offBudget = false, balanceText = "25")
+        await { model.state.value.route == ShellRoute.Home && model.state.value.accounts.list.size == before + 1 }
         val wallet =
-            model.state.value.accountsList
+            model.state.value.accounts.list
                 .single { it.name == "Wallet" }
         assertEquals(2_500L, wallet.balanceMinor)
         assertEquals(AccountsCopy.ADD, model.state.value.undoLabel)
 
         model.register.openAccount(wallet.id)
         await { model.state.value.route == ShellRoute.Register(wallet.id) }
-        model.openCloseAccount()
+        model.accounts.openClose()
         await {
-            model.state.value.accountDetail
+            model.state.value.accounts.detail
                 ?.id == wallet.id
         }
-        model.submitCloseAccount(destinationId = null, categoryId = null)
+        model.accounts.submitClose(destinationId = null, categoryId = null)
         await { model.state.value.editError != null }
         assertEquals(AccountsCopy.CHOOSE_DESTINATION, model.state.value.editError)
         val other =
-            model.state.value.accountsList
+            model.state.value.accounts.list
                 .first { it.id != wallet.id && !it.offBudget && !it.closed }
-        model.submitCloseAccount(destinationId = other.id, categoryId = null)
+        model.accounts.submitClose(destinationId = other.id, categoryId = null)
         await { library.readAccount(budgetId, wallet.id)?.closed == true }
         await {
             model.state.value.route !is ShellRoute.CloseAccount &&
@@ -209,13 +209,13 @@ class AccountContentTest {
                     .none { it.id == wallet.id }
         }
 
-        model.toggleShowClosedAccounts()
+        model.accounts.toggleShowClosed()
         await {
             model.state.value.settings.showClosedAccounts &&
-                model.state.value.accountsList
+                model.state.value.accounts.list
                     .any { it.id == wallet.id && it.closed }
         }
-        model.reopenAccount(wallet.id)
+        model.accounts.reopen(wallet.id)
         await { library.readAccount(budgetId, wallet.id)?.closed == false }
     }
 
@@ -226,19 +226,19 @@ class AccountContentTest {
         val account = library.readAccounts(budgetId, includeClosed = false).first { it.transactionCount > 0 && it.balanceMinor != 0L }
         model.register.openAccount(account.id)
         await { model.state.value.route == ShellRoute.Register(account.id) }
-        model.openCloseAccount()
+        model.accounts.openClose()
         await {
-            model.state.value.accountDetail
+            model.state.value.accounts.detail
                 ?.id == account.id
         }
-        model.submitCloseAccount(null, null, forced = true)
-        await { model.state.value.accountForceConfirm != null }
+        model.accounts.submitClose(null, null, forced = true)
+        await { model.state.value.accounts.forceConfirm != null }
         assertEquals(account.id, library.readAccount(budgetId, account.id)?.id)
-        model.keepAccount()
-        assertNull(model.state.value.accountForceConfirm)
-        model.submitCloseAccount(null, null, forced = true)
-        await { model.state.value.accountForceConfirm != null }
-        model.confirmForceClose()
+        model.accounts.keep()
+        assertNull(model.state.value.accounts.forceConfirm)
+        model.accounts.submitClose(null, null, forced = true)
+        await { model.state.value.accounts.forceConfirm != null }
+        model.accounts.confirmForceClose()
         await { library.readAccount(budgetId, account.id) == null }
     }
 }

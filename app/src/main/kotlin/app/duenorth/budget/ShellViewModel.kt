@@ -10,6 +10,7 @@ import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.ForcedWrite
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.HttpBankSyncTransport
+import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
@@ -28,7 +29,6 @@ import app.duenorth.budget.design.MonthWindow
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,6 +85,7 @@ class ShellViewModel(
             override val bankSyncTransport get() = this@ShellViewModel.bankSyncTransport
             override val probe get() = this@ShellViewModel.probe
             override val io get() = this@ShellViewModel.io
+            override val orderedIo = this@ShellViewModel.io.limitedParallelism(1)
             override val writing get() = this@ShellViewModel.writing
 
             override fun mutate(transform: (ShellUiState) -> ShellUiState) = this@ShellViewModel.mutate(transform)
@@ -118,13 +119,13 @@ class ShellViewModel(
                 history.removeLastOrNull()
             }
 
-            override fun openAddAccount() = this@ShellViewModel.openAddAccount()
+            override fun openAddAccount() = accounts.openAdd()
 
-            override fun finishOnboarding() = this@ShellViewModel.finishOnboarding()
+            override fun finishOnboarding() = onboarding.finish()
 
             override suspend fun startGetStarted(budgetId: String) = getStarted.start(budgetId)
 
-            override fun startBudgetEdit() = this@ShellViewModel.startBudgetEdit()
+            override fun startBudgetEdit() = budgetEdit.start()
 
             override fun openNewSchedule() = schedules.openNew()
 
@@ -139,7 +140,9 @@ class ShellViewModel(
 
             override fun returnToSettings(page: SettingsPage?) = settingsUi.returnTo(page)
 
-            override fun cancelBudgetEdit() = this@ShellViewModel.cancelBudgetEdit()
+            override fun cancelBudgetEdit() = budgetEdit.cancel()
+
+            override fun fillBudgetEdit(kind: MonthFillKind) = budgetEdit.fill(kind)
 
             override fun createBudget(
                 name: String,
@@ -156,7 +159,7 @@ class ShellViewModel(
 
             override fun loadCategoryNote(categoryId: String) = templates.loadNote(categoryId)
 
-            override fun applyTemplatesInBudgetEdit(overwrite: Boolean) = this@ShellViewModel.applyTemplatesInBudgetEdit(overwrite)
+            override fun applyTemplatesInBudgetEdit(overwrite: Boolean) = budgetEdit.applyTemplates(overwrite)
 
             override suspend fun afterMonthWrite(budgetId: String) = this@ShellViewModel.afterMonthWrite(budgetId)
 
@@ -166,21 +169,21 @@ class ShellViewModel(
                 fromCategoryId: String,
                 toCategoryId: String,
                 amountText: String,
-            ) = this@ShellViewModel.moveInBudgetEdit(fromCategoryId, toCategoryId, amountText)
+            ) = budgetEdit.move(fromCategoryId, toCategoryId, amountText)
 
             override fun transferToBudget(
                 categoryId: String,
                 amountText: String,
-            ) = this@ShellViewModel.transferToBudget(categoryId, amountText)
+            ) = month.transferToBudget(categoryId, amountText)
 
             override fun signOut(preferSettings: Boolean) = budgetFiles.signOut(preferSettings)
 
-            override fun refreshOnboardingFiles() = onboardingRefresh()
+            override fun refreshOnboardingFiles() = onboarding.refreshFiles()
 
             override fun finishBrowserSignIn(
                 saved: OnboardingProgress,
                 error: String?,
-            ) = this@ShellViewModel.finishBrowserSignIn(saved, error)
+            ) = onboarding.finishBrowserSignIn(saved, error)
 
             override suspend fun reloadAccount(accountId: String) = apply(load(accountId), accountId)
         }
@@ -230,11 +233,20 @@ class ShellViewModel(
     /** Schedules: the pivot, a schedule's page and editor, and posting or skipping one. */
     val schedules: SchedulesHolder = SchedulesHolder(host, rules)
 
-    /** The running server check or sign-in, cancelled by back (spec 011 R11). */
-    internal var onboardingJob: Job? = null
+    /** Bank link: linking an account to a bank, and repairing a link. */
+    val bankLink: BankLinkHolder = BankLinkHolder(host)
 
-    /** `onboarding.json` writes, one at a time and in order. */
-    internal val onboardingWrites = io.limitedParallelism(1)
+    /** Accounts: adding, editing, closing, reopening and reordering them. */
+    val accounts: AccountsHolder = AccountsHolder(host)
+
+    /** Month actions: fills, moving budget back to to budget, income auto-hold, hidden categories, and undo. */
+    val month: MonthHolder = MonthHolder(host)
+
+    /** The budget's edit mode: its boxes and keypad, fills and templates into them, and done or cancel. */
+    val budgetEdit: BudgetEditHolder = BudgetEditHolder(host, envelopes)
+
+    /** First run, and settings' add server path through the same pages. */
+    val onboarding: OnboardingHolder = OnboardingHolder(host, settingsUi, servers, budgetFiles)
 
     /** When the last sync the screen started without being asked began, in epoch millis; launch syncs at start. */
     private var lastScreenSync = System.currentTimeMillis()
@@ -255,9 +267,9 @@ class ShellViewModel(
     init {
         library.onLocalChange = localChange
         viewModelScope.launch {
-            restoreOnboarding()
+            onboarding.restore()
             reload()
-            resumeOnboarding()
+            onboarding.resume()
             val id = _state.value.settings.openBudgetId ?: return@launch
             if (_state.value.locked) return@launch
             // Launch fetches the banks first, so the sync after sends what they brought to the server.
@@ -338,13 +350,13 @@ class ShellViewModel(
 
     fun selectHomeSection(index: Int) {
         // Edit mode belongs to the budget item and holds the pivot still; leaving it anyway drops the changes.
-        if (index != ScreenBar.HOME_BUDGET && _state.value.budgetEdit != null) cancelBudgetEdit()
+        if (index != ScreenBar.HOME_BUDGET && _state.value.budgetEdit != null) budgetEdit.cancel()
         // Reorder mode belongs to the accounts item, so leaving it ends reorder too.
         _state.update {
             it.copy(
                 homeSection = index,
-                accountsReorder = it.accountsReorder && index == ScreenBar.HOME_ACCOUNTS,
                 inbox = it.inbox.copy(syncNotice = it.inbox.syncNotice.takeIf { index == ScreenBar.HOME_INBOX }),
+                accounts = it.accounts.copy(reorder = it.accounts.reorder && index == ScreenBar.HOME_ACCOUNTS),
             )
         }
     }
@@ -413,21 +425,21 @@ class ShellViewModel(
             inbox.endSelecting()
             return true
         }
-        if (current.accountsReorder && current.route == ShellRoute.Home && current.confirm == null) {
-            _state.update { it.copy(accountsReorder = false) }
+        if (current.accounts.reorder && current.route == ShellRoute.Home && current.confirm == null) {
+            _state.update { it.copy(accounts = it.accounts.copy(reorder = false)) }
             return true
         }
         // Back is edit mode's cancel: it leaves without saving anything changed there.
         if (current.budgetEdit != null && current.route == ShellRoute.Home && current.confirm == null) {
-            cancelBudgetEdit()
+            budgetEdit.cancel()
             return true
         }
         if (current.confirm != null) {
             _state.update { it.copy(confirm = null) }
             return true
         }
-        if (current.fillConfirm != null) {
-            _state.update { it.copy(fillConfirm = null) }
+        if (current.monthUi.fillConfirm != null) {
+            _state.update { it.copy(monthUi = it.monthUi.copy(fillConfirm = null)) }
             return true
         }
         if (current.templates.confirm != null) {
@@ -438,8 +450,8 @@ class ShellViewModel(
             _state.update { it.copy(templates = it.templates.copy(applyPreview = null)) }
             return true
         }
-        if (current.accountForceConfirm != null) {
-            _state.update { it.copy(accountForceConfirm = null) }
+        if (current.accounts.forceConfirm != null) {
+            _state.update { it.copy(accounts = it.accounts.copy(forceConfirm = null)) }
             return true
         }
         if (current.route == ShellRoute.Home) return false
@@ -448,7 +460,7 @@ class ShellViewModel(
             budgetFiles.cancelReplaceBudget()
             return true
         }
-        onboardingBack()?.let { return it }
+        onboarding.stepBack()?.let { return it }
         if (current.settingsReturn && current.route != ShellRoute.Settings) {
             settingsUi.returnTo()
             return true
@@ -807,7 +819,7 @@ class ShellViewModel(
                 when {
                     loaded.locked -> ShellRoute.BudgetPassword
                     visibleShell == null && current.route == ShellRoute.Home ->
-                        if (loaded.budgets.isEmpty()) onboardingRoute(current.onboarding?.progress) else ShellRoute.Create
+                        if (loaded.budgets.isEmpty()) onboarding.route(current.onboarding?.progress) else ShellRoute.Create
                     else -> current.route
                 }
             val reviewMonth =
@@ -862,6 +874,39 @@ class ShellViewModel(
             warmMonthWindow()
         }
         getStarted.retireFinished()
+    }
+
+    /**
+     * Repaints the open month after a month action or undo, drops other cached months
+     * (a fill or hold changes every later month), then syncs and repaints again.
+     */
+    internal suspend fun afterMonthWrite(budgetId: String) {
+        repaintMonth(budgetId)
+        withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
+        repaintMonth(budgetId)
+    }
+
+    private suspend fun repaintMonth(budgetId: String) {
+        val month = editorMonth()
+        val loaded =
+            withContext(io) {
+                val shell = library.readShell(budgetId, month) ?: return@withContext null
+                MonthSnapshot(month, shell, library.readMonthReview(budgetId, month))
+            }
+        months.invalidate()
+        if (loaded != null) {
+            shellGate.offer(loaded.shell)
+            if (!shellGate.gestureActive) months.applyLoaded(loaded, gestureActive = false)
+        }
+        mutate { current ->
+            val open = loaded != null && !shellGate.gestureActive
+            current.copy(
+                shell = if (open) loaded!!.shell else current.shell,
+                monthReview = if (open && current.pinnedMonth == null) loaded!!.review else current.monthReview,
+                undoLabel = library.undoLabel(budgetId),
+            )
+        }
+        warmMonthWindow()
     }
 
     private fun ShellRoute.isRegisterFlow(): Boolean =

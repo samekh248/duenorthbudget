@@ -40,11 +40,11 @@ class BudgetEditTest {
     fun plusTypedOnTheKeypadAddsToTheOldAmountButSavesNothingUntilDone() {
         val model = household("plus")
         val before = model.state.value.shell!!
-        model.startBudgetEdit()
-        model.focusBudgetBox("c-food")
-        listOf("+", "2", "5").forEach(model::typeBudgetKey)
+        model.budgetEdit.start()
+        model.budgetEdit.focusBox("c-food")
+        listOf("+", "2", "5").forEach(model.budgetEdit::typeKey)
         assertEquals("+25", model.edit().text)
-        model.doneBudgetBox()
+        model.budgetEdit.doneBox()
         assertNull(model.edit().categoryId)
         val food = before.category("c-food")!!.budgetedMinor + 2_500
         // Edit mode shows the new amount and to budget less it; the saved month is untouched.
@@ -52,7 +52,7 @@ class BudgetEditTest {
         assertEquals(before.headerMinor - 2_500, model.editing().headerMinor)
         assertEquals(before.category("c-food")!!.budgetedMinor, model.saved().category("c-food")!!.budgetedMinor)
 
-        model.endBudgetEdit()
+        model.budgetEdit.end()
         assertNull(model.state.value.budgetEdit)
         awaitMain { model.saved().category("c-food")?.budgetedMinor == food }
         awaitMain { model.saved().headerMinor == before.headerMinor - 2_500 }
@@ -61,9 +61,9 @@ class BudgetEditTest {
     @Test
     fun equalsWorksTheSumOutInTheBox() {
         val model = household("equals")
-        model.startBudgetEdit()
-        model.focusBudgetBox("c-food")
-        listOf("3", "0", "0", "÷", "2", BudgetKeys.EQUALS).forEach(model::typeBudgetKey)
+        model.budgetEdit.start()
+        model.budgetEdit.focusBox("c-food")
+        listOf("3", "0", "0", "÷", "2", BudgetKeys.EQUALS).forEach(model.budgetEdit::typeKey)
         assertEquals("150.00", model.edit().text)
     }
 
@@ -71,10 +71,10 @@ class BudgetEditTest {
     fun aSumThatDoesNotWorkOutKeepsTheKeypadOpen() {
         val model = household("bad")
         val before = model.state.value.shell!!
-        model.startBudgetEdit()
-        model.focusBudgetBox("c-food")
-        listOf("5", "÷", "0").forEach(model::typeBudgetKey)
-        model.doneBudgetBox()
+        model.budgetEdit.start()
+        model.budgetEdit.focusBox("c-food")
+        listOf("5", "÷", "0").forEach(model.budgetEdit::typeKey)
+        model.budgetEdit.doneBox()
         assertEquals(SyncCopy.ENTER_AMOUNT, model.state.value.editError)
         assertEquals("c-food", model.edit().categoryId)
         assertEquals(before.category("c-food")!!.budgetedMinor, model.editing().category("c-food")!!.budgetedMinor)
@@ -84,11 +84,11 @@ class BudgetEditTest {
     fun backLeavesEditModeAndDropsEverythingChanged() {
         val model = household("back")
         val before = model.state.value.shell!!
-        model.startBudgetEdit()
-        model.focusBudgetBox("c-food")
-        listOf("9", "9").forEach(model::typeBudgetKey)
-        model.focusBudgetBox("c-rent")
-        listOf("+", "5").forEach(model::typeBudgetKey)
+        model.budgetEdit.start()
+        model.budgetEdit.focusBox("c-food")
+        listOf("9", "9").forEach(model.budgetEdit::typeKey)
+        model.budgetEdit.focusBox("c-rent")
+        listOf("+", "5").forEach(model.budgetEdit::typeKey)
         assertTrue(model.back())
         assertNull(model.state.value.budgetEdit)
         assertEquals(ShellRoute.Home, model.state.value.route)
@@ -107,14 +107,14 @@ class BudgetEditTest {
                 .flatMap { it.categories }
                 .filter { it.availableMinor > 1_000 }
                 .take(2)
-        model.startBudgetEdit()
-        model.focusBudgetBox("c-food")
-        listOf("1", "2").forEach(model::typeBudgetKey)
-        model.doneBudgetBox()
+        model.budgetEdit.start()
+        model.budgetEdit.focusBox("c-food")
+        listOf("1", "2").forEach(model.budgetEdit::typeKey)
+        model.budgetEdit.doneBox()
         model.envelopes.openMoveFrom(from.id)
         model.envelopes.submitMove(to.id, "10")
         assertEquals(ShellRoute.Home, model.state.value.route)
-        model.cancelBudgetEdit()
+        model.budgetEdit.cancel()
         assertNull(model.state.value.budgetEdit)
         settleMain()
         assertEquals(before.groups, model.saved().groups)
@@ -126,10 +126,10 @@ class BudgetEditTest {
         val model = household("move")
         val before = model.state.value.shell!!
         val (first, second) = before.groups.flatMap { it.categories }.take(2)
-        model.startBudgetEdit()
-        model.focusBudgetBox(first.id)
-        listOf("-", "1", "0").forEach(model::typeBudgetKey)
-        model.focusBudgetBox(second.id)
+        model.budgetEdit.start()
+        model.budgetEdit.focusBox(first.id)
+        listOf("-", "1", "0").forEach(model.budgetEdit::typeKey)
+        model.budgetEdit.focusBox(second.id)
         assertEquals(second.id, model.edit().categoryId)
         assertEquals("", model.edit().text)
         assertEquals(first.budgetedMinor - 1_000, model.editing().category(first.id)!!.budgetedMinor)
@@ -145,7 +145,7 @@ class BudgetEditTest {
                 .flatMap { it.categories }
                 .filter { it.availableMinor > 1_000 }
                 .take(2)
-        model.startBudgetEdit()
+        model.budgetEdit.start()
         model.envelopes.openMoveFrom(from.id)
         assertEquals(ShellRoute.MoveCategory(from.id), model.state.value.route)
         // The screen reads the box as the person typed it, sums included.
@@ -163,16 +163,16 @@ class BudgetEditTest {
         assertEquals(from.budgetedMinor, model.saved().category(from.id)!!.budgetedMinor)
 
         val other = before.groups.flatMap { it.categories }.first { it.id != from.id && it.id != to.id }
-        model.focusBudgetBox(other.id)
-        listOf("+", "5").forEach(model::typeBudgetKey)
-        model.endBudgetEdit()
+        model.budgetEdit.focusBox(other.id)
+        listOf("+", "5").forEach(model.budgetEdit::typeKey)
+        model.budgetEdit.end()
         awaitMain { model.saved().category(to.id)?.budgetedMinor == to.budgetedMinor + 1_000 }
         awaitMain { model.saved().category(other.id)?.budgetedMinor == other.budgetedMinor + 500 }
         assertEquals(from.budgetedMinor - 1_000, model.saved().category(from.id)!!.budgetedMinor)
         awaitMain { model.state.value.undoLabel != null }
 
         // One undo takes the whole edit back.
-        model.undo()
+        model.month.undo()
         awaitMain { model.saved().groups == before.groups }
     }
 
@@ -185,7 +185,7 @@ class BudgetEditTest {
                 .flatMap { it.categories }
                 .filter { it.availableMinor > 0 }
                 .take(2)
-        model.startBudgetEdit()
+        model.budgetEdit.start()
         model.envelopes.openMoveFrom(from.id)
         model.envelopes.submitMove(to.id, MoneyParse.formatMagnitude(from.availableMinor + 100, 2))
         assertEquals(EnvelopeCopy.NOT_ENOUGH, model.state.value.editError)
@@ -197,12 +197,12 @@ class BudgetEditTest {
         val model = household("move-to-budget")
         val before = model.state.value.shell!!
         val from = before.groups.flatMap { it.categories }.first { it.availableMinor > 1_000 }
-        model.startBudgetEdit()
+        model.budgetEdit.start()
         model.envelopes.openMoveFrom(from.id)
         model.envelopes.submitMove(MOVE_TO_BUDGET, "10")
         assertEquals(ShellRoute.Home, model.state.value.route)
         assertEquals(before.headerMinor + 1_000, model.editing().headerMinor)
-        model.endBudgetEdit()
+        model.budgetEdit.end()
         awaitMain { model.saved().headerMinor == before.headerMinor + 1_000 }
     }
 
@@ -210,15 +210,15 @@ class BudgetEditTest {
     fun aMonthFillInEditModeFillsTheBoxesAndSavesOnDone() {
         val model = household("fill")
         val before = model.state.value.shell!!
-        model.startBudgetEdit()
-        model.fillMonth(MonthFillKind.ZERO)
+        model.budgetEdit.start()
+        model.month.fill(MonthFillKind.ZERO)
         awaitMain {
             model.state.value.budgetEdit
                 ?.budgeted
                 ?.isNotEmpty() == true
         }
         // Nothing to confirm in the sandbox, and nothing saved yet.
-        assertNull(model.state.value.fillConfirm)
+        assertNull(model.state.value.monthUi.fillConfirm)
         assertTrue(
             model
                 .editing()
@@ -228,7 +228,7 @@ class BudgetEditTest {
         )
         assertEquals(before.groups, model.saved().groups)
 
-        model.endBudgetEdit()
+        model.budgetEdit.end()
         awaitMain {
             model
                 .saved()
@@ -252,7 +252,7 @@ class BudgetEditTest {
         awaitMain { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }
         model.back()
         val before = model.state.value.shell!!
-        model.startBudgetEdit()
+        model.budgetEdit.start()
         model.templates.open()
         assertEquals(ShellRoute.Templates, model.state.value.route)
         model.templates.apply(overwrite = true)
@@ -265,7 +265,7 @@ class BudgetEditTest {
 
         model.back()
         assertEquals(ShellRoute.Home, model.state.value.route)
-        model.endBudgetEdit()
+        model.budgetEdit.end()
         awaitMain { model.saved().category("c-gas")?.budgetedMinor == 12_300L }
         awaitMain { model.state.value.undoLabel == UndoCopy.BUDGET_EDIT }
     }
@@ -274,9 +274,9 @@ class BudgetEditTest {
     fun leavingTheBudgetItemDropsEditMode() {
         val model = household("swipe")
         val before = model.state.value.shell!!
-        model.startBudgetEdit()
-        model.focusBudgetBox("c-food")
-        listOf("1").forEach(model::typeBudgetKey)
+        model.budgetEdit.start()
+        model.budgetEdit.focusBox("c-food")
+        listOf("1").forEach(model.budgetEdit::typeKey)
         model.selectHomeSection(ScreenBar.HOME_ACCOUNTS)
         assertNull(model.state.value.budgetEdit)
         settleMain()

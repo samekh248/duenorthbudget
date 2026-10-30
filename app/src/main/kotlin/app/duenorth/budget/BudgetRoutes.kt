@@ -35,7 +35,7 @@ internal fun CategoryBudgetRoute(
                     category = income,
                     error = state.editError,
                     onSave = model.envelopes::saveBudget,
-                    onAutoHold = model::chooseAutoHold,
+                    onAutoHold = model.month::chooseAutoHold,
                     modifier = inner,
                     showName = false,
                 )
@@ -241,7 +241,7 @@ internal fun ToBudgetRoute(
             shell = shell,
             categoryId = route.categoryId,
             error = state.editError,
-            onSave = model::submitToBudget,
+            onSave = model.month::submitToBudget,
             modifier = modifier,
         )
     }

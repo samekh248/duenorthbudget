@@ -7,6 +7,7 @@ import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.MemorySecretStore
+import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.OnboardingProgress
 import app.duenorth.budget.core.RefreshGate
@@ -31,6 +32,7 @@ internal class FakeShellHost(
     override val state = MutableStateFlow(start)
     override val scope = CoroutineScope(Dispatchers.Unconfined)
     override val io = Dispatchers.Unconfined
+    override val orderedIo = Dispatchers.Unconfined
     override var writing = false
     val pushed = mutableListOf<ShellRoute>()
     var backs = 0
@@ -70,6 +72,8 @@ internal class FakeShellHost(
     val getStarted = mutableListOf<String>()
 
     override fun startBudgetEdit() = Unit
+
+    override fun fillBudgetEdit(kind: MonthFillKind) = Unit
 
     override fun applyTemplatesInBudgetEdit(overwrite: Boolean) = Unit
 

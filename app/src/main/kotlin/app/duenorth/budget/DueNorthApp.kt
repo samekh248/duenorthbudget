@@ -214,7 +214,7 @@ fun DueNorthApp(model: ShellViewModel) {
     }
     val canBack =
         state.confirm != null ||
-            state.fillConfirm != null ||
+            state.monthUi.fillConfirm != null ||
             state.settingsUi.confirmAdvanced != null ||
             (
                 state.route != ShellRoute.Home &&
@@ -276,7 +276,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onRemoveTemplate = model.templates::remove,
                     onAddTemplate = { model.templates.openKinds() },
                     onMoveCategory = model.envelopes::openMove,
-                    onAutoHold = model::chooseAutoHold,
+                    onAutoHold = model.month::chooseAutoHold,
                     onSelectInbox = model.inbox::startSelecting,
                     onAcceptSelected = model.inbox::acceptSelected,
                     onCategorizeSelected = model.inbox::categorizeSelected,
@@ -290,16 +290,16 @@ fun DueNorthApp(model: ShellViewModel) {
                             else -> model.back()
                         }
                     },
-                    onFill = { kind -> model.fillMonth(kind) },
-                    onToBudget = model::openToBudget,
-                    onUndo = model::undo,
-                    onAddAccount = model::openAddAccount,
-                    onShowClosed = model::toggleShowClosedAccounts,
-                    onShowHidden = model::toggleShowHiddenCategories,
-                    onReorder = model::toggleReorderAccounts,
-                    onEditAccount = model::openEditAccount,
-                    onCloseAccount = model::openCloseAccount,
-                    onReopenAccount = model::reopenOpenAccount,
+                    onFill = { kind -> model.month.fill(kind) },
+                    onToBudget = model.month::openToBudget,
+                    onUndo = model.month::undo,
+                    onAddAccount = model.accounts::openAdd,
+                    onShowClosed = model.accounts::toggleShowClosed,
+                    onShowHidden = model.month::toggleShowHidden,
+                    onReorder = model.accounts::toggleReorder,
+                    onEditAccount = model.accounts::openEdit,
+                    onCloseAccount = model.accounts::openClose,
+                    onReopenAccount = model.accounts::reopenOpen,
                     onAddSchedule = model.schedules::openNew,
                     onRules = model.rules::open,
                     onAddRule = model.rules::openNew,
@@ -311,14 +311,14 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSkipSchedule = model.schedules::skipOpen,
                     onEditSchedule = model.schedules::editOpen,
                     onTemplates = model.templates::open,
-                    onBankLink = model::openBankLink,
-                    onNext = model::onboardingCheck,
-                    onRefresh = model::onboardingRefresh,
+                    onBankLink = model.bankLink::open,
+                    onNext = model.onboarding::check,
+                    onRefresh = model.onboarding::refreshFiles,
                     onSamples = model.budgetFiles::showSamples,
-                    onNewBudget = model::onboardingNewBudget,
+                    onNewBudget = model.onboarding::newBudget,
                     onSettingsNew = model.settingsUi::showCreate,
                     onSettingsPayees = model.settingsUi::showPayees,
-                    onAddServer = model::onboardingAddServer,
+                    onAddServer = model.onboarding::addServer,
                     onServerBudgets = model.servers::showBudgets,
                     onSignOut = model.servers::signOut,
                     onExport = model.settingsUi::exportBudget,
@@ -326,9 +326,9 @@ fun DueNorthApp(model: ShellViewModel) {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model.schedules::createFromTransaction)
                     },
                     onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model.register::delete) },
-                    onEditBudget = model::startBudgetEdit,
-                    onEndBudgetEdit = model::endBudgetEdit,
-                    onCancelBudgetEdit = model::cancelBudgetEdit,
+                    onEditBudget = model.budgetEdit::start,
+                    onEndBudgetEdit = model.budgetEdit::end,
+                    onCancelBudgetEdit = model.budgetEdit::cancel,
                 )
             }
         val actions = formSaveHost.bar ?: ScreenBar.forState(state, handlers)
@@ -404,7 +404,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 modifier = fill,
                             )
                         ShellRoute.AddAccount ->
-                            AddAccountScreen(error = state.editError, onSave = model::submitAddAccount, modifier = fill)
+                            AddAccountScreen(error = state.editError, onSave = model.accounts::submitAdd, modifier = fill)
                         is ShellRoute.EditAccount -> EditAccountRoute(route, state, model, fill)
                         is ShellRoute.CloseAccount -> CloseAccountRoute(route, state, model, fill)
                         is ShellRoute.ScheduleEditor -> ScheduleEditorRoute(route, state, model, fill)
@@ -429,13 +429,13 @@ fun DueNorthApp(model: ShellViewModel) {
                             modifier = fill,
                         )
                     }
-                    val fillConfirm = state.fillConfirm
+                    val fillConfirm = state.monthUi.fillConfirm
                     if (fillConfirm != null) {
                         FillConfirmScreen(
                             confirm = fillConfirm,
                             month = state.pinnedMonth ?: state.openMonth,
-                            onConfirm = model::confirmFill,
-                            onKeep = model::keepFill,
+                            onConfirm = model.month::confirmFill,
+                            onKeep = model.month::keepFill,
                             modifier = fill,
                         )
                     }
