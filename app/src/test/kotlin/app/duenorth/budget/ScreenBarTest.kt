@@ -56,9 +56,9 @@ class ScreenBarTest {
     fun syncButtonsSpinOnlyWhileSyncing() {
         val idle = ShellUiState()
         listOf("sync", "bank-sync", "refresh").forEach { assertFalse(ScreenBar.syncRunning(it, idle)) }
-        assertTrue(ScreenBar.syncRunning("sync", idle.copy(importFetchPending = true)))
+        assertTrue(ScreenBar.syncRunning("sync", idle.copy(import = ImportState(fetchPending = true))))
         assertTrue(ScreenBar.syncRunning("bank-sync", idle.copy(bankSync = BankSyncState(syncing = true))))
-        assertFalse(ScreenBar.syncRunning("bank-sync", idle.copy(importFetchPending = true)))
+        assertFalse(ScreenBar.syncRunning("bank-sync", idle.copy(import = ImportState(fetchPending = true))))
         assertTrue(ScreenBar.syncRunning("refresh", idle.copy(remoteRefreshing = true)))
         assertFalse(ScreenBar.syncRunning("add", idle.copy(bankSync = BankSyncState(syncing = true))))
     }

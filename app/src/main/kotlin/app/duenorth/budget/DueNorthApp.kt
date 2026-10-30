@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
                 )
             shellModel = model
             LaunchedEffect(intent?.data) {
-                model.completeOpenId(intent?.dataString)
+                model.servers.completeOpenId(intent?.dataString)
             }
             DueNorthApp(model)
         }
@@ -121,7 +121,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        shellModel?.completeOpenId(intent.dataString)
+        shellModel?.servers?.completeOpenId(intent.dataString)
     }
 }
 
@@ -155,15 +155,15 @@ fun DueNorthApp(model: ShellViewModel) {
                 context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                     ?: return@rememberLauncherForActivityResult
             val name = uri.lastPathSegment?.substringAfterLast('/') ?: "import.qif"
-            model.previewImportFile(accountId, bytes, name)
+            model.import.previewFile(accountId, bytes, name)
         }
-    LaunchedEffect(state.openIdRedirectUrl) {
-        val url = state.openIdRedirectUrl ?: return@LaunchedEffect
+    LaunchedEffect(state.servers.openIdRedirectUrl) {
+        val url = state.servers.openIdRedirectUrl ?: return@LaunchedEffect
         openWebPage(context, url)
-        model.clearOpenIdRedirect()
+        model.servers.clearOpenIdRedirect()
     }
-    LaunchedEffect(state.pendingExport) {
-        val export = state.pendingExport ?: return@LaunchedEffect
+    LaunchedEffect(state.settingsUi.pendingExport) {
+        val export = state.settingsUi.pendingExport ?: return@LaunchedEffect
         // Only this folder is shared through the FileProvider; an earlier export is not kept around.
         val folder = File(context.cacheDir, EXPORTS_DIR).apply { deleteRecursively() }
         folder.mkdirs()
@@ -177,7 +177,7 @@ fun DueNorthApp(model: ShellViewModel) {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         context.startActivity(Intent.createChooser(share, export.fileName))
-        model.clearPendingExport()
+        model.settingsUi.clearPendingExport()
     }
     val systemDark = isSystemInDarkTheme()
     val dark =
@@ -215,7 +215,7 @@ fun DueNorthApp(model: ShellViewModel) {
     val canBack =
         state.confirm != null ||
             state.fillConfirm != null ||
-            state.confirmAdvanced != null ||
+            state.settingsUi.confirmAdvanced != null ||
             (
                 state.route != ShellRoute.Home &&
                     state.route != ShellRoute.Welcome &&
@@ -223,8 +223,8 @@ fun DueNorthApp(model: ShellViewModel) {
                     !(state.route == ShellRoute.BudgetPassword && state.locked)
             )
     BackHandler(enabled = canBack) {
-        if (state.confirmAdvanced != null) {
-            model.cancelAdvanced()
+        if (state.settingsUi.confirmAdvanced != null) {
+            model.settingsUi.cancelAdvanced()
         } else {
             model.back()
         }
@@ -241,14 +241,14 @@ fun DueNorthApp(model: ShellViewModel) {
                 ScreenBarHandlers(
                     onAdd = {
                         when (state.route) {
-                            is ShellRoute.Register -> model.openNewTransaction()
-                            else -> model.showAddTransaction()
+                            is ShellRoute.Register -> model.register.openNew()
+                            else -> model.register.showAdd()
                         }
                     },
-                    onHold = model::showHoldMonth,
-                    onCategories = model::showManageCategories,
-                    onSettings = model::showSettings,
-                    onReconcile = model::openReconcile,
+                    onHold = model.envelopes::showHold,
+                    onCategories = model.envelopes::showManage,
+                    onSettings = model.settingsUi::show,
+                    onReconcile = model.reconcile::open,
                     onImport = {
                         val accountId =
                             (state.route as? ShellRoute.Register)?.accountId ?: return@ScreenBarHandlers
@@ -258,24 +258,24 @@ fun DueNorthApp(model: ShellViewModel) {
                     onBankSync = {
                         val accountId =
                             (state.route as? ShellRoute.Register)?.accountId ?: return@ScreenBarHandlers
-                        model.fetchBankTransactions(accountId)
+                        model.import.fetchBank(accountId)
                     },
                     onBankSyncAll = model.bankSync::syncAll,
                     onDismissBankSync = model.bankSync::dismiss,
                     onSave = {
                         when (state.route) {
-                            is ShellRoute.ImportPreviewRoute -> model.confirmImport()
-                            is ShellRoute.Reconcile -> model.finishReconcile()
+                            is ShellRoute.ImportPreviewRoute -> model.import.confirm()
+                            is ShellRoute.Reconcile -> model.reconcile.finish()
                             else -> formSaveHost.save()
                         }
                     },
-                    onClearSelected = { model.setSelectedCleared(true) },
-                    onUnclearSelected = { model.setSelectedCleared(false) },
-                    onEndSelecting = model::endSelecting,
-                    onSearch = model::toggleRegisterSearch,
+                    onClearSelected = { model.register.setSelectedCleared(true) },
+                    onUnclearSelected = { model.register.setSelectedCleared(false) },
+                    onEndSelecting = model.register::endSelecting,
+                    onSearch = model.register::toggleSearch,
                     onRemoveTemplate = model::removeTemplate,
                     onAddTemplate = { model.openTemplateKinds() },
-                    onMoveCategory = model::openMoveCategory,
+                    onMoveCategory = model.envelopes::openMove,
                     onAutoHold = model::chooseAutoHold,
                     onSelectInbox = model.inbox::startSelecting,
                     onAcceptSelected = model.inbox::acceptSelected,
@@ -285,8 +285,8 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSyncServer = model::syncInbox,
                     onCancel = {
                         when (state.route) {
-                            is ShellRoute.ImportPreviewRoute -> model.cancelImport()
-                            is ShellRoute.Reconcile -> model.cancelReconcile()
+                            is ShellRoute.ImportPreviewRoute -> model.import.cancel()
+                            is ShellRoute.Reconcile -> model.reconcile.cancel()
                             else -> model.back()
                         }
                     },
@@ -316,16 +316,16 @@ fun DueNorthApp(model: ShellViewModel) {
                     onRefresh = model::onboardingRefresh,
                     onSamples = model::showSampleBudgets,
                     onNewBudget = model::onboardingNewBudget,
-                    onSettingsNew = model::showSettingsCreate,
-                    onSettingsPayees = model::showSettingsPayees,
+                    onSettingsNew = model.settingsUi::showCreate,
+                    onSettingsPayees = model.settingsUi::showPayees,
                     onAddServer = model::onboardingAddServer,
-                    onServerBudgets = model::showServerBudgets,
-                    onSignOut = model::signOutInstance,
-                    onExport = model::exportBudget,
+                    onServerBudgets = model.servers::showBudgets,
+                    onSignOut = model.servers::signOut,
+                    onExport = model.settingsUi::exportBudget,
                     onScheduleTransaction = {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
                     },
-                    onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::deleteTransaction) },
+                    onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model.register::delete) },
                     onEditBudget = model::startBudgetEdit,
                     onEndBudgetEdit = model::endBudgetEdit,
                     onCancelBudgetEdit = model::cancelBudgetEdit,
@@ -335,7 +335,7 @@ fun DueNorthApp(model: ShellViewModel) {
         // The bank sync tile stays over every page while banks fetch or a failure waits.
         ShellChrome(
             actions,
-            syncing = state.syncing || state.importFetchPending,
+            syncing = state.syncing || state.import.fetchPending,
             progress = state.syncProgress,
             bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
             overBar =
@@ -442,18 +442,18 @@ fun DueNorthApp(model: ShellViewModel) {
                             modifier = fill,
                         )
                     }
-                    val advanced = state.confirmAdvanced
+                    val advanced = state.settingsUi.confirmAdvanced
                     if (advanced != null) {
                         ConfirmAdvancedScreen(
                             kind = advanced,
                             onConfirm = {
                                 when (advanced) {
-                                    AdvancedConfirm.Rebuild -> model.confirmRebuild()
-                                    AdvancedConfirm.Repair -> model.confirmRepair()
-                                    AdvancedConfirm.ResetSync -> model.confirmResetSync()
+                                    AdvancedConfirm.Rebuild -> model.settingsUi.confirmRebuild()
+                                    AdvancedConfirm.Repair -> model.settingsUi.confirmRepair()
+                                    AdvancedConfirm.ResetSync -> model.settingsUi.confirmResetSync()
                                 }
                             },
-                            onCancel = model::cancelAdvanced,
+                            onCancel = model.settingsUi::cancelAdvanced,
                             modifier = fill,
                         )
                     }

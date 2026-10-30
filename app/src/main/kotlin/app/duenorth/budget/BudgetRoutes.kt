@@ -34,7 +34,7 @@ internal fun CategoryBudgetRoute(
                     shell = shell,
                     category = income,
                     error = state.editError,
-                    onSave = model::saveCategoryBudget,
+                    onSave = model.envelopes::saveBudget,
                     onAutoHold = model::chooseAutoHold,
                     modifier = inner,
                     showName = false,
@@ -45,9 +45,9 @@ internal fun CategoryBudgetRoute(
                 shell = shell,
                 categoryId = route.categoryId,
                 error = state.editError,
-                onSave = model::saveCategoryBudget,
-                onMove = model::openMoveCategory,
-                onToggleCarryover = model::toggleCategoryCarryover,
+                onSave = model.envelopes::saveBudget,
+                onMove = model.envelopes::openMove,
+                onToggleCarryover = model.envelopes::toggleCarryover,
                 modifier = inner,
                 showName = false,
                 note = state.categoryNote.takeIf { state.formatPrefs.templatesOn },
@@ -81,7 +81,7 @@ internal fun MoveCategoryRoute(
             shell = shell,
             fromCategoryId = route.fromCategoryId,
             error = state.editError,
-            onSave = model::submitMoveCategory,
+            onSave = model.envelopes::submitMove,
             modifier = modifier,
         )
     } else {
@@ -95,7 +95,7 @@ internal fun MoveCategoryRoute(
                 shell = shell,
                 fromCategoryId = route.fromCategoryId,
                 error = state.editError,
-                onSave = model::submitMoveCategory,
+                onSave = model.envelopes::submitMove,
                 modifier = inner,
             )
         }
@@ -121,8 +121,8 @@ internal fun HoldMonthRoute(
             HoldMonthScreen(
                 shell = shell,
                 error = state.editError,
-                onSave = model::submitHold,
-                onRelease = model::releaseHold,
+                onSave = model.envelopes::submitHold,
+                onRelease = model.envelopes::releaseHold,
                 modifier = inner,
             )
         }
@@ -253,24 +253,24 @@ internal fun ManageCategoriesRoute(
     model: ShellViewModel,
     modifier: Modifier,
 ) {
-    val manage = state.categoryManage
+    val manage = state.envelopes.manage
     if (manage == null) {
         Placeholder()
     } else {
         ManageCategoriesScreen(
             manage = manage,
             error = state.editError,
-            onAddGroup = model::addCategoryGroup,
-            onAddCategory = model::addEnvelopeCategory,
-            onRenameGroup = model::renameCategoryGroup,
-            onRenameCategory = model::renameEnvelopeCategory,
-            onHideCategory = model::hideEnvelopeCategory,
-            onHideGroup = model::hideCategoryGroup,
-            onMoveToGroup = model::moveCategoryToGroup,
-            onDeleteCategory = model::deleteEnvelopeCategory,
-            onDeleteGroup = model::deleteCategoryGroup,
-            onPlaceGroup = model::placeCategoryGroup,
-            onPlaceCategory = model::placeEnvelopeCategory,
+            onAddGroup = model.envelopes::addGroup,
+            onAddCategory = model.envelopes::addCategory,
+            onRenameGroup = model.envelopes::renameGroup,
+            onRenameCategory = model.envelopes::renameCategory,
+            onHideCategory = model.envelopes::hideCategory,
+            onHideGroup = model.envelopes::hideGroup,
+            onMoveToGroup = model.envelopes::moveToGroup,
+            onDeleteCategory = model.envelopes::deleteCategory,
+            onDeleteGroup = model.envelopes::deleteGroup,
+            onPlaceGroup = model.envelopes::placeGroup,
+            onPlaceCategory = model.envelopes::placeCategory,
             modifier = modifier,
         )
     }

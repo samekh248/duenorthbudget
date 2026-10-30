@@ -53,7 +53,7 @@ class SyncLeaveScreenTest {
         // The download must hold on a thread of its own while the test leaves the screen, so this model keeps Dispatchers.IO.
         val model = ShellViewModel(library, sync)
         awaitMain { !model.state.value.loading }
-        model.showServer()
+        model.servers.show()
         awaitMain { model.state.value.route == ShellRoute.Server }
         model.connect("http://127.0.0.1:9", "server-secret")
         awaitMain { model.state.value.signedIn && !model.state.value.syncing }

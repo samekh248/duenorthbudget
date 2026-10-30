@@ -111,8 +111,8 @@ class BudgetEditTest {
         model.focusBudgetBox("c-food")
         listOf("1", "2").forEach(model::typeBudgetKey)
         model.doneBudgetBox()
-        model.openMoveFrom(from.id)
-        model.submitMoveCategory(to.id, "10")
+        model.envelopes.openMoveFrom(from.id)
+        model.envelopes.submitMove(to.id, "10")
         assertEquals(ShellRoute.Home, model.state.value.route)
         model.cancelBudgetEdit()
         assertNull(model.state.value.budgetEdit)
@@ -146,10 +146,10 @@ class BudgetEditTest {
                 .filter { it.availableMinor > 1_000 }
                 .take(2)
         model.startBudgetEdit()
-        model.openMoveFrom(from.id)
+        model.envelopes.openMoveFrom(from.id)
         assertEquals(ShellRoute.MoveCategory(from.id), model.state.value.route)
         // The screen reads the box as the person typed it, sums included.
-        model.submitMoveCategory(
+        model.envelopes.submitMove(
             to.id,
             model.state.value.formatPrefs
                 .readAmount("4+6"),
@@ -186,8 +186,8 @@ class BudgetEditTest {
                 .filter { it.availableMinor > 0 }
                 .take(2)
         model.startBudgetEdit()
-        model.openMoveFrom(from.id)
-        model.submitMoveCategory(to.id, MoneyParse.formatMagnitude(from.availableMinor + 100, 2))
+        model.envelopes.openMoveFrom(from.id)
+        model.envelopes.submitMove(to.id, MoneyParse.formatMagnitude(from.availableMinor + 100, 2))
         assertEquals(EnvelopeCopy.NOT_ENOUGH, model.state.value.editError)
         assertEquals(ShellRoute.MoveCategory(from.id), model.state.value.route)
     }
@@ -198,8 +198,8 @@ class BudgetEditTest {
         val before = model.state.value.shell!!
         val from = before.groups.flatMap { it.categories }.first { it.availableMinor > 1_000 }
         model.startBudgetEdit()
-        model.openMoveFrom(from.id)
-        model.submitMoveCategory(MOVE_TO_BUDGET, "10")
+        model.envelopes.openMoveFrom(from.id)
+        model.envelopes.submitMove(MOVE_TO_BUDGET, "10")
         assertEquals(ShellRoute.Home, model.state.value.route)
         assertEquals(before.headerMinor + 1_000, model.editing().headerMinor)
         model.endBudgetEdit()
@@ -241,12 +241,12 @@ class BudgetEditTest {
     @Test
     fun templatesInEditModeFillTheBoxesWithoutSaving() {
         val model = household("templates")
-        model.setExperimental(true)
-        model.setGoalTemplates(true)
+        model.settingsUi.setExperimental(true)
+        model.settingsUi.setGoalTemplates(true)
         awaitMain { model.state.value.formatPrefs.templatesOn }
         // The screen shows the switch at once, but the file is written after; templates read the file.
         awaitMain { library.readFormatPrefs(model.state.value.settings.openBudgetId!!).templatesOn }
-        model.openCategoryBudget("c-gas")
+        model.envelopes.openBudget("c-gas")
         awaitMain { model.state.value.categoryNote != null }
         model.saveCategoryNote("#template 123")
         awaitMain { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }

@@ -86,7 +86,7 @@ fun ShellViewModel.onboardingAddServer() {
         )
     mutate { it.copy(onboarding = OnboardingUi(progress)) }
     viewModelScope.launch(onboardingWrites) { library.onboarding().write(progress) }
-    openFromSettings(ShellRoute.OnboardingAddress, SettingsPage.SERVER)
+    settingsUi.openFrom(ShellRoute.OnboardingAddress, SettingsPage.SERVER)
 }
 
 /** The settings-origin path is over without a pick: drop its progress and show the server item. */
@@ -94,7 +94,7 @@ private fun ShellViewModel.leaveSettingsOnboarding() {
     cancelOnboardingJob()
     mutate { it.copy(onboarding = null) }
     viewModelScope.launch(onboardingWrites) { library.onboarding().clear() }
-    returnToSettings(SettingsPage.SERVER)
+    settingsUi.returnTo(SettingsPage.SERVER)
 }
 
 /** After the first load, the file list needs the server's budgets again. */
@@ -245,9 +245,7 @@ fun ShellViewModel.onboardingSignIn(password: String) {
                     remoteFiles = if (result.error == null) result.files else it.remoteFiles,
                     serverError = null,
                     settings = settings,
-                    instances = settings.instances,
-                    activeInstance = settings.activeInstance(),
-                    instanceReachable = if (result.error == null) true else it.instanceReachable,
+                    servers = it.servers.copy(reachable = if (result.error == null) true else it.servers.reachable),
                     signedIn = sync.signedIn(),
                 )
             }
@@ -261,7 +259,7 @@ fun ShellViewModel.onboardingBrowser() {
             ?.progress
             ?.readyAddress ?: return
     updateOnboarding { it.copy(progress = it.progress.copy(openIdPendingAddress = address), signInError = null) }
-    beginOpenId(address)
+    servers.beginOpenId(address)
 }
 
 /** Called once the browser sign-in returns to the app while onboarding. */

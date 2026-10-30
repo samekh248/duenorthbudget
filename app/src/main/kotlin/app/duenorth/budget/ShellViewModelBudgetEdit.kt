@@ -73,7 +73,7 @@ fun ShellViewModel.endBudgetEdit() {
     // Templates rerun on save, so every amount goes back over theirs; otherwise only what changed. A fill can
     // reach categories the budget is not showing, which are saved as they are.
     val changed = if (edit.templates != null) edit.budgeted else edit.budgeted.filter { (id, minor) -> saved[id] != minor }
-    if (changed.isNotEmpty() || edit.templates != null) saveBudgets(shell.month, changed, edit.templates)
+    if (changed.isNotEmpty() || edit.templates != null) envelopes.saveBudgets(shell.month, changed, edit.templates)
 }
 
 /** A month fill in edit mode: copy last month, 3 month average or set to zero land in the boxes, unsaved. */

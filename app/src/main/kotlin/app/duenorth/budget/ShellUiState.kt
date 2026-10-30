@@ -62,10 +62,8 @@ data class ShellUiState(
     val defaultBudgetName: String = "",
     val shell: MonthShell? = null,
     val register: RegisterPage? = null,
-    /** Transactions picked in the register's select mode; null when not selecting. */
-    val registerSelection: Set<String>? = null,
-    /** The register's search, open over the rows; null when closed. */
-    val registerSearch: RegisterSearch? = null,
+    /** The register's own state, kept by [RegisterHolder]. */
+    val registerUi: RegisterUi = RegisterUi(),
     val categoryTarget: CategoryTarget? = null,
     val createError: String? = null,
     val writeError: String? = null,
@@ -77,8 +75,8 @@ data class ShellUiState(
     val monthReview: MonthReviewPage? = null,
     val netWorth: NetWorthPage? = null,
     val categoryMonth: CategoryMonthPage? = null,
-    val reconcile: ReconcilePage? = null,
-    val reconcileError: String? = null,
+    /** Reconcile's own state, kept by [ReconcileHolder]. */
+    val reconcile: ReconcileUi = ReconcileUi(),
     /** Every schedule, ended ones included, by next date. */
     val schedules: List<ScheduleSummary> = emptyList(),
     /** The schedule [ShellRoute.ScheduleDetails] shows; null while it loads. */
@@ -104,30 +102,20 @@ data class ShellUiState(
     val editError: String? = null,
     val askEachTime: Boolean = true,
     val signedIn: Boolean = false,
-    val importPreview: ImportPreview? = null,
-    val importCandidates: List<ParsedImportRow> = emptyList(),
-    val importReview: ImportReviewPage? = null,
-    val importError: String? = null,
-    val importFetchPending: Boolean = false,
+    /** Importing's own state, kept by [ImportHolder]. */
+    val import: ImportState = ImportState(),
     /** Bank sync's own state, kept by [BankSyncHolder]. */
     val bankSync: BankSyncState = BankSyncState(),
     /** The onboarding files list is asking the server for its budgets again. */
     val remoteRefreshing: Boolean = false,
     val registerBankLinked: Boolean = false,
-    val categoryManage: CategoryManagePage? = null,
-    val instances: List<SavedInstance> = emptyList(),
-    val activeInstance: SavedInstance? = null,
-    val instanceReachable: Boolean? = null,
+    /** The envelopes' own state, kept by [EnvelopesHolder]. */
+    val envelopes: EnvelopesUi = EnvelopesUi(),
     val formatPrefs: FormatPrefs = FormatPrefs(),
     val budgetMethod: String = "envelope",
     val cloudFileId: String? = null,
-    val pendingExport: PendingExport? = null,
-    val confirmAdvanced: AdvancedConfirm? = null,
-    val openIdRedirectUrl: String? = null,
-    val openIdAvailable: Boolean = false,
-    val openIdPendingAddress: String? = null,
-    val switchInstanceTarget: SavedInstance? = null,
-    val encryptionError: String? = null,
+    /** The servers' own state, kept by [ServersHolder]. */
+    val servers: ServersState = ServersState(),
     val switchReturnRoute: ShellRoute = ShellRoute.Home,
     /** The phone's budgets that picking [pendingFile] clears. */
     val replaceBudgets: List<BudgetSummary> = emptyList(),
@@ -176,11 +164,17 @@ data class ShellUiState(
     val newTransactionPrefill: NewTransactionPrefill? = null,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
     val settingsPage: SettingsPage = SettingsPage.BUDGET,
-    val settingsScroll: Map<SettingsPage, Int> = emptyMap(),
     /** True while a page opened from settings is showing; back and finish return to settings. */
     val settingsReturn: Boolean = false,
-    val budgetEncrypted: Boolean = false,
-)
+    /** The settings screen's own state, kept by [SettingsHolder]. */
+    val settingsUi: SettingsUi = SettingsUi(),
+) {
+    /** The saved servers, from [settings]. */
+    val instances: List<SavedInstance> get() = settings.instances
+
+    /** The server in use, from [settings]; null when none is saved. */
+    val activeInstance: SavedInstance? get() = settings.activeInstance()
+}
 
 data class NewTransactionPrefill(
     val amountMinor: Long,

@@ -26,7 +26,7 @@ internal fun SettingsRoute(
         page = state.settingsPage,
         instances = state.instances,
         activeInstance = state.activeInstance,
-        instanceReachable = state.instanceReachable,
+        instanceReachable = state.servers.reachable,
         signedIn = state.signedIn,
         budgets = state.budgets,
         openBudgetId = state.settings.openBudgetId,
@@ -35,34 +35,34 @@ internal fun SettingsRoute(
         styleId = state.settings.style,
         formatPrefs = state.formatPrefs,
         cloudFileId = state.cloudFileId,
-        encrypted = state.budgetEncrypted,
-        onPage = model::selectSettingsPage,
-        onMakeActive = model::requestInstanceSwitch,
-        onRemoveInstance = model::requestRemoveInstance,
+        encrypted = state.settingsUi.budgetEncrypted,
+        onPage = model.settingsUi::selectPage,
+        onMakeActive = model.servers::requestSwitch,
+        onRemoveInstance = model.servers::requestRemove,
         onOpenBudget = model::requestSwitch,
-        onTheme = model::setTheme,
-        onAccent = model::setAccent,
-        onStyle = model::setStyle,
+        onTheme = model.settingsUi::setTheme,
+        onAccent = model.settingsUi::setAccent,
+        onStyle = model.settingsUi::setStyle,
         launcherIcon = launcherIcon,
         onLauncherIcon = {
             LauncherIcons.set(context, it)
             launcherIcon = it
         },
-        onPayees = model::showSettingsPayees,
-        onDateFormat = model::setDateFormat,
-        onNumberFormat = model::setNumberFormat,
-        onFirstDay = model::setFirstDay,
-        onHideFraction = model::setHideFraction,
-        onExperimental = model::setExperimental,
-        onExperimentalFeature = model::setExperimentalFeature,
-        onLearning = model::setLearning,
-        onExport = model::exportBudget,
-        onEncryption = model::showEncryption,
-        onRequestAdvanced = model::requestAdvanced,
+        onPayees = model.settingsUi::showPayees,
+        onDateFormat = model.settingsUi::setDateFormat,
+        onNumberFormat = model.settingsUi::setNumberFormat,
+        onFirstDay = model.settingsUi::setFirstDay,
+        onHideFraction = model.settingsUi::setHideFraction,
+        onExperimental = model.settingsUi::setExperimental,
+        onExperimentalFeature = model.settingsUi::setExperimentalFeature,
+        onLearning = model.settingsUi::setLearning,
+        onExport = model.settingsUi::exportBudget,
+        onEncryption = model.settingsUi::showEncryption,
+        onRequestAdvanced = model.settingsUi::requestAdvanced,
         phoneSettings = state.settings,
-        onBackgroundSyncHours = model::setBackgroundSyncHours,
-        scroll = state.settingsScroll,
-        onScroll = model::saveSettingsScroll,
+        onBackgroundSyncHours = model.settingsUi::setBackgroundSyncHours,
+        scroll = state.settingsUi.scroll,
+        onScroll = model.settingsUi::saveScroll,
         modifier = modifier,
     )
 }
@@ -76,8 +76,8 @@ internal fun ExperimentalOfferRoute(
 ) {
     ExperimentalOfferScreen(
         budgetName = state.budgets.find { it.id == route.budgetId }?.name ?: state.openBudgetName(),
-        onTurnOn = model::acceptExperimentalOffer,
-        onKeepOff = model::declineExperimentalOffer,
+        onTurnOn = model.settingsUi::acceptExperimentalOffer,
+        onKeepOff = model.settingsUi::declineExperimentalOffer,
         current = route.current,
         modifier = modifier,
     )
@@ -92,10 +92,10 @@ internal fun EncryptionPasswordRoute(
 ) {
     EncryptionPasswordScreen(
         mode = route.mode,
-        error = state.encryptionError,
-        onSet = model::setEncryptionPassword,
-        onChange = model::changeEncryptionPassword,
-        onRemove = model::removeEncryptionPassword,
+        error = state.settingsUi.encryptionError,
+        onSet = model.settingsUi::setEncryptionPassword,
+        onChange = model.settingsUi::changeEncryptionPassword,
+        onRemove = model.settingsUi::removeEncryptionPassword,
         modifier = modifier,
     )
 }
@@ -110,7 +110,7 @@ internal fun ConfirmRemoveInstanceRoute(
     val instance = state.instances.find { it.id == route.instanceId }
     ConfirmRemoveInstanceScreen(
         name = instance?.label ?: instance?.address.orEmpty(),
-        onRemove = model::confirmRemoveInstance,
+        onRemove = model.servers::confirmRemove,
         onKeep = { model.back() },
         modifier = modifier,
     )
@@ -127,10 +127,12 @@ internal fun ConfirmInstanceSwitchRoute(
             state.activeInstance?.label
                 ?: state.activeInstance?.address.orEmpty(),
         opening =
-            state.switchInstanceTarget?.label
-                ?: state.switchInstanceTarget?.address.orEmpty(),
-        onOpen = { model.confirmInstanceSwitch() },
-        onStay = model::cancelInstanceSwitch,
+            state.servers.switchTarget?.label
+                ?: state.servers.switchTarget
+                    ?.address
+                    .orEmpty(),
+        onOpen = { model.servers.confirmSwitch() },
+        onStay = model.servers::cancelSwitch,
         modifier = modifier,
     )
 }
@@ -309,7 +311,7 @@ internal fun ServerRoute(
         status = state.syncStatus,
         error = state.serverError,
         conflictCount = state.conflicts.size,
-        onConflicts = model::showConflicts,
+        onConflicts = model.servers::showConflicts,
         onConnect = model::connect,
         onOpen = model::requestRemote,
         onReplace = model::requestReplace,

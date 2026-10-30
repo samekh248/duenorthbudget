@@ -193,8 +193,8 @@ class OnboardingFlowTest {
         library(root).create("Home", "USD")
         val model = model(root)
         awaitMain { model.state.value.shell != null }
-        model.showSettings()
-        model.selectSettingsPage(SettingsPage.SERVER)
+        model.settingsUi.show()
+        model.settingsUi.selectPage(SettingsPage.SERVER)
 
         model.onboardingAddServer()
         assertEquals(ShellRoute.OnboardingAddress, model.state.value.route)
@@ -258,29 +258,29 @@ class OnboardingFlowTest {
         library(root).create("Home", "USD")
         val model = model(root)
         awaitMain { model.state.value.shell != null }
-        model.showSettings()
+        model.settingsUi.show()
         assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
 
-        model.selectSettingsPage(SettingsPage.ADVANCED)
-        model.showEncryption(EncryptionMode.SET)
+        model.settingsUi.selectPage(SettingsPage.ADVANCED)
+        model.settingsUi.showEncryption(EncryptionMode.SET)
         assertEquals(ShellRoute.EncryptionPassword(EncryptionMode.SET), model.state.value.route)
         assertTrue(model.back())
         assertEquals(ShellRoute.Settings, model.state.value.route)
         assertEquals(SettingsPage.ADVANCED, model.state.value.settingsPage)
 
         // Setting a password returns to advanced and shows the budget as encrypted.
-        model.showEncryption(EncryptionMode.SET)
-        model.setEncryptionPassword("secret")
-        awaitMain { model.state.value.route == ShellRoute.Settings && model.state.value.budgetEncrypted }
+        model.settingsUi.showEncryption(EncryptionMode.SET)
+        model.settingsUi.setEncryptionPassword("secret")
+        awaitMain { model.state.value.route == ShellRoute.Settings && model.state.value.settingsUi.budgetEncrypted }
         assertEquals(SettingsPage.ADVANCED, model.state.value.settingsPage)
 
-        model.showSettingsPayees()
+        model.settingsUi.showPayees()
         assertEquals(ShellRoute.Payees, model.state.value.route)
         assertTrue(model.back())
         assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
 
         // New budget from settings opens it and comes back to the budget item.
-        model.showSettingsCreate()
+        model.settingsUi.showCreate()
         model.create("Trip", "EUR")
         awaitMain {
             model.state.value.shell
@@ -291,10 +291,10 @@ class OnboardingFlowTest {
         assertFalse(model.state.value.settingsReturn)
 
         // Leaving settings and coming back starts on the budget item.
-        model.selectSettingsPage(SettingsPage.APPEARANCE)
+        model.settingsUi.selectPage(SettingsPage.APPEARANCE)
         assertTrue(model.back())
         assertEquals(ShellRoute.Home, model.state.value.route)
-        model.showSettings()
+        model.settingsUi.show()
         assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
     }
 
@@ -304,7 +304,7 @@ class OnboardingFlowTest {
         library(root).create("Home", "USD")
         val model = model(root)
         awaitMain { model.state.value.shell != null }
-        model.showSettings()
+        model.settingsUi.show()
         model.onboardingAddServer()
         model.onboardingAddress("budget.example.com")
         model.onboardingCheck()
@@ -318,13 +318,13 @@ class OnboardingFlowTest {
                 .activeInstance()!!
                 .id
 
-        model.requestRemoveInstance(id)
+        model.servers.requestRemove(id)
         assertEquals(ShellRoute.ConfirmRemoveInstance(id), model.state.value.route)
         assertTrue(model.back())
         assertEquals(1, library(root).settings().instances.size)
 
-        model.requestRemoveInstance(id)
-        model.confirmRemoveInstance()
+        model.servers.requestRemove(id)
+        model.servers.confirmRemove()
         awaitMain { library(root).settings().instances.isEmpty() }
         assertEquals(ShellRoute.Settings, model.state.value.route)
         assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
@@ -338,8 +338,8 @@ class OnboardingFlowTest {
         transport.downloads["server-household"] = budgetBytes("Household")
         val model = model(root)
         awaitMain { model.state.value.shell != null }
-        model.showSettings()
-        model.selectSettingsPage(SettingsPage.SERVER)
+        model.settingsUi.show()
+        model.settingsUi.selectPage(SettingsPage.SERVER)
         model.onboardingAddServer()
         model.onboardingAddress("budget.example.com")
         model.onboardingCheck()
@@ -379,7 +379,7 @@ class OnboardingFlowTest {
         }
         // A budget with no experimental choice yet asks first, then shows its home.
         awaitMain { model.state.value.route is ShellRoute.ExperimentalOffer }
-        model.declineExperimentalOffer()
+        model.settingsUi.declineExperimentalOffer()
         assertEquals(ShellRoute.Home, model.state.value.route)
         assertEquals(listOf("Household"), library(root).list().map { it.name })
         assertEquals("server-household", library(root).settings().openBudgetId)
@@ -393,7 +393,7 @@ class OnboardingFlowTest {
         library(root).create("Home", "USD")
         val model = model(root)
         awaitMain { model.state.value.shell != null }
-        model.showSettings()
+        model.settingsUi.show()
         model.onboardingAddServer()
         model.onboardingAddress("budget.example.com")
         model.onboardingCheck()
@@ -407,7 +407,7 @@ class OnboardingFlowTest {
                 .activeInstance()!!
                 .id
 
-        model.confirmInstanceSwitch(id)
+        model.servers.confirmSwitch(id)
         awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         assertTrue(model.back())
         assertEquals(ShellRoute.Settings, model.state.value.route)
@@ -459,7 +459,7 @@ class OnboardingFlowTest {
         awaitMain { model.state.value.route is ShellRoute.ExperimentalOffer }
         assertEquals(true, (model.state.value.route as ShellRoute.ExperimentalOffer).current)
         // Turning them off here saves off on the budget.
-        model.declineExperimentalOffer()
+        model.settingsUi.declineExperimentalOffer()
         assertEquals(ShellRoute.Home, model.state.value.route)
         awaitMain { !library.readFormatPrefs("server-household").experimental }
     }

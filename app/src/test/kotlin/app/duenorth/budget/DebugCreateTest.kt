@@ -54,7 +54,7 @@ class DebugCreateTest {
         model.create("Home", "USD")
         // A first budget asks about experimental features first, then shows its home.
         awaitMain { model.state.value.route is ShellRoute.ExperimentalOffer }
-        model.declineExperimentalOffer()
+        model.settingsUi.declineExperimentalOffer()
         awaitMain { model.state.value.route == ShellRoute.Home && model.state.value.shell != null }
         assertEquals(ScreenBar.HOME_BUDGET, model.state.value.homeSection)
         assertEquals(

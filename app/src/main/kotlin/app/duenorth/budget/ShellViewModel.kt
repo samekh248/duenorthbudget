@@ -62,8 +62,6 @@ class ShellViewModel(
     /** Category note saves, written in the order they were made. */
     internal val noteWrites = Mutex()
 
-    /** Budget preference saves, in the order they were made, so two flipped together both land. */
-    internal val preferenceWrites = Mutex()
     private val _state =
         MutableStateFlow(
             ShellUiState(
@@ -86,6 +84,8 @@ class ShellViewModel(
             override val scope get() = viewModelScope
             override val library get() = this@ShellViewModel.library
             override val sync get() = this@ShellViewModel.sync
+            override val bankSyncTransport get() = this@ShellViewModel.bankSyncTransport
+            override val probe get() = this@ShellViewModel.probe
             override val io get() = this@ShellViewModel.io
             override val writing get() = this@ShellViewModel.writing
 
@@ -111,9 +111,60 @@ class ShellViewModel(
 
             override fun clearHistory() = history.clear()
 
-            override fun loadAccount(accountId: String) {
-                viewModelScope.launch { apply(load(accountId), accountId) }
+            override fun replaceHistory(routes: List<ShellRoute>) {
+                history.clear()
+                history.addAll(routes)
             }
+
+            override fun dropLastHistory() {
+                history.removeLastOrNull()
+            }
+
+            override fun openAddAccount() = this@ShellViewModel.openAddAccount()
+
+            override fun openFromSettings(
+                route: ShellRoute,
+                page: SettingsPage,
+            ) = settingsUi.openFrom(route, page)
+
+            override fun returnToSettings(page: SettingsPage?) = settingsUi.returnTo(page)
+
+            override fun cancelBudgetEdit() = this@ShellViewModel.cancelBudgetEdit()
+
+            override fun createBudget(
+                name: String,
+                currency: String,
+            ) = this@ShellViewModel.createBudget(name, currency)
+
+            override fun onBackgroundSyncHours(hours: Int) = this@ShellViewModel.onBackgroundSyncHours(hours)
+
+            override fun editorMonth() = this@ShellViewModel.editorMonth()
+
+            override val shellGate get() = this@ShellViewModel.shellGate
+
+            override fun loadCategoryNote(categoryId: String) = this@ShellViewModel.loadCategoryNote(categoryId)
+
+            override fun moveInBudgetEdit(
+                fromCategoryId: String,
+                toCategoryId: String,
+                amountText: String,
+            ) = this@ShellViewModel.moveInBudgetEdit(fromCategoryId, toCategoryId, amountText)
+
+            override fun transferToBudget(
+                categoryId: String,
+                amountText: String,
+            ) = this@ShellViewModel.transferToBudget(categoryId, amountText)
+
+            override fun signOut(preferSettings: Boolean) = this@ShellViewModel.signOut(preferSettings)
+
+            override fun refreshOnboardingFiles() = onboardingRefresh()
+
+            override fun finishBrowserSignIn(
+                saved: OnboardingProgress,
+                error: String?,
+            ) = this@ShellViewModel.finishBrowserSignIn(saved, error)
+
+            override suspend fun reloadAccount(accountId: String) = apply(load(accountId), accountId)
         }
 
     /** The inbox: filing, deleting and opening what came in. */
@@ -124,6 +175,24 @@ class ShellViewModel(
 
     /** Payees: the payees page, renaming and merging, and the names payee boxes offer. */
     val payees: PayeesHolder = PayeesHolder(host)
+
+    /** Importing: a file preview, a bank fetch and the review of what came in. */
+    val import: ImportHolder = ImportHolder(host)
+
+    /** Servers: the instances list, OpenID sign-in, switching and removing a server, and server checks. */
+    val servers: ServersHolder = ServersHolder(host)
+
+    /** Settings: its pages, formats, appearance, experimental features, export, encryption and repairs. */
+    val settingsUi: SettingsHolder = SettingsHolder(host, payees, servers)
+
+    /** Envelopes: budgeting into categories, moving and holding money, and managing groups and categories. */
+    val envelopes: EnvelopesHolder = EnvelopesHolder(host)
+
+    /** The register: an account's transactions, the transaction form, select mode, search and matching. */
+    val register: RegisterHolder = RegisterHolder(host, inbox)
+
+    /** Reconcile: matching an account's cleared transactions to a statement. */
+    val reconcile: ReconcileHolder = ReconcileHolder(host, register)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -295,13 +364,13 @@ class ShellViewModel(
 
     fun back(): Boolean {
         val current = _state.value
-        if (current.registerSelection != null && current.confirm == null) {
-            endSelecting()
+        if (current.registerUi.selection != null && current.confirm == null) {
+            register.endSelecting()
             return true
         }
         // Back closes the register's search before it leaves the account.
-        if (current.registerSearch != null && current.route is ShellRoute.Register && current.confirm == null) {
-            closeRegisterSearch()
+        if (current.registerUi.search != null && current.route is ShellRoute.Register && current.confirm == null) {
+            register.closeSearch()
             return true
         }
         if (current.inbox.selection != null && current.route == ShellRoute.Home && current.confirm == null) {
@@ -345,7 +414,7 @@ class ShellViewModel(
         }
         onboardingBack()?.let { return it }
         if (current.settingsReturn && current.route != ShellRoute.Settings) {
-            returnToSettings()
+            settingsUi.returnTo()
             return true
         }
         if (current.route == ShellRoute.Create && current.shell == null) return false
@@ -453,7 +522,7 @@ class ShellViewModel(
     }
 
     fun setNetWorthIncludeOffBudget(include: Boolean) {
-        saveSettings(_state.value.settings.copy(netWorthIncludeOffBudget = include))
+        settingsUi.save(_state.value.settings.copy(netWorthIncludeOffBudget = include))
         refreshNetWorth()
     }
 
@@ -567,11 +636,11 @@ class ShellViewModel(
                             route = ShellRoute.Reconcile(accountId),
                             writeError = null,
                             confirm = null,
-                            registerSelection = null,
+                            registerUi = it.registerUi.copy(selection = null),
                         )
                     }
                     apply(load(accountId), accountId)
-                    reloadReconcile(accountId)
+                    reconcile.reload(accountId)
                     return
                 }
                 if (toRegister) {
@@ -582,7 +651,7 @@ class ShellViewModel(
                             route = ShellRoute.Register(accountId),
                             writeError = null,
                             confirm = null,
-                            registerSelection = null,
+                            registerUi = it.registerUi.copy(selection = null),
                         )
                     }
                 } else {
@@ -739,8 +808,6 @@ class ShellViewModel(
                 remoteFiles = sync.remoteFiles,
                 signedIn = sync.signedIn(),
                 registerBankLinked = loaded.bankLinked,
-                instances = loaded.settings.instances,
-                activeInstance = loaded.settings.activeInstance(),
                 formatPrefs = loaded.formatPrefs,
                 budgetMethod = loaded.formatPrefs.budgetType,
                 cloudFileId = loaded.cloudFileId,

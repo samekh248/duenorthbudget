@@ -187,7 +187,7 @@ class AccountContentTest {
         assertEquals(2_500L, wallet.balanceMinor)
         assertEquals(AccountsCopy.ADD, model.state.value.undoLabel)
 
-        model.openAccount(wallet.id)
+        model.register.openAccount(wallet.id)
         await { model.state.value.route == ShellRoute.Register(wallet.id) }
         model.openCloseAccount()
         await {
@@ -224,7 +224,7 @@ class AccountContentTest {
         val (model, library) = household("force-close")
         val budgetId = model.state.value.settings.openBudgetId!!
         val account = library.readAccounts(budgetId, includeClosed = false).first { it.transactionCount > 0 && it.balanceMinor != 0L }
-        model.openAccount(account.id)
+        model.register.openAccount(account.id)
         await { model.state.value.route == ShellRoute.Register(account.id) }
         model.openCloseAccount()
         await {

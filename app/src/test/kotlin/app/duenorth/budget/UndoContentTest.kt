@@ -36,8 +36,8 @@ class UndoContentTest {
                 .accounts
                 .first()
                 .id
-        model.openCategoryBudget("c-food")
-        model.saveCategoryBudget("250")
+        model.envelopes.openBudget("c-food")
+        model.envelopes.saveBudget("250")
         await { model.state.value.undoLabel == UndoCopy.ASSIGN }
         library.renameAccount(budgetId, accountId, "Everyday")
         assertEquals(AccountsCopy.EDIT, library.undoLabel(budgetId))
