@@ -3,6 +3,7 @@ package app.duenorth.budget
 import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.CreateResult
+import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.OnboardingProgress
 import app.duenorth.budget.core.RefreshGate
@@ -112,6 +113,9 @@ internal interface ShellHost {
 
     /** Leaves the budget's edit mode without saving. */
     fun cancelBudgetEdit()
+
+    /** Edit mode's fill: changes the amounts being edited rather than writing. */
+    fun fillBudgetEdit(kind: MonthFillKind)
 
     /** Makes a budget the way this build does: empty, or from the walkthrough sample in debug builds. */
     fun createBudget(

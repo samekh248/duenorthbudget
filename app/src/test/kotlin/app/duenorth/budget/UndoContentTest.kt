@@ -41,9 +41,9 @@ class UndoContentTest {
         await { model.state.value.undoLabel == UndoCopy.ASSIGN }
         library.renameAccount(budgetId, accountId, "Everyday")
         assertEquals(AccountsCopy.EDIT, library.undoLabel(budgetId))
-        model.undo()
+        model.month.undo()
         await { model.state.value.undoLabel == UndoCopy.ASSIGN }
-        model.undo()
+        model.month.undo()
         await { model.state.value.undoLabel == null }
     }
 
@@ -60,10 +60,10 @@ class UndoContentTest {
         // Someone else renames it again before the undo.
         library.useDatabase(budgetId) { session -> SyncSchema.write(session, "accounts", accountId, "name", "Joint") }
         model.mutate { it.copy(undoLabel = library.undoLabel(budgetId)) }
-        model.undo()
+        model.month.undo()
         await { model.state.value.route == ShellRoute.Conflicts }
         assertTrue(
-            model.state.value.monthNotice!!
+            model.state.value.monthUi.notice!!
                 .contains(MonthActionCopy.UNDO_CONFLICT),
         )
         await { model.state.value.undoLabel == null }

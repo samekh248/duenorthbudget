@@ -92,8 +92,8 @@ data class ShellUiState(
     val cloudFileId: String? = null,
     /** The servers' own state, kept by [ServersHolder]. */
     val servers: ServersState = ServersState(),
-    val fillConfirm: FillConfirm? = null,
-    val monthNotice: String? = null,
+    /** The month actions' own state, kept by [MonthHolder]. */
+    val monthUi: MonthUi = MonthUi(),
     val undoLabel: String? = null,
     /** The accounts' own state, kept by [AccountsHolder]. */
     val accounts: AccountsUi = AccountsUi(),

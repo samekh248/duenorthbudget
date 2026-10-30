@@ -73,7 +73,7 @@ internal fun HomeRoute(
                 )
             },
         editError = state.editError,
-        notice = state.monthNotice,
+        notice = state.monthUi.notice,
         formatOptions =
             FormatOptions(
                 hideFraction = state.formatPrefs.hideFraction,

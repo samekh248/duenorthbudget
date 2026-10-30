@@ -172,7 +172,7 @@ class BudgetEditTest {
         awaitMain { model.state.value.undoLabel != null }
 
         // One undo takes the whole edit back.
-        model.undo()
+        model.month.undo()
         awaitMain { model.saved().groups == before.groups }
     }
 
@@ -211,14 +211,14 @@ class BudgetEditTest {
         val model = household("fill")
         val before = model.state.value.shell!!
         model.startBudgetEdit()
-        model.fillMonth(MonthFillKind.ZERO)
+        model.month.fill(MonthFillKind.ZERO)
         awaitMain {
             model.state.value.budgetEdit
                 ?.budgeted
                 ?.isNotEmpty() == true
         }
         // Nothing to confirm in the sandbox, and nothing saved yet.
-        assertNull(model.state.value.fillConfirm)
+        assertNull(model.state.value.monthUi.fillConfirm)
         assertTrue(
             model
                 .editing()

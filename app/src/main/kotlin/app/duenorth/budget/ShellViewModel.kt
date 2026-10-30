@@ -10,6 +10,7 @@ import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.ForcedWrite
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.HttpBankSyncTransport
+import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
@@ -141,6 +142,8 @@ class ShellViewModel(
 
             override fun cancelBudgetEdit() = this@ShellViewModel.cancelBudgetEdit()
 
+            override fun fillBudgetEdit(kind: MonthFillKind) = this@ShellViewModel.fillBudgetEdit(kind)
+
             override fun createBudget(
                 name: String,
                 currency: String,
@@ -171,7 +174,7 @@ class ShellViewModel(
             override fun transferToBudget(
                 categoryId: String,
                 amountText: String,
-            ) = this@ShellViewModel.transferToBudget(categoryId, amountText)
+            ) = month.transferToBudget(categoryId, amountText)
 
             override fun signOut(preferSettings: Boolean) = budgetFiles.signOut(preferSettings)
 
@@ -235,6 +238,9 @@ class ShellViewModel(
 
     /** Accounts: adding, editing, closing, reopening and reordering them. */
     val accounts: AccountsHolder = AccountsHolder(host)
+
+    /** Month actions: fills, moving budget back to to budget, income auto-hold, hidden categories, and undo. */
+    val month: MonthHolder = MonthHolder(host)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -432,8 +438,8 @@ class ShellViewModel(
             _state.update { it.copy(confirm = null) }
             return true
         }
-        if (current.fillConfirm != null) {
-            _state.update { it.copy(fillConfirm = null) }
+        if (current.monthUi.fillConfirm != null) {
+            _state.update { it.copy(monthUi = it.monthUi.copy(fillConfirm = null)) }
             return true
         }
         if (current.templates.confirm != null) {
@@ -868,6 +874,39 @@ class ShellViewModel(
             warmMonthWindow()
         }
         getStarted.retireFinished()
+    }
+
+    /**
+     * Repaints the open month after a month action or undo, drops other cached months
+     * (a fill or hold changes every later month), then syncs and repaints again.
+     */
+    internal suspend fun afterMonthWrite(budgetId: String) {
+        repaintMonth(budgetId)
+        withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
+        repaintMonth(budgetId)
+    }
+
+    private suspend fun repaintMonth(budgetId: String) {
+        val month = editorMonth()
+        val loaded =
+            withContext(io) {
+                val shell = library.readShell(budgetId, month) ?: return@withContext null
+                MonthSnapshot(month, shell, library.readMonthReview(budgetId, month))
+            }
+        months.invalidate()
+        if (loaded != null) {
+            shellGate.offer(loaded.shell)
+            if (!shellGate.gestureActive) months.applyLoaded(loaded, gestureActive = false)
+        }
+        mutate { current ->
+            val open = loaded != null && !shellGate.gestureActive
+            current.copy(
+                shell = if (open) loaded!!.shell else current.shell,
+                monthReview = if (open && current.pinnedMonth == null) loaded!!.review else current.monthReview,
+                undoLabel = library.undoLabel(budgetId),
+            )
+        }
+        warmMonthWindow()
     }
 
     private fun ShellRoute.isRegisterFlow(): Boolean =

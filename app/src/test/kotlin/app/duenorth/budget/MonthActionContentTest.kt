@@ -89,23 +89,23 @@ class MonthActionContentTest {
         val month =
             model.state.value.shell!!
                 .month
-        model.fillMonth(MonthFillKind.COPY_LAST)
-        awaitMain { model.state.value.fillConfirm != null }
+        model.month.fill(MonthFillKind.COPY_LAST)
+        awaitMain { model.state.value.monthUi.fillConfirm != null }
         assertEquals(
             MonthFillCopy.REPLACES,
-            model.state.value.fillConfirm!!
+            model.state.value.monthUi.fillConfirm!!
                 .reason,
         )
         assertEquals(220_000L, budgeted(library, budgetId, month, "c-food"))
 
-        model.keepFill()
-        assertNull(model.state.value.fillConfirm)
+        model.month.keepFill()
+        assertNull(model.state.value.monthUi.fillConfirm)
         idleMain()
         assertEquals(220_000L, budgeted(library, budgetId, month, "c-food"))
 
-        model.fillMonth(MonthFillKind.COPY_LAST)
-        awaitMain { model.state.value.fillConfirm != null }
-        model.confirmFill()
+        model.month.fill(MonthFillKind.COPY_LAST)
+        awaitMain { model.state.value.monthUi.fillConfirm != null }
+        model.month.confirmFill()
         awaitMain {
             model.state.value.shell
                 ?.category("c-food")
@@ -124,15 +124,15 @@ class MonthActionContentTest {
         val month =
             model.state.value.shell!!
                 .month
-        model.fillMonth(MonthFillKind.ZERO)
-        awaitMain { model.state.value.fillConfirm != null }
+        model.month.fill(MonthFillKind.ZERO)
+        awaitMain { model.state.value.monthUi.fillConfirm != null }
         assertEquals(
             MonthFillCopy.ZERO_CONFIRM,
-            model.state.value.fillConfirm!!
+            model.state.value.monthUi.fillConfirm!!
                 .reason,
         )
         assertEquals(80_000L, budgeted(library, budgetId, month, "c-gas"))
-        model.confirmFill()
+        model.month.confirmFill()
         awaitMain {
             model.state.value.shell
                 ?.category("c-gas")
@@ -145,9 +145,9 @@ class MonthActionContentTest {
         val (model, _) = household("to-budget")
         val before = model.state.value.shell!!
         model.envelopes.openBudget("c-food")
-        model.openToBudget()
+        model.month.openToBudget()
         assertEquals(ShellRoute.ToBudget("c-food"), model.state.value.route)
-        model.submitToBudget("25")
+        model.month.submitToBudget("25")
         // Optimistic: painted before the write finishes.
         assertEquals(
             before.headerMinor + 2_500,
@@ -180,8 +180,8 @@ class MonthActionContentTest {
         val (model, _) = household("to-budget-refused")
         val before = model.state.value.shell!!
         model.envelopes.openBudget("c-food")
-        model.openToBudget()
-        model.submitToBudget("999999")
+        model.month.openToBudget()
+        model.month.submitToBudget("999999")
         awaitMain { model.state.value.editError != null }
         assertEquals(
             before.headerMinor,
@@ -239,7 +239,7 @@ class MonthActionContentTest {
                     category = state.shell!!.incomeCategory("c-sal")!!,
                     error = state.editError,
                     onSave = model.envelopes::saveBudget,
-                    onAutoHold = model::chooseAutoHold,
+                    onAutoHold = model.month::chooseAutoHold,
                 )
             }
         }
@@ -334,9 +334,9 @@ class MonthActionContentTest {
         assertFalse(undo.primary)
         assertEquals(25_000L, budgeted(library, budgetId, month, "c-food"))
 
-        model.undo()
+        model.month.undo()
         // The label clears when the step is popped; the notice follows the write.
-        awaitMain { model.state.value.monthNotice == "${MonthActionCopy.UNDONE} ${UndoCopy.ASSIGN}" }
+        awaitMain { model.state.value.monthUi.notice == "${MonthActionCopy.UNDONE} ${UndoCopy.ASSIGN}" }
         awaitMain { model.state.value.undoLabel == null }
         assertEquals(220_000L, budgeted(library, budgetId, month, "c-food"))
         awaitMain {
