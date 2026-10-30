@@ -109,10 +109,8 @@ data class ShellUiState(
     val importReview: ImportReviewPage? = null,
     val importError: String? = null,
     val importFetchPending: Boolean = false,
-    /** Every SimpleFIN account is fetching, from the accounts bar or at launch. */
-    val bankSyncing: Boolean = false,
-    /** What the accounts page's bank sync panel shows; null when there is nothing to show. */
-    val bankSync: BankSyncUi? = null,
+    /** Bank sync's own state, kept by [BankSyncHolder]. */
+    val bankSync: BankSyncState = BankSyncState(),
     /** The onboarding files list is asking the server for its budgets again. */
     val remoteRefreshing: Boolean = false,
     val registerBankLinked: Boolean = false,

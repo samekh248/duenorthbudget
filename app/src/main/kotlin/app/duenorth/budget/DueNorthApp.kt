@@ -260,8 +260,8 @@ fun DueNorthApp(model: ShellViewModel) {
                             (state.route as? ShellRoute.Register)?.accountId ?: return@ScreenBarHandlers
                         model.fetchBankTransactions(accountId)
                     },
-                    onBankSyncAll = model::syncBanks,
-                    onDismissBankSync = model::dismissBankSync,
+                    onBankSyncAll = model.bankSync::syncAll,
+                    onDismissBankSync = model.bankSync::dismiss,
                     onSave = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.confirmImport()
@@ -339,11 +339,17 @@ fun DueNorthApp(model: ShellViewModel) {
             progress = state.syncProgress,
             bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
             overBar =
-                state.bankSync
+                state.bankSync.panel
                     ?.takeIf { state.route != ShellRoute.BankSyncReport }
                     ?.let { ui ->
                         { modifier ->
-                            BankSyncPanel(ui, model::syncBanks, model::dismissBankSync, modifier, onOpen = model::openBankSyncReport)
+                            BankSyncPanel(
+                                ui,
+                                model.bankSync::syncAll,
+                                model.bankSync::dismiss,
+                                modifier,
+                                onOpen = model.bankSync::openReport,
+                            )
                         }
                     },
         ) { modifier ->

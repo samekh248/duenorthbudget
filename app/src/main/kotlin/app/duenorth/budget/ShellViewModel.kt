@@ -85,12 +85,17 @@ class ShellViewModel(
             override val state get() = this@ShellViewModel.state
             override val scope get() = viewModelScope
             override val library get() = this@ShellViewModel.library
+            override val sync get() = this@ShellViewModel.sync
             override val io get() = this@ShellViewModel.io
             override val writing get() = this@ShellViewModel.writing
 
             override fun mutate(transform: (ShellUiState) -> ShellUiState) = this@ShellViewModel.mutate(transform)
 
             override fun push(route: ShellRoute) = this@ShellViewModel.push(route)
+
+            override fun back() {
+                this@ShellViewModel.back()
+            }
 
             override fun launchWrite(block: suspend (String) -> Unit) = this@ShellViewModel.launchWrite(block)
 
@@ -99,6 +104,8 @@ class ShellViewModel(
                 accountId: String,
                 stayOnRegister: Boolean,
             ) = this@ShellViewModel.publish(result, accountId, stayOnRegister)
+
+            override suspend fun reload() = this@ShellViewModel.reload()
 
             override fun loadPayees() = this@ShellViewModel.loadPayees()
 
@@ -109,6 +116,9 @@ class ShellViewModel(
 
     /** The inbox: filing, deleting and opening what came in. */
     val inbox = InboxHolder(host)
+
+    /** Bank sync: every SimpleFIN account fetches, then the budget syncs. */
+    val bankSync = BankSyncHolder(host)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -142,7 +152,7 @@ class ShellViewModel(
             if (_state.value.locked) return@launch
             // Launch fetches the banks first, so the sync after sends what they brought to the server.
             // The panel only shows once a linked account starts, so a budget with none never sees it.
-            runBankSync(id, quiet = true)
+            bankSync.run(id, quiet = true)
         }
     }
 

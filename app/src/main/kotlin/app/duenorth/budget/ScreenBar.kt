@@ -394,8 +394,8 @@ object ScreenBar {
         state: ShellUiState,
     ): Boolean =
         when (id) {
-            "sync" -> state.importFetchPending || state.bankSyncing
-            "bank-sync" -> state.bankSyncing
+            "sync" -> state.importFetchPending || state.bankSync.syncing
+            "bank-sync" -> state.bankSync.syncing
             "refresh" -> state.remoteRefreshing
             else -> false
         }

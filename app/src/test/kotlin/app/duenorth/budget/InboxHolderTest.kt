@@ -53,7 +53,7 @@ class InboxHolderTest {
                 .inbox
                 .first { it.suggestionId != null }
         inbox.accept(row.id)
-        assertEquals(listOf(row.id), host.published.map { it.second })
+        assertEquals(listOf(row.accountId), host.published.map { it.second })
         assertTrue(host.published.single().first is WriteResult.Saved)
         // The write has landed, so the confirmation ending lets the row go.
         inbox.filedShown(row.id)
@@ -63,53 +63,7 @@ class InboxHolderTest {
         )
     }
 
-    /** A shell over the household sample whose writes run at once and whose publishes are only recorded. */
-    private class FakeHost(
-        override val library: BudgetLibrary,
-        start: ShellUiState,
-    ) : ShellHost {
-        override val state = MutableStateFlow(start)
-        override val scope = CoroutineScope(Dispatchers.Unconfined)
-        override val io = Dispatchers.Unconfined
-        override var writing = false
-        val pushed = mutableListOf<ShellRoute>()
-
-        /** Each publish's result, with the transaction the holder filed (the first filed row's id). */
-        val published = mutableListOf<Pair<WriteResult, String>>()
-
-        override fun mutate(transform: (ShellUiState) -> ShellUiState) = state.update(transform)
-
-        override fun push(route: ShellRoute) {
-            pushed += route
-        }
-
-        override fun launchWrite(block: suspend (String) -> Unit) {
-            val id = state.value.settings.openBudgetId ?: return
-            writing = true
-            try {
-                runBlocking { block(id) }
-            } finally {
-                writing = false
-            }
-        }
-
-        override suspend fun publish(
-            result: WriteResult,
-            accountId: String,
-            stayOnRegister: Boolean,
-        ) {
-            published += result to
-                state.value.inbox.filed
-                    .first()
-                    .row.id
-        }
-
-        override fun loadPayees() = Unit
-
-        override fun loadAccount(accountId: String) = Unit
-    }
-
-    private fun host(name: String): FakeHost {
+    private fun host(name: String): FakeShellHost {
         val root =
             File(RuntimeEnvironment.getApplication().filesDir, name).apply {
                 deleteRecursively()
@@ -117,6 +71,6 @@ class InboxHolderTest {
             }
         val library = BudgetLibrary(root, AndroidSessionOpener(), BudgetClock.System)
         val id = (library.createFromMock(MockBudgets.HOUSEHOLD) as CreateResult.Created).id
-        return FakeHost(library, ShellUiState(settings = library.settings(), shell = library.readShell(id)))
+        return FakeShellHost(library, ShellUiState(settings = library.settings(), shell = library.readShell(id)))
     }
 }
