@@ -65,9 +65,9 @@ class DebugCreateTest {
         )
 
         // Set up categories opens the starter set while the budget has none; add brings them in.
-        model.openGetStarted(GetStartedStep.CATEGORIES)
+        model.getStarted.open(GetStartedStep.CATEGORIES)
         assertEquals(ShellRoute.StarterCategories, model.state.value.route)
-        model.addStarterCategories(StarterCategories.all.take(2))
+        model.getStarted.addStarterCategories(StarterCategories.all.take(2))
         awaitMain {
             model.state.value.route == ShellRoute.Home && model.state.value.shell!!
                 .groups.size == 2
@@ -79,7 +79,7 @@ class DebugCreateTest {
                 .map { it.done },
         )
 
-        model.hideGetStarted()
+        model.getStarted.hide()
         assertNull(model.state.value.getStarted())
         awaitMain { library.settings().getStarted.isEmpty() }
     }

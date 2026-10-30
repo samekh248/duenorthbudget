@@ -124,7 +124,13 @@ class ShellViewModel(
 
             override fun finishOnboarding() = this@ShellViewModel.finishOnboarding()
 
-            override suspend fun startGetStarted(budgetId: String) = this@ShellViewModel.startGetStarted(budgetId)
+            override suspend fun startGetStarted(budgetId: String) = getStarted.start(budgetId)
+
+            override fun startBudgetEdit() = this@ShellViewModel.startBudgetEdit()
+
+            override fun openNewSchedule() = this@ShellViewModel.openNewSchedule()
+
+            override fun forgetMonths() = months.invalidate()
 
             override fun openFromSettings(
                 route: ShellRoute,
@@ -202,7 +208,12 @@ class ShellViewModel(
 
     /** Budget files: creating, opening, switching and replacing a budget, unlocking it, signing out and syncing it. */
     val budgetFiles: BudgetFilesHolder = BudgetFilesHolder(host, samples, developerMode, settingsUi)
+
+    /** Reports: the hub's pages, and the pivot over one shared range. */
     val reports: ReportsHolder = ReportsHolder(host)
+
+    /** The get started list over a budget made on this phone. */
+    val getStarted: GetStartedHolder = GetStartedHolder(host, envelopes)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -832,7 +843,7 @@ class ShellViewModel(
         if (!loaded.locked && loaded.shell != null) {
             warmMonthWindow()
         }
-        retireFinishedGetStarted()
+        getStarted.retireFinished()
     }
 
     private fun ShellRoute.isRegisterFlow(): Boolean =

@@ -61,6 +61,15 @@ internal interface ShellHost {
     /** Starts the get started list for a budget made empty. */
     suspend fun startGetStarted(budgetId: String)
 
+    /** The budget's edit mode, for assigning every category at once. */
+    fun startBudgetEdit()
+
+    /** The new schedule form. */
+    fun openNewSchedule()
+
+    /** Forgets every cached month, after a change that reaches them all; the next select reads again. */
+    fun forgetMonths()
+
     /** Runs [block] with the open budget's id as the one write in flight, unless one already runs. */
     fun launchWrite(block: suspend (String) -> Unit)
 

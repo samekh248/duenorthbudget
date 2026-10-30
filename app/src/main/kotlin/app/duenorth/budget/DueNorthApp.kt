@@ -398,7 +398,11 @@ fun DueNorthApp(model: ShellViewModel) {
                         is ShellRoute.MoveCategory -> MoveCategoryRoute(route, state, model, fill)
                         ShellRoute.HoldMonth -> HoldMonthRoute(state, model, fill)
                         ShellRoute.StarterCategories ->
-                            StarterCategoriesScreen(error = state.editError, onAdd = model::addStarterCategories, modifier = fill)
+                            StarterCategoriesScreen(
+                                error = state.editError,
+                                onAdd = model.getStarted::addStarterCategories,
+                                modifier = fill,
+                            )
                         ShellRoute.AddAccount ->
                             AddAccountScreen(error = state.editError, onSave = model::submitAddAccount, modifier = fill)
                         is ShellRoute.EditAccount -> EditAccountRoute(route, state, model, fill)

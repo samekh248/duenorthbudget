@@ -69,6 +69,12 @@ internal class FakeShellHost(
 
     val getStarted = mutableListOf<String>()
 
+    override fun startBudgetEdit() = Unit
+
+    override fun openNewSchedule() = Unit
+
+    override fun forgetMonths() = Unit
+
     override suspend fun startGetStarted(budgetId: String) {
         getStarted += budgetId
     }
