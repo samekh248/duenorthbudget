@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.FormatPrefs
+import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.theme.MetroTheme
@@ -27,6 +28,13 @@ class SettingsScreenshotTest {
 
     @Test
     fun settingsDark() = snap("settings_dark", SettingsPage.BUDGET, dark = true)
+
+    // A budget only on the phone, with the server signed out: the picker row says how to reach it.
+    @Test
+    fun budgetSignedOutLight() = snap("settings_budget_signed_out_light", SettingsPage.BUDGET, dark = false, signedIn = false)
+
+    @Test
+    fun budgetSignedOutDark() = snap("settings_budget_signed_out_dark", SettingsPage.BUDGET, dark = true, signedIn = false)
 
     @Test
     fun serverLight() = snap("settings_server_light", SettingsPage.SERVER, dark = false)
@@ -107,6 +115,8 @@ class SettingsScreenshotTest {
     @Test
     fun experimentalOfferDark() = page("experimental_offer_dark", dark = true, hosted = true) { ExperimentalOfferScreen("Home", {}, {}) }
 
+    private val serverFiles = listOf(RemoteFile("cloud-1", "g1", "Home", null), RemoteFile("household", "g2", "Household", "key-1"))
+
     private val home = SavedInstance("i1", "http://192.168.1.20:5006", "home server")
     private val office = SavedInstance("i2", "https://budget.example.com", "office")
 
@@ -116,7 +126,8 @@ class SettingsScreenshotTest {
         dark: Boolean,
         budgetOpen: Boolean = true,
         prefs: FormatPrefs = FormatPrefs(),
-    ) = page(name, dark) { settingsScreen(settingsPage, dark, budgetOpen, prefs) }
+        signedIn: Boolean = true,
+    ) = page(name, dark) { settingsScreen(settingsPage, dark, budgetOpen, prefs, signedIn) }
 
     @androidx.compose.runtime.Composable
     private fun settingsScreen(
@@ -124,13 +135,14 @@ class SettingsScreenshotTest {
         dark: Boolean,
         budgetOpen: Boolean = true,
         prefs: FormatPrefs = FormatPrefs(),
+        signedIn: Boolean = true,
     ) {
         SettingsScreen(
             page = settingsPage,
             instances = listOf(home, office),
             activeInstance = home,
             instanceReachable = true,
-            signedIn = true,
+            signedIn = signedIn,
             budgets =
                 listOf(
                     BudgetSummary("home", "Home", "USD"),
@@ -140,7 +152,7 @@ class SettingsScreenshotTest {
             themeMode = if (dark) "dark" else "light",
             accentId = "magenta",
             formatPrefs = prefs,
-            cloudFileId = "cloud-1",
+            cloudFileId = if (signedIn) "cloud-1" else null,
             encrypted = false,
             onPage = {},
             onMakeActive = {},
@@ -157,6 +169,7 @@ class SettingsScreenshotTest {
             onExport = {},
             onEncryption = {},
             onRequestAdvanced = {},
+            remoteFiles = serverFiles,
         )
     }
 

@@ -55,6 +55,8 @@ class SettingsHolder internal constructor(
             )
         }
         refresh()
+        // The budget item's box lists the server's budgets too, so fetch them fresh.
+        if (host.sync.signedIn()) host.refreshOnboardingFiles()
     }
 
     fun selectPage(page: SettingsPage) {

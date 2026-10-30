@@ -120,6 +120,15 @@ class OnboardingScreenshotTest {
     fun filesReplacingDark() =
         snap(ShellRoute.OnboardingFiles, "budget_picker_replacing_dark", dark = true) { files(replacing = listOf("Home")) }
 
+    // Opened from settings → budget: the budget already open is marked in the list.
+    @Test
+    fun filesFromSettingsLight() =
+        snap(ShellRoute.OnboardingFiles, "budget_picker_open_light", dark = false) { files(replacing = listOf("Home"), openId = "home") }
+
+    @Test
+    fun filesFromSettingsDark() =
+        snap(ShellRoute.OnboardingFiles, "budget_picker_open_dark", dark = true) { files(replacing = listOf("Home"), openId = "home") }
+
     @Test
     fun confirmReplaceLight() = snap(ShellRoute.ConfirmReplaceBudget, "budget_picker_confirm_light", dark = false) { confirmReplace() }
 
@@ -162,19 +171,23 @@ class OnboardingScreenshotTest {
         )
 
     @Composable
-    private fun files(replacing: List<String> = emptyList()) =
-        OnboardingFilesScreen(
-            label = "home server",
-            files =
-                listOf(
-                    RemoteFile("a1b2c3d4", "g1", "Household", "key-1"),
-                    RemoteFile("e5f6a7b8", "g2", "Travel 2026", null),
-                    RemoteFile("c9d0e1f2", "g3", "Travel 2026", null),
-                ),
-            error = null,
-            onOpen = {},
-            replacing = replacing,
-        )
+    private fun files(
+        replacing: List<String> = emptyList(),
+        openId: String? = null,
+    ) = OnboardingFilesScreen(
+        label = "home server",
+        files =
+            listOfNotNull(
+                RemoteFile("home", "g0", "Home", null).takeIf { openId != null },
+                RemoteFile("a1b2c3d4", "g1", "Household", "key-1"),
+                RemoteFile("e5f6a7b8", "g2", "Travel 2026", null),
+                RemoteFile("c9d0e1f2", "g3", "Travel 2026", null),
+            ),
+        error = null,
+        onOpen = {},
+        replacing = replacing,
+        openId = openId,
+    )
 
     private fun snap(
         route: ShellRoute,

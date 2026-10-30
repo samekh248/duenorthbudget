@@ -33,6 +33,7 @@ import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.DateFormats
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.FormatPrefs
+import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.ThemeMode
@@ -83,38 +84,65 @@ internal fun BudgetItem(
     onOpen: (String) -> Unit,
     onPayees: () -> Unit,
     onLearning: (Boolean) -> Unit,
+    serverName: String? = null,
+    signedIn: Boolean = false,
+    cloudFileId: String? = null,
+    remoteFiles: List<RemoteFile> = emptyList(),
+    onOpenServer: (RemoteFile) -> Unit = {},
+    error: String? = null,
 ) {
     val open = budgets.find { it.id == openBudgetId }
-    if (open == null) {
-        SettingsHeading("budgets", first = true)
-        MetroText(SettingsCopy.NO_BUDGET, Metro.typography.subheader, Modifier.testTag("settings-open-budget"))
+    // One box is both the open budget and the way to another: the phone's budgets, then the server's.
+    val choices = BudgetChoice.of(budgets, remoteFiles, serverName?.takeIf { signedIn }, cloudFileId)
+    val byKey = choices.associateBy { it.key }
+    SettingsHeading("open budget", tag = "settings-method", first = true)
+    if (choices.isEmpty()) {
+        MetroText(SettingsCopy.NO_BUDGET, Metro.typography.subheader, Modifier.testTag("settings-open-budget-none"))
     } else {
-        SettingsHeading("open budget", tag = "settings-method", first = true)
-        MetroText(open.name, Metro.typography.subheader, Modifier.testTag("settings-open-budget"), color = Metro.accent.text)
-        MetroText(
-            SettingsCopy.method(budgetType),
-            Metro.typography.body,
-            Modifier.testTag("settings-method-value"),
-            color = Metro.colors.secondary,
+        MetroComboBox(
+            choices = choices.map { it.key },
+            selected = open?.let { BudgetChoice.Phone(it).key }.orEmpty(),
+            label = { byKey[it]?.label.orEmpty() },
+            onPick = { key ->
+                when (val choice = byKey[key]) {
+                    is BudgetChoice.Phone -> onOpen(choice.budget.id)
+                    is BudgetChoice.Server -> onOpenServer(choice.file)
+                    null -> Unit
+                }
+            },
+            tag = "settings-open-budget",
+            modifier = Modifier.padding(top = 4.dp),
+            placeholder = SettingsCopy.NO_BUDGET,
         )
     }
-    val others = budgets.filter { it.id != openBudgetId }
-    if (others.isNotEmpty()) {
-        if (open != null) SettingsHeading("other budgets")
-        others.forEach { budget ->
-            SettingsActionRow(budget.name, "settings-budget-${budget.id}") { onOpen(budget.id) }
-        }
+    val hints =
+        listOfNotNull(
+            open?.let { SettingsCopy.method(budgetType) + " · " + SettingsCopy.lives(serverName.takeIf { !cloudFileId.isNullOrBlank() }) },
+            serverName?.takeIf { signedIn && choices.any { it is BudgetChoice.Server } }?.let(SettingsCopy::serverChoices),
+            serverName?.takeIf { !signedIn }?.let(SettingsCopy::signInFor),
+        )
+    hints.forEachIndexed { index, hint ->
+        val tag = if (index == 0 && open != null) "settings-method-value" else "settings-open-budget-hint-$index"
+        val top = if (index == 0) 4.dp else 0.dp
+        MetroText(hint, Metro.typography.body, Modifier.padding(top = top).testTag(tag), color = Metro.colors.secondary)
+    }
+    if (error != null) {
+        MetroText(error, Metro.typography.body, Modifier.testTag("settings-open-budget-error"), color = Metro.accent.text)
     }
     if (open != null) {
         SettingsHeading("payees")
-        SettingsActionRow("rename and merge payees", "settings-payees", onPayees)
+        SettingsLinkRow(SettingsCopy.RENAME_PAYEES, SettingsCopy.RENAME_PAYEES_HINT, "settings-payees", onPayees)
         // Actual's "learn categories": a payee's usual category becomes a rule.
         SettingsHeading("rules", tag = "settings-rules")
-        ChoiceRow(
-            if (learning) "learn categories  on" else "learn categories",
-            learning,
-            "settings-learning",
-        ) { onLearning(!learning) }
+        Column(Modifier.padding(top = MetroDimens.Row).testTag("settings-learning")) {
+            SwitchRow(SettingsCopy.LEARN, learning, "settings-learning-switch", onLearning)
+            MetroText(
+                SettingsCopy.LEARN_HINT,
+                Metro.typography.caption,
+                Modifier.padding(top = 4.dp),
+                color = Metro.colors.secondary,
+            )
+        }
     }
 }
 
@@ -358,6 +386,27 @@ private fun SettingsActionRow(
             .padding(vertical = MetroDimens.Row)
             .testTag(tag),
     )
+}
+
+/** A row that opens something, with one line under it saying what. */
+@Composable
+private fun SettingsLinkRow(
+    label: String,
+    caption: String,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress(onClick)
+            .padding(vertical = MetroDimens.Row)
+            .testTag(tag),
+    ) {
+        MetroText(label, Metro.typography.subheader)
+        MetroText(caption, Metro.typography.caption, color = Metro.colors.secondary)
+    }
 }
 
 @Composable

@@ -3,6 +3,7 @@ package app.duenorth.budget
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.CreateResult
+import app.duenorth.budget.core.RemoteFile
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +44,42 @@ class BudgetFilesHolderTest {
         val files = holder(host)
         files.setAskEachTime(false)
         assertEquals(false, host.state.value.budgetFiles.askEachTime)
+    }
+
+    @Test
+    fun pickingTheOpenBudgetFromTheServerListGoesBackToItWithoutADownload() {
+        val host = host("budget-files-holder-open-remote")
+        val home = (host.library.create("Home", "USD") as CreateResult.Created).id
+        host.mutate {
+            it.copy(
+                route = ShellRoute.OnboardingFiles,
+                settingsReturn = true,
+                settings = host.library.settings(),
+                budgets = host.library.list(),
+            )
+        }
+        holder(host).requestRemote(RemoteFile(fileId = home, groupId = "g", name = "Home", encryptKeyId = null))
+        assertEquals(ShellRoute.Home, host.state.value.route)
+        assertEquals(false, host.state.value.syncing)
+        assertEquals(null, host.state.value.budgetFiles.pendingFile)
+    }
+
+    @Test
+    fun keepingThePhonesBudgetsAfterPickingAServerOneFromSettingsGoesBackToSettings() {
+        val host = host("budget-files-holder-settings-remote")
+        host.library.create("Home", "USD")
+        host.mutate {
+            it.copy(route = ShellRoute.Settings, settings = host.library.settings(), budgets = host.library.list())
+        }
+        val files = holder(host)
+        val household = RemoteFile(fileId = "household", groupId = "g", name = "Household", encryptKeyId = null)
+        files.requestRemote(household)
+        // Home would be cleared, so the phone asks first.
+        assertEquals(ShellRoute.ConfirmReplaceBudget, host.state.value.route)
+        assertEquals(household, host.state.value.budgetFiles.pendingFile)
+        files.cancelReplaceBudget()
+        assertEquals(ShellRoute.Settings, host.state.value.route)
+        assertEquals(null, host.state.value.budgetFiles.pendingFile)
     }
 
     private fun holder(host: FakeShellHost) =

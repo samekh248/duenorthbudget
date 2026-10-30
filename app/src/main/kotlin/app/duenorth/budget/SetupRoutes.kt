@@ -63,6 +63,9 @@ internal fun SettingsRoute(
         onBackgroundSyncHours = model.settingsUi::setBackgroundSyncHours,
         scroll = state.settingsUi.scroll,
         onScroll = model.settingsUi::saveScroll,
+        remoteFiles = state.remoteFiles,
+        onOpenServer = model.budgetFiles::requestRemote,
+        budgetError = state.serverError,
         modifier = modifier,
     )
 }
@@ -245,6 +248,7 @@ internal fun OnboardingFilesRoute(
         onOpen = model.onboarding::open,
         modifier = modifier,
         replacing = state.budgets.map { it.name },
+        openId = state.settings.openBudgetId,
     )
 }
 

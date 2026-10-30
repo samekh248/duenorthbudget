@@ -171,13 +171,18 @@ class BudgetFilesHolder internal constructor(
     }
 
     fun requestRemote(file: RemoteFile) {
+        // The budget already open is not downloaded over itself; picking it just goes back to it.
+        if (file.fileId == state.settings.openBudgetId) {
+            host.mutate { it.copy(route = ShellRoute.Home, settingsReturn = false, serverError = null) }
+            return
+        }
         // Keep and failures come back to the list the budget was picked from.
         host.mutate {
             it.copy(
                 budgetFiles =
                     it.budgetFiles.copy(
                         switchReturnRoute =
-                            it.route.takeIf(::isServerList) ?: it.budgetFiles.switchReturnRoute,
+                            it.route.takeIf(::isPickedFrom) ?: it.budgetFiles.switchReturnRoute,
                     ),
             )
         }
@@ -199,7 +204,7 @@ class BudgetFilesHolder internal constructor(
         val file = current.budgetFiles.pendingFile ?: return
         if (current.syncing) return
         // The download's progress shows over the list it was picked from.
-        host.mutate { it.copy(route = it.budgetFiles.switchReturnRoute.takeIf(::isServerList) ?: ShellRoute.Server) }
+        host.mutate { it.copy(route = it.budgetFiles.switchReturnRoute.takeIf(::isPickedFrom) ?: ShellRoute.Server) }
         beginOpen(file)
     }
 
@@ -207,7 +212,7 @@ class BudgetFilesHolder internal constructor(
     fun cancelReplaceBudget() {
         host.mutate {
             it.copy(
-                route = it.budgetFiles.switchReturnRoute.takeIf(::isServerList) ?: ShellRoute.Server,
+                route = it.budgetFiles.switchReturnRoute.takeIf(::isPickedFrom) ?: ShellRoute.Server,
                 budgetFiles = it.budgetFiles.copy(pendingFile = null, replaceBudgets = emptyList(), passwordError = null),
             )
         }
@@ -345,6 +350,9 @@ class BudgetFilesHolder internal constructor(
 
     private fun isServerList(route: ShellRoute): Boolean = route == ShellRoute.OnboardingFiles || route == ShellRoute.Server
 
+    /** Where a server budget can be picked from: the server lists, or settings → budget's open-budget box. */
+    private fun isPickedFrom(route: ShellRoute): Boolean = isServerList(route) || route == ShellRoute.Settings
+
     private fun beginOpen(file: RemoteFile) {
         host.scope.launch {
             host.mutate { it.copy(syncing = true, syncProgress = 0f, serverError = null) }
@@ -389,7 +397,7 @@ class BudgetFilesHolder internal constructor(
                             route =
                                 when {
                                     it.onboarding != null -> ShellRoute.OnboardingFiles
-                                    isServerList(it.budgetFiles.switchReturnRoute) -> it.budgetFiles.switchReturnRoute
+                                    isPickedFrom(it.budgetFiles.switchReturnRoute) -> it.budgetFiles.switchReturnRoute
                                     else -> ShellRoute.Server
                                 },
                             budgetFiles = it.budgetFiles.copy(replaceBudgets = emptyList()),
