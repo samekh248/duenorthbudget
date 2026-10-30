@@ -42,6 +42,8 @@ fun <T> MetroComboBox(
     modifier: Modifier = Modifier,
     fullScreenThreshold: Int = Int.MAX_VALUE,
     onOpenFull: () -> Unit = {},
+    /** What the closed box says while [selected] is none of [choices]. */
+    placeholder: String = "",
 ) {
     var open by remember { mutableStateOf(false) }
     Column(
@@ -70,7 +72,7 @@ fun <T> MetroComboBox(
     ) {
         if (!open) {
             MetroComboValue(
-                text = if (selected in choices) label(selected) else "",
+                text = if (selected in choices) label(selected) else placeholder,
                 tag = "$tag-value",
                 onClick = { if (choices.size > fullScreenThreshold) onOpenFull() else open = true },
             )

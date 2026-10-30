@@ -55,6 +55,8 @@ class SettingsHolder internal constructor(
             )
         }
         refresh()
+        // The budget item's box lists the server's budgets too, so fetch them fresh.
+        if (host.sync.signedIn()) host.refreshOnboardingFiles()
     }
 
     fun selectPage(page: SettingsPage) {
@@ -104,13 +106,6 @@ class SettingsHolder internal constructor(
     }
 
     fun showCreate() = openFrom(ShellRoute.Create, SettingsPage.BUDGET)
-
-    /** Settings → budget → budgets on the server: the pick-a-budget page, and back comes to the budget item. */
-    fun showServerBudgets() {
-        if (!state.signedIn) return
-        openFrom(ShellRoute.OnboardingFiles, SettingsPage.BUDGET)
-        host.refreshOnboardingFiles()
-    }
 
     fun showPayees() {
         payees.show()

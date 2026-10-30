@@ -64,6 +64,24 @@ class BudgetFilesHolderTest {
         assertEquals(null, host.state.value.budgetFiles.pendingFile)
     }
 
+    @Test
+    fun keepingThePhonesBudgetsAfterPickingAServerOneFromSettingsGoesBackToSettings() {
+        val host = host("budget-files-holder-settings-remote")
+        host.library.create("Home", "USD")
+        host.mutate {
+            it.copy(route = ShellRoute.Settings, settings = host.library.settings(), budgets = host.library.list())
+        }
+        val files = holder(host)
+        val household = RemoteFile(fileId = "household", groupId = "g", name = "Household", encryptKeyId = null)
+        files.requestRemote(household)
+        // Home would be cleared, so the phone asks first.
+        assertEquals(ShellRoute.ConfirmReplaceBudget, host.state.value.route)
+        assertEquals(household, host.state.value.budgetFiles.pendingFile)
+        files.cancelReplaceBudget()
+        assertEquals(ShellRoute.Settings, host.state.value.route)
+        assertEquals(null, host.state.value.budgetFiles.pendingFile)
+    }
+
     private fun holder(host: FakeShellHost) =
         BudgetFilesHolder(host, null, developerMode = false, SettingsHolder(host, PayeesHolder(host), ServersHolder(host)))
 

@@ -33,6 +33,7 @@ import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.DateFormats
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.FormatPrefs
+import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.ThemeMode
@@ -85,40 +86,48 @@ internal fun BudgetItem(
     onLearning: (Boolean) -> Unit,
     serverName: String? = null,
     signedIn: Boolean = false,
-    synced: Boolean = false,
-    onServerBudgets: () -> Unit = {},
+    cloudFileId: String? = null,
+    remoteFiles: List<RemoteFile> = emptyList(),
+    onOpenServer: (RemoteFile) -> Unit = {},
+    error: String? = null,
 ) {
     val open = budgets.find { it.id == openBudgetId }
+    // One box is both the open budget and the way to another: the phone's budgets, then the server's.
+    val choices = BudgetChoice.of(budgets, remoteFiles, serverName?.takeIf { signedIn }, cloudFileId)
+    val byKey = choices.associateBy { it.key }
     SettingsHeading("open budget", tag = "settings-method", first = true)
-    if (open == null) {
-        MetroText(SettingsCopy.NO_BUDGET, Metro.typography.subheader, Modifier.testTag("settings-open-budget"))
+    if (choices.isEmpty()) {
+        MetroText(SettingsCopy.NO_BUDGET, Metro.typography.subheader, Modifier.testTag("settings-open-budget-none"))
     } else {
-        MetroText(open.name, Metro.typography.subheader, Modifier.testTag("settings-open-budget"), color = Metro.accent.text)
-        MetroText(
-            SettingsCopy.method(budgetType) + " · " + SettingsCopy.lives(serverName.takeIf { synced }),
-            Metro.typography.body,
-            Modifier.testTag("settings-method-value"),
-            color = Metro.colors.secondary,
+        MetroComboBox(
+            choices = choices.map { it.key },
+            selected = open?.let { BudgetChoice.Phone(it).key }.orEmpty(),
+            label = { byKey[it]?.label.orEmpty() },
+            onPick = { key ->
+                when (val choice = byKey[key]) {
+                    is BudgetChoice.Phone -> onOpen(choice.budget.id)
+                    is BudgetChoice.Server -> onOpenServer(choice.file)
+                    null -> Unit
+                }
+            },
+            tag = "settings-open-budget",
+            modifier = Modifier.padding(top = 4.dp),
+            placeholder = SettingsCopy.NO_BUDGET,
         )
     }
-    // Every way to another budget sits under one heading: the phone's own, then the server's picker.
-    val others = budgets.filter { it.id != openBudgetId }
-    val server = serverName?.takeIf { signedIn }
-    if (others.isNotEmpty() || serverName != null) {
-        SettingsHeading(if (open == null) SettingsCopy.OPEN_A_BUDGET else SettingsCopy.OPEN_ANOTHER, tag = "settings-switch")
-    }
-    others.forEach { budget ->
-        SettingsLinkRow(budget.name, SettingsCopy.ON_PHONE, "settings-budget-${budget.id}") { onOpen(budget.id) }
-    }
-    if (server != null) {
-        SettingsLinkRow(SettingsCopy.serverBudgets(server), SettingsCopy.SERVER_BUDGETS_HINT, "settings-server-budgets", onServerBudgets)
-    } else if (serverName != null) {
-        MetroText(
-            SettingsCopy.signInFor(serverName),
-            Metro.typography.body,
-            Modifier.padding(top = 4.dp).testTag("settings-server-budgets-signed-out"),
-            color = Metro.colors.secondary,
+    val hints =
+        listOfNotNull(
+            open?.let { SettingsCopy.method(budgetType) + " · " + SettingsCopy.lives(serverName.takeIf { !cloudFileId.isNullOrBlank() }) },
+            serverName?.takeIf { signedIn && choices.any { it is BudgetChoice.Server } }?.let(SettingsCopy::serverChoices),
+            serverName?.takeIf { !signedIn }?.let(SettingsCopy::signInFor),
         )
+    hints.forEachIndexed { index, hint ->
+        val tag = if (index == 0 && open != null) "settings-method-value" else "settings-open-budget-hint-$index"
+        val top = if (index == 0) 4.dp else 0.dp
+        MetroText(hint, Metro.typography.body, Modifier.padding(top = top).testTag(tag), color = Metro.colors.secondary)
+    }
+    if (error != null) {
+        MetroText(error, Metro.typography.body, Modifier.testTag("settings-open-budget-error"), color = Metro.accent.text)
     }
     if (open != null) {
         SettingsHeading("payees")

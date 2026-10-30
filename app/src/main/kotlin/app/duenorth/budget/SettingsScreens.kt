@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.PhoneSettings
+import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
@@ -78,10 +79,6 @@ object SettingsCopy {
     const val NO_SERVER_HINT = "add the Actual server you run to sync this phone's budgets"
     const val BACKGROUND_SYNC_HINT = "fetches linked banks, then syncs the open budget, while the app is closed"
     const val NO_BUDGET = "no budget open"
-    const val OPEN_ANOTHER = "open another budget"
-    const val OPEN_A_BUDGET = "open a budget"
-    const val ON_PHONE = "on this phone"
-    const val SERVER_BUDGETS_HINT = "pick one to download and open"
     const val RENAME_PAYEES = "rename and merge payees"
     const val RENAME_PAYEES_HINT = "tidy names that came in from banks and imports"
     const val LEARN = "learn categories"
@@ -102,7 +99,8 @@ object SettingsCopy {
     /** Where the open budget lives: synced with [server], or only on this phone. */
     fun lives(server: String?) = if (server == null) "only on this phone" else "syncs with $server"
 
-    fun serverBudgets(server: String) = "budgets on $server"
+    /** Under the box while it lists the server's budgets as well as the phone's. */
+    fun serverChoices(server: String) = "a budget from $server downloads when you pick it"
 
     fun signInFor(server: String) = "sign in to $server on the server page to open its budgets"
 
@@ -158,7 +156,9 @@ fun SettingsScreen(
     onBackgroundSyncHours: (Int) -> Unit = {},
     scroll: Map<SettingsPage, Int> = emptyMap(),
     onScroll: (SettingsPage, Int) -> Unit = { _, _ -> },
-    onServerBudgets: () -> Unit = {},
+    remoteFiles: List<RemoteFile> = emptyList(),
+    onOpenServer: (RemoteFile) -> Unit = {},
+    budgetError: String? = null,
 ) {
     val budgetOpen = !openBudgetId.isNullOrBlank()
     val pages = SettingsPage.shown(budgetOpen)
@@ -179,8 +179,10 @@ fun SettingsScreen(
                                 onLearning = onLearning,
                                 serverName = activeInstance?.let { it.label ?: it.address },
                                 signedIn = signedIn,
-                                synced = !cloudFileId.isNullOrBlank(),
-                                onServerBudgets = onServerBudgets,
+                                cloudFileId = cloudFileId,
+                                remoteFiles = remoteFiles,
+                                onOpenServer = onOpenServer,
+                                error = budgetError,
                             )
                         SettingsPage.SERVER ->
                             ServerItem(

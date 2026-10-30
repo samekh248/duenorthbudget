@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.FormatPrefs
+import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.theme.MetroTheme
@@ -114,6 +115,8 @@ class SettingsScreenshotTest {
     @Test
     fun experimentalOfferDark() = page("experimental_offer_dark", dark = true, hosted = true) { ExperimentalOfferScreen("Home", {}, {}) }
 
+    private val serverFiles = listOf(RemoteFile("cloud-1", "g1", "Home", null), RemoteFile("household", "g2", "Household", "key-1"))
+
     private val home = SavedInstance("i1", "http://192.168.1.20:5006", "home server")
     private val office = SavedInstance("i2", "https://budget.example.com", "office")
 
@@ -166,6 +169,7 @@ class SettingsScreenshotTest {
             onExport = {},
             onEncryption = {},
             onRequestAdvanced = {},
+            remoteFiles = serverFiles,
         )
     }
 

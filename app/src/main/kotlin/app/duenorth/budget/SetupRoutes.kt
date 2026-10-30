@@ -63,7 +63,9 @@ internal fun SettingsRoute(
         onBackgroundSyncHours = model.settingsUi::setBackgroundSyncHours,
         scroll = state.settingsUi.scroll,
         onScroll = model.settingsUi::saveScroll,
-        onServerBudgets = model.settingsUi::showServerBudgets,
+        remoteFiles = state.remoteFiles,
+        onOpenServer = model.budgetFiles::requestRemote,
+        budgetError = state.serverError,
         modifier = modifier,
     )
 }

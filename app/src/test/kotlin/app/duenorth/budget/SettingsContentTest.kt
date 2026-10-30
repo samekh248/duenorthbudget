@@ -23,6 +23,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.FormatPrefs
+import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.ThemeMode
@@ -61,25 +62,32 @@ class SettingsContentTest {
         compose.onNodeWithText("experimental").assertDoesNotExist()
         // The stored advanced item is not shown, so settings falls back to budget.
         compose.onNodeWithTag("settings-item-budget").assertIsDisplayed()
-        compose.onNodeWithTag("settings-open-budget").assertTextEquals("no budget open")
-        compose.onNodeWithTag("settings-budget-a").assertIsDisplayed()
+        compose.onNodeWithTag("settings-open-budget-value").assertTextEquals("no budget open")
+        compose.onNodeWithTag("settings-open-budget-value", useUnmergedTree = true).performClick()
+        compose.onNodeWithTag("settings-open-budget-phone-a").assertIsDisplayed()
     }
 
     @Test
     fun budgetItemShowsOpenBudgetMethodAndOthers() {
         var opened: String? = null
         show(SettingsPage.BUDGET, onOpenBudget = { opened = it })
-        compose.onNodeWithTag("settings-open-budget").assertTextEquals("Beta")
+        compose.onNodeWithTag("settings-open-budget-value").assertTextEquals("Beta")
         compose.onNodeWithTag("settings-method-value").assertTextEquals("envelope budget · syncs with home")
-        compose.onNodeWithTag("settings-budget-b").assertDoesNotExist()
-        compose.onNodeWithTag("settings-budget-a").performClick()
+        compose.onNodeWithTag("settings-open-budget-phone-a").assertDoesNotExist()
+        compose.onNodeWithTag("settings-open-budget-value", useUnmergedTree = true).performClick()
+        // Picking the budget already open folds the box and opens nothing.
+        compose.onNodeWithTag("settings-open-budget-phone-b").performClick()
+        assertEquals(null, opened)
+        compose.onNodeWithTag("settings-open-budget-value", useUnmergedTree = true).performClick()
+        compose.onNodeWithTag("settings-open-budget-phone-a").performClick()
         assertEquals("a", opened)
     }
 
     @Test
-    fun budgetItemOpensTheServersBudgetsOnlyWhenSignedIn() {
-        var picker = 0
+    fun budgetBoxListsTheServersBudgetsOnlyWhenSignedIn() {
+        var picked: RemoteFile? = null
         var signedIn by mutableStateOf(false)
+        val household = RemoteFile("h1", "g1", "Household", null)
         compose.setContent {
             MetroTheme {
                 androidx.compose.foundation.layout.Column {
@@ -93,17 +101,23 @@ class SettingsContentTest {
                         onLearning = {},
                         serverName = "home",
                         signedIn = signedIn,
-                        synced = true,
-                        onServerBudgets = { picker++ },
+                        cloudFileId = "b",
+                        // Beta came from the server, so only Household is new.
+                        remoteFiles = listOf(RemoteFile("b", "g0", "Beta", null), household),
+                        onOpenServer = { picked = it },
                     )
                 }
             }
         }
-        compose.onNodeWithTag("settings-server-budgets").assertDoesNotExist()
-        compose.onNodeWithTag("settings-server-budgets-signed-out").assertIsDisplayed()
+        compose.onNodeWithText(SettingsCopy.signInFor("home")).assertIsDisplayed()
+        compose.onNodeWithTag("settings-open-budget-value", useUnmergedTree = true).performClick()
+        compose.onNodeWithTag("settings-open-budget-server-h1").assertDoesNotExist()
+        compose.onNodeWithTag("settings-open-budget-phone-b").performClick()
         signedIn = true
-        compose.onNodeWithTag("settings-server-budgets").performClick()
-        assertEquals(1, picker)
+        compose.onNodeWithTag("settings-open-budget-value", useUnmergedTree = true).performClick()
+        compose.onNodeWithTag("settings-open-budget-server-b").assertDoesNotExist()
+        compose.onNodeWithTag("settings-open-budget-server-h1").assertTextEquals("Household · home").performClick()
+        assertEquals(household, picked)
     }
 
     @Test
