@@ -311,7 +311,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSkipSchedule = model.schedules::skipOpen,
                     onEditSchedule = model.schedules::editOpen,
                     onTemplates = model.templates::open,
-                    onBankLink = model::openBankLink,
+                    onBankLink = model.bankLink::open,
                     onNext = model::onboardingCheck,
                     onRefresh = model::onboardingRefresh,
                     onSamples = model.budgetFiles::showSamples,

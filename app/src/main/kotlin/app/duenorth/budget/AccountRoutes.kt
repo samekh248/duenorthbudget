@@ -21,7 +21,7 @@ internal fun BankSyncReportRoute(
         if (failure.fix == BankSyncFix.SIMPLEFIN) {
             openWebPage(context, SimpleFinError.BRIDGE_URL)
         } else {
-            model.repairBankLink(failure)
+            model.bankLink.repair(failure)
         }
     }
 }
@@ -234,16 +234,16 @@ internal fun BankLinkRoute(
         BankLinkScreen(
             ui = ui,
             currency = shell.currency,
-            onProvider = model::pickBankProvider,
-            onToken = model::sendSimpleFinToken,
-            onCountry = model::findGoCardlessBanks,
-            onInstitution = model::startGoCardless,
+            onProvider = model.bankLink::pickProvider,
+            onToken = model.bankLink::sendSimpleFinToken,
+            onCountry = model.bankLink::findGoCardlessBanks,
+            onInstitution = model.bankLink::startGoCardless,
             onOpenBank = { url -> openWebPage(context, url) },
-            onSignedIn = model::checkGoCardless,
-            onLink = model::linkBank,
-            onRemove = model::removeBankLink,
+            onSignedIn = model.bankLink::checkGoCardless,
+            onLink = model.bankLink::link,
+            onRemove = model.bankLink::remove,
             modifier = modifier,
-            onNewToken = model::replaceSimpleFinToken,
+            onNewToken = model.bankLink::replaceSimpleFinToken,
         )
     }
 }

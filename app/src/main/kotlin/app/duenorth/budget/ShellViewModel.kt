@@ -230,6 +230,9 @@ class ShellViewModel(
     /** Schedules: the pivot, a schedule's page and editor, and posting or skipping one. */
     val schedules: SchedulesHolder = SchedulesHolder(host, rules)
 
+    /** Bank link: linking an account to a bank, and repairing a link. */
+    val bankLink: BankLinkHolder = BankLinkHolder(host)
+
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
 
