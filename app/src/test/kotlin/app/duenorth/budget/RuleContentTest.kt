@@ -258,7 +258,7 @@ class RuleContentTest {
         val (model, library) = household("learning")
         val budgetId = model.state.value.settings.openBudgetId!!
         assertTrue(model.state.value.formatPrefs.learnCategories)
-        model.setLearning(false)
+        model.settingsUi.setLearning(false)
         await { !library.learningEnabled(budgetId) }
         assertEquals(false, model.state.value.formatPrefs.learnCategories)
     }

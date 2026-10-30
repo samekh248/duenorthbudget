@@ -49,8 +49,8 @@ fun ShellViewModel.create(
                     )
                 }
                 reload()
-                offerExperimental(always = settingUp)
-                if (toSettings) refreshSettingsSections()
+                settingsUi.offerExperimental(always = settingUp)
+                if (toSettings) settingsUi.refresh()
                 if (send) uploadNew()
             }
         }
@@ -77,7 +77,7 @@ fun ShellViewModel.createSample(datasetId: String) {
                 if (datasetId == samples.brandNew) startGetStarted(result.id)
                 mutate { it.copy(createError = null, route = ShellRoute.Home) }
                 reload()
-                offerExperimental(always = settingUp)
+                settingsUi.offerExperimental(always = settingUp)
             }
         }
     }
@@ -120,7 +120,7 @@ fun ShellViewModel.confirmSwitch() {
         withContext(io) { library.switchTo(target.id) }
         mutate { it.copy(route = ShellRoute.Home, switchTarget = null) }
         reload()
-        offerExperimental()
+        settingsUi.offerExperimental()
     }
 }
 
@@ -340,7 +340,7 @@ private fun ShellViewModel.beginOpen(file: RemoteFile) {
                     )
                 }
                 reload()
-                offerExperimental(always = settingUp)
+                settingsUi.offerExperimental(always = settingUp)
             }
             OpenResult.NeedsPassword ->
                 mutate {

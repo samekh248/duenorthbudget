@@ -115,11 +115,8 @@ data class ShellUiState(
     val formatPrefs: FormatPrefs = FormatPrefs(),
     val budgetMethod: String = "envelope",
     val cloudFileId: String? = null,
-    val pendingExport: PendingExport? = null,
-    val confirmAdvanced: AdvancedConfirm? = null,
     /** The servers' own state, kept by [ServersHolder]. */
     val servers: ServersState = ServersState(),
-    val encryptionError: String? = null,
     val switchReturnRoute: ShellRoute = ShellRoute.Home,
     /** The phone's budgets that picking [pendingFile] clears. */
     val replaceBudgets: List<BudgetSummary> = emptyList(),
@@ -168,10 +165,10 @@ data class ShellUiState(
     val newTransactionPrefill: NewTransactionPrefill? = null,
     /** The settings pivot item showing, kept while a settings page is open (spec 012). */
     val settingsPage: SettingsPage = SettingsPage.BUDGET,
-    val settingsScroll: Map<SettingsPage, Int> = emptyMap(),
     /** True while a page opened from settings is showing; back and finish return to settings. */
     val settingsReturn: Boolean = false,
-    val budgetEncrypted: Boolean = false,
+    /** The settings screen's own state, kept by [SettingsHolder]. */
+    val settingsUi: SettingsUi = SettingsUi(),
 ) {
     /** The saved servers, from [settings]. */
     val instances: List<SavedInstance> get() = settings.instances

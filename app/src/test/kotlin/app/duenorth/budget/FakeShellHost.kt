@@ -3,6 +3,7 @@ package app.duenorth.budget
 import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.MemorySecretStore
@@ -90,6 +91,23 @@ internal class FakeShellHost(
         saved: OnboardingProgress,
         error: String?,
     ) = Unit
+
+    var budgetEditsCancelled = 0
+
+    override fun cancelBudgetEdit() {
+        budgetEditsCancelled++
+    }
+
+    override fun createBudget(
+        name: String,
+        currency: String,
+    ): CreateResult = library.create(name, currency)
+
+    val backgroundSyncHours = mutableListOf<Int>()
+
+    override fun onBackgroundSyncHours(hours: Int) {
+        backgroundSyncHours += hours
+    }
 
     override fun loadPayees() = Unit
 

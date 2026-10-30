@@ -86,7 +86,7 @@ fun ShellViewModel.onboardingAddServer() {
         )
     mutate { it.copy(onboarding = OnboardingUi(progress)) }
     viewModelScope.launch(onboardingWrites) { library.onboarding().write(progress) }
-    openFromSettings(ShellRoute.OnboardingAddress, SettingsPage.SERVER)
+    settingsUi.openFrom(ShellRoute.OnboardingAddress, SettingsPage.SERVER)
 }
 
 /** The settings-origin path is over without a pick: drop its progress and show the server item. */
@@ -94,7 +94,7 @@ private fun ShellViewModel.leaveSettingsOnboarding() {
     cancelOnboardingJob()
     mutate { it.copy(onboarding = null) }
     viewModelScope.launch(onboardingWrites) { library.onboarding().clear() }
-    returnToSettings(SettingsPage.SERVER)
+    settingsUi.returnTo(SettingsPage.SERVER)
 }
 
 /** After the first load, the file list needs the server's budgets again. */

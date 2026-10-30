@@ -162,8 +162,8 @@ fun DueNorthApp(model: ShellViewModel) {
         openWebPage(context, url)
         model.servers.clearOpenIdRedirect()
     }
-    LaunchedEffect(state.pendingExport) {
-        val export = state.pendingExport ?: return@LaunchedEffect
+    LaunchedEffect(state.settingsUi.pendingExport) {
+        val export = state.settingsUi.pendingExport ?: return@LaunchedEffect
         // Only this folder is shared through the FileProvider; an earlier export is not kept around.
         val folder = File(context.cacheDir, EXPORTS_DIR).apply { deleteRecursively() }
         folder.mkdirs()
@@ -177,7 +177,7 @@ fun DueNorthApp(model: ShellViewModel) {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
         context.startActivity(Intent.createChooser(share, export.fileName))
-        model.clearPendingExport()
+        model.settingsUi.clearPendingExport()
     }
     val systemDark = isSystemInDarkTheme()
     val dark =
@@ -215,7 +215,7 @@ fun DueNorthApp(model: ShellViewModel) {
     val canBack =
         state.confirm != null ||
             state.fillConfirm != null ||
-            state.confirmAdvanced != null ||
+            state.settingsUi.confirmAdvanced != null ||
             (
                 state.route != ShellRoute.Home &&
                     state.route != ShellRoute.Welcome &&
@@ -223,8 +223,8 @@ fun DueNorthApp(model: ShellViewModel) {
                     !(state.route == ShellRoute.BudgetPassword && state.locked)
             )
     BackHandler(enabled = canBack) {
-        if (state.confirmAdvanced != null) {
-            model.cancelAdvanced()
+        if (state.settingsUi.confirmAdvanced != null) {
+            model.settingsUi.cancelAdvanced()
         } else {
             model.back()
         }
@@ -247,7 +247,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     },
                     onHold = model::showHoldMonth,
                     onCategories = model::showManageCategories,
-                    onSettings = model::showSettings,
+                    onSettings = model.settingsUi::show,
                     onReconcile = model::openReconcile,
                     onImport = {
                         val accountId =
@@ -316,12 +316,12 @@ fun DueNorthApp(model: ShellViewModel) {
                     onRefresh = model::onboardingRefresh,
                     onSamples = model::showSampleBudgets,
                     onNewBudget = model::onboardingNewBudget,
-                    onSettingsNew = model::showSettingsCreate,
-                    onSettingsPayees = model::showSettingsPayees,
+                    onSettingsNew = model.settingsUi::showCreate,
+                    onSettingsPayees = model.settingsUi::showPayees,
                     onAddServer = model::onboardingAddServer,
                     onServerBudgets = model.servers::showBudgets,
                     onSignOut = model.servers::signOut,
-                    onExport = model::exportBudget,
+                    onExport = model.settingsUi::exportBudget,
                     onScheduleTransaction = {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
                     },
@@ -442,18 +442,18 @@ fun DueNorthApp(model: ShellViewModel) {
                             modifier = fill,
                         )
                     }
-                    val advanced = state.confirmAdvanced
+                    val advanced = state.settingsUi.confirmAdvanced
                     if (advanced != null) {
                         ConfirmAdvancedScreen(
                             kind = advanced,
                             onConfirm = {
                                 when (advanced) {
-                                    AdvancedConfirm.Rebuild -> model.confirmRebuild()
-                                    AdvancedConfirm.Repair -> model.confirmRepair()
-                                    AdvancedConfirm.ResetSync -> model.confirmResetSync()
+                                    AdvancedConfirm.Rebuild -> model.settingsUi.confirmRebuild()
+                                    AdvancedConfirm.Repair -> model.settingsUi.confirmRepair()
+                                    AdvancedConfirm.ResetSync -> model.settingsUi.confirmResetSync()
                                 }
                             },
-                            onCancel = model::cancelAdvanced,
+                            onCancel = model.settingsUi::cancelAdvanced,
                             modifier = fill,
                         )
                     }

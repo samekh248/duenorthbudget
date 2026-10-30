@@ -62,8 +62,6 @@ class ShellViewModel(
     /** Category note saves, written in the order they were made. */
     internal val noteWrites = Mutex()
 
-    /** Budget preference saves, in the order they were made, so two flipped together both land. */
-    internal val preferenceWrites = Mutex()
     private val _state =
         MutableStateFlow(
             ShellUiState(
@@ -116,9 +114,18 @@ class ShellViewModel(
             override fun openFromSettings(
                 route: ShellRoute,
                 page: SettingsPage,
-            ) = this@ShellViewModel.openFromSettings(route, page)
+            ) = settingsUi.openFrom(route, page)
 
-            override fun returnToSettings(page: SettingsPage?) = this@ShellViewModel.returnToSettings(page)
+            override fun returnToSettings(page: SettingsPage?) = settingsUi.returnTo(page)
+
+            override fun cancelBudgetEdit() = this@ShellViewModel.cancelBudgetEdit()
+
+            override fun createBudget(
+                name: String,
+                currency: String,
+            ) = this@ShellViewModel.createBudget(name, currency)
+
+            override fun onBackgroundSyncHours(hours: Int) = this@ShellViewModel.onBackgroundSyncHours(hours)
 
             override fun signOut(preferSettings: Boolean) = this@ShellViewModel.signOut(preferSettings)
 
@@ -146,6 +153,9 @@ class ShellViewModel(
 
     /** Servers: the instances list, OpenID sign-in, switching and removing a server, and server checks. */
     val servers: ServersHolder = ServersHolder(host)
+
+    /** Settings: its pages, formats, appearance, experimental features, export, encryption and repairs. */
+    val settingsUi: SettingsHolder = SettingsHolder(host, payees, servers)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -367,7 +377,7 @@ class ShellViewModel(
         }
         onboardingBack()?.let { return it }
         if (current.settingsReturn && current.route != ShellRoute.Settings) {
-            returnToSettings()
+            settingsUi.returnTo()
             return true
         }
         if (current.route == ShellRoute.Create && current.shell == null) return false
@@ -475,7 +485,7 @@ class ShellViewModel(
     }
 
     fun setNetWorthIncludeOffBudget(include: Boolean) {
-        saveSettings(_state.value.settings.copy(netWorthIncludeOffBudget = include))
+        settingsUi.save(_state.value.settings.copy(netWorthIncludeOffBudget = include))
         refreshNetWorth()
     }
 

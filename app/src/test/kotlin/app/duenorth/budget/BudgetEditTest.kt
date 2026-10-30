@@ -241,8 +241,8 @@ class BudgetEditTest {
     @Test
     fun templatesInEditModeFillTheBoxesWithoutSaving() {
         val model = household("templates")
-        model.setExperimental(true)
-        model.setGoalTemplates(true)
+        model.settingsUi.setExperimental(true)
+        model.settingsUi.setGoalTemplates(true)
         awaitMain { model.state.value.formatPrefs.templatesOn }
         // The screen shows the switch at once, but the file is written after; templates read the file.
         awaitMain { library.readFormatPrefs(model.state.value.settings.openBudgetId!!).templatesOn }

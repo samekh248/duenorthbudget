@@ -2,6 +2,7 @@ package app.duenorth.budget
 
 import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.OnboardingProgress
 import app.duenorth.budget.core.ServerProbe
 import app.duenorth.budget.core.SyncCoordinator
@@ -78,6 +79,18 @@ internal interface ShellHost {
         saved: OnboardingProgress,
         error: String?,
     )
+
+    /** Leaves the budget's edit mode without saving. */
+    fun cancelBudgetEdit()
+
+    /** Makes a budget the way this build does: empty, or from the walkthrough sample in debug builds. */
+    fun createBudget(
+        name: String,
+        currency: String,
+    ): CreateResult
+
+    /** Reschedules the background sync job for a new interval. */
+    fun onBackgroundSyncHours(hours: Int)
 
     /** Reloads the shell with [accountId]'s register, for a page about to show it. */
     suspend fun reloadAccount(accountId: String)

@@ -120,8 +120,8 @@ class TemplateContentTest {
         val (model, library) = household("templates")
         model.openTemplates()
         assertEquals(ShellRoute.Home, model.state.value.route)
-        model.setExperimental(true)
-        model.setGoalTemplates(true)
+        model.settingsUi.setExperimental(true)
+        model.settingsUi.setGoalTemplates(true)
         await { model.state.value.formatPrefs.templatesOn }
         model.openCategoryBudget("c-gas")
         await { model.state.value.categoryNote != null }
@@ -205,8 +205,8 @@ class TemplateContentTest {
     @Test
     fun addEditMoveAndRemoveTemplatesThroughTheNote() {
         val (model, library) = household("template-editor")
-        model.setExperimental(true)
-        model.setGoalTemplates(true)
+        model.settingsUi.setExperimental(true)
+        model.settingsUi.setGoalTemplates(true)
         await { model.state.value.formatPrefs.templatesOn }
         model.openCategoryBudget("c-gas")
         await { model.state.value.categoryNote != null }
@@ -310,8 +310,8 @@ class TemplateContentTest {
     @Test
     fun lanesMoveATemplateToAnotherPriorityAndApplyFillsEditModeAfterTheList() {
         val (model, library) = household("template-lanes")
-        model.setExperimental(true)
-        model.setGoalTemplates(true)
+        model.settingsUi.setExperimental(true)
+        model.settingsUi.setGoalTemplates(true)
         await { model.state.value.formatPrefs.templatesOn }
         val budgetId = model.state.value.settings.openBudgetId!!
         library.saveCategoryNote(budgetId, "c-gas", "fill up on fridays\n#template 123")
