@@ -286,12 +286,12 @@ internal fun PayeesRoute(
     modifier: Modifier,
 ) {
     PayeesScreen(
-        payees = state.payees,
+        payees = state.payees.rows,
         error = state.writeError,
-        mergeTarget = state.payeeMergeTarget,
-        onRename = model::renamePayee,
-        onConfirmMerge = model::confirmPayeeMerge,
-        onCancelMerge = model::cancelPayeeMerge,
+        mergeTarget = state.payees.mergeTarget,
+        onRename = model.payees::rename,
+        onConfirmMerge = model.payees::confirmMerge,
+        onCancelMerge = model.payees::cancelMerge,
         modifier = modifier,
     )
 }

@@ -34,6 +34,9 @@ internal interface ShellHost {
     /** Back, as the system back button does it. */
     fun back()
 
+    /** Forgets the pages back would return to, for a page opened as a new root. */
+    fun clearHistory()
+
     /** Runs [block] with the open budget's id as the one write in flight, unless one already runs. */
     fun launchWrite(block: suspend (String) -> Unit)
 

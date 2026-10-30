@@ -80,7 +80,7 @@ class ShellViewModel(
     internal var writing = false
 
     /** What the feature holders reach the rest of the shell through. */
-    private val host =
+    private val host: ShellHost =
         object : ShellHost {
             override val state get() = this@ShellViewModel.state
             override val scope get() = viewModelScope
@@ -107,7 +107,9 @@ class ShellViewModel(
 
             override suspend fun reload() = this@ShellViewModel.reload()
 
-            override fun loadPayees() = this@ShellViewModel.loadPayees()
+            override fun loadPayees() = payees.load()
+
+            override fun clearHistory() = history.clear()
 
             override fun loadAccount(accountId: String) {
                 viewModelScope.launch { apply(load(accountId), accountId) }
@@ -115,10 +117,13 @@ class ShellViewModel(
         }
 
     /** The inbox: filing, deleting and opening what came in. */
-    val inbox = InboxHolder(host)
+    val inbox: InboxHolder = InboxHolder(host)
 
     /** Bank sync: every SimpleFIN account fetches, then the budget syncs. */
-    val bankSync = BankSyncHolder(host)
+    val bankSync: BankSyncHolder = BankSyncHolder(host)
+
+    /** Payees: the payees page, renaming and merging, and the names payee boxes offer. */
+    val payees: PayeesHolder = PayeesHolder(host)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null

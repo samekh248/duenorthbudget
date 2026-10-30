@@ -46,7 +46,7 @@ internal fun ScheduleEditorRoute(
             error = state.editError,
             onSave = model::submitSchedule,
             modifier = modifier,
-            payees = PayeeTypeAhead.names(state.payees),
+            payees = PayeeTypeAhead.names(state.payees.rows),
         )
     }
 }

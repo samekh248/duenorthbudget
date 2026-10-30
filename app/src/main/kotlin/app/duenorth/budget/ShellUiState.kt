@@ -87,8 +87,8 @@ data class ShellUiState(
     val schedulesSection: Int = 0,
     /** Upcoming shows a month calendar instead of the list. */
     val schedulesCalendar: Boolean = false,
-    val payees: List<PayeeRow> = emptyList(),
-    val payeeMergeTarget: String? = null,
+    /** The payees' own state, kept by [PayeesHolder]. */
+    val payees: PayeesState = PayeesState(),
     val scheduleDuplicateId: String? = null,
     val serverError: String? = null,
     val remoteFiles: List<RemoteFile> = emptyList(),
