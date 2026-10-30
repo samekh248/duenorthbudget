@@ -130,15 +130,15 @@ internal fun ReportPivotRoute(
     modifier: Modifier,
 ) {
     ReportsScreen(
-        page = state.reports,
-        loading = state.reportsLoading,
-        preset = state.reportPreset,
-        groupBy = state.reportGroupBy,
+        page = state.reports.page,
+        loading = state.reports.loading,
+        preset = state.reports.preset,
+        groupBy = state.reports.groupBy,
         includeOffBudget = state.settings.netWorthIncludeOffBudget,
-        onPreset = model::setReportPreset,
-        onCustom = model::setReportRange,
-        onGroupBy = model::setReportGroupBy,
-        onIncludeOffBudget = model::setReportIncludeOffBudget,
+        onPreset = model.reports::setPreset,
+        onCustom = model.reports::setRange,
+        onGroupBy = model.reports::setGroupBy,
+        onIncludeOffBudget = model.reports::setIncludeOffBudget,
         modifier = modifier,
         initialItem = route.item,
     )

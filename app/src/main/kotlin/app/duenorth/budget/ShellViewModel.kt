@@ -142,6 +142,8 @@ class ShellViewModel(
 
             override fun onBackgroundSyncHours(hours: Int) = this@ShellViewModel.onBackgroundSyncHours(hours)
 
+            override fun setNetWorthIncludeOffBudget(include: Boolean) = this@ShellViewModel.setNetWorthIncludeOffBudget(include)
+
             override fun editorMonth() = this@ShellViewModel.editorMonth()
 
             override val shellGate get() = this@ShellViewModel.shellGate
@@ -200,6 +202,7 @@ class ShellViewModel(
 
     /** Budget files: creating, opening, switching and replacing a budget, unlocking it, signing out and syncing it. */
     val budgetFiles: BudgetFilesHolder = BudgetFilesHolder(host, samples, developerMode, settingsUi)
+    val reports: ReportsHolder = ReportsHolder(host)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null

@@ -136,30 +136,30 @@ class ReportContentTest {
     @Test
     fun reportsThroughTheModel() {
         val (model, _) = household("reports")
-        model.openReport(ReportItems.CASH_FLOW)
+        model.reports.open(ReportItems.CASH_FLOW)
         assertEquals(ShellRoute.ReportPivot(ReportItems.CASH_FLOW), model.state.value.route)
-        await { model.state.value.reports != null && !model.state.value.reportsLoading }
+        await { model.state.value.reports.page != null && !model.state.value.reports.loading }
         assertEquals(
             6,
-            model.state.value.reports!!
+            model.state.value.reports.page!!
                 .cashFlow.months.size,
         )
-        model.setReportPreset(ReportPreset.LAST_12)
+        model.reports.setPreset(ReportPreset.LAST_12)
         await {
-            model.state.value.reports!!
+            model.state.value.reports.page!!
                 .cashFlow.months.size == 12
         }
-        model.setReportGroupBy(SpendingGroupBy.PAYEE)
+        model.reports.setGroupBy(SpendingGroupBy.PAYEE)
         await {
-            model.state.value.reports!!
+            model.state.value.reports.page!!
                 .spending.groupBy == SpendingGroupBy.PAYEE
         }
-        model.setReportRange(ReportRange(YearMonth.of(2000, 1), YearMonth.of(2000, 2)))
+        model.reports.setRange(ReportRange(YearMonth.of(2000, 1), YearMonth.of(2000, 2)))
         await {
-            model.state.value.reports!!
+            model.state.value.reports.page!!
                 .range.start == YearMonth.of(2000, 1)
         }
-        val empty = model.state.value.reports!!
+        val empty = model.state.value.reports.page!!
         assertEquals(0L, empty.cashFlow.incomeMinor)
         assertTrue(empty.spending.rows.isEmpty())
         model.back()
@@ -205,11 +205,11 @@ class ReportContentTest {
     @Test
     fun reportPagesGoBackToHome() {
         val (model, _) = household("networth")
-        model.openNetWorth()
+        model.reports.openNetWorth()
         assertEquals(ShellRoute.NetWorth, model.state.value.route)
         model.back()
         assertEquals(ShellRoute.Home, model.state.value.route)
-        model.openMonthReview()
+        model.reports.openMonthReview()
         assertEquals(ShellRoute.MonthReview, model.state.value.route)
         model.back()
         assertEquals(ShellRoute.Home, model.state.value.route)

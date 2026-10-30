@@ -110,6 +110,9 @@ internal interface ShellHost {
     /** Reschedules the background sync job for a new interval. */
     fun onBackgroundSyncHours(hours: Int)
 
+    /** Counts off-budget accounts in net worth, or leaves them out, and reads net worth again. */
+    fun setNetWorthIncludeOffBudget(include: Boolean)
+
     /** The month the budget editors write to: the pinned month, or the open one. */
     fun editorMonth(): YearMonth
 

@@ -47,9 +47,9 @@ internal fun HomeRoute(
                 )
             },
         netWorth = state.netWorth,
-        onNetWorth = model::openNetWorth,
-        onMonthReview = model::openMonthReview,
-        onReport = model::openReport,
+        onNetWorth = model.reports::openNetWorth,
+        onMonthReview = model.reports::openMonthReview,
+        onReport = model.reports::open,
         modifier = modifier,
         onSelectMonth = model::selectOpenMonth,
         onBudgetCategory = if (state.shell == null) null else model.envelopes::openBudget,

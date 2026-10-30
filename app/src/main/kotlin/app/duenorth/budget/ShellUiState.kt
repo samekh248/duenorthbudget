@@ -24,16 +24,12 @@ import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterSearch
 import app.duenorth.budget.core.RemoteFile
-import app.duenorth.budget.core.ReportPreset
-import app.duenorth.budget.core.ReportRange
-import app.duenorth.budget.core.ReportsPage
 import app.duenorth.budget.core.RuleDraft
 import app.duenorth.budget.core.RuleSummary
 import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.core.ScheduleDetails
 import app.duenorth.budget.core.ScheduleDraft
 import app.duenorth.budget.core.ScheduleSummary
-import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplatePlan
 import app.duenorth.budget.core.TemplateResult
@@ -121,11 +117,7 @@ data class ShellUiState(
     val scheduleDraft: ScheduleDraft? = null,
     val rulesList: List<RuleSummary> = emptyList(),
     val ruleDraft: RuleDraft? = null,
-    val reports: ReportsPage? = null,
-    val reportsLoading: Boolean = false,
-    val reportPreset: ReportPreset = ReportPreset.LAST_6,
-    val reportCustom: ReportRange? = null,
-    val reportGroupBy: SpendingGroupBy = SpendingGroupBy.CATEGORY,
+    val reports: ReportsUi = ReportsUi(),
     val templateResult: TemplateResult? = null,
     val templateBusy: Boolean = false,
     val templateConfirm: String? = null,

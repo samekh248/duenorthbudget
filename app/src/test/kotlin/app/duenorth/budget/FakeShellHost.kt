@@ -134,6 +134,10 @@ internal class FakeShellHost(
         backgroundSyncHours += hours
     }
 
+    override fun setNetWorthIncludeOffBudget(include: Boolean) {
+        mutate { it.copy(settings = it.settings.copy(netWorthIncludeOffBudget = include)) }
+    }
+
     var month: YearMonth = YearMonth.now()
 
     override fun editorMonth() = month
