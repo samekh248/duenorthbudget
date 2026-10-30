@@ -1,0 +1,277 @@
+package app.duenorth.budget
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Modifier
+import app.duenorth.budget.core.TemplateLines
+import app.duenorth.budget.core.TemplateNote
+
+// The pages of the budget month: a category, moves, holds, templates and categories, each wired to the view model. DueNorthApp picks one per route.
+
+@Composable
+internal fun CategoryBudgetRoute(
+    route: ShellRoute.CategoryBudget,
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val shell = state.shell
+    if (shell == null) {
+        Placeholder()
+    } else {
+        val income = shell.incomeCategory(route.categoryId)
+        val categories = shell.groups.flatMap { it.categories }
+        val name = income?.name ?: categories.firstOrNull { it.id == route.categoryId }?.name
+        EditorWithMonth(
+            openMonth = state.openMonth,
+            monthWindow = model.monthWindow(),
+            onSelectMonth = model::selectOpenMonth,
+            modifier = modifier,
+            title = name,
+        ) { inner ->
+            if (income != null) {
+                IncomeCategoryScreen(
+                    shell = shell,
+                    category = income,
+                    error = state.editError,
+                    onSave = model::saveCategoryBudget,
+                    onAutoHold = model::chooseAutoHold,
+                    modifier = inner,
+                    showName = false,
+                )
+                return@EditorWithMonth
+            }
+            CategoryBudgetScreen(
+                shell = shell,
+                categoryId = route.categoryId,
+                error = state.editError,
+                onSave = model::saveCategoryBudget,
+                onMove = model::openMoveCategory,
+                onToggleCarryover = model::toggleCategoryCarryover,
+                modifier = inner,
+                showName = false,
+                note = state.categoryNote.takeIf { state.formatPrefs.templatesOn },
+                onSaveNote = model::saveCategoryNoteText,
+                templateAmounts = state.categoryTemplateAmounts,
+                onOpenTemplate = model::openTemplate,
+                onMoveTemplate = model::moveTemplate,
+                recent = state.categoryMonth,
+                onSeeAll = { model.openReviewCategory(route.categoryId) },
+            )
+            LaunchedEffect(state.categoryNote, shell.month) { model.refreshTemplateAmounts() }
+            // Read again whenever the month's figures change, so a saved transaction shows.
+            LaunchedEffect(route.categoryId, shell) { model.loadCategoryMonth(route.categoryId) }
+        }
+    }
+}
+
+@Composable
+internal fun MoveCategoryRoute(
+    route: ShellRoute.MoveCategory,
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val shell = state.editingShell()
+    if (shell == null) {
+        Placeholder()
+    } else if (state.budgetEdit != null) {
+        // From edit mode the move lands in its sandbox, on the month being edited.
+        MoveCategoryScreen(
+            shell = shell,
+            fromCategoryId = route.fromCategoryId,
+            error = state.editError,
+            onSave = model::submitMoveCategory,
+            modifier = modifier,
+        )
+    } else {
+        EditorWithMonth(
+            openMonth = state.openMonth,
+            monthWindow = model.monthWindow(),
+            onSelectMonth = model::selectOpenMonth,
+            modifier = modifier,
+        ) { inner ->
+            MoveCategoryScreen(
+                shell = shell,
+                fromCategoryId = route.fromCategoryId,
+                error = state.editError,
+                onSave = model::submitMoveCategory,
+                modifier = inner,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun HoldMonthRoute(
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val shell = state.shell
+    if (shell == null) {
+        Placeholder()
+    } else {
+        EditorWithMonth(
+            openMonth = state.openMonth,
+            monthWindow = model.monthWindow(),
+            onSelectMonth = model::selectOpenMonth,
+            modifier = modifier,
+        ) { inner ->
+            HoldMonthScreen(
+                shell = shell,
+                error = state.editError,
+                onSave = model::submitHold,
+                onRelease = model::releaseHold,
+                modifier = inner,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun TemplateKindsRoute(
+    route: ShellRoute.TemplateKinds,
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val shell = state.shell
+    val category = shell?.groups?.flatMap { it.categories }?.firstOrNull { it.id == route.categoryId }
+    if (category == null) {
+        Placeholder()
+    } else {
+        TemplateKindsScreen(
+            categoryName = category.name,
+            line =
+                route.index?.let { index ->
+                    state.categoryNote?.let {
+                        TemplateNote
+                            .parse(it)
+                            .entries
+                            .getOrNull(index)
+                            ?.line
+                    }
+                },
+            onPick = model::pickTemplateKind,
+            onRemove = model::removeTemplate,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+internal fun TemplateEditorRoute(
+    route: ShellRoute.TemplateEditor,
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val shell = state.shell
+    val category = shell?.groups?.flatMap { it.categories }?.firstOrNull { it.id == route.categoryId }
+    if (shell == null || category == null) {
+        Placeholder()
+    } else {
+        TemplateEditorScreen(
+            categoryName = category.name,
+            kind = route.kind,
+            initial = state.templateDraftStart(route),
+            isNew = route.index == null,
+            month = shell.month,
+            currency = shell.currency,
+            schedules = state.templateSchedules,
+            sources =
+                listOf(
+                    PercentSource(TemplateLines.ALL_INCOME, TemplateLines.ALL_INCOME),
+                    PercentSource(TemplateLines.AVAILABLE_FUNDS, TemplateLines.AVAILABLE_FUNDS),
+                ) + shell.incomeGroups.flatMap { it.categories }.map { PercentSource(it.name, it.name) },
+            preview = state.templatePreview,
+            onPreview = model::previewTemplate,
+            onSave = model::saveTemplate,
+            onRemove = model::removeTemplate,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+internal fun TemplatesRoute(
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    // A note saved from a chip's form (or a chip moved) changes the lanes.
+    LaunchedEffect(state.undoLabel) { model.refreshTemplatePlan() }
+    TemplatesScreen(
+        month = state.budgetEdit?.month ?: state.pinnedMonth ?: state.openMonth,
+        result = state.templateResult,
+        busy = state.templateBusy,
+        confirm = state.templateConfirm,
+        onCheck = {
+            model.checkTemplates()
+            model.refreshTemplatePlan()
+        },
+        onApply = { model.previewApplyTemplates(overwrite = false) },
+        onOverwrite = { model.previewApplyTemplates(overwrite = true) },
+        onConfirm = model::confirmTemplateOverwrite,
+        onKeep = model::keepTemplates,
+        modifier = modifier,
+        plan = state.templatePlan,
+        currency = state.shell?.currency,
+        applyPreview = state.templateApplyPreview,
+        onOpenChip = model::openTemplateChip,
+        onMoveChip = model::moveTemplateToPriority,
+        onConfirmPreview = model::confirmApplyPreview,
+        onKeepPreview = model::keepApplyPreview,
+    )
+}
+
+@Composable
+internal fun ToBudgetRoute(
+    route: ShellRoute.ToBudget,
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val shell = state.shell
+    if (shell == null) {
+        Placeholder()
+    } else {
+        ToBudgetScreen(
+            shell = shell,
+            categoryId = route.categoryId,
+            error = state.editError,
+            onSave = model::submitToBudget,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+internal fun ManageCategoriesRoute(
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val manage = state.categoryManage
+    if (manage == null) {
+        Placeholder()
+    } else {
+        ManageCategoriesScreen(
+            manage = manage,
+            error = state.editError,
+            onAddGroup = model::addCategoryGroup,
+            onAddCategory = model::addEnvelopeCategory,
+            onRenameGroup = model::renameCategoryGroup,
+            onRenameCategory = model::renameEnvelopeCategory,
+            onHideCategory = model::hideEnvelopeCategory,
+            onHideGroup = model::hideCategoryGroup,
+            onMoveToGroup = model::moveCategoryToGroup,
+            onDeleteCategory = model::deleteEnvelopeCategory,
+            onDeleteGroup = model::deleteCategoryGroup,
+            onPlaceGroup = model::placeCategoryGroup,
+            onPlaceCategory = model::placeEnvelopeCategory,
+            modifier = modifier,
+        )
+    }
+}
