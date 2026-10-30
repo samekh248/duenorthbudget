@@ -245,8 +245,8 @@ fun DueNorthApp(model: ShellViewModel) {
                             else -> model.showAddTransaction()
                         }
                     },
-                    onHold = model::showHoldMonth,
-                    onCategories = model::showManageCategories,
+                    onHold = model.envelopes::showHold,
+                    onCategories = model.envelopes::showManage,
                     onSettings = model.settingsUi::show,
                     onReconcile = model::openReconcile,
                     onImport = {
@@ -275,7 +275,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSearch = model::toggleRegisterSearch,
                     onRemoveTemplate = model::removeTemplate,
                     onAddTemplate = { model.openTemplateKinds() },
-                    onMoveCategory = model::openMoveCategory,
+                    onMoveCategory = model.envelopes::openMove,
                     onAutoHold = model::chooseAutoHold,
                     onSelectInbox = model.inbox::startSelecting,
                     onAcceptSelected = model.inbox::acceptSelected,

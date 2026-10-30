@@ -18,7 +18,7 @@ class CategoryMonthReadTest {
         val last =
             model.state.value.openMonth
                 .minusMonths(1)
-        model.openCategoryBudget("c-food")
+        model.envelopes.openBudget("c-food")
         model.selectOpenMonth(last)
         model.loadCategoryMonth("c-food")
         await {

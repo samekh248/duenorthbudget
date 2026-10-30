@@ -7,7 +7,9 @@ import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.MemorySecretStore
+import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.OnboardingProgress
+import app.duenorth.budget.core.RefreshGate
 import app.duenorth.budget.core.ServerProbe
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.WriteResult
@@ -16,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.runBlocking
+import java.time.YearMonth
 
 /** A stand-in shell for holder tests: work runs at once, and pushes, backs, reloads and publishes are only recorded. */
 internal class FakeShellHost(
@@ -108,6 +111,29 @@ internal class FakeShellHost(
     override fun onBackgroundSyncHours(hours: Int) {
         backgroundSyncHours += hours
     }
+
+    var month: YearMonth = YearMonth.now()
+
+    override fun editorMonth() = month
+
+    override val shellGate = RefreshGate<MonthShell>()
+
+    override fun loadCategoryNote(categoryId: String) = Unit
+
+    val budgetEditMoves = mutableListOf<Triple<String, String, String>>()
+
+    override fun moveInBudgetEdit(
+        fromCategoryId: String,
+        toCategoryId: String,
+        amountText: String,
+    ) {
+        budgetEditMoves += Triple(fromCategoryId, toCategoryId, amountText)
+    }
+
+    override fun transferToBudget(
+        categoryId: String,
+        amountText: String,
+    ) = Unit
 
     override fun loadPayees() = Unit
 

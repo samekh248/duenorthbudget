@@ -144,7 +144,7 @@ class MonthActionContentTest {
     fun transferToBudgetLowersTheCategoryAndRaisesTheHeader() {
         val (model, _) = household("to-budget")
         val before = model.state.value.shell!!
-        model.openCategoryBudget("c-food")
+        model.envelopes.openBudget("c-food")
         model.openToBudget()
         assertEquals(ShellRoute.ToBudget("c-food"), model.state.value.route)
         model.submitToBudget("25")
@@ -179,7 +179,7 @@ class MonthActionContentTest {
     fun transferMoreThanAvailableRollsBack() {
         val (model, _) = household("to-budget-refused")
         val before = model.state.value.shell!!
-        model.openCategoryBudget("c-food")
+        model.envelopes.openBudget("c-food")
         model.openToBudget()
         model.submitToBudget("999999")
         awaitMain { model.state.value.editError != null }
@@ -230,7 +230,7 @@ class MonthActionContentTest {
             model.state.value.shell!!
                 .incomeCategory("c-sal")!!
         assertFalse(salary.autoHold)
-        model.openCategoryBudget("c-sal")
+        model.envelopes.openBudget("c-sal")
         compose.setContent {
             MetroTheme {
                 val state = model.state.collectAsState().value
@@ -238,7 +238,7 @@ class MonthActionContentTest {
                     shell = state.shell!!,
                     category = state.shell!!.incomeCategory("c-sal")!!,
                     error = state.editError,
-                    onSave = model::saveCategoryBudget,
+                    onSave = model.envelopes::saveBudget,
                     onAutoHold = model::chooseAutoHold,
                 )
             }
@@ -267,8 +267,8 @@ class MonthActionContentTest {
             model.state.value.shell!!
                 .mode,
         )
-        model.openCategoryBudget("c-sal")
-        model.saveCategoryBudget("5000")
+        model.envelopes.openBudget("c-sal")
+        model.envelopes.saveBudget("5000")
         awaitMain {
             model.state.value.shell
                 ?.incomeCategory("c-sal")
@@ -326,8 +326,8 @@ class MonthActionContentTest {
         assertNull(model.state.value.undoLabel)
         assertFalse(homeIds(model).contains("undo"))
 
-        model.openCategoryBudget("c-food")
-        model.saveCategoryBudget("250")
+        model.envelopes.openBudget("c-food")
+        model.envelopes.saveBudget("250")
         awaitMain { model.state.value.undoLabel != null }
         val undo = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, model.state.value.undoLabel).single { it.id == "undo" }
         assertEquals("undo assign", undo.label)

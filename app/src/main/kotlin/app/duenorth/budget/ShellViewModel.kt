@@ -127,6 +127,23 @@ class ShellViewModel(
 
             override fun onBackgroundSyncHours(hours: Int) = this@ShellViewModel.onBackgroundSyncHours(hours)
 
+            override fun editorMonth() = this@ShellViewModel.editorMonth()
+
+            override val shellGate get() = this@ShellViewModel.shellGate
+
+            override fun loadCategoryNote(categoryId: String) = this@ShellViewModel.loadCategoryNote(categoryId)
+
+            override fun moveInBudgetEdit(
+                fromCategoryId: String,
+                toCategoryId: String,
+                amountText: String,
+            ) = this@ShellViewModel.moveInBudgetEdit(fromCategoryId, toCategoryId, amountText)
+
+            override fun transferToBudget(
+                categoryId: String,
+                amountText: String,
+            ) = this@ShellViewModel.transferToBudget(categoryId, amountText)
+
             override fun signOut(preferSettings: Boolean) = this@ShellViewModel.signOut(preferSettings)
 
             override fun refreshOnboardingFiles() = onboardingRefresh()
@@ -156,6 +173,9 @@ class ShellViewModel(
 
     /** Settings: its pages, formats, appearance, experimental features, export, encryption and repairs. */
     val settingsUi: SettingsHolder = SettingsHolder(host, payees, servers)
+
+    /** Envelopes: budgeting into categories, moving and holding money, and managing groups and categories. */
+    val envelopes: EnvelopesHolder = EnvelopesHolder(host)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null

@@ -25,7 +25,7 @@ fun ShellViewModel.openGetStarted(step: GetStartedStep) {
                 push(ShellRoute.StarterCategories)
                 mutate { it.copy(editError = null) }
             } else {
-                showManageCategories()
+                envelopes.showManage()
             }
         GetStartedStep.ASSIGN -> startBudgetEdit()
         GetStartedStep.SCHEDULE -> openNewSchedule()

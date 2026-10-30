@@ -35,7 +35,7 @@ class CategoryRenameTest {
                 .categories
                 .first()
                 .id
-        model.renameEnvelopeCategory(id, "Dining out ")
+        model.envelopes.renameCategory(id, "Dining out ")
         // Nothing has run on the main thread yet, so this is the page before the write lands.
         assertEquals("Dining out", model.category(id))
         settleMain()
@@ -51,7 +51,7 @@ class CategoryRenameTest {
                 .groups
                 .first()
                 .id
-        model.renameCategoryGroup(id, "Everyday")
+        model.envelopes.renameGroup(id, "Everyday")
         assertEquals(
             "Everyday",
             model
@@ -81,14 +81,14 @@ class CategoryRenameTest {
                 .first()
                 .categories
                 .first()
-        model.renameEnvelopeCategory(category.id, "  ")
+        model.envelopes.renameCategory(category.id, "  ")
         assertEquals(category.name, model.category(category.id))
         settleMain()
         assertEquals(category.name, model.category(category.id))
         assertEquals(EnvelopeCopy.ENTER_NAME, model.state.value.editError)
     }
 
-    private fun ShellViewModel.page() = state.value.categoryManage!!
+    private fun ShellViewModel.page() = state.value.envelopes.manage!!
 
     private fun ShellViewModel.category(id: String) =
         page()
@@ -109,8 +109,8 @@ class CategoryRenameTest {
         val sync = SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System)
         val model = ShellViewModel(library, sync, io = Dispatchers.Main)
         awaitMain { !model.state.value.loading && model.state.value.shell != null }
-        model.showManageCategories()
-        awaitMain { model.state.value.categoryManage != null }
+        model.envelopes.showManage()
+        awaitMain { model.state.value.envelopes.manage != null }
         return model
     }
 }

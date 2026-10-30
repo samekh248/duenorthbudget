@@ -3,13 +3,16 @@ package app.duenorth.budget
 import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.CreateResult
+import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.OnboardingProgress
+import app.duenorth.budget.core.RefreshGate
 import app.duenorth.budget.core.ServerProbe
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.WriteResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
+import java.time.YearMonth
 
 /**
  * What a feature holder (such as [InboxHolder]) needs from the shell: the shared state, navigation, the
@@ -91,6 +94,28 @@ internal interface ShellHost {
 
     /** Reschedules the background sync job for a new interval. */
     fun onBackgroundSyncHours(hours: Int)
+
+    /** The month the budget editors write to: the pinned month, or the open one. */
+    fun editorMonth(): YearMonth
+
+    /** Holds month reads back while a gesture runs, so a swipe never jumps. */
+    val shellGate: RefreshGate<MonthShell>
+
+    /** Reads [categoryId]'s note, for its templates. */
+    fun loadCategoryNote(categoryId: String)
+
+    /** Edit mode's move: changes the amounts being edited rather than writing. */
+    fun moveInBudgetEdit(
+        fromCategoryId: String,
+        toCategoryId: String,
+        amountText: String,
+    )
+
+    /** Moves [amountText] from [categoryId] back to to-budget. */
+    fun transferToBudget(
+        categoryId: String,
+        amountText: String,
+    )
 
     /** Reloads the shell with [accountId]'s register, for a page about to show it. */
     suspend fun reloadAccount(accountId: String)

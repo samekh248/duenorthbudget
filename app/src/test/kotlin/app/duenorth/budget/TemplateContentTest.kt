@@ -123,7 +123,7 @@ class TemplateContentTest {
         model.settingsUi.setExperimental(true)
         model.settingsUi.setGoalTemplates(true)
         await { model.state.value.formatPrefs.templatesOn }
-        model.openCategoryBudget("c-gas")
+        model.envelopes.openBudget("c-gas")
         await { model.state.value.categoryNote != null }
         model.saveCategoryNote("#template 123")
         await { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }
@@ -208,7 +208,7 @@ class TemplateContentTest {
         model.settingsUi.setExperimental(true)
         model.settingsUi.setGoalTemplates(true)
         await { model.state.value.formatPrefs.templatesOn }
-        model.openCategoryBudget("c-gas")
+        model.envelopes.openBudget("c-gas")
         await { model.state.value.categoryNote != null }
         model.saveCategoryNote("fill up on fridays")
         await { model.state.value.categoryNote == "fill up on fridays" }

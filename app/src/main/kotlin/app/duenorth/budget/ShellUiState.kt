@@ -111,7 +111,8 @@ data class ShellUiState(
     /** The onboarding files list is asking the server for its budgets again. */
     val remoteRefreshing: Boolean = false,
     val registerBankLinked: Boolean = false,
-    val categoryManage: CategoryManagePage? = null,
+    /** The envelopes' own state, kept by [EnvelopesHolder]. */
+    val envelopes: EnvelopesUi = EnvelopesUi(),
     val formatPrefs: FormatPrefs = FormatPrefs(),
     val budgetMethod: String = "envelope",
     val cloudFileId: String? = null,
