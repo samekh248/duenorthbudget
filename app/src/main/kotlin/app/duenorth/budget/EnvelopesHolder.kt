@@ -63,13 +63,15 @@ class EnvelopesHolder internal constructor(
 
     fun saveBudget(amountText: String) {
         val categoryId = (state.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
-        assign(categoryId, amountText)
+        // Saving goes back to the page that opened the category, as the transaction form does.
+        assign(categoryId, amountText, stayOnRoute = false)
     }
 
     /** Sets [categoryId]'s budgeted amount for the month being edited; [amountText] reads like "1234.56". */
     fun assign(
         categoryId: String,
         amountText: String,
+        stayOnRoute: Boolean = true,
     ) {
         val shell = state.shell ?: return
         val budgeted = MoneyFormat.parse(amountText, shell.currency.decimals)
@@ -77,7 +79,7 @@ class EnvelopesHolder internal constructor(
             host.mutate { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
             return
         }
-        applyEdit(optimistic = { it.withBudgetedAssignment(categoryId, budgeted) }) {
+        applyEdit(stayOnRoute = stayOnRoute, optimistic = { it.withBudgetedAssignment(categoryId, budgeted) }) {
             host.sync.assign(shell.budgetId, categoryId, host.editorMonth(), amountText)
         }
     }
