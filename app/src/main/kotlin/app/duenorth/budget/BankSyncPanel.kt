@@ -27,11 +27,13 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BankSyncFailure
 import app.duenorth.budget.core.BankSyncFix
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
+import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.syncSpin
 import app.duenorth.budget.design.metroTilt
@@ -71,6 +73,10 @@ object BankSyncCopy {
     const val FIX_SIMPLEFIN = "fix at SimpleFIN"
     const val FIX_TOKEN = "new setup token"
     const val FIX_RELINK = "link again"
+    const val UNLINK = "unlink"
+
+    /** The unlink question's title, naming the account. */
+    fun unlinkTitle(accountName: String) = "$UNLINK $accountName"
 
     /** The button that mends a failed account, or null when nothing on the phone can. */
     fun fix(fix: BankSyncFix?) =
@@ -200,6 +206,8 @@ fun BankSyncReportScreen(
     modifier: Modifier = Modifier,
     /** A failed account's fix: SimpleFIN's own site, a new setup token, or linking again. */
     onFix: (BankSyncFailure) -> Unit = {},
+    /** A failed account's unlink: its bank link goes, the account and its transactions stay. */
+    onUnlink: (BankSyncFailure) -> Unit = {},
 ) {
     val colors = Metro.colors
     val failures = ui?.failures.orEmpty().associateBy { it.accountName }
@@ -246,7 +254,15 @@ fun BankSyncReportScreen(
             failed.forEachIndexed { i, name ->
                 val failure = failures.getValue(name)
                 item(key = "failed-$name") {
-                    ReportLine(name, failure.message, ledgerBanded(i), error = true, fix = BankSyncCopy.fix(failure.fix)) { onFix(failure) }
+                    ReportLine(
+                        name,
+                        failure.message,
+                        ledgerBanded(i),
+                        error = true,
+                        fix = BankSyncCopy.fix(failure.fix),
+                        onFix = { onFix(failure) },
+                        onUnlink = { onUnlink(failure) }.takeIf { failure.accountId.isNotEmpty() },
+                    )
                 }
             }
         }
@@ -269,7 +285,7 @@ private fun ReportHeading(label: String) {
     MetroText(label, Metro.typography.caption, Modifier.padding(top = 14.dp, bottom = 4.dp), color = Metro.accent.text)
 }
 
-/** An account on a ledger line: its name, why it failed under it, and the button that mends it. */
+/** An account on a ledger line: its name, why it failed under it, and the buttons that mend it or unlink it. */
 @Composable
 private fun ReportLine(
     name: String,
@@ -278,6 +294,7 @@ private fun ReportLine(
     error: Boolean = false,
     fix: String? = null,
     onFix: () -> Unit = {},
+    onUnlink: (() -> Unit)? = null,
 ) {
     Column(
         Modifier
@@ -292,8 +309,31 @@ private fun ReportLine(
         if (detail != null) {
             MetroText(detail, Metro.typography.caption, color = if (error) Metro.colors.error else Metro.colors.secondary, maxLines = 2)
         }
-        if (fix != null) {
-            MetroButton(fix, Modifier.padding(top = 8.dp, bottom = 4.dp).testTag("bank-sync-fix-$name"), onFix)
+        if (fix != null || onUnlink != null) {
+            MetroButtonGrid(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
+                if (fix != null) MetroButton(fix, Modifier.testTag("bank-sync-fix-$name"), onFix)
+                if (onUnlink != null) MetroButton(BankSyncCopy.UNLINK, Modifier.testTag("bank-sync-unlink-$name"), onUnlink)
+            }
         }
     }
+}
+
+/** The question before a failed account's unlink: its bank link goes, the account and its transactions stay. */
+@Composable
+fun BankSyncUnlinkScreen(
+    failure: BankSyncFailure,
+    onYes: () -> Unit,
+    onKeep: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ConfirmPage(
+        title = BankSyncCopy.unlinkTitle(failure.accountName),
+        caption = failure.message,
+        body = BankLinkCopy.REMOVE_BODY,
+        yes = BankSyncCopy.UNLINK,
+        onYes = onYes,
+        onKeep = onKeep,
+        tag = "bank-sync-unlink-confirm",
+        modifier = modifier,
+    )
 }
