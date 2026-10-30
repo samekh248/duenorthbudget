@@ -916,6 +916,12 @@ class BudgetLibrary(
         categoryId: String,
     ): String = open(budgetId) { CategoryNotes.read(it, categoryId) }.orEmpty()
 
+    /** The category's budget automations when desktop's automations own it (`source = ui`); null while its note does. */
+    fun readCategoryAutomations(
+        budgetId: String,
+        categoryId: String,
+    ): CategoryAutomations? = open(budgetId) { CategoryNotes.automations(it, categoryId) }
+
     fun saveCategoryNote(
         budgetId: String,
         categoryId: String,

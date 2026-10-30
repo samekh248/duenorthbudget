@@ -105,6 +105,8 @@ object ScreenBar {
         accountForceConfirm: Boolean = false,
         /** An open account is linked through SimpleFIN and the budget lives on a server, so the accounts bar can bank sync. */
         accountsBankSync: Boolean = false,
+        /** The open category's templates are desktop's budget automations, which the phone does not add to yet. */
+        categoryAutomations: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -296,7 +298,7 @@ object ScreenBar {
                     buildList {
                         addAll(saveCancel())
                         add(spec("move", AppGlyph.Transfer, EnvelopeCopy.MOVE))
-                        if (templates) add(menu("add-template", AppGlyph.Add, TemplateEditorCopy.ADD))
+                        if (templates && !categoryAutomations) add(menu("add-template", AppGlyph.Add, TemplateEditorCopy.ADD))
                         if (mode != BudgetMode.TRACKING) add(menu("to-budget", AppGlyph.Transfer, MonthActionCopy.TRANSFER))
                     }
                 }
@@ -378,6 +380,7 @@ object ScreenBar {
                     ?.accounts
                     .orEmpty()
                     .any { it.bankSync && !it.closed },
+            categoryAutomations = state.templates.automations != null,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,

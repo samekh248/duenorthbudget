@@ -1,6 +1,7 @@
 package app.duenorth.budget
 
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.CategoryAutomations
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
@@ -8,6 +9,7 @@ import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplateChip
 import app.duenorth.budget.core.TemplateError
+import app.duenorth.budget.core.TemplateJson
 import app.duenorth.budget.core.TemplateLane
 import app.duenorth.budget.core.TemplatePlan
 import app.duenorth.budget.core.TemplateResult
@@ -17,6 +19,16 @@ import java.time.YearMonth
 /** Fixed inputs for the spec 010 US5 template screens. */
 internal object TemplateSamples {
     val october: YearMonth = YearMonth.of(2026, 10)
+
+    /** A category desktop's budget automations own: two the phone runs and a refill it cannot yet. */
+    val automations =
+        CategoryAutomations(
+            listOf(
+                TemplateJson.Stored("simple", Template.Simple(BigDecimal("400"), null, 1)),
+                TemplateJson.Stored("schedule", Template.Schedule("Rent", full = false, priority = 2)),
+                TemplateJson.Stored("refill", null),
+            ),
+        )
 
     val invalid =
         TemplateResult.Invalid(

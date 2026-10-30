@@ -1,7 +1,9 @@
 package app.duenorth.budget
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -9,6 +11,8 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.core.TemplateResult
+import app.duenorth.budget.design.theme.Metro
+import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroStyle
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -27,6 +31,9 @@ import java.time.YearMonth
 class TemplateEditorScreenshotTest {
     @Test
     fun tiles() = every("template_tiles") { Tiles() }
+
+    @Test
+    fun automationTiles() = every("automation_tiles") { Automations() }
 
     @Test
     fun kinds() = every("template_kinds") { TemplateKindsScreen("Food", null, {}, {}) }
@@ -70,6 +77,14 @@ class TemplateEditorScreenshotTest {
             note = TemplateSamples.TILES,
             templateAmounts = TemplateSamples.tileAmounts,
         )
+    }
+
+    @Composable
+    private fun Automations() {
+        // The tiles alone: on the whole category page they sit below the fold.
+        Box(Modifier.background(Metro.colors.background).padding(MetroDimens.Gutter)) {
+            AutomationTiles(TemplateSamples.automations, listOf(40_000L, 12_500L, null), TemplateSamples.shell.currency)
+        }
     }
 
     @Composable

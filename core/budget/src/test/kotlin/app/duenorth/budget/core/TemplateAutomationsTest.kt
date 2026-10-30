@@ -131,4 +131,50 @@ class TemplateAutomationsTest {
         assertFalse(TemplateJson.managed("""{"source":"notes"}"""))
         assertFalse(TemplateJson.managed(null))
     }
+
+    @Test
+    fun theCategoryPageReadsAutomationsOnlyForCategoriesTheyOwn() {
+        fixture.open().use { opened ->
+            val fixed = fixture.id("categories", "Fixed")
+            assertNull(opened.library.readCategoryAutomations(opened.budgetId, fixed))
+            opened.db { session ->
+                session.transaction {
+                    SyncSchema.write(
+                        session,
+                        "categories",
+                        fixed,
+                        "goal_def",
+                        """[{"type":"simple","monthly":123,"priority":0,"directive":"template"},{"type":"copy","lookBack":3,"priority":1,"directive":"template"}]""",
+                    )
+                    SyncSchema.write(session, "categories", fixed, "template_settings", ui)
+                }
+            }
+            val automations = opened.library.readCategoryAutomations(opened.budgetId, fixed)!!
+            assertEquals(listOf("simple", "copy"), automations.entries.map { it.type })
+            assertEquals(listOf(Template.Simple(BigDecimal("123"), null, 0)), automations.templates)
+            assertFalse(automations.runnable)
+        }
+    }
+
+    @Test
+    fun theirChipsAreMarkedSoTheLanesLeaveThemAlone() {
+        fixture.open().use { opened ->
+            opened.db { session ->
+                val fixed = fixture.id("categories", "Fixed")
+                session.transaction {
+                    SyncSchema.write(
+                        session,
+                        "categories",
+                        fixed,
+                        "goal_def",
+                        """[{"type":"simple","monthly":123,"priority":0,"directive":"template"}]""",
+                    )
+                    SyncSchema.write(session, "categories", fixed, "template_settings", ui)
+                }
+                val chips = TemplateEngine(session, fixture.today).plan(october).lanes.flatMap { it.chips }
+                assertTrue(chips.single { it.categoryId == fixed }.managed)
+                assertTrue(chips.filter { it.categoryId != fixed }.none { it.managed })
+            }
+        }
+    }
 }

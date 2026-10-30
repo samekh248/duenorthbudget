@@ -35,6 +35,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.CategoryAutomations
 import app.duenorth.budget.core.CategoryMonthPage
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.CurrencySpec
@@ -71,6 +72,8 @@ fun CategoryBudgetScreen(
     showName: Boolean = true,
     note: String? = null,
     onSaveNote: (String) -> Unit = {},
+    // Desktop's budget automations, when they own the category: shown in place of the note's template lines.
+    automations: CategoryAutomations? = null,
     templateAmounts: List<Long?> = emptyList(),
     onOpenTemplate: (Int) -> Unit = {},
     onMoveTemplate: (Int, Int) -> Unit = { _, _ -> },
@@ -132,7 +135,9 @@ fun CategoryBudgetScreen(
                 MetroButton(EnvelopeCopy.MOVE, onClick = onMove)
             }
         }
-        if (note != null) {
+        if (automations != null) {
+            AutomationTiles(automations, templateAmounts, shell.currency, Modifier.padding(top = 12.dp))
+        } else if (note != null) {
             TemplateTiles(
                 note,
                 templateAmounts,

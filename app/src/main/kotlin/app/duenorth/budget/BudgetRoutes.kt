@@ -52,13 +52,14 @@ internal fun CategoryBudgetRoute(
                 showName = false,
                 note = state.templates.note.takeIf { state.formatPrefs.templatesOn },
                 onSaveNote = model.templates::saveNoteText,
+                automations = state.templates.automations.takeIf { state.formatPrefs.templatesOn },
                 templateAmounts = state.templates.amounts,
                 onOpenTemplate = model.templates::openTemplate,
                 onMoveTemplate = model.templates::move,
                 recent = state.categoryMonth,
                 onSeeAll = { model.openReviewCategory(route.categoryId) },
             )
-            LaunchedEffect(state.templates.note, shell.month) { model.templates.refreshAmounts() }
+            LaunchedEffect(state.templates.note, state.templates.automations, shell.month) { model.templates.refreshAmounts() }
             // Read again whenever the month's figures change, so a saved transaction shows.
             LaunchedEffect(route.categoryId, shell) { model.loadCategoryMonth(route.categoryId) }
         }
