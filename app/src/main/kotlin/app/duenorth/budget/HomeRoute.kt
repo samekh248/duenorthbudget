@@ -47,7 +47,7 @@ internal fun HomeRoute(
                 )
             },
         netWorth = state.netWorth,
-        onNetWorth = model.reports::openNetWorth,
+        onNetWorth = model.netWorthGraph::open,
         onMonthReview = model.reports::openMonthReview,
         onReport = model.reports::open,
         modifier = modifier,

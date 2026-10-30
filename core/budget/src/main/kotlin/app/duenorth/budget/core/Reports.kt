@@ -2,6 +2,7 @@ package app.duenorth.budget.core
 
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 
 /** Words for spec 010's reports (`contracts/reports.md`). */
@@ -22,11 +23,10 @@ object ReportsCopy {
 
     // The reports hub: one line per report, under what it shows.
     const val NET_WORTH_TODAY = "on and off budget, as of today"
+    const val NET_WORTH_SINCE = "since"
     const val MONTH_REVIEW = "month review"
     const val MONTH_REVIEW_NOTE = "income and spending for"
     const val CASH_FLOW_NOTE = "income and expenses by month"
-    const val NET_WORTH_BY_MONTH = "net worth by month"
-    const val NET_WORTH_BY_MONTH_NOTE = "how the total moved over time"
     const val SPENDING_NOTE = "by category, group or payee"
 }
 
@@ -89,6 +89,55 @@ data class NetWorthMonth(
     val offBudgetMinor: Long,
 ) {
     fun total(includeOffBudget: Boolean): Long = onBudgetMinor + if (includeOffBudget) offBudgetMinor else 0L
+}
+
+/** The net worth graph's time spans, each ending today. */
+enum class NetWorthSpan(
+    val label: String,
+) {
+    ONE_MONTH("1m"),
+    THREE_MONTHS("3m"),
+    SIX_MONTHS("6m"),
+    YEAR_TO_DATE("ytd"),
+    ONE_YEAR("1y"),
+    ALL("all"),
+    ;
+
+    /** The first day shown; [ALL] starts at [earliest], the budget's first transaction. */
+    fun start(
+        today: LocalDate,
+        earliest: LocalDate,
+    ): LocalDate =
+        when (this) {
+            ONE_MONTH -> today.minusMonths(1)
+            THREE_MONTHS -> today.minusMonths(3)
+            SIX_MONTHS -> today.minusMonths(6)
+            YEAR_TO_DATE -> today.withDayOfYear(1)
+            ONE_YEAR -> today.minusYears(1)
+            ALL -> minOf(earliest, today)
+        }
+}
+
+/** Both sides of the budget at the end of [date]. */
+data class NetWorthPoint(
+    val date: LocalDate,
+    val onBudgetMinor: Long,
+    val offBudgetMinor: Long,
+) {
+    fun total(includeOffBudget: Boolean): Long = onBudgetMinor + if (includeOffBudget) offBudgetMinor else 0L
+}
+
+/** Net worth from [span]'s start through today, oldest first; the last point is today. */
+data class NetWorthHistory(
+    val span: NetWorthSpan,
+    val currency: CurrencySpec,
+    val points: List<NetWorthPoint>,
+) {
+    val first: NetWorthPoint? get() = points.firstOrNull()
+    val last: NetWorthPoint? get() = points.lastOrNull()
+
+    /** How far the total moved over the span. */
+    fun change(includeOffBudget: Boolean): Long = (last?.total(includeOffBudget) ?: 0L) - (first?.total(includeOffBudget) ?: 0L)
 }
 
 data class NetWorthReport(
@@ -183,6 +232,39 @@ class ReportsReader(
             },
             includeOffBudget,
         )
+
+    /**
+     * Each side's running balance at the end of evenly spaced days from [span]'s start through today, at most
+     * [maxPoints] of them so a long span still draws as one smooth line. Later-dated transactions are left out.
+     */
+    fun netWorthHistory(
+        span: NetWorthSpan,
+        currency: CurrencySpec,
+        maxPoints: Int = NET_WORTH_POINTS,
+    ): NetWorthHistory {
+        val sorted = lines.sortedBy { it.date }
+        val earliest = sorted.firstOrNull()?.date?.let { LocalDate.of(it / 10_000, it / 100 % 100, it % 100) } ?: today
+        val start = span.start(today, earliest)
+        val days = ChronoUnit.DAYS.between(start, today)
+        val steps = minOf(days, (maxPoints - 1).toLong()).coerceAtLeast(1)
+        val dates =
+            (0..steps)
+                .map { start.plusDays(days * it / steps) }
+                .distinct()
+        var index = 0
+        var on = 0L
+        var off = 0L
+        val points =
+            dates.map { date ->
+                val through = date.toInt()
+                while (index < sorted.size && sorted[index].date <= through) {
+                    val line = sorted[index++]
+                    if (line.offBudget) off += line.amount else on += line.amount
+                }
+                NetWorthPoint(date, on, off)
+            }
+        return NetWorthHistory(span, currency, points)
+    }
 
     /** Expenses only: negative, on-budget, not a transfer; largest first. */
     fun spending(
@@ -283,3 +365,6 @@ class ReportsReader(
 
     private fun LocalDate.toInt(): Int = year * 10_000 + monthValue * 100 + dayOfMonth
 }
+
+/** Enough points for a smooth line on a phone without drawing every day of a long span. */
+private const val NET_WORTH_POINTS = 120

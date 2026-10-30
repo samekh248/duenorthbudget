@@ -1,5 +1,7 @@
 package app.duenorth.budget.core.parity
 
+import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.NetWorthSpan
 import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.ReportsReader
@@ -15,6 +17,7 @@ import kotlinx.serialization.json.long
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 import java.time.YearMonth
 
 /** Spec 010 T051: reports against desktop Actual 26.8.1 (`parity/reports/`). */
@@ -115,6 +118,31 @@ class ReportsParityTest {
                 assertTrue(reader.netWorth(range, true).months.all { it.onBudgetMinor == 0L && it.offBudgetMinor == 0L })
             }
         }
+    }
+
+    @Test
+    fun theNetWorthGraphMatchesEachMonthEnd() {
+        val usd = Currencies.byCode("USD")!!
+        val (history, months) = read { it.netWorthHistory(NetWorthSpan.THREE_MONTHS, usd) to it.netWorth(range, true).months }
+        assertEquals(fixture.today.minusMonths(3), history.first?.date)
+        assertEquals("the line ends today", fixture.today, history.last?.date)
+        assertTrue("three months draws a point a day", history.points.zipWithNext().all { (a, b) -> a.date.plusDays(1) == b.date })
+        for (month in months.filter { it.month >= YearMonth.of(2026, 7) }) {
+            val point = history.points.single { it.date == month.month.atEndOfMonth() }
+            assertEquals("${month.month}", month.onBudgetMinor to month.offBudgetMinor, point.onBudgetMinor to point.offBudgetMinor)
+        }
+    }
+
+    @Test
+    fun longNetWorthSpansAreThinnedAndAllStartsAtTheFirstTransaction() {
+        val usd = Currencies.byCode("USD")!!
+        val (year, all) = read { it.netWorthHistory(NetWorthSpan.ONE_YEAR, usd) to it.netWorthHistory(NetWorthSpan.ALL, usd) }
+        assertTrue(year.points.size <= 120)
+        assertEquals(fixture.today.minusYears(1), year.first?.date)
+        assertEquals(fixture.today, year.last?.date)
+        assertTrue(all.first!!.date > LocalDate.of(2000, 1, 1))
+        assertTrue("nothing before the first transaction", all.first!!.total(true) != 0L)
+        assertEquals(year.last, all.last)
     }
 
     @Test

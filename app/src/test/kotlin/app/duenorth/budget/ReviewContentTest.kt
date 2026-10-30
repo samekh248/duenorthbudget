@@ -5,13 +5,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthReviewPage
-import app.duenorth.budget.core.NetWorthPage
+import app.duenorth.budget.core.NetWorthSpan
 import app.duenorth.budget.core.ReviewCategoryRow
 import app.duenorth.budget.design.theme.MetroTheme
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,21 +59,19 @@ class ReviewContentTest {
     }
 
     @Test
-    fun netWorthShowsTotal() {
-        val page =
-            NetWorthPage(
-                currency = Currencies.byCode("USD")!!,
-                onBudgetMinor = 800,
-                offBudgetMinor = 500,
-                includeOffBudget = true,
-            )
+    fun netWorthShowsTotalAndEachSpan() {
+        val picked = mutableListOf<NetWorthSpan>()
         compose.setContent {
             MetroTheme {
-                Box(Modifier.width(390.dp).height(420.dp)) {
-                    NetWorthSection(page = page, loading = false, onIncludeOffBudget = {})
+                Box(Modifier.width(390.dp).height(780.dp)) {
+                    NetWorthGraphScreen(NetWorthUi(history = ReportSamples.history()), true, { picked += it }, {})
                 }
             }
         }
-        compose.onNodeWithTag("net-worth-total").assertIsDisplayed()
+        val last = ReportSamples.history().last!!
+        compose.onNodeWithTag("net-worth-total").assertTextEquals(MoneyFormat.format(last.total(true), Currencies.byCode("USD")!!))
+        compose.onNodeWithTag("net-worth-graph").assertIsDisplayed()
+        compose.onNodeWithTag("net-worth-span-one_year").performClick()
+        assertEquals(listOf(NetWorthSpan.ONE_YEAR), picked)
     }
 }

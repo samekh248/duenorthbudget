@@ -805,15 +805,24 @@ class BudgetLibrary(
         groupBy: SpendingGroupBy,
     ): ReportsPage? =
         open(budgetId) { session ->
-            val code =
-                session
-                    .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
-                    .firstOrNull()
-                    ?.str("value")
-                    .orEmpty()
-            val currency = Currencies.byCode(code) ?: Currencies.byCode("USD")!!
-            ReportsReader(session, clock.today()).page(range, includeOffBudget, groupBy, currency)
+            ReportsReader(session, clock.today()).page(range, includeOffBudget, groupBy, reportCurrency(session))
         }
+
+    /** The net worth graph over [span], ending today. */
+    fun readNetWorthHistory(
+        budgetId: String,
+        span: NetWorthSpan,
+    ): NetWorthHistory? = open(budgetId) { session -> ReportsReader(session, clock.today()).netWorthHistory(span, reportCurrency(session)) }
+
+    private fun reportCurrency(session: SqlSession): CurrencySpec {
+        val code =
+            session
+                .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
+                .firstOrNull()
+                ?.str("value")
+                .orEmpty()
+        return Currencies.byCode(code) ?: Currencies.byCode("USD")!!
+    }
 
     /** Lists bad template lines across category notes; writes nothing (spec 010 US5). */
     fun checkTemplates(budgetId: String): TemplateResult =

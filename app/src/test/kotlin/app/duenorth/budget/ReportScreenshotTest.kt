@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import app.duenorth.budget.core.Currencies
-import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.SpendingGroupBy
@@ -31,12 +29,6 @@ class ReportScreenshotTest {
     fun cashFlowDark() = snap("report_cashflow_dark", dark = true, item = ReportItems.CASH_FLOW)
 
     @Test
-    fun netWorthLight() = snap("report_networth_light", dark = false, item = ReportItems.NET_WORTH)
-
-    @Test
-    fun netWorthDark() = snap("report_networth_dark", dark = true, item = ReportItems.NET_WORTH)
-
-    @Test
     fun spendingLight() = snap("report_spending_light", dark = false, item = ReportItems.SPENDING)
 
     @Test
@@ -49,23 +41,21 @@ class ReportScreenshotTest {
     fun customRangeDark() = capture("report_custom_range_dark", dark = true) { Reports(ReportItems.CASH_FLOW, ReportPreset.CUSTOM) }
 
     @Test
-    fun netWorthTodayLight() = capture("reports_networth_today_light", dark = false) { NetWorthToday() }
+    fun netWorthLight() = capture("report_networth_light", dark = false) { NetWorthGraph() }
 
     @Test
-    fun netWorthTodayDark() = capture("reports_networth_today_dark", dark = true) { NetWorthToday() }
+    fun netWorthDark() = capture("report_networth_dark", dark = true) { NetWorthGraph() }
 
-    private val today =
-        NetWorthPage(
-            currency = Currencies.byCode("USD")!!,
-            onBudgetMinor = 1_284_250,
-            offBudgetMinor = 21_830_000,
-            includeOffBudget = true,
-        )
+    @Test
+    fun netWorthOnBudgetOnlyLight() = capture("report_networth_on_budget_light", dark = false) { NetWorthGraph(include = false) }
+
+    @Test
+    fun netWorthOnBudgetOnlyDark() = capture("report_networth_on_budget_dark", dark = true) { NetWorthGraph(include = false) }
 
     @Composable
-    private fun NetWorthToday() {
+    private fun NetWorthGraph(include: Boolean = true) {
         SectionTitled(ReportsCopy.TITLE.uppercase()) {
-            NetWorthSection(today, loading = false, onIncludeOffBudget = {})
+            NetWorthGraphScreen(NetWorthUi(history = ReportSamples.history()), include, {}, {})
         }
     }
 
@@ -74,7 +64,7 @@ class ReportScreenshotTest {
         item: Int,
         preset: ReportPreset = ReportPreset.LAST_6,
     ) {
-        ReportsScreen(ReportSamples.page(), false, preset, SpendingGroupBy.CATEGORY, true, {}, {}, {}, {}, initialItem = item)
+        ReportsScreen(ReportSamples.page(), false, preset, SpendingGroupBy.CATEGORY, {}, {}, {}, initialItem = item)
     }
 
     private fun snap(

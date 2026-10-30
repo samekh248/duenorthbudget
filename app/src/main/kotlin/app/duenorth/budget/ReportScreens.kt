@@ -30,7 +30,6 @@ import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.ReportsPage
-import app.duenorth.budget.core.ReviewCopy
 import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroComboBox
@@ -49,15 +48,14 @@ private val MONTH = DateTimeFormatter.ofPattern("MMM yyyy", Locale.US)
 
 /** The [ReportsScreen] pivot items, in order; [ShellRoute.ReportPivot] opens one. */
 object ReportItems {
-    val headers = listOf(ReportsCopy.CASH_FLOW, ReportsCopy.NET_WORTH, ReportsCopy.SPENDING)
+    val headers = listOf(ReportsCopy.CASH_FLOW, ReportsCopy.SPENDING)
     val CASH_FLOW = headers.indexOf(ReportsCopy.CASH_FLOW)
-    val NET_WORTH = headers.indexOf(ReportsCopy.NET_WORTH)
     val SPENDING = headers.indexOf(ReportsCopy.SPENDING)
 }
 
 /**
  * Home pivot → reports: the reporting hub, listing every report. Net worth shows today's
- * total on its line and opens the on/off budget totals; month review opens the open month's
+ * total on its line and opens the graph over time; month review opens the open month's
  * spending by category; the rest open the range pivot at their item.
  */
 @Composable
@@ -89,11 +87,6 @@ fun ReportsHub(
                 )
             }
             item { HubLine(ReportsCopy.CASH_FLOW, ReportsCopy.CASH_FLOW_NOTE, "reports-hub-cashflow") { onReport(ReportItems.CASH_FLOW) } }
-            item {
-                HubLine(ReportsCopy.NET_WORTH_BY_MONTH, ReportsCopy.NET_WORTH_BY_MONTH_NOTE, "reports-hub-networth-months") {
-                    onReport(ReportItems.NET_WORTH)
-                }
-            }
             item { HubLine(ReportsCopy.SPENDING, ReportsCopy.SPENDING_NOTE, "reports-hub-spending") { onReport(ReportItems.SPENDING) } }
         }
     }
@@ -119,7 +112,7 @@ private fun HubLine(
 }
 
 /**
- * Reports → cash flow, net worth by month, or spending: a pivot with cash flow, net worth, and spending over one shared range.
+ * Reports → cash flow or spending: a pivot with cash flow and spending over one shared range.
  * While a report computes, content-shaped placeholders fade in (`contracts/reports.md`).
  */
 @Composable
@@ -128,11 +121,9 @@ fun ReportsScreen(
     loading: Boolean,
     preset: ReportPreset,
     groupBy: SpendingGroupBy,
-    includeOffBudget: Boolean,
     onPreset: (ReportPreset) -> Unit,
     onCustom: (ReportRange) -> Unit,
     onGroupBy: (SpendingGroupBy) -> Unit,
-    onIncludeOffBudget: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     initialItem: Int = 0,
 ) {
@@ -142,11 +133,6 @@ fun ReportsScreen(
             listOf(
                 PivotItem(ReportsCopy.CASH_FLOW) {
                     ReportBody(page, loading, preset, onPreset, onCustom, "report-cashflow") { CashFlow(it) }
-                },
-                PivotItem(ReportsCopy.NET_WORTH) {
-                    ReportBody(page, loading, preset, onPreset, onCustom, "report-networth") {
-                        NetWorth(it, includeOffBudget, onIncludeOffBudget)
-                    }
                 },
                 PivotItem(ReportsCopy.SPENDING) {
                     ReportBody(page, loading, preset, onPreset, onCustom, "report-spending") { Spending(it, groupBy, onGroupBy) }
@@ -256,51 +242,6 @@ private fun CashFlow(page: ReportsPage) {
                     Metro.typography.caption,
                     color = Metro.colors.secondary,
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun NetWorth(
-    page: ReportsPage,
-    includeOffBudget: Boolean,
-    onIncludeOffBudget: (Boolean) -> Unit,
-) {
-    val months = page.netWorth.months
-    val scale = months.maxOfOrNull { abs(it.total(includeOffBudget)) }?.takeIf { it > 0 } ?: 1L
-    LazyColumn(Modifier.fillMaxSize()) {
-        item {
-            val last = months.lastOrNull()
-            Totals(
-                listOfNotNull(
-                    ReportsCopy.ON_BUDGET to (last?.onBudgetMinor ?: 0L),
-                    (ReportsCopy.OFF_BUDGET to (last?.offBudgetMinor ?: 0L)).takeIf { includeOffBudget },
-                    ReportsCopy.TOTAL to (last?.total(includeOffBudget) ?: 0L),
-                ),
-                page.currency,
-                "report-networth-totals",
-            )
-            Box(Modifier.padding(horizontal = MetroDimens.Gutter)) {
-                Choice(
-                    if (includeOffBudget) "hide off budget" else ReviewCopy.INCLUDE_OFF_BUDGET,
-                    includeOffBudget,
-                    "report-networth-offbudget",
-                ) { onIncludeOffBudget(!includeOffBudget) }
-            }
-        }
-        items(months.reversed(), key = { it.month.toString() }) { month ->
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
-                    .testTag("report-networth-${month.month}"),
-            ) {
-                Row(Modifier.fillMaxWidth()) {
-                    MetroText(month.month.format(MONTH).lowercase(), Metro.typography.subheader, Modifier.weight(1f))
-                    MetroText(MoneyFormat.format(month.total(includeOffBudget), page.currency, formatOptions()), Metro.typography.subheader)
-                }
-                Bar(abs(month.total(includeOffBudget)), scale, Metro.accent.fill)
             }
         }
     }

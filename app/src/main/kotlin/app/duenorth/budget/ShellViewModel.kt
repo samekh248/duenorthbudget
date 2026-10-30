@@ -221,6 +221,9 @@ class ShellViewModel(
     /** Reports: the hub's pages, and the pivot over one shared range. */
     val reports: ReportsHolder = ReportsHolder(host)
 
+    /** Reports → net worth: the graph of the total over a picked span. */
+    val netWorthGraph: NetWorthHolder = NetWorthHolder(host)
+
     /** The get started list over a budget made on this phone. */
     val getStarted: GetStartedHolder = GetStartedHolder(host, envelopes)
 
