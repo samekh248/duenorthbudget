@@ -97,7 +97,7 @@ class BankSyncPanelContentTest {
         assertEquals(listOf(attention, token), fixed)
     }
 
-    // Every failed account the page can name by id offers unlink beside its fix, after a single failed sync.
+    // Every failed account the page can name by id offers unlink under its fix, after a single failed sync.
     @Test
     fun reportOffersUnlinkForEachLinkedFailure() {
         val missing = BankSyncFailure("Savings", SimpleFinError.ACCOUNT_MISSING, "savings", BankSyncFix.RELINK)
@@ -106,7 +106,7 @@ class BankSyncPanelContentTest {
         val asked = mutableListOf<BankSyncFailure>()
         val ui = BankSyncUi(running = false, failures = listOf(missing, down, unnamed))
         compose.setContent { MetroTheme { BankSyncReportScreen(ui, onUnlink = { asked += it }) } }
-        compose.onNodeWithTag("bank-sync-unlink-Savings").assert(hasText(BankSyncCopy.UNLINK)).performClick()
+        compose.onNodeWithTag("bank-sync-unlink-Savings").assert(hasText(BankSyncCopy.UNLINK_LINK)).performClick()
         compose.onNodeWithTag("bank-sync-unlink-Card").performClick()
         assertEquals(0, compose.onAllNodesWithTagCount("bank-sync-unlink-Mystery"))
         assertEquals(listOf(missing, down), asked)

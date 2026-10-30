@@ -291,7 +291,7 @@ class ShellScreenshotTest {
         }
     }
 
-    private val cardFailure = BankSyncFailure("Credit card", ImportCopy.FETCH_FAILED)
+    private val cardFailure = BankSyncFailure("Credit card", ImportCopy.FETCH_FAILED, "card")
 
     private fun bankSyncSnap(
         name: String,
