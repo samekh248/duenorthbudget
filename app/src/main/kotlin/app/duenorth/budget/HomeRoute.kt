@@ -39,7 +39,7 @@ internal fun HomeRoute(
             remember(model) {
                 InboxActions(
                     onDetails = model.inbox::openDetails,
-                    onSchedule = model::createScheduleFromTransaction,
+                    onSchedule = model.schedules::createFromTransaction,
                     onDelete = model.inbox::delete,
                     onOpenAccount = model.register::openAccount,
                     onMatch = { model.register.match(it, stayOnRegister = false) },

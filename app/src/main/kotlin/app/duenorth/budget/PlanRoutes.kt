@@ -33,7 +33,7 @@ internal fun ScheduleEditorRoute(
     model: ShellViewModel,
     modifier: Modifier,
 ) {
-    val draft = state.scheduleDraft
+    val draft = state.schedulesUi.draft
     val shell = state.shell
     if (draft == null || shell == null || draft.id != route.scheduleId) {
         Placeholder()
@@ -44,7 +44,7 @@ internal fun ScheduleEditorRoute(
             categories = state.categories.filter { !it.income || draft.amountMinor > 0 },
             decimals = shell.currency.decimals,
             error = state.editError,
-            onSave = model::submitSchedule,
+            onSave = model.schedules::submit,
             modifier = modifier,
             payees = PayeeTypeAhead.names(state.payees.rows),
         )
@@ -65,12 +65,12 @@ internal fun SchedulesRoute(
             schedules = state.schedules,
             currency = shell.currency,
             today = RegisterEntry.parseDate(state.today) ?: 0,
-            section = state.schedulesSection,
-            calendar = state.schedulesCalendar,
-            onSection = model::setSchedulesSection,
-            onOpen = model::openScheduleDetails,
-            onPost = model::postSchedule,
-            onSkip = model::skipSchedule,
+            section = state.schedulesUi.section,
+            calendar = state.schedulesUi.calendar,
+            onSection = model.schedules::setSection,
+            onOpen = model.schedules::openDetails,
+            onPost = model.schedules::post,
+            onSkip = model.schedules::skip,
             onGesture = model::setGesture,
             modifier = modifier,
         )
@@ -84,7 +84,7 @@ internal fun ScheduleDetailsRoute(
     model: ShellViewModel,
     modifier: Modifier,
 ) {
-    val details = state.scheduleDetails
+    val details = state.schedulesUi.details
     val shell = state.shell
     if (details == null || shell == null || details.summary.id != route.scheduleId) {
         Placeholder()
@@ -151,17 +151,17 @@ internal fun RuleEditorRoute(
     model: ShellViewModel,
     modifier: Modifier,
 ) {
-    val draft = state.ruleDraft
+    val draft = state.rules.draft
     val shell = state.shell
     if (draft == null || shell == null || draft.id != route.ruleId) {
         Placeholder()
     } else {
         RuleEditorScreen(
             draft = draft,
-            names = model.ruleNames(),
+            names = model.rules.names(),
             decimals = shell.currency.decimals,
             error = state.editError,
-            onSave = model::submitRule,
+            onSave = model.rules::submit,
             modifier = modifier,
         )
     }

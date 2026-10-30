@@ -300,16 +300,16 @@ fun DueNorthApp(model: ShellViewModel) {
                     onEditAccount = model::openEditAccount,
                     onCloseAccount = model::openCloseAccount,
                     onReopenAccount = model::reopenOpenAccount,
-                    onAddSchedule = model::openNewSchedule,
-                    onRules = model::openRules,
-                    onAddRule = model::openNewRule,
-                    onDeleteSchedule = model::deleteOpenSchedule,
-                    onDeleteRule = model::deleteOpenRule,
-                    onSchedules = model::openSchedules,
-                    onSchedulesView = model::toggleSchedulesCalendar,
-                    onPostSchedule = model::postOpenSchedule,
-                    onSkipSchedule = model::skipOpenSchedule,
-                    onEditSchedule = model::editOpenSchedule,
+                    onAddSchedule = model.schedules::openNew,
+                    onRules = model.rules::open,
+                    onAddRule = model.rules::openNew,
+                    onDeleteSchedule = model.schedules::deleteOpen,
+                    onDeleteRule = model.rules::deleteOpen,
+                    onSchedules = model.schedules::open,
+                    onSchedulesView = model.schedules::toggleCalendar,
+                    onPostSchedule = model.schedules::postOpen,
+                    onSkipSchedule = model.schedules::skipOpen,
+                    onEditSchedule = model.schedules::editOpen,
                     onTemplates = model.templates::open,
                     onBankLink = model::openBankLink,
                     onNext = model::onboardingCheck,
@@ -323,7 +323,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSignOut = model.servers::signOut,
                     onExport = model.settingsUi::exportBudget,
                     onScheduleTransaction = {
-                        (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
+                        (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model.schedules::createFromTransaction)
                     },
                     onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model.register::delete) },
                     onEditBudget = model::startBudgetEdit,
@@ -408,7 +408,7 @@ fun DueNorthApp(model: ShellViewModel) {
                         is ShellRoute.EditAccount -> EditAccountRoute(route, state, model, fill)
                         is ShellRoute.CloseAccount -> CloseAccountRoute(route, state, model, fill)
                         is ShellRoute.ScheduleEditor -> ScheduleEditorRoute(route, state, model, fill)
-                        ShellRoute.Rules -> RulesScreen(state.rulesList, model::openRule, fill)
+                        ShellRoute.Rules -> RulesScreen(state.rules.list, model.rules::openEditor, fill)
                         ShellRoute.Schedules -> SchedulesRoute(state, model, fill)
                         is ShellRoute.ScheduleDetails -> ScheduleDetailsRoute(route, state, model, fill)
                         ShellRoute.MonthReview -> MonthReviewRoute(state, model, fill)
@@ -439,10 +439,10 @@ fun DueNorthApp(model: ShellViewModel) {
                             modifier = fill,
                         )
                     }
-                    if (state.scheduleDuplicateId != null) {
+                    if (state.schedulesUi.duplicateId != null) {
                         ScheduleDuplicateScreen(
-                            onPostAnyway = model::confirmScheduleDuplicate,
-                            onCancel = model::cancelScheduleDuplicate,
+                            onPostAnyway = model.schedules::confirmDuplicate,
+                            onCancel = model.schedules::cancelDuplicate,
                             modifier = fill,
                         )
                     }

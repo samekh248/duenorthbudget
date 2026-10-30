@@ -126,7 +126,9 @@ class ShellViewModel(
 
             override fun startBudgetEdit() = this@ShellViewModel.startBudgetEdit()
 
-            override fun openNewSchedule() = this@ShellViewModel.openNewSchedule()
+            override fun openNewSchedule() = schedules.openNew()
+
+            override fun refresh() = this@ShellViewModel.refresh()
 
             override fun forgetMonths() = months.invalidate()
 
@@ -221,6 +223,12 @@ class ShellViewModel(
 
     /** Templates: checking and applying them, the tiles on a category page, and the priority lanes. */
     val templates: TemplatesHolder = TemplatesHolder(host)
+
+    /** Rules: the list, the rule editor, and the names and categories the editors pick from. */
+    val rules: RulesHolder = RulesHolder(host)
+
+    /** Schedules: the pivot, a schedule's page and editor, and posting or skipping one. */
+    val schedules: SchedulesHolder = SchedulesHolder(host, rules)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -826,10 +834,6 @@ class ShellViewModel(
                 shell = visibleShell,
                 register = register,
                 schedules = loaded.schedules,
-                scheduleDetails =
-                    (route as? ShellRoute.ScheduleDetails)?.let { open ->
-                        (loaded.scheduleDetails ?: current.scheduleDetails)?.takeIf { it.summary.id == open.scheduleId }
-                    },
                 route = route,
                 settingsReturn = current.settingsReturn && route != ShellRoute.Home,
                 openMonth = reviewMonth,
@@ -845,6 +849,13 @@ class ShellViewModel(
                 budgetMethod = loaded.formatPrefs.budgetType,
                 cloudFileId = loaded.cloudFileId,
                 undoLabel = loaded.undoLabel,
+                schedulesUi =
+                    current.schedulesUi.copy(
+                        details =
+                            (route as? ShellRoute.ScheduleDetails)?.let { open ->
+                                (loaded.scheduleDetails ?: current.schedulesUi.details)?.takeIf { it.summary.id == open.scheduleId }
+                            },
+                    ),
             )
         }
         if (!loaded.locked && loaded.shell != null) {

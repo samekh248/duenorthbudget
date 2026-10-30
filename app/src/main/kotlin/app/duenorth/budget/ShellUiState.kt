@@ -24,11 +24,7 @@ import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterSearch
 import app.duenorth.budget.core.RemoteFile
-import app.duenorth.budget.core.RuleDraft
-import app.duenorth.budget.core.RuleSummary
 import app.duenorth.budget.core.SavedInstance
-import app.duenorth.budget.core.ScheduleDetails
-import app.duenorth.budget.core.ScheduleDraft
 import app.duenorth.budget.core.ScheduleSummary
 import app.duenorth.budget.core.WriteResult
 import app.duenorth.budget.core.activeInstance
@@ -71,15 +67,8 @@ data class ShellUiState(
     val reconcile: ReconcileUi = ReconcileUi(),
     /** Every schedule, ended ones included, by next date. */
     val schedules: List<ScheduleSummary> = emptyList(),
-    /** The schedule [ShellRoute.ScheduleDetails] shows; null while it loads. */
-    val scheduleDetails: ScheduleDetails? = null,
-    /** The schedules pivot item showing: [SchedulesSection.UPCOMING] or [SchedulesSection.ALL]. */
-    val schedulesSection: Int = 0,
-    /** Upcoming shows a month calendar instead of the list. */
-    val schedulesCalendar: Boolean = false,
     /** The payees' own state, kept by [PayeesHolder]. */
     val payees: PayeesState = PayeesState(),
-    val scheduleDuplicateId: String? = null,
     val serverError: String? = null,
     val remoteFiles: List<RemoteFile> = emptyList(),
     val syncing: Boolean = false,
@@ -111,9 +100,10 @@ data class ShellUiState(
     val accountDetail: AccountDetail? = null,
     val accountsReorder: Boolean = false,
     val accountForceConfirm: String? = null,
-    val scheduleDraft: ScheduleDraft? = null,
-    val rulesList: List<RuleSummary> = emptyList(),
-    val ruleDraft: RuleDraft? = null,
+    /** The schedules' own state, kept by [SchedulesHolder]. */
+    val schedulesUi: SchedulesUi = SchedulesUi(),
+    /** The rules' own state, kept by [RulesHolder]. */
+    val rules: RulesUi = RulesUi(),
     val reports: ReportsUi = ReportsUi(),
     val templates: TemplatesUi = TemplatesUi(),
     val bankLink: BankLinkUi? = null,

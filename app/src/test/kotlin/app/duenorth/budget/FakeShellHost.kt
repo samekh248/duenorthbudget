@@ -83,6 +83,10 @@ internal class FakeShellHost(
 
     override fun openNewSchedule() = Unit
 
+    override fun refresh() {
+        reloads++
+    }
+
     override fun forgetMonths() = Unit
 
     override suspend fun startGetStarted(budgetId: String) {

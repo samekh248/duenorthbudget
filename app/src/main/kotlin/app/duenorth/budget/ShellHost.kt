@@ -83,6 +83,9 @@ internal interface ShellHost {
     /** Reads the open budget again and shows it. */
     suspend fun reload()
 
+    /** [reload], started on its own. */
+    fun refresh()
+
     /** Reads the payees, for a transaction form about to open. */
     fun loadPayees()
 
