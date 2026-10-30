@@ -170,7 +170,7 @@ private fun Side(
 }
 
 /**
- * The line itself: a flat accent stroke over a faint flat wash, three hairline guides labelled with
+ * The line itself: a flat accent stroke over a solid flat fill down to the bottom, three hairline guides labelled with
  * the top and bottom of the scale, a dashed zero line when the total crosses it, and a dot on today.
  */
 @Composable
@@ -242,14 +242,14 @@ private fun NetWorthLine(
         values.forEachIndexed { index, value ->
             if (index == 0) stroke.moveTo(x(index), y(value)) else stroke.lineTo(x(index), y(value))
         }
-        val wash =
+        val area =
             Path().apply {
                 addPath(stroke)
                 lineTo(x(values.lastIndex), size.height)
                 lineTo(x(0), size.height)
                 close()
             }
-        drawPath(wash, line.copy(alpha = 0.14f))
+        drawPath(area, line.copy(alpha = AREA_ALPHA))
         drawPath(stroke, line, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
 
         val marked = scrub ?: values.lastIndex
@@ -270,3 +270,6 @@ private fun DrawScope.label(
     val top = if (above) at.y - text.size.height - gap else at.y + gap
     drawText(text, topLeft = Offset(at.x, top.coerceIn(0f, size.height - text.size.height)))
 }
+
+/** How strongly the area under the line is filled: plainly the accent, while the line and labels still read over it. */
+private const val AREA_ALPHA = 0.4f
