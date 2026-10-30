@@ -87,6 +87,7 @@ class ShellViewModel(
             override val library get() = this@ShellViewModel.library
             override val sync get() = this@ShellViewModel.sync
             override val bankSyncTransport get() = this@ShellViewModel.bankSyncTransport
+            override val probe get() = this@ShellViewModel.probe
             override val io get() = this@ShellViewModel.io
             override val writing get() = this@ShellViewModel.writing
 
@@ -112,6 +113,22 @@ class ShellViewModel(
 
             override fun clearHistory() = history.clear()
 
+            override fun openFromSettings(
+                route: ShellRoute,
+                page: SettingsPage,
+            ) = this@ShellViewModel.openFromSettings(route, page)
+
+            override fun returnToSettings(page: SettingsPage?) = this@ShellViewModel.returnToSettings(page)
+
+            override fun signOut(preferSettings: Boolean) = this@ShellViewModel.signOut(preferSettings)
+
+            override fun refreshOnboardingFiles() = onboardingRefresh()
+
+            override fun finishBrowserSignIn(
+                saved: OnboardingProgress,
+                error: String?,
+            ) = this@ShellViewModel.finishBrowserSignIn(saved, error)
+
             override suspend fun reloadAccount(accountId: String) = apply(load(accountId), accountId)
         }
 
@@ -126,6 +143,9 @@ class ShellViewModel(
 
     /** Importing: a file preview, a bank fetch and the review of what came in. */
     val import: ImportHolder = ImportHolder(host)
+
+    /** Servers: the instances list, OpenID sign-in, switching and removing a server, and server checks. */
+    val servers: ServersHolder = ServersHolder(host)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -741,8 +761,6 @@ class ShellViewModel(
                 remoteFiles = sync.remoteFiles,
                 signedIn = sync.signedIn(),
                 registerBankLinked = loaded.bankLinked,
-                instances = loaded.settings.instances,
-                activeInstance = loaded.settings.activeInstance(),
                 formatPrefs = loaded.formatPrefs,
                 budgetMethod = loaded.formatPrefs.budgetType,
                 cloudFileId = loaded.cloudFileId,

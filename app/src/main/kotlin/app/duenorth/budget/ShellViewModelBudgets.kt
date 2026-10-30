@@ -128,7 +128,7 @@ fun ShellViewModel.connect(
     address: String,
     password: String,
 ) {
-    connectInstance(address, password)
+    servers.connect(address, password)
 }
 
 fun ShellViewModel.signOut(preferSettings: Boolean = false) {
@@ -142,9 +142,7 @@ fun ShellViewModel.signOut(preferSettings: Boolean = false) {
                 serverError = null,
                 signedIn = false,
                 settings = settings,
-                instances = settings.instances,
-                activeInstance = settings.activeInstance(),
-                instanceReachable = null,
+                servers = current.servers.copy(reachable = null),
                 route =
                     when {
                         preferSettings || current.route == ShellRoute.Settings -> ShellRoute.Settings

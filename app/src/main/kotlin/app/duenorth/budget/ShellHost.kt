@@ -2,6 +2,8 @@ package app.duenorth.budget
 
 import app.duenorth.budget.core.BankSyncTransport
 import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.OnboardingProgress
+import app.duenorth.budget.core.ServerProbe
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.WriteResult
 import kotlinx.coroutines.CoroutineDispatcher
@@ -21,6 +23,7 @@ internal interface ShellHost {
     val library: BudgetLibrary
     val sync: SyncCoordinator
     val bankSyncTransport: BankSyncTransport
+    val probe: ServerProbe
 
     /** Where file and network work runs. */
     val io: CoroutineDispatcher
@@ -54,6 +57,27 @@ internal interface ShellHost {
 
     /** Reads the payees, for a transaction form about to open. */
     fun loadPayees()
+
+    /** Opens [route] from settings, so back and finish return to [page]. */
+    fun openFromSettings(
+        route: ShellRoute,
+        page: SettingsPage,
+    )
+
+    /** Back to settings, on [page] or the page it was on. */
+    fun returnToSettings(page: SettingsPage? = null)
+
+    /** Signs out of the server; [preferSettings] lands on settings rather than where sign out started. */
+    fun signOut(preferSettings: Boolean)
+
+    /** Asks the server for its budgets again, for the pick-a-budget page. */
+    fun refreshOnboardingFiles()
+
+    /** First run's end of a browser sign-in: on to the server's budgets, or back to sign in with [error]. */
+    fun finishBrowserSignIn(
+        saved: OnboardingProgress,
+        error: String?,
+    )
 
     /** Reloads the shell with [accountId]'s register, for a page about to show it. */
     suspend fun reloadAccount(accountId: String)

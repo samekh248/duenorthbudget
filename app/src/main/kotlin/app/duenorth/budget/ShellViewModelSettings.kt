@@ -71,7 +71,7 @@ internal fun ShellViewModel.returnToSettings(page: SettingsPage? = null) {
             createError = null,
             encryptionError = null,
             switchTarget = null,
-            switchInstanceTarget = null,
+            servers = it.servers.copy(switchTarget = null),
             pendingFile = null,
         )
     }
@@ -302,8 +302,6 @@ internal fun ShellViewModel.refreshSettingsSections() {
             it.copy(
                 budgetEncrypted = encrypted,
                 settings = settings,
-                instances = settings.instances,
-                activeInstance = settings.activeInstance(),
                 formatPrefs = prefs,
                 budgetMethod = prefs.budgetType,
                 cloudFileId = cloud?.takeIf { id -> id.isNotBlank() },
@@ -312,10 +310,10 @@ internal fun ShellViewModel.refreshSettingsSections() {
         }
         val address = settings.activeInstance()?.address
         if (!address.isNullOrBlank()) {
-            probeOpenId(address)
-            probeReachability()
+            servers.probeOpenId(address)
+            servers.probeReachability()
         } else {
-            mutate { it.copy(openIdAvailable = false, instanceReachable = null) }
+            mutate { it.copy(servers = it.servers.copy(openIdAvailable = false, reachable = null)) }
         }
     }
 }

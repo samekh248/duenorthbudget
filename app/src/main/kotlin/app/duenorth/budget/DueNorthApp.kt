@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
                 )
             shellModel = model
             LaunchedEffect(intent?.data) {
-                model.completeOpenId(intent?.dataString)
+                model.servers.completeOpenId(intent?.dataString)
             }
             DueNorthApp(model)
         }
@@ -121,7 +121,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        shellModel?.completeOpenId(intent.dataString)
+        shellModel?.servers?.completeOpenId(intent.dataString)
     }
 }
 
@@ -157,10 +157,10 @@ fun DueNorthApp(model: ShellViewModel) {
             val name = uri.lastPathSegment?.substringAfterLast('/') ?: "import.qif"
             model.import.previewFile(accountId, bytes, name)
         }
-    LaunchedEffect(state.openIdRedirectUrl) {
-        val url = state.openIdRedirectUrl ?: return@LaunchedEffect
+    LaunchedEffect(state.servers.openIdRedirectUrl) {
+        val url = state.servers.openIdRedirectUrl ?: return@LaunchedEffect
         openWebPage(context, url)
-        model.clearOpenIdRedirect()
+        model.servers.clearOpenIdRedirect()
     }
     LaunchedEffect(state.pendingExport) {
         val export = state.pendingExport ?: return@LaunchedEffect
@@ -319,8 +319,8 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSettingsNew = model::showSettingsCreate,
                     onSettingsPayees = model::showSettingsPayees,
                     onAddServer = model::onboardingAddServer,
-                    onServerBudgets = model::showServerBudgets,
-                    onSignOut = model::signOutInstance,
+                    onServerBudgets = model.servers::showBudgets,
+                    onSignOut = model.servers::signOut,
                     onExport = model::exportBudget,
                     onScheduleTransaction = {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)

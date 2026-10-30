@@ -6,6 +6,8 @@ import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.HttpBankSyncTransport
 import app.duenorth.budget.core.MemorySecretStore
+import app.duenorth.budget.core.OnboardingProgress
+import app.duenorth.budget.core.ServerProbe
 import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.WriteResult
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +22,7 @@ internal class FakeShellHost(
     start: ShellUiState,
     override val sync: SyncCoordinator = SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System),
     override val bankSyncTransport: BankSyncTransport = HttpBankSyncTransport(),
+    override val probe: ServerProbe = ServerProbe(),
 ) : ShellHost {
     override val state = MutableStateFlow(start)
     override val scope = CoroutineScope(Dispatchers.Unconfined)
@@ -65,6 +68,28 @@ internal class FakeShellHost(
     override suspend fun reload() {
         reloads++
     }
+
+    override fun openFromSettings(
+        route: ShellRoute,
+        page: SettingsPage,
+    ) = push(route)
+
+    override fun returnToSettings(page: SettingsPage?) {
+        mutate { it.copy(route = ShellRoute.Settings) }
+    }
+
+    var signOuts = 0
+
+    override fun signOut(preferSettings: Boolean) {
+        signOuts++
+    }
+
+    override fun refreshOnboardingFiles() = Unit
+
+    override fun finishBrowserSignIn(
+        saved: OnboardingProgress,
+        error: String?,
+    ) = Unit
 
     override fun loadPayees() = Unit
 

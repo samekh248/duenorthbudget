@@ -112,18 +112,13 @@ data class ShellUiState(
     val remoteRefreshing: Boolean = false,
     val registerBankLinked: Boolean = false,
     val categoryManage: CategoryManagePage? = null,
-    val instances: List<SavedInstance> = emptyList(),
-    val activeInstance: SavedInstance? = null,
-    val instanceReachable: Boolean? = null,
     val formatPrefs: FormatPrefs = FormatPrefs(),
     val budgetMethod: String = "envelope",
     val cloudFileId: String? = null,
     val pendingExport: PendingExport? = null,
     val confirmAdvanced: AdvancedConfirm? = null,
-    val openIdRedirectUrl: String? = null,
-    val openIdAvailable: Boolean = false,
-    val openIdPendingAddress: String? = null,
-    val switchInstanceTarget: SavedInstance? = null,
+    /** The servers' own state, kept by [ServersHolder]. */
+    val servers: ServersState = ServersState(),
     val encryptionError: String? = null,
     val switchReturnRoute: ShellRoute = ShellRoute.Home,
     /** The phone's budgets that picking [pendingFile] clears. */
@@ -177,7 +172,13 @@ data class ShellUiState(
     /** True while a page opened from settings is showing; back and finish return to settings. */
     val settingsReturn: Boolean = false,
     val budgetEncrypted: Boolean = false,
-)
+) {
+    /** The saved servers, from [settings]. */
+    val instances: List<SavedInstance> get() = settings.instances
+
+    /** The server in use, from [settings]; null when none is saved. */
+    val activeInstance: SavedInstance? get() = settings.activeInstance()
+}
 
 data class NewTransactionPrefill(
     val amountMinor: Long,

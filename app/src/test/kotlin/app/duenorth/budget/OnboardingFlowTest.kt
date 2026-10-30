@@ -318,13 +318,13 @@ class OnboardingFlowTest {
                 .activeInstance()!!
                 .id
 
-        model.requestRemoveInstance(id)
+        model.servers.requestRemove(id)
         assertEquals(ShellRoute.ConfirmRemoveInstance(id), model.state.value.route)
         assertTrue(model.back())
         assertEquals(1, library(root).settings().instances.size)
 
-        model.requestRemoveInstance(id)
-        model.confirmRemoveInstance()
+        model.servers.requestRemove(id)
+        model.servers.confirmRemove()
         awaitMain { library(root).settings().instances.isEmpty() }
         assertEquals(ShellRoute.Settings, model.state.value.route)
         assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
@@ -407,7 +407,7 @@ class OnboardingFlowTest {
                 .activeInstance()!!
                 .id
 
-        model.confirmInstanceSwitch(id)
+        model.servers.confirmSwitch(id)
         awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         assertTrue(model.back())
         assertEquals(ShellRoute.Settings, model.state.value.route)

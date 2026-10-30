@@ -45,7 +45,7 @@ class SyncAfterWriteTest {
         val sync = SyncCoordinator(library, transport, MemorySecretStore(), clock, retryDelays = emptyList())
         val model = ShellViewModel(library, sync, io = Dispatchers.Main)
         awaitMain { !model.state.value.loading }
-        model.showServer()
+        model.servers.show()
         awaitMain { model.state.value.route == ShellRoute.Server }
         model.connect("http://127.0.0.1:9", "server-secret")
         awaitMain { model.state.value.signedIn && !model.state.value.syncing }

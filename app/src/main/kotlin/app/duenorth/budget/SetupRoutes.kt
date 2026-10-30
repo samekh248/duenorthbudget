@@ -26,7 +26,7 @@ internal fun SettingsRoute(
         page = state.settingsPage,
         instances = state.instances,
         activeInstance = state.activeInstance,
-        instanceReachable = state.instanceReachable,
+        instanceReachable = state.servers.reachable,
         signedIn = state.signedIn,
         budgets = state.budgets,
         openBudgetId = state.settings.openBudgetId,
@@ -37,8 +37,8 @@ internal fun SettingsRoute(
         cloudFileId = state.cloudFileId,
         encrypted = state.budgetEncrypted,
         onPage = model::selectSettingsPage,
-        onMakeActive = model::requestInstanceSwitch,
-        onRemoveInstance = model::requestRemoveInstance,
+        onMakeActive = model.servers::requestSwitch,
+        onRemoveInstance = model.servers::requestRemove,
         onOpenBudget = model::requestSwitch,
         onTheme = model::setTheme,
         onAccent = model::setAccent,
@@ -110,7 +110,7 @@ internal fun ConfirmRemoveInstanceRoute(
     val instance = state.instances.find { it.id == route.instanceId }
     ConfirmRemoveInstanceScreen(
         name = instance?.label ?: instance?.address.orEmpty(),
-        onRemove = model::confirmRemoveInstance,
+        onRemove = model.servers::confirmRemove,
         onKeep = { model.back() },
         modifier = modifier,
     )
@@ -127,10 +127,12 @@ internal fun ConfirmInstanceSwitchRoute(
             state.activeInstance?.label
                 ?: state.activeInstance?.address.orEmpty(),
         opening =
-            state.switchInstanceTarget?.label
-                ?: state.switchInstanceTarget?.address.orEmpty(),
-        onOpen = { model.confirmInstanceSwitch() },
-        onStay = model::cancelInstanceSwitch,
+            state.servers.switchTarget?.label
+                ?: state.servers.switchTarget
+                    ?.address
+                    .orEmpty(),
+        onOpen = { model.servers.confirmSwitch() },
+        onStay = model.servers::cancelSwitch,
         modifier = modifier,
     )
 }
@@ -309,7 +311,7 @@ internal fun ServerRoute(
         status = state.syncStatus,
         error = state.serverError,
         conflictCount = state.conflicts.size,
-        onConflicts = model::showConflicts,
+        onConflicts = model.servers::showConflicts,
         onConnect = model::connect,
         onOpen = model::requestRemote,
         onReplace = model::requestReplace,
