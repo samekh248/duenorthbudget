@@ -243,10 +243,10 @@ fun ShellViewModel.syncInbox() {
     val id = state.value.settings.openBudgetId ?: return
     if (state.value.syncing) return
     viewModelScope.launch {
-        mutate { it.copy(syncing = true, syncProgress = 0.08f, inboxSyncNotice = null) }
+        mutate { it.copy(syncing = true, syncProgress = 0.08f, inbox = it.inbox.copy(syncNotice = null)) }
         val result = withContext(io) { runCatching { sync.sync(id) }.getOrNull() }
         val notice = result?.status?.takeIf { it.isNotBlank() } ?: SyncCopy.LAST_FAILED
-        mutate { it.copy(syncing = false, syncProgress = null, inboxSyncNotice = notice) }
+        mutate { it.copy(syncing = false, syncProgress = null, inbox = it.inbox.copy(syncNotice = notice)) }
         reload()
     }
 }

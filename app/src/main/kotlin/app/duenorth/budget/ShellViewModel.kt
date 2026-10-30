@@ -79,9 +79,36 @@ class ShellViewModel(
 
     internal var writing = false
 
-    /** Inbox rows whose filing is still being written, and those of them whose confirmation has already played. */
-    internal val inboxWriting = mutableSetOf<String>()
-    internal val inboxPlayed = mutableSetOf<String>()
+    /** What the feature holders reach the rest of the shell through. */
+    private val host =
+        object : ShellHost {
+            override val state get() = this@ShellViewModel.state
+            override val scope get() = viewModelScope
+            override val library get() = this@ShellViewModel.library
+            override val io get() = this@ShellViewModel.io
+            override val writing get() = this@ShellViewModel.writing
+
+            override fun mutate(transform: (ShellUiState) -> ShellUiState) = this@ShellViewModel.mutate(transform)
+
+            override fun push(route: ShellRoute) = this@ShellViewModel.push(route)
+
+            override fun launchWrite(block: suspend (String) -> Unit) = this@ShellViewModel.launchWrite(block)
+
+            override suspend fun publish(
+                result: WriteResult,
+                accountId: String,
+                stayOnRegister: Boolean,
+            ) = this@ShellViewModel.publish(result, accountId, stayOnRegister)
+
+            override fun loadPayees() = this@ShellViewModel.loadPayees()
+
+            override fun loadAccount(accountId: String) {
+                viewModelScope.launch { apply(load(accountId), accountId) }
+            }
+        }
+
+    /** The inbox: filing, deleting and opening what came in. */
+    val inbox = InboxHolder(host)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -197,7 +224,7 @@ class ShellViewModel(
             it.copy(
                 homeSection = index,
                 accountsReorder = it.accountsReorder && index == ScreenBar.HOME_ACCOUNTS,
-                inboxSyncNotice = it.inboxSyncNotice.takeIf { index == ScreenBar.HOME_INBOX },
+                inbox = it.inbox.copy(syncNotice = it.inbox.syncNotice.takeIf { index == ScreenBar.HOME_INBOX }),
             )
         }
     }
@@ -262,8 +289,8 @@ class ShellViewModel(
             closeRegisterSearch()
             return true
         }
-        if (current.inboxSelection != null && current.route == ShellRoute.Home && current.confirm == null) {
-            endInboxSelecting()
+        if (current.inbox.selection != null && current.route == ShellRoute.Home && current.confirm == null) {
+            inbox.endSelecting()
             return true
         }
         if (current.accountsReorder && current.route == ShellRoute.Home && current.confirm == null) {

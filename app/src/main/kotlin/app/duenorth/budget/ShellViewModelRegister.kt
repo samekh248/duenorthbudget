@@ -1,11 +1,13 @@
 package app.duenorth.budget
 
 import androidx.lifecycle.viewModelScope
+import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.ReconcileFinishResult
 import app.duenorth.budget.core.ReconcileStartResult
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterSearch
 import app.duenorth.budget.core.TransactionDraft
+import app.duenorth.budget.core.WriteResult
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -168,7 +170,7 @@ fun ShellViewModel.submitTransaction(draft: TransactionDraft) {
 
 fun ShellViewModel.submitCategory(categoryId: String?) {
     val target = state.value.categoryTarget ?: return
-    val inbox = shownInbox().orEmpty()
+    val inbox = this.inbox.shown().orEmpty()
     val index = inbox.indexOfFirst { it.id == target.transactionId }
     val others = (state.value.route as? ShellRoute.PickCategory)?.others.orEmpty()
     if (categoryId != null && others.isNotEmpty()) {
@@ -179,7 +181,7 @@ fun ShellViewModel.submitCategory(categoryId: String?) {
                 .orEmpty()
         val ids = setOf(target.transactionId) + others
         val rows = inbox.withIndex().filter { it.value.id in ids }
-        fileInboxRows(
+        this.inbox.fileRows(
             rows.associate { it.value.id to categoryId },
             rows.map { InboxFiled(it.value, it.index, name) },
             fromPicker = true,
@@ -192,7 +194,7 @@ fun ShellViewModel.submitCategory(categoryId: String?) {
                 .firstOrNull { it.id == categoryId }
                 ?.name
                 .orEmpty()
-        fileInbox(inbox[index], index, categoryId, name, fromPicker = true)
+        this.inbox.file(inbox[index], index, categoryId, name, fromPicker = true)
         return
     }
     launchWrite { id ->
@@ -275,5 +277,30 @@ internal fun ShellViewModel.reloadReconcile(accountId: String) {
     viewModelScope.launch {
         val page = withContext(io) { library.readReconcile(budgetId, accountId) }
         mutate { it.copy(reconcile = page, reconcileError = null) }
+    }
+}
+
+/**
+ * Match: keeps the bank's transaction with the entry's payee, category and note, and deletes the
+ * entry. When neither side had a category the one left leads the inbox, ready to file.
+ */
+fun ShellViewModel.matchTransactions(
+    pair: MatchPair,
+    stayOnRegister: Boolean,
+) {
+    launchWrite { id ->
+        val result = withContext(io) { library.matchTransactions(id, pair.bank.id, pair.entered.id) }
+        if (result is WriteResult.Saved) mutate { it.copy(inbox = it.inbox.copy(lead = pair.bank.id)) }
+        publish(result, pair.bank.accountId, stayOnRegister)
+    }
+}
+
+fun ShellViewModel.notAMatch(
+    pair: MatchPair,
+    stayOnRegister: Boolean,
+) {
+    launchWrite { id ->
+        val result = withContext(io) { library.notAMatch(id, pair.bank.id, pair.entered.id) }
+        publish(result, pair.bank.accountId, stayOnRegister)
     }
 }

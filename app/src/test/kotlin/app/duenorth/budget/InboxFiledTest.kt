@@ -27,19 +27,19 @@ class InboxFiledTest {
                 .inbox
                 .firstOrNull { it.suggestionId != null }
         assertNotNull("the sample needs an inbox row with a suggestion", row)
-        model.acceptInbox(row!!.id)
+        model.inbox.accept(row!!.id)
         // The confirmation plays out before the write and its reload have landed.
-        model.inboxFiledShown(row.id)
+        model.inbox.filedShown(row.id)
         assertTrue(
             "a row still listed must stay filed, or it shows again as waiting",
-            model.state.value.inboxFiled
+            model.state.value.inbox.filed
                 .any { it.row.id == row.id },
         )
         await {
             model.state.value.shell!!
                 .inbox
                 .none { it.id == row.id } &&
-                model.state.value.inboxFiled
+                model.state.value.inbox.filed
                     .isEmpty()
         }
     }
@@ -51,15 +51,15 @@ class InboxFiledTest {
             model.state.value.shell!!
                 .inbox
                 .first { it.suggestionId != null }
-        model.acceptInbox(row.id)
+        model.inbox.accept(row.id)
         await {
             model.state.value.shell!!
                 .inbox
                 .none { it.id == row.id }
         }
-        model.inboxFiledShown(row.id)
+        model.inbox.filedShown(row.id)
         await {
-            model.state.value.inboxFiled
+            model.state.value.inbox.filed
                 .isEmpty()
         }
     }
