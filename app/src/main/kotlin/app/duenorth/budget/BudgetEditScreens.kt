@@ -24,9 +24,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
@@ -40,6 +37,7 @@ import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.acrylicSheet
+import app.duenorth.budget.design.components.layerFocusLine
 import app.duenorth.budget.design.components.layerSlice
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.components.relief
@@ -291,7 +289,6 @@ private fun EditLine(
         // Windows Phone text boxes: filled at rest, white with an accent edge while typing. A relief style cuts the
         // box into the page instead, and keeps the accent edge while typing.
         val relief = Metro.style.relief
-        val accentLine = Metro.accent.fill
         Box(
             Modifier
                 .weight(BOX_WEIGHT)
@@ -306,14 +303,7 @@ private fun EditLine(
                     when {
                         !open -> Modifier
                         // Mica underlines the open box in the accent, as it does a field being typed in.
-                        Metro.style.layers ->
-                            Modifier.drawBehind {
-                                drawRect(
-                                    accentLine,
-                                    Offset(3.dp.toPx(), size.height - 2.dp.toPx()),
-                                    Size(size.width - 6.dp.toPx(), 2.dp.toPx()),
-                                )
-                            }
+                        Metro.style.layers -> Modifier.layerFocusLine(true)
                         else -> Modifier.border(2.dp, Metro.accent.fill)
                     },
                 ).metroPress(onClick = onFocus)

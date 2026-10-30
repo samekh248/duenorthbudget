@@ -35,11 +35,15 @@ import androidx.compose.ui.graphics.Path as ComposePath
 /** A corner large enough to make any shape a circle or a pill. */
 val PillCorner: Dp = 999.dp
 
-/** Mica's corners: a layer card (a group, a day, the keypad's sheet) and a control on one (a field, a key). */
+/**
+ * Mica's corners: a layer card (a group, a day, the keypad's sheet), a control on one (a field, a key), a floating
+ * sheet, and a badge (a template's priority).
+ */
 object LayerCorner {
     val Card = 8.dp
     val Control = 6.dp
     val Floating = 12.dp
+    val Badge = 12.dp
 }
 
 /**
