@@ -171,7 +171,9 @@ fun ShellViewModel.deleteOpenRule() {
 /** Names for the rule editor: payees, accounts, and categories by id. */
 fun ShellViewModel.ruleNames(): RuleNames =
     RuleNames(
-        payees = state.value.payees.associate { it.id to it.name },
+        payees =
+            state.value.payees.rows
+                .associate { it.id to it.name },
         accounts =
             state.value.shell
                 ?.accounts
@@ -193,7 +195,7 @@ private fun ShellViewModel.loadRuleCategories() {
     viewModelScope.launch {
         val (categories, payees) =
             withContext(io) { sync.categories(budgetId) to library.listPayees(budgetId).filter { !it.transfer } }
-        mutate { it.copy(categories = categories, payees = payees) }
+        mutate { it.copy(categories = categories, payees = it.payees.copy(rows = payees)) }
     }
 }
 
@@ -209,5 +211,63 @@ private fun ShellViewModel.afterRuleWrite(
     viewModelScope.launch {
         withContext(io) { runCatching { sync.sendUnsent(budgetId) } }
         refresh()
+    }
+}
+
+fun ShellViewModel.postSchedule(scheduleId: String) {
+    launchSchedule(scheduleId, forceDuplicate = false)
+}
+
+fun ShellViewModel.confirmScheduleDuplicate() {
+    val id = state.value.scheduleDuplicateId ?: return
+    mutate { it.copy(scheduleDuplicateId = null) }
+    launchSchedule(id, forceDuplicate = true)
+}
+
+fun ShellViewModel.cancelScheduleDuplicate() {
+    mutate { it.copy(scheduleDuplicateId = null) }
+}
+
+fun ShellViewModel.skipSchedule(scheduleId: String) {
+    val budgetId = state.value.settings.openBudgetId ?: return
+    viewModelScope.launch {
+        when (withContext(io) { library.skipSchedule(budgetId, scheduleId) }) {
+            is ScheduleWriteResult.Skipped,
+            is ScheduleWriteResult.Posted,
+            -> refresh()
+            is ScheduleWriteResult.Rejected -> Unit
+            is ScheduleWriteResult.ConfirmDuplicate -> Unit
+        }
+    }
+}
+
+fun ShellViewModel.createScheduleFromTransaction(transactionId: String) {
+    val budgetId = state.value.settings.openBudgetId ?: return
+    val next = state.value.today
+    viewModelScope.launch {
+        withContext(io) {
+            library.createScheduleFromTransaction(budgetId, transactionId, "monthly", next)
+        }
+        refresh()
+    }
+}
+
+private fun ShellViewModel.launchSchedule(
+    scheduleId: String,
+    forceDuplicate: Boolean,
+) {
+    val budgetId = state.value.settings.openBudgetId ?: return
+    viewModelScope.launch {
+        when (
+            withContext(io) {
+                library.postSchedule(budgetId, scheduleId, forceDuplicate)
+            }
+        ) {
+            is ScheduleWriteResult.Posted -> refresh()
+            is ScheduleWriteResult.ConfirmDuplicate ->
+                mutate { it.copy(scheduleDuplicateId = scheduleId) }
+            is ScheduleWriteResult.Rejected -> Unit
+            is ScheduleWriteResult.Skipped -> refresh()
+        }
     }
 }

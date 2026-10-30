@@ -213,7 +213,7 @@ class RuleContentTest {
         model.openRules()
         await {
             model.state.value.route == ShellRoute.Rules &&
-                model.state.value.payees
+                model.state.value.payees.rows
                     .isNotEmpty()
         }
         val before = library.listRules(budgetId).size
@@ -222,7 +222,7 @@ class RuleContentTest {
         await { model.state.value.editError != null }
         assertEquals(RuleEditorCopy.NEEDS_CONDITION, model.state.value.editError)
         val payee =
-            model.state.value.payees
+            model.state.value.payees.rows
                 .first()
         val category =
             model.state.value.categories

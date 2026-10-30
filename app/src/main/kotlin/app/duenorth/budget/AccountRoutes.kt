@@ -123,7 +123,7 @@ internal fun EditTransactionRoute(
             dateFormat = state.formatPrefs.dateFormat,
             numberFormat = state.formatPrefs.numberFormat,
             hideFraction = state.formatPrefs.hideFraction,
-            payees = PayeeTypeAhead.names(state.payees),
+            payees = PayeeTypeAhead.names(state.payees.rows),
         )
     }
 }

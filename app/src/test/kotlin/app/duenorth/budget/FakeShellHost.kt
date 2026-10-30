@@ -39,6 +39,8 @@ internal class FakeShellHost(
         backs++
     }
 
+    override fun clearHistory() = Unit
+
     override fun launchWrite(block: suspend (String) -> Unit) {
         val id = state.value.settings.openBudgetId ?: return
         writing = true

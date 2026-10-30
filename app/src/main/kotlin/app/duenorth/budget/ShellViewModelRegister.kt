@@ -33,7 +33,7 @@ fun ShellViewModel.showAddTransaction() {
     push(ShellRoute.EditTransaction(accountId, null))
     // The form waits for this account's page rather than drawing over another account's.
     mutate { it.copy(editFromHome = true, registerSelection = null, register = null) }
-    loadPayees()
+    payees.load()
     viewModelScope.launch { apply(load(accountId), accountId) }
 }
 
@@ -47,7 +47,7 @@ fun ShellViewModel.openNewTransaction() {
     val accountId = openAccountId() ?: return
     mutate { it.copy(editFromHome = false, newTransactionPrefill = null) }
     push(ShellRoute.EditTransaction(accountId, null))
-    loadPayees()
+    payees.load()
 }
 
 /** A reconcile's "add it": a new transaction for the difference, dated on the statement, so saving it balances. */
@@ -62,7 +62,7 @@ fun ShellViewModel.addMissingForReconcile() {
 fun ShellViewModel.openEdit(transactionId: String) {
     val accountId = openAccountId() ?: return
     push(ShellRoute.EditTransaction(accountId, transactionId))
-    loadPayees()
+    payees.load()
 }
 
 fun ShellViewModel.openReconcile() {

@@ -81,7 +81,7 @@ internal fun ShellViewModel.returnToSettings(page: SettingsPage? = null) {
 fun ShellViewModel.showSettingsCreate() = openFromSettings(ShellRoute.Create, SettingsPage.BUDGET)
 
 fun ShellViewModel.showSettingsPayees() {
-    showPayees()
+    payees.show()
     mutate { it.copy(settingsReturn = true, settingsPage = SettingsPage.BUDGET) }
 }
 
