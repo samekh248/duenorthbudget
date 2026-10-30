@@ -293,13 +293,13 @@ fun DueNorthApp(model: ShellViewModel) {
                     onFill = { kind -> model.fillMonth(kind) },
                     onToBudget = model::openToBudget,
                     onUndo = model::undo,
-                    onAddAccount = model::openAddAccount,
-                    onShowClosed = model::toggleShowClosedAccounts,
+                    onAddAccount = model.accounts::openAdd,
+                    onShowClosed = model.accounts::toggleShowClosed,
                     onShowHidden = model::toggleShowHiddenCategories,
-                    onReorder = model::toggleReorderAccounts,
-                    onEditAccount = model::openEditAccount,
-                    onCloseAccount = model::openCloseAccount,
-                    onReopenAccount = model::reopenOpenAccount,
+                    onReorder = model.accounts::toggleReorder,
+                    onEditAccount = model.accounts::openEdit,
+                    onCloseAccount = model.accounts::openClose,
+                    onReopenAccount = model.accounts::reopenOpen,
                     onAddSchedule = model.schedules::openNew,
                     onRules = model.rules::open,
                     onAddRule = model.rules::openNew,
@@ -404,7 +404,7 @@ fun DueNorthApp(model: ShellViewModel) {
                                 modifier = fill,
                             )
                         ShellRoute.AddAccount ->
-                            AddAccountScreen(error = state.editError, onSave = model::submitAddAccount, modifier = fill)
+                            AddAccountScreen(error = state.editError, onSave = model.accounts::submitAdd, modifier = fill)
                         is ShellRoute.EditAccount -> EditAccountRoute(route, state, model, fill)
                         is ShellRoute.CloseAccount -> CloseAccountRoute(route, state, model, fill)
                         is ShellRoute.ScheduleEditor -> ScheduleEditorRoute(route, state, model, fill)

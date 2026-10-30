@@ -118,7 +118,7 @@ class ShellViewModel(
                 history.removeLastOrNull()
             }
 
-            override fun openAddAccount() = this@ShellViewModel.openAddAccount()
+            override fun openAddAccount() = accounts.openAdd()
 
             override fun finishOnboarding() = this@ShellViewModel.finishOnboarding()
 
@@ -233,6 +233,9 @@ class ShellViewModel(
     /** Bank link: linking an account to a bank, and repairing a link. */
     val bankLink: BankLinkHolder = BankLinkHolder(host)
 
+    /** Accounts: adding, editing, closing, reopening and reordering them. */
+    val accounts: AccountsHolder = AccountsHolder(host)
+
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
 
@@ -346,8 +349,8 @@ class ShellViewModel(
         _state.update {
             it.copy(
                 homeSection = index,
-                accountsReorder = it.accountsReorder && index == ScreenBar.HOME_ACCOUNTS,
                 inbox = it.inbox.copy(syncNotice = it.inbox.syncNotice.takeIf { index == ScreenBar.HOME_INBOX }),
+                accounts = it.accounts.copy(reorder = it.accounts.reorder && index == ScreenBar.HOME_ACCOUNTS),
             )
         }
     }
@@ -416,8 +419,8 @@ class ShellViewModel(
             inbox.endSelecting()
             return true
         }
-        if (current.accountsReorder && current.route == ShellRoute.Home && current.confirm == null) {
-            _state.update { it.copy(accountsReorder = false) }
+        if (current.accounts.reorder && current.route == ShellRoute.Home && current.confirm == null) {
+            _state.update { it.copy(accounts = it.accounts.copy(reorder = false)) }
             return true
         }
         // Back is edit mode's cancel: it leaves without saving anything changed there.
@@ -441,8 +444,8 @@ class ShellViewModel(
             _state.update { it.copy(templates = it.templates.copy(applyPreview = null)) }
             return true
         }
-        if (current.accountForceConfirm != null) {
-            _state.update { it.copy(accountForceConfirm = null) }
+        if (current.accounts.forceConfirm != null) {
+            _state.update { it.copy(accounts = it.accounts.copy(forceConfirm = null)) }
             return true
         }
         if (current.route == ShellRoute.Home) return false

@@ -1,6 +1,5 @@
 package app.duenorth.budget
 
-import app.duenorth.budget.core.AccountDetail
 import app.duenorth.budget.core.BudgetConflict
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.CategoryChoice
@@ -96,10 +95,8 @@ data class ShellUiState(
     val fillConfirm: FillConfirm? = null,
     val monthNotice: String? = null,
     val undoLabel: String? = null,
-    val accountsList: List<AccountDetail> = emptyList(),
-    val accountDetail: AccountDetail? = null,
-    val accountsReorder: Boolean = false,
-    val accountForceConfirm: String? = null,
+    /** The accounts' own state, kept by [AccountsHolder]. */
+    val accounts: AccountsUi = AccountsUi(),
     /** The schedules' own state, kept by [SchedulesHolder]. */
     val schedulesUi: SchedulesUi = SchedulesUi(),
     /** The rules' own state, kept by [RulesHolder]. */

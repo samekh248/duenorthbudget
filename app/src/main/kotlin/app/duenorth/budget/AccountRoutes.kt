@@ -182,11 +182,11 @@ internal fun EditAccountRoute(
     model: ShellViewModel,
     modifier: Modifier,
 ) {
-    val detail = state.accountDetail
+    val detail = state.accounts.detail
     if (detail == null || detail.id != route.accountId) {
         Placeholder()
     } else {
-        EditAccountScreen(detail, state.editError, model::submitEditAccount, modifier)
+        EditAccountScreen(detail, state.editError, model.accounts::submitEdit, modifier)
     }
 }
 
@@ -197,22 +197,22 @@ internal fun CloseAccountRoute(
     model: ShellViewModel,
     modifier: Modifier,
 ) {
-    val detail = state.accountDetail
+    val detail = state.accounts.detail
     val shell = state.shell
-    val force = state.accountForceConfirm
+    val force = state.accounts.forceConfirm
     when {
         detail == null || shell == null || detail.id != route.accountId -> Placeholder()
         force != null ->
-            ForceCloseConfirmScreen(force, model::confirmForceClose, model::keepAccount, modifier)
+            ForceCloseConfirmScreen(force, model.accounts::confirmForceClose, model.accounts::keep, modifier)
         else ->
             CloseAccountScreen(
                 account = detail,
-                others = state.accountsList,
+                others = state.accounts.list,
                 categories = state.categories,
                 currency = shell.currency,
                 error = state.editError,
-                onClose = { destination, category -> model.submitCloseAccount(destination, category) },
-                onForceClose = { model.submitCloseAccount(null, null, forced = true) },
+                onClose = { destination, category -> model.accounts.submitClose(destination, category) },
+                onForceClose = { model.accounts.submitClose(null, null, forced = true) },
                 modifier = modifier,
             )
     }

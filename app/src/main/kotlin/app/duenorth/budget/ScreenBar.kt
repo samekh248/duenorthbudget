@@ -367,11 +367,11 @@ object ScreenBar {
                         ?.summary
                         ?.completed != true,
             ),
-            state.accountsReorder,
+            state.accounts.reorder,
             state.register
                 ?.account
                 ?.closed == true,
-            state.accountForceConfirm != null,
+            state.accounts.forceConfirm != null,
             state.signedIn &&
                 !state.cloudFileId.isNullOrBlank() &&
                 state.shell
