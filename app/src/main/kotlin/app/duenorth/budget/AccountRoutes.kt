@@ -16,7 +16,7 @@ internal fun BankSyncReportRoute(
     modifier: Modifier,
 ) {
     val context = LocalContext.current
-    BankSyncReportScreen(state.bankSync, modifier) { failure ->
+    BankSyncReportScreen(state.bankSync.panel, modifier) { failure ->
         // The bank's own sign-in lives at SimpleFIN Bridge; the rest is mended on the bank link.
         if (failure.fix == BankSyncFix.SIMPLEFIN) {
             openWebPage(context, SimpleFinError.BRIDGE_URL)

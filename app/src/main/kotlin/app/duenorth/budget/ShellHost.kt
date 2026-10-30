@@ -1,6 +1,7 @@
 package app.duenorth.budget
 
 import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.WriteResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -17,6 +18,7 @@ internal interface ShellHost {
     /** Where a holder's work runs; cancelled with the view model. */
     val scope: CoroutineScope
     val library: BudgetLibrary
+    val sync: SyncCoordinator
 
     /** Where file and network work runs. */
     val io: CoroutineDispatcher
@@ -29,6 +31,9 @@ internal interface ShellHost {
     /** Opens [route] over the current page; back returns to it. */
     fun push(route: ShellRoute)
 
+    /** Back, as the system back button does it. */
+    fun back()
+
     /** Runs [block] with the open budget's id as the one write in flight, unless one already runs. */
     fun launchWrite(block: suspend (String) -> Unit)
 
@@ -38,6 +43,9 @@ internal interface ShellHost {
         accountId: String,
         stayOnRegister: Boolean,
     )
+
+    /** Reads the open budget again and shows it. */
+    suspend fun reload()
 
     /** Reads the payees, for a transaction form about to open. */
     fun loadPayees()
