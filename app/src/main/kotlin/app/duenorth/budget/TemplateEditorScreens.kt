@@ -303,7 +303,7 @@ private fun TemplateTile(
 
 /** A template's place in the order: its priority filled with the accent, or an outlined word for the two that run last. */
 @Composable
-private fun PriorityBadge(
+internal fun PriorityBadge(
     template: Template,
     modifier: Modifier = Modifier,
 ) {

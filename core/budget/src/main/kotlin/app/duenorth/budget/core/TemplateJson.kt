@@ -31,11 +31,26 @@ object TemplateJson {
     fun parse(
         goalDef: String?,
         scheduleName: (String) -> String? = { null },
-    ): List<Template?> {
+    ): List<Template?> = read(goalDef, scheduleName).map { it.template }
+
+    /** As [parse], keeping each stored automation's own `type`, so one the phone cannot run can still be named. */
+    fun read(
+        goalDef: String?,
+        scheduleName: (String) -> String? = { null },
+    ): List<Stored> {
         if (goalDef.isNullOrBlank()) return emptyList()
-        val array = runCatching { Json.parseToJsonElement(goalDef) }.getOrNull() as? JsonArray ?: return listOf(null)
-        return array.map { (it as? JsonObject)?.let { obj -> runCatching { template(obj, scheduleName) }.getOrNull() } }
+        val array = runCatching { Json.parseToJsonElement(goalDef) }.getOrNull() as? JsonArray ?: return listOf(Stored(null, null))
+        return array.map { element ->
+            val obj = element as? JsonObject
+            Stored(obj?.text("type"), obj?.let { runCatching { template(it, scheduleName) }.getOrNull() })
+        }
     }
+
+    /** One stored automation: its `type` as desktop wrote it, and the [Template] it runs as, null when this port cannot. */
+    data class Stored(
+        val type: String?,
+        val template: Template?,
+    )
 
     private fun template(
         obj: JsonObject,
@@ -103,4 +118,14 @@ object TemplateJson {
 
     private fun JsonObject.number(key: String): BigDecimal? =
         (this[key] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content?.toBigDecimalOrNull()
+}
+
+/** A category's automations as desktop's budget automations store them, for the category page (read-only for now). */
+data class CategoryAutomations(
+    val entries: List<TemplateJson.Stored>,
+) {
+    /** True when every automation is one the phone can run; otherwise runs leave the category alone. */
+    val runnable: Boolean get() = entries.all { it.template != null }
+
+    val templates: List<Template> get() = entries.mapNotNull { it.template }
 }

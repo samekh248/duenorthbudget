@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.CategoryAutomations
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplateChip
 import app.duenorth.budget.core.TemplateKind
@@ -21,6 +22,11 @@ data class TemplatesUi(
     val confirm: String? = null,
     /** The open category's note, which holds its templates. */
     val note: String? = null,
+    /**
+     * The open category's budget automations, when desktop's automations own it (`template_settings.source = ui`):
+     * they, not [note], are what runs, so the page shows them instead of the note's lines.
+     */
+    val automations: CategoryAutomations? = null,
     /** What each line of [note] asks for in the open month; null for a line that is not a template. */
     val amounts: List<Long?> = emptyList(),
     /** The form's template and what it would give this month. */
@@ -106,12 +112,15 @@ class TemplatesHolder internal constructor(
         val budgetId = state.settings.openBudgetId ?: return
         if (!state.formatPrefs.templatesOn) return
         host.scope.launch {
-            val note = withContext(host.io) { host.library.readCategoryNote(budgetId, categoryId) }
+            val (note, automations) =
+                withContext(host.io) {
+                    host.library.readCategoryNote(budgetId, categoryId) to host.library.readCategoryAutomations(budgetId, categoryId)
+                }
             host.mutate { current ->
                 if ((current.route as? ShellRoute.CategoryBudget)?.categoryId ==
                     categoryId
                 ) {
-                    current.copy(templates = current.templates.copy(note = note))
+                    current.copy(templates = current.templates.copy(note = note, automations = automations))
                 } else {
                     current
                 }
@@ -153,6 +162,7 @@ class TemplatesHolder internal constructor(
     fun refreshAmounts() {
         val budgetId = state.settings.openBudgetId ?: return
         val categoryId = openCategoryId() ?: return
+        state.templates.automations?.let { return refreshAutomationAmounts(budgetId, categoryId, it) }
         val note = state.templates.note ?: return
         val entries = TemplateNote.parse(note).entries
         val month = host.editorMonth()
@@ -164,9 +174,28 @@ class TemplatesHolder internal constructor(
         }
     }
 
+    /** What each automation asks for in the open month; none when one of them is a kind the phone cannot run. */
+    private fun refreshAutomationAmounts(
+        budgetId: String,
+        categoryId: String,
+        automations: CategoryAutomations,
+    ) {
+        val month = host.editorMonth()
+        host.scope.launch {
+            val amounts =
+                if (automations.runnable) {
+                    withContext(host.io) { host.library.previewCategoryTemplates(budgetId, categoryId, month, automations.templates) }
+                } else {
+                    automations.entries.map { null }
+                }
+            host.mutate { if (it.templates.automations == automations) it.copy(templates = it.templates.copy(amounts = amounts)) else it }
+        }
+    }
+
     /** Category page → add template, or (with [index]) a line that does not read: the grid of kinds. */
     fun openKinds(index: Int? = null) {
         val categoryId = openCategoryId() ?: return
+        if (state.templates.automations != null) return
         host.push(ShellRoute.TemplateKinds(categoryId, index))
         loadSchedules()
     }
@@ -174,6 +203,7 @@ class TemplatesHolder internal constructor(
     /** A tile tapped: its form, or the kinds grid for a line that does not read. */
     fun openTemplate(index: Int) {
         val categoryId = openCategoryId() ?: return
+        if (state.templates.automations != null) return
         val entry = state.templates.note?.let { TemplateNote.parse(it).entries.getOrNull(index) } ?: return
         val template = entry.template ?: return openKinds(index)
         host.mutate { it.copy(templates = it.templates.copy(preview = null)) }
@@ -266,6 +296,13 @@ class TemplatesHolder internal constructor(
     /** A chip tapped: its template's form, or the kinds grid for a line that does not read. Save and back land on the lanes. */
     fun openChip(chip: TemplateChip) {
         val budgetId = state.settings.openBudgetId ?: return
+        // Automations are changed on desktop for now; their category page shows them.
+        if (chip.managed) {
+            host.push(ShellRoute.CategoryBudget(chip.categoryId))
+            host.mutate { it.copy(editError = null, templates = it.templates.copy(note = null, automations = null)) }
+            loadNote(chip.categoryId)
+            return
+        }
         host.scope.launch {
             val note = withContext(host.io) { host.library.readCategoryNote(budgetId, chip.categoryId) }
             val template =
@@ -292,6 +329,7 @@ class TemplatesHolder internal constructor(
         priority: Int,
     ) {
         val budgetId = state.settings.openBudgetId ?: return
+        if (chip.managed) return
         host.scope.launch {
             noteWrites.withLock {
                 withContext(host.io) {

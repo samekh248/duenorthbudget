@@ -332,6 +332,8 @@ data class TemplateChip(
     val line: String,
     val asks: Long?,
     val given: Long?,
+    /** Desktop's budget automations own the category: [index] counts its automations, not note lines, and the phone does not change them yet. */
+    val managed: Boolean = false,
 )
 
 sealed interface TemplateResult {
@@ -555,7 +557,7 @@ class TemplateEngine(
             given: Long?,
         ): TemplateChip {
             val entry = category.entries[index]
-            return TemplateChip(category.id, category.name, index, entry.template, entry.line, asks, given)
+            return TemplateChip(category.id, category.name, index, entry.template, entry.line, asks, given, category.managed)
         }
         val lanes = mutableListOf<TemplateLane>()
         val priorities = chips { it.priority != null }.mapNotNull { (c, i) -> c.entries[i].template?.priority }.distinct().sorted()
@@ -883,4 +885,26 @@ object CategoryNotes {
     ) {
         SyncSchema.write(session, "notes", categoryId, "note", note.ifBlank { null })
     }
+
+    /** The category's automations when desktop's budget automations own it; null when its note holds its templates. */
+    fun automations(
+        session: SqlSession,
+        categoryId: String,
+    ): CategoryAutomations? {
+        val row =
+            session
+                .query("SELECT goal_def, template_settings FROM categories WHERE id = ?", listOf(categoryId))
+                .firstOrNull() ?: return null
+        if (!TemplateJson.managed(row.str("template_settings"))) return null
+        return CategoryAutomations(TemplateJson.read(row.str("goal_def")) { scheduleName(session, it) })
+    }
+
+    private fun scheduleName(
+        session: SqlSession,
+        scheduleId: String,
+    ): String? =
+        session
+            .query("SELECT name FROM schedules WHERE id = ? AND IFNULL(tombstone, 0) = 0", listOf(scheduleId))
+            .firstOrNull()
+            ?.str("name")
 }
