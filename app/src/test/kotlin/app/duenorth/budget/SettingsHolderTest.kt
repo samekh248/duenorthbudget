@@ -50,6 +50,21 @@ class SettingsHolderTest {
         assertEquals(false, host.state.value.settingsReturn)
     }
 
+    @Test
+    fun serverBudgetsOpenThePickerFromTheBudgetItemOnlyWhenSignedIn() {
+        val host = host("settings-holder-server-budgets")
+        val settings = holder(host)
+        settings.showServerBudgets()
+        assertEquals("signed out, there is no list to pick from", emptyList<ShellRoute>(), host.pushed)
+        host.mutate { it.copy(signedIn = true, route = ShellRoute.Settings, settingsPage = SettingsPage.BUDGET) }
+        settings.showServerBudgets()
+        assertEquals(ShellRoute.OnboardingFiles, host.state.value.route)
+        assertEquals(true, host.state.value.settingsReturn)
+        settings.returnTo()
+        assertEquals(ShellRoute.Settings, host.state.value.route)
+        assertEquals(SettingsPage.BUDGET, host.state.value.settingsPage)
+    }
+
     private fun holder(host: FakeShellHost) = SettingsHolder(host, PayeesHolder(host), ServersHolder(host))
 
     private fun host(name: String): FakeShellHost {

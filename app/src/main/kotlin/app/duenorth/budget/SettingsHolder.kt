@@ -105,6 +105,13 @@ class SettingsHolder internal constructor(
 
     fun showCreate() = openFrom(ShellRoute.Create, SettingsPage.BUDGET)
 
+    /** Settings → budget → budgets on the server: the pick-a-budget page, and back comes to the budget item. */
+    fun showServerBudgets() {
+        if (!state.signedIn) return
+        openFrom(ShellRoute.OnboardingFiles, SettingsPage.BUDGET)
+        host.refreshOnboardingFiles()
+    }
+
     fun showPayees() {
         payees.show()
         host.mutate { it.copy(settingsReturn = true, settingsPage = SettingsPage.BUDGET) }

@@ -171,6 +171,11 @@ class BudgetFilesHolder internal constructor(
     }
 
     fun requestRemote(file: RemoteFile) {
+        // The budget already open is not downloaded over itself; picking it just goes back to it.
+        if (file.fileId == state.settings.openBudgetId) {
+            host.mutate { it.copy(route = ShellRoute.Home, settingsReturn = false, serverError = null) }
+            return
+        }
         // Keep and failures come back to the list the budget was picked from.
         host.mutate {
             it.copy(

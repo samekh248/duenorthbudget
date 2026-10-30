@@ -3,6 +3,7 @@ package app.duenorth.budget
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.CreateResult
+import app.duenorth.budget.core.RemoteFile
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +44,24 @@ class BudgetFilesHolderTest {
         val files = holder(host)
         files.setAskEachTime(false)
         assertEquals(false, host.state.value.budgetFiles.askEachTime)
+    }
+
+    @Test
+    fun pickingTheOpenBudgetFromTheServerListGoesBackToItWithoutADownload() {
+        val host = host("budget-files-holder-open-remote")
+        val home = (host.library.create("Home", "USD") as CreateResult.Created).id
+        host.mutate {
+            it.copy(
+                route = ShellRoute.OnboardingFiles,
+                settingsReturn = true,
+                settings = host.library.settings(),
+                budgets = host.library.list(),
+            )
+        }
+        holder(host).requestRemote(RemoteFile(fileId = home, groupId = "g", name = "Home", encryptKeyId = null))
+        assertEquals(ShellRoute.Home, host.state.value.route)
+        assertEquals(false, host.state.value.syncing)
+        assertEquals(null, host.state.value.budgetFiles.pendingFile)
     }
 
     private fun holder(host: FakeShellHost) =

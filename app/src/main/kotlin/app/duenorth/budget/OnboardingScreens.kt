@@ -73,6 +73,7 @@ object OnboardingScreenCopy {
     const val PICK = "pick a budget"
     const val NEW_BUDGET = "new budget"
     const val ENCRYPTED = "encrypted · asks for its password"
+    const val OPEN_NOW = "open now"
     const val NEXT = "next"
     const val REFRESH = "refresh"
 
@@ -408,6 +409,8 @@ fun OnboardingFilesScreen(
     onOpen: (RemoteFile) -> Unit,
     modifier: Modifier = Modifier,
     replacing: List<String> = emptyList(),
+    /** The budget open on this phone, marked in the list so the person can tell it from the rest. */
+    openId: String? = null,
 ) {
     OnboardingPage(OnboardingScreenCopy.PICK, "onboarding-files", modifier) {
         MetroText(OnboardingScreenCopy.on(label), Metro.typography.subheader, color = Metro.colors.secondary)
@@ -437,6 +440,7 @@ fun OnboardingFilesScreen(
             items(files, key = { it.fileId }) { file ->
                 val captions =
                     listOfNotNull(
+                        OnboardingScreenCopy.OPEN_NOW.takeIf { file.fileId == openId },
                         OnboardingScreenCopy.ENCRYPTED.takeIf { file.encryptKeyId != null },
                         file.fileId.take(6).takeIf { file.name in repeated },
                     )
@@ -448,7 +452,11 @@ fun OnboardingFilesScreen(
                         .padding(vertical = MetroDimens.Row)
                         .testTag("onboarding-file-${file.fileId}"),
                 ) {
-                    MetroText(file.name.ifBlank { file.fileId.take(6) }, Metro.typography.subheader)
+                    MetroText(
+                        file.name.ifBlank { file.fileId.take(6) },
+                        Metro.typography.subheader,
+                        color = if (file.fileId == openId) Metro.accent.text else Metro.colors.foreground,
+                    )
                     if (captions.isNotEmpty()) {
                         MetroText(captions.joinToString(" · "), Metro.typography.caption, color = Metro.colors.secondary)
                     }

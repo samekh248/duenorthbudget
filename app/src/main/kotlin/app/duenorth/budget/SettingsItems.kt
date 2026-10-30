@@ -83,38 +83,57 @@ internal fun BudgetItem(
     onOpen: (String) -> Unit,
     onPayees: () -> Unit,
     onLearning: (Boolean) -> Unit,
+    serverName: String? = null,
+    signedIn: Boolean = false,
+    synced: Boolean = false,
+    onServerBudgets: () -> Unit = {},
 ) {
     val open = budgets.find { it.id == openBudgetId }
+    SettingsHeading("open budget", tag = "settings-method", first = true)
     if (open == null) {
-        SettingsHeading("budgets", first = true)
         MetroText(SettingsCopy.NO_BUDGET, Metro.typography.subheader, Modifier.testTag("settings-open-budget"))
     } else {
-        SettingsHeading("open budget", tag = "settings-method", first = true)
         MetroText(open.name, Metro.typography.subheader, Modifier.testTag("settings-open-budget"), color = Metro.accent.text)
         MetroText(
-            SettingsCopy.method(budgetType),
+            SettingsCopy.method(budgetType) + " · " + SettingsCopy.lives(serverName.takeIf { synced }),
             Metro.typography.body,
             Modifier.testTag("settings-method-value"),
             color = Metro.colors.secondary,
         )
     }
+    // Every way to another budget sits under one heading: the phone's own, then the server's picker.
     val others = budgets.filter { it.id != openBudgetId }
-    if (others.isNotEmpty()) {
-        if (open != null) SettingsHeading("other budgets")
-        others.forEach { budget ->
-            SettingsActionRow(budget.name, "settings-budget-${budget.id}") { onOpen(budget.id) }
-        }
+    val server = serverName?.takeIf { signedIn }
+    if (others.isNotEmpty() || serverName != null) {
+        SettingsHeading(if (open == null) SettingsCopy.OPEN_A_BUDGET else SettingsCopy.OPEN_ANOTHER, tag = "settings-switch")
+    }
+    others.forEach { budget ->
+        SettingsLinkRow(budget.name, SettingsCopy.ON_PHONE, "settings-budget-${budget.id}") { onOpen(budget.id) }
+    }
+    if (server != null) {
+        SettingsLinkRow(SettingsCopy.serverBudgets(server), SettingsCopy.SERVER_BUDGETS_HINT, "settings-server-budgets", onServerBudgets)
+    } else if (serverName != null) {
+        MetroText(
+            SettingsCopy.signInFor(serverName),
+            Metro.typography.body,
+            Modifier.padding(top = 4.dp).testTag("settings-server-budgets-signed-out"),
+            color = Metro.colors.secondary,
+        )
     }
     if (open != null) {
         SettingsHeading("payees")
-        SettingsActionRow("rename and merge payees", "settings-payees", onPayees)
+        SettingsLinkRow(SettingsCopy.RENAME_PAYEES, SettingsCopy.RENAME_PAYEES_HINT, "settings-payees", onPayees)
         // Actual's "learn categories": a payee's usual category becomes a rule.
         SettingsHeading("rules", tag = "settings-rules")
-        ChoiceRow(
-            if (learning) "learn categories  on" else "learn categories",
-            learning,
-            "settings-learning",
-        ) { onLearning(!learning) }
+        Column(Modifier.padding(top = MetroDimens.Row).testTag("settings-learning")) {
+            SwitchRow(SettingsCopy.LEARN, learning, "settings-learning-switch", onLearning)
+            MetroText(
+                SettingsCopy.LEARN_HINT,
+                Metro.typography.caption,
+                Modifier.padding(top = 4.dp),
+                color = Metro.colors.secondary,
+            )
+        }
     }
 }
 
@@ -358,6 +377,27 @@ private fun SettingsActionRow(
             .padding(vertical = MetroDimens.Row)
             .testTag(tag),
     )
+}
+
+/** A row that opens something, with one line under it saying what. */
+@Composable
+private fun SettingsLinkRow(
+    label: String,
+    caption: String,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress(onClick)
+            .padding(vertical = MetroDimens.Row)
+            .testTag(tag),
+    ) {
+        MetroText(label, Metro.typography.subheader)
+        MetroText(caption, Metro.typography.caption, color = Metro.colors.secondary)
+    }
 }
 
 @Composable

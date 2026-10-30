@@ -198,7 +198,7 @@ private fun FeatureRow(
 
 /** A name with an off/on pair at the row's end, the switch the person flips. */
 @Composable
-private fun SwitchRow(
+internal fun SwitchRow(
     label: String,
     on: Boolean,
     tag: String,

@@ -70,10 +70,40 @@ class SettingsContentTest {
         var opened: String? = null
         show(SettingsPage.BUDGET, onOpenBudget = { opened = it })
         compose.onNodeWithTag("settings-open-budget").assertTextEquals("Beta")
-        compose.onNodeWithTag("settings-method-value").assertTextEquals("envelope budget")
+        compose.onNodeWithTag("settings-method-value").assertTextEquals("envelope budget · syncs with home")
         compose.onNodeWithTag("settings-budget-b").assertDoesNotExist()
         compose.onNodeWithTag("settings-budget-a").performClick()
         assertEquals("a", opened)
+    }
+
+    @Test
+    fun budgetItemOpensTheServersBudgetsOnlyWhenSignedIn() {
+        var picker = 0
+        var signedIn by mutableStateOf(false)
+        compose.setContent {
+            MetroTheme {
+                androidx.compose.foundation.layout.Column {
+                    BudgetItem(
+                        budgets = budgets,
+                        openBudgetId = "b",
+                        budgetType = "envelope",
+                        learning = false,
+                        onOpen = {},
+                        onPayees = {},
+                        onLearning = {},
+                        serverName = "home",
+                        signedIn = signedIn,
+                        synced = true,
+                        onServerBudgets = { picker++ },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("settings-server-budgets").assertDoesNotExist()
+        compose.onNodeWithTag("settings-server-budgets-signed-out").assertIsDisplayed()
+        signedIn = true
+        compose.onNodeWithTag("settings-server-budgets").performClick()
+        assertEquals(1, picker)
     }
 
     @Test
