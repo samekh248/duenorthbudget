@@ -51,6 +51,16 @@ internal class FakeShellHost(
 
     override fun clearHistory() = Unit
 
+    val histories = mutableListOf<List<ShellRoute>>()
+
+    override fun replaceHistory(routes: List<ShellRoute>) {
+        histories += routes
+    }
+
+    override fun dropLastHistory() = Unit
+
+    override fun openAddAccount() = push(ShellRoute.AddAccount)
+
     override fun launchWrite(block: suspend (String) -> Unit) {
         val id = state.value.settings.openBudgetId ?: return
         writing = true

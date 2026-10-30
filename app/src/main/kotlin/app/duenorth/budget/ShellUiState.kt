@@ -62,10 +62,8 @@ data class ShellUiState(
     val defaultBudgetName: String = "",
     val shell: MonthShell? = null,
     val register: RegisterPage? = null,
-    /** Transactions picked in the register's select mode; null when not selecting. */
-    val registerSelection: Set<String>? = null,
-    /** The register's search, open over the rows; null when closed. */
-    val registerSearch: RegisterSearch? = null,
+    /** The register's own state, kept by [RegisterHolder]. */
+    val registerUi: RegisterUi = RegisterUi(),
     val categoryTarget: CategoryTarget? = null,
     val createError: String? = null,
     val writeError: String? = null,
@@ -77,8 +75,8 @@ data class ShellUiState(
     val monthReview: MonthReviewPage? = null,
     val netWorth: NetWorthPage? = null,
     val categoryMonth: CategoryMonthPage? = null,
-    val reconcile: ReconcilePage? = null,
-    val reconcileError: String? = null,
+    /** Reconcile's own state, kept by [ReconcileHolder]. */
+    val reconcile: ReconcileUi = ReconcileUi(),
     /** Every schedule, ended ones included, by next date. */
     val schedules: List<ScheduleSummary> = emptyList(),
     /** The schedule [ShellRoute.ScheduleDetails] shows; null while it loads. */

@@ -33,7 +33,7 @@ class InboxSelectTest {
         val target = model.state.value.categoryTarget!!
         assertEquals("2 ${InboxCopy.TRANSACTIONS}", target.payee)
         assertEquals(inbox.take(2).sumOf { it.amountMinor }, target.amountMinor)
-        model.submitCategory(target.categories.first { !it.income }.id)
+        model.register.submitCategory(target.categories.first { !it.income }.id)
         await {
             model.state.value.route == ShellRoute.Home &&
                 model.state.value.shell!!

@@ -46,6 +46,15 @@ internal interface ShellHost {
     /** Forgets the pages back would return to, for a page opened as a new root. */
     fun clearHistory()
 
+    /** Sets the pages back returns through to [routes], the first one last. */
+    fun replaceHistory(routes: List<ShellRoute>)
+
+    /** Forgets the page back would return to next. */
+    fun dropLastHistory()
+
+    /** The add account page, or its first step. */
+    fun openAddAccount()
+
     /** Runs [block] with the open budget's id as the one write in flight, unless one already runs. */
     fun launchWrite(block: suspend (String) -> Unit)
 

@@ -23,7 +23,7 @@ class SaveReturnsTest {
             model.state.value.register!!
                 .rows
                 .first { !it.parent && it.transferId == null }
-        model.openEdit(row.id)
+        model.register.openEdit(row.id)
         save(model, edited(row, accountId))
         assertEquals(ShellRoute.Register(accountId), model.state.value.route)
         model.back()
@@ -34,7 +34,7 @@ class SaveReturnsTest {
     fun aNewTransactionFromTheRegisterGoesBackToTheRegister() {
         val (model, _) = household("save-register-new")
         val accountId = openFirstAccount(model)
-        model.openNewTransaction()
+        model.register.openNew()
         save(model, fresh(accountId))
         assertEquals(ShellRoute.Register(accountId), model.state.value.route)
         model.back()
@@ -44,7 +44,7 @@ class SaveReturnsTest {
     @Test
     fun aNewTransactionFromHomeGoesBackHome() {
         val (model, _) = household("save-home-new")
-        model.showAddTransaction()
+        model.register.showAdd()
         val accountId = (model.state.value.route as ShellRoute.EditTransaction).accountId
         await { model.state.value.register != null }
         save(model, fresh(accountId))
@@ -76,12 +76,12 @@ class SaveReturnsTest {
     fun anEditFromAReconcileGoesBackToTheReconcile() {
         val (model, _) = household("save-reconcile")
         val accountId = openFirstAccount(model)
-        model.openReconcile()
+        model.reconcile.open()
         val row =
             model.state.value.register!!
                 .rows
                 .first { !it.parent && it.transferId == null && !it.reconciled }
-        model.openEdit(row.id)
+        model.register.openEdit(row.id)
         save(model, edited(row, accountId))
         assertEquals(ShellRoute.Reconcile(accountId), model.state.value.route)
         model.back()
@@ -97,7 +97,7 @@ class SaveReturnsTest {
             model.state.value.register!!
                 .rows
                 .first { !it.parent && it.transferId == null }
-        model.openEdit(row.id)
+        model.register.openEdit(row.id)
         save(model, edited(row, other).copy(categoryId = null))
         assertEquals(ShellRoute.Register(accountId), model.state.value.route)
         await {
@@ -113,7 +113,7 @@ class SaveReturnsTest {
     fun aNewTransactionPutInAnotherAccountGoesBackToTheRegisterItCameFrom() {
         val (model, _) = household("save-register-new-move")
         val accountId = openFirstAccount(model)
-        model.openNewTransaction()
+        model.register.openNew()
         save(model, fresh(otherAccount(model, accountId)))
         assertEquals(ShellRoute.Register(accountId), model.state.value.route)
         assertEquals(
@@ -128,12 +128,12 @@ class SaveReturnsTest {
     fun aTransactionMovedOutOfAReconcileGoesBackToTheReconcile() {
         val (model, _) = household("save-reconcile-move")
         val accountId = openFirstAccount(model)
-        model.openReconcile()
+        model.reconcile.open()
         val row =
             model.state.value.register!!
                 .rows
                 .first { !it.parent && it.transferId == null && !it.reconciled }
-        model.openEdit(row.id)
+        model.register.openEdit(row.id)
         save(model, edited(row, otherAccount(model, accountId)).copy(categoryId = null))
         assertEquals(ShellRoute.Reconcile(accountId), model.state.value.route)
     }
@@ -153,7 +153,7 @@ class SaveReturnsTest {
                 .accounts
                 .first { !it.closed && !it.offBudget }
                 .id
-        model.openAccount(accountId)
+        model.register.openAccount(accountId)
         await {
             model.state.value.register
                 ?.account
@@ -167,7 +167,7 @@ class SaveReturnsTest {
         draft: TransactionDraft,
     ) {
         val form = model.state.value.route
-        model.submitTransaction(draft)
+        model.register.submit(draft)
         await { model.state.value.route != form || model.state.value.writeError != null || model.state.value.confirm != null }
         assertEquals(null, model.state.value.writeError)
     }

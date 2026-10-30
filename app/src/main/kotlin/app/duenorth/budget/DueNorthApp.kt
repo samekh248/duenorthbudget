@@ -241,14 +241,14 @@ fun DueNorthApp(model: ShellViewModel) {
                 ScreenBarHandlers(
                     onAdd = {
                         when (state.route) {
-                            is ShellRoute.Register -> model.openNewTransaction()
-                            else -> model.showAddTransaction()
+                            is ShellRoute.Register -> model.register.openNew()
+                            else -> model.register.showAdd()
                         }
                     },
                     onHold = model.envelopes::showHold,
                     onCategories = model.envelopes::showManage,
                     onSettings = model.settingsUi::show,
-                    onReconcile = model::openReconcile,
+                    onReconcile = model.reconcile::open,
                     onImport = {
                         val accountId =
                             (state.route as? ShellRoute.Register)?.accountId ?: return@ScreenBarHandlers
@@ -265,14 +265,14 @@ fun DueNorthApp(model: ShellViewModel) {
                     onSave = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.import.confirm()
-                            is ShellRoute.Reconcile -> model.finishReconcile()
+                            is ShellRoute.Reconcile -> model.reconcile.finish()
                             else -> formSaveHost.save()
                         }
                     },
-                    onClearSelected = { model.setSelectedCleared(true) },
-                    onUnclearSelected = { model.setSelectedCleared(false) },
-                    onEndSelecting = model::endSelecting,
-                    onSearch = model::toggleRegisterSearch,
+                    onClearSelected = { model.register.setSelectedCleared(true) },
+                    onUnclearSelected = { model.register.setSelectedCleared(false) },
+                    onEndSelecting = model.register::endSelecting,
+                    onSearch = model.register::toggleSearch,
                     onRemoveTemplate = model::removeTemplate,
                     onAddTemplate = { model.openTemplateKinds() },
                     onMoveCategory = model.envelopes::openMove,
@@ -286,7 +286,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onCancel = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.import.cancel()
-                            is ShellRoute.Reconcile -> model.cancelReconcile()
+                            is ShellRoute.Reconcile -> model.reconcile.cancel()
                             else -> model.back()
                         }
                     },
@@ -325,7 +325,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onScheduleTransaction = {
                         (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::createScheduleFromTransaction)
                     },
-                    onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model::deleteTransaction) },
+                    onDeleteTransaction = { (state.route as? ShellRoute.EditTransaction)?.transactionId?.let(model.register::delete) },
                     onEditBudget = model::startBudgetEdit,
                     onEndBudgetEdit = model::endBudgetEdit,
                     onCancelBudgetEdit = model::cancelBudgetEdit,

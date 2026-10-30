@@ -41,20 +41,20 @@ internal fun RegisterRoute(
         RegisterScreen(
             page = page,
             onGesture = model::setRegisterGesture,
-            onOpen = model::openEdit,
-            selection = state.registerSelection,
-            onSelect = model::startSelecting,
-            onToggleSelected = model::toggleSelected,
-            onAdd = model::openNewTransaction,
-            onReconcile = model::openReconcile,
+            onOpen = model.register::openEdit,
+            selection = state.registerUi.selection,
+            onSelect = model.register::startSelecting,
+            onToggleSelected = model.register::toggleSelected,
+            onAdd = model.register::openNew,
+            onReconcile = model.reconcile::open,
             onImportFile = {
                 onImportFile(route.accountId)
             },
             modifier = modifier,
-            onMatch = { model.matchTransactions(it, stayOnRegister = true) },
-            onNotAMatch = { model.notAMatch(it, stayOnRegister = true) },
-            search = state.registerSearch,
-            onSearch = model::setRegisterSearch,
+            onMatch = { model.register.match(it, stayOnRegister = true) },
+            onNotAMatch = { model.register.notAMatch(it, stayOnRegister = true) },
+            search = state.registerUi.search,
+            onSearch = model.register::setSearch,
         )
     }
 }
@@ -118,7 +118,7 @@ internal fun EditTransactionRoute(
             initialAmountMinor = prefill?.amountMinor,
             chooseAccount = state.editFromHome,
             error = state.writeError,
-            onSave = model::submitTransaction,
+            onSave = model.register::submit,
             modifier = modifier,
             dateFormat = state.formatPrefs.dateFormat,
             numberFormat = state.formatPrefs.numberFormat,
@@ -141,7 +141,7 @@ internal fun PickCategoryRoute(
         CategoryPickerScreen(
             target = target,
             error = state.writeError,
-            onPick = model::submitCategory,
+            onPick = model.register::submitCategory,
             modifier = modifier,
         )
     }
@@ -159,16 +159,16 @@ internal fun ReconcileRoute(
     } else {
         ReconcileRegisterScreen(
             register = register,
-            page = state.reconcile,
-            error = state.reconcileError,
+            page = state.reconcile.page,
+            error = state.reconcile.error,
             onGesture = model::setRegisterGesture,
-            onStart = model::startReconcile,
-            onToggle = model::toggleReconcileCleared,
-            onSetCleared = model::setReconcileCleared,
-            onOpen = model::openEdit,
-            onAddMissing = model::addMissingForReconcile,
-            onFinish = model::finishReconcile,
-            onCancel = model::cancelReconcile,
+            onStart = model.reconcile::start,
+            onToggle = model.reconcile::toggleCleared,
+            onSetCleared = model.reconcile::setCleared,
+            onOpen = model.register::openEdit,
+            onAddMissing = model.reconcile::addMissing,
+            onFinish = model.reconcile::finish,
+            onCancel = model.reconcile::cancel,
             modifier = modifier,
             today = RegisterEntry.parseDate(state.today) ?: RegisterEntry.parseDate(RegisterEntry.todayIso())!!,
         )

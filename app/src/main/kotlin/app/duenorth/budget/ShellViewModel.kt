@@ -111,6 +111,17 @@ class ShellViewModel(
 
             override fun clearHistory() = history.clear()
 
+            override fun replaceHistory(routes: List<ShellRoute>) {
+                history.clear()
+                history.addAll(routes)
+            }
+
+            override fun dropLastHistory() {
+                history.removeLastOrNull()
+            }
+
+            override fun openAddAccount() = this@ShellViewModel.openAddAccount()
+
             override fun openFromSettings(
                 route: ShellRoute,
                 page: SettingsPage,
@@ -176,6 +187,12 @@ class ShellViewModel(
 
     /** Envelopes: budgeting into categories, moving and holding money, and managing groups and categories. */
     val envelopes: EnvelopesHolder = EnvelopesHolder(host)
+
+    /** The register: an account's transactions, the transaction form, select mode, search and matching. */
+    val register: RegisterHolder = RegisterHolder(host, inbox)
+
+    /** Reconcile: matching an account's cleared transactions to a statement. */
+    val reconcile: ReconcileHolder = ReconcileHolder(host, register)
 
     /** The running server check or sign-in, cancelled by back (spec 011 R11). */
     internal var onboardingJob: Job? = null
@@ -347,13 +364,13 @@ class ShellViewModel(
 
     fun back(): Boolean {
         val current = _state.value
-        if (current.registerSelection != null && current.confirm == null) {
-            endSelecting()
+        if (current.registerUi.selection != null && current.confirm == null) {
+            register.endSelecting()
             return true
         }
         // Back closes the register's search before it leaves the account.
-        if (current.registerSearch != null && current.route is ShellRoute.Register && current.confirm == null) {
-            closeRegisterSearch()
+        if (current.registerUi.search != null && current.route is ShellRoute.Register && current.confirm == null) {
+            register.closeSearch()
             return true
         }
         if (current.inbox.selection != null && current.route == ShellRoute.Home && current.confirm == null) {
@@ -619,11 +636,11 @@ class ShellViewModel(
                             route = ShellRoute.Reconcile(accountId),
                             writeError = null,
                             confirm = null,
-                            registerSelection = null,
+                            registerUi = it.registerUi.copy(selection = null),
                         )
                     }
                     apply(load(accountId), accountId)
-                    reloadReconcile(accountId)
+                    reconcile.reload(accountId)
                     return
                 }
                 if (toRegister) {
@@ -634,7 +651,7 @@ class ShellViewModel(
                             route = ShellRoute.Register(accountId),
                             writeError = null,
                             confirm = null,
-                            registerSelection = null,
+                            registerUi = it.registerUi.copy(selection = null),
                         )
                     }
                 } else {

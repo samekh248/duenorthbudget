@@ -351,7 +351,7 @@ object ScreenBar {
             ),
             state.homeSection,
             state.settings.showHiddenCategories,
-            state.registerSelection != null,
+            state.registerUi.selection != null,
             state.inbox.selection != null,
             state.inbox.selection?.let { InboxPick.of(it, state.shell?.inbox.orEmpty()) } ?: InboxPick.NONE,
             state.shell?.inbox.isNullOrEmpty(),

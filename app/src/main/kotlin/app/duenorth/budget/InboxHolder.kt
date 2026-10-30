@@ -70,7 +70,7 @@ class InboxHolder internal constructor(
                 ?.inbox
                 ?.firstOrNull { it.id == transactionId } ?: return
         host.push(route(row.accountId))
-        host.mutate { it.copy(editFromHome = true, registerSelection = null) }
+        host.mutate { it.copy(editFromHome = true, registerUi = it.registerUi.copy(selection = null)) }
         host.loadPayees()
         host.scope.launch { host.reloadAccount(row.accountId) }
     }
