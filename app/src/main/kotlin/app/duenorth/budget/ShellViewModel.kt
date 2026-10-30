@@ -457,6 +457,10 @@ class ShellViewModel(
             _state.update { it.copy(accounts = it.accounts.copy(forceConfirm = null)) }
             return true
         }
+        if (current.bankSync.unlinking != null && current.route == ShellRoute.BankSyncReport) {
+            bankSync.keepLink()
+            return true
+        }
         if (current.route == ShellRoute.Home) return false
         if (current.route == ShellRoute.BudgetPassword && current.locked) return false
         if (current.route == ShellRoute.ConfirmReplaceBudget) {

@@ -10,8 +10,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.BankSyncFailure
+import app.duenorth.budget.core.BankSyncFix
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
+import app.duenorth.budget.core.SimpleFinError
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -44,6 +47,18 @@ class ConfirmScreenshotTest {
 
     @Test
     fun scheduleDuplicateDark() = snap("confirm_schedule_duplicate_dark", dark = true) { ScheduleDuplicateScreen({}, {}) }
+
+    // Unlink on the failed bank sync's page asks first.
+    @Test
+    fun bankSyncUnlinkLight() = snap("confirm_bank_sync_unlink_light", dark = false) { Unlink() }
+
+    @Test
+    fun bankSyncUnlinkDark() = snap("confirm_bank_sync_unlink_dark", dark = true) { Unlink() }
+
+    @Composable
+    private fun Unlink() {
+        BankSyncUnlinkScreen(BankSyncFailure("Savings", SimpleFinError.ACCOUNT_MISSING, "savings", BankSyncFix.RELINK), {}, {})
+    }
 
     @Composable
     private fun Fill() {

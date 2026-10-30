@@ -16,14 +16,24 @@ internal fun BankSyncReportRoute(
     modifier: Modifier,
 ) {
     val context = LocalContext.current
-    BankSyncReportScreen(state.bankSync.panel, modifier) { failure ->
-        // The bank's own sign-in lives at SimpleFIN Bridge; the rest is mended on the bank link.
-        if (failure.fix == BankSyncFix.SIMPLEFIN) {
-            openWebPage(context, SimpleFinError.BRIDGE_URL)
-        } else {
-            model.bankLink.repair(failure)
-        }
+    val unlinking = state.bankSync.unlinking
+    if (unlinking != null) {
+        BankSyncUnlinkScreen(unlinking, model.bankSync::unlink, model.bankSync::keepLink, modifier)
+        return
     }
+    BankSyncReportScreen(
+        state.bankSync.panel,
+        modifier,
+        onFix = { failure ->
+            // The bank's own sign-in lives at SimpleFIN Bridge; the rest is mended on the bank link.
+            if (failure.fix == BankSyncFix.SIMPLEFIN) {
+                openWebPage(context, SimpleFinError.BRIDGE_URL)
+            } else {
+                model.bankLink.repair(failure)
+            }
+        },
+        onUnlink = model.bankSync::askUnlink,
+    )
 }
 
 @Composable

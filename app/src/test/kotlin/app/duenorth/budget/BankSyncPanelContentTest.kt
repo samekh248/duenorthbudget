@@ -97,6 +97,21 @@ class BankSyncPanelContentTest {
         assertEquals(listOf(attention, token), fixed)
     }
 
+    // Every failed account the page can name by id offers unlink beside its fix, after a single failed sync.
+    @Test
+    fun reportOffersUnlinkForEachLinkedFailure() {
+        val missing = BankSyncFailure("Savings", SimpleFinError.ACCOUNT_MISSING, "savings", BankSyncFix.RELINK)
+        val down = BankSyncFailure("Card", SimpleFinError.SERVER_DOWN, "card")
+        val unnamed = BankSyncFailure("Mystery", "fetch did not finish")
+        val asked = mutableListOf<BankSyncFailure>()
+        val ui = BankSyncUi(running = false, failures = listOf(missing, down, unnamed))
+        compose.setContent { MetroTheme { BankSyncReportScreen(ui, onUnlink = { asked += it }) } }
+        compose.onNodeWithTag("bank-sync-unlink-Savings").assert(hasText(BankSyncCopy.UNLINK)).performClick()
+        compose.onNodeWithTag("bank-sync-unlink-Card").performClick()
+        assertEquals(0, compose.onAllNodesWithTagCount("bank-sync-unlink-Mystery"))
+        assertEquals(listOf(missing, down), asked)
+    }
+
     private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.onAllNodesWithTagCount(tag: String) =
         onAllNodes(
             androidx.compose.ui.test
