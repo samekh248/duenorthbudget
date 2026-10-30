@@ -75,7 +75,7 @@ class BudgetEditHolder internal constructor(
         host.mutate { it.copy(budgetEdit = null, editError = null) }
         if (shell == null || edit.budgetId != shell.budgetId || edit.month != shell.month) return
         val saved = shell.groups.flatMap { it.categories }.associate { it.id to it.budgetedMinor }
-        // Templates rerun on save, so every amount goes host.back over theirs; otherwise only what changed. A fill can
+        // Templates rerun on save, so every amount goes back over theirs; otherwise only what changed. A fill can
         // reach categories the budget is not showing, which are saved as they are.
         val changed = if (edit.templates != null) edit.budgeted else edit.budgeted.filter { (id, minor) -> saved[id] != minor }
         if (changed.isNotEmpty() || edit.templates != null) envelopes.saveBudgets(shell.month, changed, edit.templates)
@@ -151,7 +151,7 @@ class BudgetEditHolder internal constructor(
                             ?.currency
                             ?.decimals ?: 2
                     val minor = MoneyMath.evaluate(edit.text, prefs.numberFormat, decimals, category.budgetedMinor)
-                    // A negative result would read host.back as "take this off", so it stays as typed.
+                    // A negative result would read back as "take this off", so it stays as typed.
                     if (minor == null || minor < 0) edit.text else prefs.editAmount(minor, decimals)
                 }
                 else -> edit.text + key
@@ -188,7 +188,7 @@ class BudgetEditHolder internal constructor(
 
     /**
      * The move screen's save while editing: moves [amountText] of [fromCategoryId]'s available to [toCategoryId]
-     * (or host.back to to budget) in the sandbox, the way a saved move would, and returns to the boxes.
+     * (or back to to budget) in the sandbox, the way a saved move would, and returns to the boxes.
      */
     fun move(
         fromCategoryId: String,

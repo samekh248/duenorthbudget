@@ -33,6 +33,9 @@ internal interface ShellHost {
     /** Where file and network work runs. */
     val io: CoroutineDispatcher
 
+    /** [io] one task at a time, in the order they were started, for writes that must land in order. */
+    val orderedIo: CoroutineDispatcher
+
     /** True while a write runs; [launchWrite] drops another until it ends. */
     val writing: Boolean
 

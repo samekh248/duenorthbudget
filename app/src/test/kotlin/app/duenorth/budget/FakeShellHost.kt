@@ -32,6 +32,7 @@ internal class FakeShellHost(
     override val state = MutableStateFlow(start)
     override val scope = CoroutineScope(Dispatchers.Unconfined)
     override val io = Dispatchers.Unconfined
+    override val orderedIo = Dispatchers.Unconfined
     override var writing = false
     val pushed = mutableListOf<ShellRoute>()
     var backs = 0

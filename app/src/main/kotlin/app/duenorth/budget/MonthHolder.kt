@@ -76,7 +76,7 @@ class MonthHolder internal constructor(
         host.mutate { it.copy(monthUi = it.monthUi.copy(fillConfirm = null)) }
     }
 
-    /** From category budget: move part of the category's budget host.back to to-budget. */
+    /** From category budget: move part of the category's budget back to to-budget. */
     fun openToBudget() {
         val categoryId = (state.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
         if (state.shell?.mode != BudgetMode.ENVELOPE) return
@@ -84,13 +84,13 @@ class MonthHolder internal constructor(
         host.mutate { it.copy(editError = null) }
     }
 
-    /** Paints the lower budget and higher to-budget first, and rolls host.back on a refusal. */
+    /** Paints the lower budget and higher to-budget first, and rolls back on a refusal. */
     fun submitToBudget(amountText: String) {
         val categoryId = (state.route as? ShellRoute.ToBudget)?.categoryId ?: return
         transferToBudget(categoryId, amountText)
     }
 
-    /** Moves [amountText] of [categoryId]'s budget host.back to to budget, then goes host.back a page. Envelope only. */
+    /** Moves [amountText] of [categoryId]'s budget back to to budget, then goes back a page. Envelope only. */
     fun transferToBudget(
         categoryId: String,
         amountText: String,

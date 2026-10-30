@@ -164,7 +164,7 @@ internal fun CreateRoute(
         modifier = modifier,
         defaultName = draft?.createName?.ifBlank { null } ?: state.defaultBudgetName,
         defaultCurrency = draft?.createCurrency ?: Currencies.forLocale(Locale.getDefault()),
-        onDraft = if (draft == null) null else model::onboardingCreateDraft,
+        onDraft = if (draft == null) null else model.onboarding::createDraft,
     )
 }
 
@@ -175,8 +175,8 @@ internal fun WelcomeRoute(
     modifier: Modifier,
 ) {
     WelcomeScreen(
-        onServer = model::onboardingChooseServer,
-        onPhone = model::onboardingChoosePhone,
+        onServer = model.onboarding::chooseServer,
+        onPhone = model.onboarding::choosePhone,
         modifier = modifier,
     )
 }
@@ -192,9 +192,9 @@ internal fun OnboardingAddressRoute(
         address = onboarding?.progress?.addressText.orEmpty(),
         checking = onboarding?.checking == true,
         error = onboarding?.addressError,
-        onAddress = model::onboardingAddress,
-        onNext = model::onboardingCheck,
-        onPhone = model::onboardingChoosePhone,
+        onAddress = model.onboarding::setAddress,
+        onNext = model.onboarding::check,
+        onPhone = model.onboarding::choosePhone,
         modifier = modifier,
         offerPhone = onboarding?.progress?.origin != OnboardingOrigin.SETTINGS,
     )
@@ -215,9 +215,9 @@ internal fun OnboardingSignInRoute(
         label = onboarding?.progress?.instanceLabel.orEmpty(),
         checking = onboarding?.checking == true || state.syncing,
         error = onboarding?.signInError,
-        onLabel = model::onboardingLabel,
-        onSignIn = model::onboardingSignIn,
-        onBrowser = model::onboardingBrowser,
+        onLabel = model.onboarding::setLabel,
+        onSignIn = model.onboarding::signIn,
+        onBrowser = model.onboarding::browser,
         modifier = modifier,
         secure = ready.isEmpty() || ServerAddress.isSecure(ready),
         replacing =
@@ -242,7 +242,7 @@ internal fun OnboardingFilesRoute(
                     .orEmpty(),
         files = state.remoteFiles,
         error = state.serverError,
-        onOpen = model::onboardingOpen,
+        onOpen = model.onboarding::open,
         modifier = modifier,
         replacing = state.budgets.map { it.name },
     )

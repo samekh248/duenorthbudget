@@ -24,7 +24,7 @@ class BankLinkHolder internal constructor(
     }
 
     /**
-     * A failed account's fix on the bank host.sync page that the phone can carry out: SimpleFIN picked on its bank
+     * A failed account's fix on the bank sync page that the phone can carry out: SimpleFIN picked on its bank
      * link, asking for a new setup token when SimpleFIN refused the old one, or listing its accounts to link again.
      */
     fun repair(failure: BankSyncFailure) {

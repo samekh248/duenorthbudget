@@ -29,7 +29,6 @@ import app.duenorth.budget.design.MonthWindow
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -86,6 +85,7 @@ class ShellViewModel(
             override val bankSyncTransport get() = this@ShellViewModel.bankSyncTransport
             override val probe get() = this@ShellViewModel.probe
             override val io get() = this@ShellViewModel.io
+            override val orderedIo = this@ShellViewModel.io.limitedParallelism(1)
             override val writing get() = this@ShellViewModel.writing
 
             override fun mutate(transform: (ShellUiState) -> ShellUiState) = this@ShellViewModel.mutate(transform)
@@ -121,7 +121,7 @@ class ShellViewModel(
 
             override fun openAddAccount() = accounts.openAdd()
 
-            override fun finishOnboarding() = this@ShellViewModel.finishOnboarding()
+            override fun finishOnboarding() = onboarding.finish()
 
             override suspend fun startGetStarted(budgetId: String) = getStarted.start(budgetId)
 
@@ -178,12 +178,12 @@ class ShellViewModel(
 
             override fun signOut(preferSettings: Boolean) = budgetFiles.signOut(preferSettings)
 
-            override fun refreshOnboardingFiles() = onboardingRefresh()
+            override fun refreshOnboardingFiles() = onboarding.refreshFiles()
 
             override fun finishBrowserSignIn(
                 saved: OnboardingProgress,
                 error: String?,
-            ) = this@ShellViewModel.finishBrowserSignIn(saved, error)
+            ) = onboarding.finishBrowserSignIn(saved, error)
 
             override suspend fun reloadAccount(accountId: String) = apply(load(accountId), accountId)
         }
@@ -245,11 +245,8 @@ class ShellViewModel(
     /** The budget's edit mode: its boxes and keypad, fills and templates into them, and done or cancel. */
     val budgetEdit: BudgetEditHolder = BudgetEditHolder(host, envelopes)
 
-    /** The running server check or sign-in, cancelled by back (spec 011 R11). */
-    internal var onboardingJob: Job? = null
-
-    /** `onboarding.json` writes, one at a time and in order. */
-    internal val onboardingWrites = io.limitedParallelism(1)
+    /** First run, and settings' add server path through the same pages. */
+    val onboarding: OnboardingHolder = OnboardingHolder(host, settingsUi, servers, budgetFiles)
 
     /** When the last sync the screen started without being asked began, in epoch millis; launch syncs at start. */
     private var lastScreenSync = System.currentTimeMillis()
@@ -270,9 +267,9 @@ class ShellViewModel(
     init {
         library.onLocalChange = localChange
         viewModelScope.launch {
-            restoreOnboarding()
+            onboarding.restore()
             reload()
-            resumeOnboarding()
+            onboarding.resume()
             val id = _state.value.settings.openBudgetId ?: return@launch
             if (_state.value.locked) return@launch
             // Launch fetches the banks first, so the sync after sends what they brought to the server.
@@ -463,7 +460,7 @@ class ShellViewModel(
             budgetFiles.cancelReplaceBudget()
             return true
         }
-        onboardingBack()?.let { return it }
+        onboarding.stepBack()?.let { return it }
         if (current.settingsReturn && current.route != ShellRoute.Settings) {
             settingsUi.returnTo()
             return true
@@ -822,7 +819,7 @@ class ShellViewModel(
                 when {
                     loaded.locked -> ShellRoute.BudgetPassword
                     visibleShell == null && current.route == ShellRoute.Home ->
-                        if (loaded.budgets.isEmpty()) onboardingRoute(current.onboarding?.progress) else ShellRoute.Create
+                        if (loaded.budgets.isEmpty()) onboarding.route(current.onboarding?.progress) else ShellRoute.Create
                     else -> current.route
                 }
             val reviewMonth =

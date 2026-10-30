@@ -131,7 +131,7 @@ class AccountsHolder internal constructor(
         }
     }
 
-    /** Closes and paints the account gone before the write lands; a refusal puts it host.back. */
+    /** Closes and paints the account gone before the write lands; a refusal puts it back. */
     fun submitClose(
         destinationId: String?,
         categoryId: String?,
@@ -264,7 +264,7 @@ class AccountsHolder internal constructor(
         }
     }
 
-    /** A closed account's register makes no sense to return to; go host.back past it. */
+    /** A closed account's register makes no sense to return to; go back past it. */
     private fun leaveFlow() {
         host.back()
         if (state.route is ShellRoute.Register && !state.settings.showClosedAccounts) host.back()
