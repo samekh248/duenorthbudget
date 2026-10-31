@@ -215,9 +215,6 @@ class ShellViewModel(
     /** Reconcile: matching an account's cleared transactions to a statement. */
     val reconcile: ReconcileHolder = ReconcileHolder(host, register)
 
-    /** The assistant: what the checks found, and their fixes. */
-    val assistant: AssistantHolder = AssistantHolder(host, register, reconcile, bankSync)
-
     /** Budget files: creating, opening, switching and replacing a budget, unlocking it, signing out and syncing it. */
     val budgetFiles: BudgetFilesHolder = BudgetFilesHolder(host, samples, developerMode, settingsUi)
 
@@ -238,6 +235,9 @@ class ShellViewModel(
 
     /** Schedules: the pivot, a schedule's page and editor, and posting or skipping one. */
     val schedules: SchedulesHolder = SchedulesHolder(host, rules)
+
+    /** The assistant: what the checks found, and their fixes. */
+    val assistant: AssistantHolder = AssistantHolder(host, register, reconcile, bankSync, envelopes, schedules)
 
     /** Bank link: linking an account to a bank, and repairing a link. */
     val bankLink: BankLinkHolder = BankLinkHolder(host)

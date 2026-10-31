@@ -10,6 +10,7 @@ import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.Finding
 import app.duenorth.budget.core.FindingAction
+import app.duenorth.budget.core.FindingFigure
 import app.duenorth.budget.core.FindingKind
 import app.duenorth.budget.core.FindingSide
 import app.duenorth.budget.core.FindingSure
@@ -61,7 +62,7 @@ class AssistantScreenshotTest {
             "assistant_all_light",
             dark = false,
             report =
-                AssistantReport(sampleAssistant().findings + sampleAssistantMore().findings),
+                AssistantReport(sampleAssistant().findings + sampleAssistantBudget().findings + sampleAssistantMore().findings),
         )
 
     @Test
@@ -72,6 +73,28 @@ class AssistantScreenshotTest {
             report = AssistantReport(sampleAssistantMore().findings.drop(2)),
             expanded = setOf(FindingKind.STALE_SYNC, FindingKind.RECONCILE),
         )
+
+    @Test
+    fun budgetLight() =
+        snap(
+            "assistant_budget_light",
+            dark = false,
+            report = sampleAssistantBudget(),
+            expanded = setOf(FindingKind.OVERSPENT),
+        )
+
+    @Test
+    fun billsDark() =
+        snap(
+            "assistant_bills_dark",
+            dark = true,
+            report = AssistantReport(sampleAssistantBudget().findings.takeLast(2)),
+            expanded = setOf(FindingKind.BILLS_AHEAD, FindingKind.BANK_BALANCE),
+        )
+
+    @Test
+    fun oneKindStartsOpenLight() =
+        snap("assistant_one_kind_light", dark = false, report = AssistantReport(sampleAssistantBudget().findings.take(1)))
 
     @Test
     fun clearLight() = snap("assistant_clear_light", dark = false, report = AssistantReport.EMPTY)
@@ -251,3 +274,75 @@ internal fun sampleAssistantMore(): AssistantReport {
         ),
     )
 }
+
+internal fun sampleAssistantBudget(): AssistantReport =
+    AssistantReport(
+        listOf(
+            Finding(
+                key = "overspent:202610|dining|-4280",
+                kind = FindingKind.OVERSPENT,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.overspent("Dining"),
+                sides = emptyList(),
+                reasons = emptyList(),
+                actions = listOf(FindingAction.BudgetCategory("dining"), FindingAction.Dismiss(AssistantCopy.LATER)),
+                accountId = "",
+                figures =
+                    listOf(
+                        FindingFigure(AssistantCopy.BUDGETED, 20000),
+                        FindingFigure(AssistantCopy.SPENT, -24280),
+                        FindingFigure(AssistantCopy.AVAILABLE, -4280),
+                    ),
+            ),
+            Finding(
+                key = "below:202610|car|15000",
+                kind = FindingKind.UNDERFUNDED,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.underfunded("Car repairs", longGoal = false),
+                sides = emptyList(),
+                reasons = emptyList(),
+                actions = listOf(FindingAction.BudgetCategory("car"), FindingAction.Dismiss(AssistantCopy.LATER)),
+                accountId = "",
+                figures = listOf(FindingFigure(AssistantCopy.BUDGETED, 15000), FindingFigure(AssistantCopy.GOAL, 25000)),
+            ),
+            Finding(
+                key = "tobudget:202610|31250",
+                kind = FindingKind.TO_BUDGET,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.toBudget("October", over = false),
+                sides = emptyList(),
+                reasons = emptyList(),
+                actions = listOf(FindingAction.HoldForNext, FindingAction.Dismiss(AssistantCopy.LATER)),
+                accountId = "",
+                figures = listOf(FindingFigure(AssistantCopy.TO_BUDGET, 31250)),
+            ),
+            Finding(
+                key = "bills:20261105|checking|-42100",
+                kind = FindingKind.BILLS_AHEAD,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.billsAhead("Checking", "nov 5", 14),
+                sides = emptyList(),
+                reasons = emptyList(),
+                actions = listOf(FindingAction.OpenSchedules, FindingAction.Dismiss(AssistantCopy.LATER)),
+                accountId = "checking",
+                figures =
+                    listOf(
+                        FindingFigure(AssistantCopy.BALANCE_NOW, 112900),
+                        FindingFigure(AssistantCopy.dueIn(14), -155000),
+                        FindingFigure(AssistantCopy.LOWEST, -42100),
+                    ),
+            ),
+            Finding(
+                key = "balance:checking|118900|112900",
+                kind = FindingKind.BANK_BALANCE,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.bankBalance("Checking"),
+                sides = emptyList(),
+                reasons = emptyList(),
+                actions = listOf(FindingAction.Reconcile("checking"), FindingAction.Dismiss(AssistantCopy.LATER)),
+                accountId = "checking",
+                difference = 6000,
+                figures = listOf(FindingFigure(AssistantCopy.AT_THE_BANK, 118900), FindingFigure(AssistantCopy.IN_REGISTER, 112900)),
+            ),
+        ),
+    )

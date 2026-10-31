@@ -249,7 +249,128 @@ class AssistantTest {
         }
     }
 
-    private fun read(session: SqlSession) = AssistantReader.read(session, TODAY)
+    @Test
+    fun anOverspentCategoryAndOverbudgetingShowInEnvelopeMode() {
+        db { session ->
+            entered(session, "dinner", date = 20261012, account = "checking", amount = -5420, category = "c-dining")
+            val budget = readAll(session).findings.filter { it.kind.group == FindingGroup.BUDGET }
+            val overspent = budget.single()
+            assertEquals(FindingKind.OVERSPENT, overspent.kind)
+            assertEquals(FindingAction.BudgetCategory("c-dining"), overspent.actions.first())
+            assertEquals(FindingFigure(AssistantCopy.AVAILABLE, -5420), overspent.figures.last())
+            assertEquals("overspent:202610|c-dining|-5420", overspent.key)
+
+            // Covered, but with money the month does not have: to budget goes below zero.
+            session.exec("INSERT INTO zero_budgets (id, month, category, amount) VALUES ('202610-c-dining', 202610, 'c-dining', 6000)")
+            val after = readAll(session).findings.filter { it.kind.group == FindingGroup.BUDGET }
+            assertEquals(listOf(FindingKind.TO_BUDGET), after.map { it.kind })
+            assertEquals("You've budgeted more in October than you have.", after.single().headline)
+            assertEquals(FindingFigure(AssistantCopy.TO_BUDGET, -6000), after.single().figures.single())
+
+            session.exec("UPDATE preferences SET value = 'tracking' WHERE id = 'budgetType'")
+            assertTrue(readAll(session).findings.none { it.kind.group == FindingGroup.BUDGET && it.kind != FindingKind.BILLS_AHEAD })
+        }
+    }
+
+    @Test
+    fun aCategoryUnderItsGoalIsBelowGoal() {
+        db { session ->
+            session.exec("INSERT INTO category_groups (id, name, is_income, sort_order) VALUES ('g-in', 'Income', 1, 1)")
+            session.exec("INSERT INTO categories (id, name, is_income, cat_group) VALUES ('c-pay', 'Pay', 1, 'g-in')")
+            insert(session, "pay", 20261001, 50000, "checking", "p-bank", "c-pay", null, "f-pay", "ACME PAYROLL")
+            session.exec(
+                "INSERT INTO zero_budgets (id, month, category, amount, goal) VALUES ('202610-c-dining', 202610, 'c-dining', 10000, 20000)",
+            )
+            val below = readAll(session).findings.filter { it.kind.group == FindingGroup.BUDGET }
+            assertEquals(listOf(FindingKind.UNDERFUNDED, FindingKind.TO_BUDGET), below.map { it.kind })
+            assertEquals(listOf(FindingFigure(AssistantCopy.BUDGETED, 10000), FindingFigure(AssistantCopy.GOAL, 20000)), below[0].figures)
+            assertEquals(FindingAction.HoldForNext, below[1].actions.first())
+        }
+    }
+
+    @Test
+    fun billsDueBeforeTheMoneyIsThereAreBillsAhead() {
+        db { session ->
+            session.exec("UPDATE preferences SET value = 'tracking' WHERE id = 'budgetType'")
+            insert(session, "pay", 20261001, 20000, "checking", "p-bank", null, null, "f-pay", "ACME PAYROLL")
+            insert(session, "rent", 20261005, -15000, "checking", "p-gas", null, null, "f-rent", "RENT")
+            val made = SchedulesBook(session, { TODAY }).createFromTransaction("rent", "monthly", "2026-11-05")
+            assertTrue(made.toString(), made !is ScheduleWriteResult.Rejected)
+            val bills = readAll(session).findings.single { it.kind == FindingKind.BILLS_AHEAD }
+            assertEquals("checking", bills.accountId)
+            assertEquals("bills:20261105|checking|-10000", bills.key)
+            assertEquals(
+                listOf(
+                    FindingFigure(AssistantCopy.BALANCE_NOW, 5000),
+                    FindingFigure(AssistantCopy.dueIn(BudgetChecks.BILLS_DAYS), -15000),
+                    FindingFigure(AssistantCopy.LOWEST, -10000),
+                ),
+                bills.figures,
+            )
+            // A day dismissed once it has gone by is forgotten at the next dismissal.
+            AssistantBook(session, TODAY).dismiss(bills.key)
+            AssistantBook(session, LocalDate.of(2026, 11, 6)).dismiss("other:x")
+            assertEquals(setOf("other:x"), AssistantBook.dismissed(session))
+        }
+    }
+
+    @Test
+    fun aBankBalanceThatIsNotTheRegistersIsAMismatch() {
+        db { session ->
+            val now = TODAY.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            session.exec(
+                """
+                UPDATE accounts SET account_sync_source = 'simpleFin', account_id = 'b-1', last_sync = ?, balance_current = 5000
+                WHERE id = 'checking'
+                """.trimIndent(),
+                listOf(now.toString()),
+            )
+            bank(session, "pay", date = 20261020, account = "checking", amount = 4000, financialId = "f-pay")
+            val mismatch = read(session).findings.single()
+            assertEquals(FindingKind.BANK_BALANCE, mismatch.kind)
+            assertEquals(1000L, mismatch.difference)
+            assertEquals(FindingAction.Reconcile("checking"), mismatch.actions.first())
+            session.exec("UPDATE accounts SET balance_current = 4000 WHERE id = 'checking'")
+            assertTrue(read(session).findings.isEmpty())
+        }
+    }
+
+    @Test
+    fun bankSyncKeepsTheBanksBalance() {
+        db { session ->
+            session.exec("UPDATE accounts SET account_sync_source = 'simpleFin', account_id = 'b-1' WHERE id = 'checking'")
+            val transport =
+                object : BankSyncTransport {
+                    override fun fetchTransactions(
+                        serverAddress: String,
+                        token: String,
+                        bankAccountId: String,
+                        startDateIso: String,
+                    ): List<ParsedImportRow> = emptyList()
+
+                    override fun fetchAccount(
+                        serverAddress: String,
+                        token: String,
+                        bankAccountId: String,
+                        startDateIso: String,
+                    ) = BankFetch(listOf(ParsedImportRow(20261020, "Pay", 4000, financialId = "n1")), 12345)
+                }
+            BankSyncBook(session, transport).syncAll("https://example.test", "token", TODAY, 1L, {
+                java.util.UUID
+                    .randomUUID()
+                    .toString()
+            })
+            assertEquals(
+                12345L,
+                session.query("SELECT balance_current FROM accounts WHERE id = 'checking'").single().long("balance_current"),
+            )
+        }
+    }
+
+    /** The transaction and account checks; the budget checks have tests of their own. */
+    private fun read(session: SqlSession) = AssistantReport(readAll(session).findings.filter { it.kind.group != FindingGroup.BUDGET })
+
+    private fun readAll(session: SqlSession) = AssistantReader.read(session, TODAY)
 
     private fun entered(
         session: SqlSession,

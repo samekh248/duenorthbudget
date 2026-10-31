@@ -27,6 +27,8 @@ class AssistantHolder internal constructor(
     private val register: RegisterHolder,
     private val reconcile: ReconcileHolder,
     private val bankSync: BankSyncHolder,
+    private val envelopes: EnvelopesHolder,
+    private val schedules: SchedulesHolder,
 ) {
     private val state get() = host.state.value
 
@@ -64,6 +66,9 @@ class AssistantHolder internal constructor(
                 reconcile.open()
                 return
             }
+            is FindingAction.BudgetCategory -> return envelopes.openBudget(action.categoryId)
+            FindingAction.HoldForNext -> return envelopes.showHold()
+            FindingAction.OpenSchedules -> return schedules.open()
             FindingAction.SyncBank -> {
                 // Hidden while the sync runs; the reload after it shows the account again if it is still behind.
                 update { it.copy(settling = it.settling + finding.key) }
@@ -89,11 +94,19 @@ class AssistantHolder internal constructor(
                         is FindingAction.OpenAccount,
                         is FindingAction.Reconcile,
                         FindingAction.SyncBank,
+                        is FindingAction.BudgetCategory,
+                        FindingAction.HoldForNext,
+                        FindingAction.OpenSchedules,
                         -> WriteResult.Saved
                     }
                 }
             if (result !is WriteResult.Saved) update { it.copy(settling = it.settling - finding.key) }
-            host.publish(result, finding.accountId, stayOnRegister = false)
+            // A budget finding belongs to no account: a save just reads the budget again.
+            if (finding.accountId.isBlank() && result is WriteResult.Saved) {
+                host.reload()
+            } else {
+                host.publish(result, finding.accountId, stayOnRegister = false)
+            }
         }
     }
 

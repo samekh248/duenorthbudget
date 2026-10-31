@@ -32,6 +32,7 @@ import app.duenorth.budget.core.AssistantReport
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.Finding
 import app.duenorth.budget.core.FindingAction
+import app.duenorth.budget.core.FindingFigure
 import app.duenorth.budget.core.FindingKind
 import app.duenorth.budget.core.FindingSide
 import app.duenorth.budget.core.FindingSure
@@ -50,7 +51,7 @@ import kotlin.math.abs
 
 /**
  * The assistant pivot item: a count of what needs a look, then a card for each kind of finding with its count in a
- * circle. The cards start collapsed so every kind shows at once; a tap opens one to its findings, each with its fix
+ * circle. The cards start collapsed so every kind shows at once (a lone kind starts open); a tap opens one to its findings, each with its fix
  * and its "that's fine" side by side.
  */
 @Composable
@@ -90,8 +91,10 @@ fun AssistantSection(
                 "assistant-count",
             )
         }
+        // With one kind there is nothing to scan past, so it starts open; a tap still closes it.
+        val alone = byKind.size == 1
         byKind.forEach { (kind, all) ->
-            val open = kind in expanded
+            val open = (kind in expanded) != alone
             item(key = "kind-${kind.name}") {
                 KindCard(kind, all.size, open, Modifier.padding(top = 12.dp)) { onToggleExpanded(kind) }
             }
@@ -187,6 +190,7 @@ internal fun FindingPanel(
         finding.sides.forEachIndexed { index, side ->
             FindingSideLine(side, money, showAccount = finding.kind == FindingKind.WRONG_ACCOUNT || index == 0)
         }
+        if (finding.figures.isNotEmpty()) FindingFigures(finding.figures, money)
         FindingReasons(finding.reasons + listOfNotNull(finding.difference?.let { AssistantCopy.offBy(money(abs(it))) }))
         MetroButtonGrid(Modifier.padding(top = 12.dp)) {
             finding.actions.forEachIndexed { index, action ->
@@ -223,6 +227,34 @@ private fun FindingSideLine(
             )
         }
         MetroText(money(side.side.amountMinor), Metro.typography.body, maxLines = 1, softWrap = false)
+    }
+}
+
+/** The amounts behind a finding, a label on the left and its amount on the right; a negative one in red. */
+@Composable
+private fun FindingFigures(
+    figures: List<FindingFigure>,
+    money: (Long) -> String,
+) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        figures.forEach { figure ->
+            Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.Bottom) {
+                MetroText(
+                    figure.label,
+                    Metro.typography.caption,
+                    Modifier.weight(1f).padding(end = 12.dp),
+                    color = Metro.colors.secondary,
+                    maxLines = 1,
+                )
+                MetroText(
+                    money(figure.amountMinor),
+                    Metro.typography.body,
+                    color = if (figure.amountMinor < 0) Metro.colors.error else Metro.colors.foreground,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+        }
     }
 }
 
