@@ -13,6 +13,21 @@ object AssistantCopy {
     const val MAYBE = "maybe"
     const val TO_LOOK_AT = "to look at"
 
+    /** What a finding says in place of its buttons while its fix is being saved. */
+    fun working(action: FindingAction): String =
+        when (action) {
+            is FindingAction.MergePayees -> "merging payees\u2026"
+            is FindingAction.Merge, is FindingAction.Match, is FindingAction.MoveAndMatch, is FindingAction.AdoptAndMatch ->
+                "merging\u2026"
+            is FindingAction.Delete -> "deleting\u2026"
+            is FindingAction.MoveTo -> "moving\u2026"
+            is FindingAction.LinkTransfer -> "linking\u2026"
+            is FindingAction.MakeRule -> "making the rule\u2026"
+            is FindingAction.MakeSchedule -> "making the schedule\u2026"
+            is FindingAction.PostSchedule -> "entering the bill\u2026"
+            else -> "saving\u2026"
+        }
+
     const val BANK_SYNC = "bank sync"
     const val FILE_IMPORT = "file import"
     const val ENTERED = "you entered"

@@ -341,6 +341,7 @@ fun DueNorthApp(model: ShellViewModel) {
             actions,
             syncing = state.syncing || state.import.fetchPending,
             progress = state.syncProgress,
+            working = state.writing || state.assistant.working != null,
             bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
             overBar =
                 state.bankSync.panel

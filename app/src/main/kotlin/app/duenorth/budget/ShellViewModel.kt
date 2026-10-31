@@ -671,11 +671,13 @@ class ShellViewModel(
         if (writing) return
         val budgetId = _state.value.settings.openBudgetId ?: return
         writing = true
+        _state.update { it.copy(writing = true) }
         viewModelScope.launch {
             try {
                 block(budgetId)
             } finally {
                 writing = false
+                _state.update { it.copy(writing = false) }
             }
         }
     }
