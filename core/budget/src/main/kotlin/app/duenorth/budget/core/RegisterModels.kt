@@ -281,6 +281,10 @@ sealed interface ForcedWrite {
         val transactionIds: List<String>,
         val cleared: Boolean,
     ) : ForcedWrite
+
+    data class Merge(
+        val transactionIds: List<String>,
+    ) : ForcedWrite
 }
 
 sealed interface WriteResult {

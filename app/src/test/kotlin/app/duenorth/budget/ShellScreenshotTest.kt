@@ -29,6 +29,7 @@ import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SimpleFinError
+import app.duenorth.budget.core.TransactionMerge
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
@@ -361,6 +362,29 @@ class ShellScreenshotTest {
     @Test
     fun inboxSelectMicaDark() = selectSnap("style_mica_inbox_select_dark", dark = true, setOf("coffee", "shell"), MetroStyle.Mica)
 
+    // Two checked rows of one account and amount, the bank's copy and the one entered by hand: merge joins the bar.
+    @Test
+    fun inboxSelectMergeLight() = mergeSnap("inbox_select_merge_light", dark = false)
+
+    @Test
+    fun inboxSelectMergeDark() = mergeSnap("inbox_select_merge_dark", dark = true)
+
+    private fun mergeSnap(
+        name: String,
+        dark: Boolean,
+    ) = snap(
+        name,
+        dark = dark,
+        shell =
+            sample().let {
+                val coffee = it.inbox.first { row -> row.id == "coffee" }
+                val bank = coffee.copy(id = "coffee-bank", payee = "CORNER COFFEE #42", date = 20261016)
+                it.copy(inbox = listOf(bank, coffee) + it.inbox.filter { row -> row.id in setOf("shell", "atm") })
+            },
+        section = HomeSections.headers.indexOf(HomeSections.INBOX),
+        selection = setOf("coffee", "coffee-bank"),
+    )
+
     private fun selectSnap(
         name: String,
         dark: Boolean,
@@ -477,6 +501,10 @@ class ShellScreenshotTest {
                                                 homeSection = ScreenBar.HOME_INBOX,
                                                 inboxSelecting = true,
                                                 inboxPick = InboxPick.of(selection, shown.inbox),
+                                                inboxMerge =
+                                                    TransactionMerge.canMerge(
+                                                        TransactionMerge.ofInbox(shown.inbox.filter { it.id in selection }),
+                                                    ),
                                             ).filter { it.primary }
                                             .map { ScreenAction(it.id, it.glyph, it.label, it.primary, apart = it.apart) {} }
                                     } else if (!accounts) {

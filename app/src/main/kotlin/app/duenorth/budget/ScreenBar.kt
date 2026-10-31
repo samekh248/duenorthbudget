@@ -5,6 +5,7 @@ import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.InboxRow
+import app.duenorth.budget.core.MergeCopy
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.RegisterCopy
@@ -12,6 +13,7 @@ import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SignInMethod
 import app.duenorth.budget.core.StarterCategoriesCopy
 import app.duenorth.budget.core.TemplateCopy
+import app.duenorth.budget.core.TransactionMerge
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.ScreenAction
 
@@ -109,6 +111,10 @@ object ScreenBar {
         categoryAutomations: Boolean = false,
         /** Budget automations are on for the budget, so a category can be switched to them and back, and edited. */
         automationsOn: Boolean = false,
+        /** The picked register transactions can be merged: two or more, by Actual's merge rule. */
+        registerMerge: Boolean = false,
+        /** The checked inbox rows can be merged: two or more of one account and amount. */
+        inboxMerge: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar.
@@ -156,8 +162,12 @@ object ScreenBar {
                         buildList {
                             if (inboxPick == InboxPick.READY) add(spec("accept-selected", AppGlyph.Save, InboxCopy.ACCEPT))
                             if (inboxPick != InboxPick.NONE) add(spec("categorize-selected", AppGlyph.Categories, InboxCopy.CATEGORIZE))
+                            if (inboxMerge) add(spec("merge-inbox-selected", AppGlyph.Merge, MergeCopy.MERGE))
                             add(spec("end-inbox-selecting", AppGlyph.Cancel, InboxCopy.CANCEL))
-                            if (inboxPick != InboxPick.NONE) {
+                            // The bar holds four buttons; with merge on it, delete moves into the menu.
+                            if (inboxMerge) {
+                                add(menu("delete-selected", AppGlyph.Delete, InboxCopy.DELETE))
+                            } else if (inboxPick != InboxPick.NONE) {
                                 add(ScreenBarSpec("delete-selected", AppGlyph.Delete, InboxCopy.DELETE, apart = true))
                             }
                         }
@@ -194,9 +204,10 @@ object ScreenBar {
             // Select mode swaps the register's bar for what can be done to the picked transactions.
             is ShellRoute.Register ->
                 if (selecting) {
-                    listOf(
+                    listOfNotNull(
                         spec("clear-selected", AppGlyph.Reconcile, RegisterCopy.CLEAR),
                         spec("unclear-selected", AppGlyph.Undo, RegisterCopy.UNCLEAR),
+                        spec("merge-selected", AppGlyph.Merge, MergeCopy.MERGE).takeIf { registerMerge },
                         spec("end-selecting", AppGlyph.Cancel, RegisterCopy.DONE),
                     )
                 } else {
@@ -395,6 +406,8 @@ object ScreenBar {
                     .any { it.bankSync && !it.closed },
             categoryAutomations = state.templates.automations != null,
             automationsOn = state.formatPrefs.automationsOn,
+            registerMerge = registerMerge(state),
+            inboxMerge = inboxMerge(state),
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -406,6 +419,28 @@ object ScreenBar {
                 run = handlers.bind(spec.id, state),
             )
         }
+    }
+
+    /** Whether the register's picked transactions can be merged, by desktop Actual's rule. */
+    internal fun registerMerge(state: ShellUiState): Boolean {
+        val picked = state.registerUi.selection ?: return false
+        val rows =
+            state.register
+                ?.rows
+                .orEmpty()
+                .filter { it.id in picked }
+        return TransactionMerge.canMerge(TransactionMerge.ofRegister(rows))
+    }
+
+    /** Whether the inbox's checked rows can be merged: two or more of one account and amount. */
+    internal fun inboxMerge(state: ShellUiState): Boolean {
+        val picked = state.inbox.selection ?: return false
+        val rows =
+            state.shell
+                ?.inbox
+                .orEmpty()
+                .filter { it.id in picked }
+        return TransactionMerge.canMerge(TransactionMerge.ofInbox(rows))
     }
 
     /** Whether the work a sync button starts is running now: its glyph turns only while it is. */
@@ -557,6 +592,8 @@ class ScreenBarHandlers(
     val onCategorizeSelected: () -> Unit = {},
     val onEndInboxSelecting: () -> Unit = {},
     val onDeleteSelected: () -> Unit = {},
+    val onMergeSelected: () -> Unit = {},
+    val onMergeInboxSelected: () -> Unit = {},
     val onSyncServer: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
@@ -632,6 +669,8 @@ class ScreenBarHandlers(
             "categorize-selected" -> onCategorizeSelected
             "end-inbox-selecting" -> onEndInboxSelecting
             "delete-selected" -> onDeleteSelected
+            "merge-selected" -> onMergeSelected
+            "merge-inbox-selected" -> onMergeInboxSelected
             "schedule-transaction" -> onScheduleTransaction
             "delete-transaction" -> onDeleteTransaction
             "edit-budget" -> onEditBudget

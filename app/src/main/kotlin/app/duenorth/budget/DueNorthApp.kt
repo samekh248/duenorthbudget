@@ -284,6 +284,8 @@ fun DueNorthApp(model: ShellViewModel) {
                     onCategorizeSelected = model.inbox::categorizeSelected,
                     onEndInboxSelecting = model.inbox::endSelecting,
                     onDeleteSelected = model.inbox::deleteSelected,
+                    onMergeSelected = model.register::mergeSelected,
+                    onMergeInboxSelected = model.inbox::mergeSelected,
                     onSyncServer = model.budgetFiles::syncInbox,
                     onCancel = {
                         when (state.route) {

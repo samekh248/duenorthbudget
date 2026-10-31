@@ -295,6 +295,47 @@ class ScreenBarTest {
     }
 
     @Test
+    fun registerSelectModeOffersMergeWhenThePickedRowsCanMerge() {
+        val ids =
+            ScreenBar
+                .specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE, selecting = true, registerMerge = true)
+                .map { it.id }
+        assertEquals(listOf("clear-selected", "unclear-selected", "merge-selected", "end-selecting"), ids)
+    }
+
+    @Test
+    fun inboxSelectModeOffersMergeWhenTheCheckedRowsCanMerge() {
+        val ids =
+            ScreenBar
+                .specsFor(
+                    ShellRoute.Home,
+                    hasBudget = true,
+                    mode = BudgetMode.ENVELOPE,
+                    homeSection = ScreenBar.HOME_INBOX,
+                    inboxSelecting = true,
+                    inboxPick = InboxPick.READY,
+                    inboxMerge = true,
+                ).map { it.id }
+        assertEquals(
+            listOf("accept-selected", "categorize-selected", "merge-inbox-selected", "end-inbox-selecting", "delete-selected", "settings"),
+            ids,
+        )
+        val delete =
+            ScreenBar
+                .specsFor(
+                    ShellRoute.Home,
+                    hasBudget = true,
+                    mode = BudgetMode.ENVELOPE,
+                    homeSection = ScreenBar.HOME_INBOX,
+                    inboxSelecting = true,
+                    inboxPick = InboxPick.READY,
+                    inboxMerge = true,
+                ).single { it.id == "delete-selected" }
+        // Five buttons do not fit the bar, so delete waits in the menu while merge is on it.
+        assertFalse(delete.primary)
+    }
+
+    @Test
     fun envelopeIncomeCategoryHasNoSave() {
         val income = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, incomeCategory = true)
         assertEquals(listOf("auto-hold-on", "auto-hold-off-month", "auto-hold-off", "settings"), income.map { it.id })

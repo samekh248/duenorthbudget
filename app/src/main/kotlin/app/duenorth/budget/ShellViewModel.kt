@@ -593,6 +593,7 @@ class ShellViewModel(
                 is ForcedWrite.Category -> retry.transactionId
                 is ForcedWrite.Categories -> retry.assignments.keys.firstOrNull()
                 is ForcedWrite.Deletes -> retry.transactionIds.firstOrNull()
+                is ForcedWrite.Merge -> retry.transactionIds.firstOrNull()
                 else -> null
             }?.let { id ->
                 _state.value.shell
@@ -617,6 +618,7 @@ class ShellViewModel(
                         is ForcedWrite.Unsplit -> library.unsplitTransaction(id, retry.transactionId, true)
                         is ForcedWrite.Cleared ->
                             library.setTransactionsCleared(id, retry.transactionIds, retry.cleared, true)
+                        is ForcedWrite.Merge -> library.mergeTransactions(id, retry.transactionIds, true)
                     }
                 }
             publish(result, accountId, stay)
