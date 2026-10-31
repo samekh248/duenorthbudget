@@ -15,6 +15,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.CleanupCopy
+import app.duenorth.budget.core.CleanupResult
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.TemplateChip
@@ -55,6 +57,8 @@ fun TemplatesScreen(
     onMoveChip: (TemplateChip, Int) -> Unit = { _, _ -> },
     onConfirmPreview: () -> Unit = {},
     onKeepPreview: () -> Unit = {},
+    cleanup: CleanupResult? = null,
+    onCleanup: (() -> Unit)? = null,
 ) {
     if (confirm != null) {
         ConfirmPage(
@@ -91,6 +95,7 @@ fun TemplatesScreen(
             TemplateApplyList(applyPreview, currency, onConfirmPreview, onKeepPreview)
             return@Column
         }
+        if (cleanup != null && !busy) CleanupOutcome(cleanup)
         if (lanes != null && currency != null) {
             // The lanes list bad lines themselves, each with fix.
             if (result is TemplateResult.Invalid) {
@@ -113,8 +118,27 @@ fun TemplatesScreen(
                 ScreenAction("templates-apply", AppGlyph.Save, TemplateCopy.APPLY, run = onApply),
                 ScreenAction("templates-overwrite", AppGlyph.Copy, TemplateCopy.OVERWRITE, primary = false, run = onOverwrite),
                 ScreenAction("templates-check", AppGlyph.Search, TemplateCopy.CHECK, primary = false, run = onCheck),
-            ),
+            ) +
+                listOfNotNull(
+                    onCleanup?.let { ScreenAction("templates-cleanup", AppGlyph.Copy, CleanupCopy.ACTION, primary = false, run = it) },
+                ),
         )
+    }
+}
+
+/** What the end-of-month cleanup did, with desktop's notes on money it could not move. */
+@Composable
+private fun CleanupOutcome(result: CleanupResult) {
+    Column(Modifier.testTag("templates-cleanup-result"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        when (result) {
+            is CleanupResult.Applied -> MetroText(CleanupCopy.applied(result), Metro.typography.subheader)
+            CleanupResult.UpToDate -> MetroText(CleanupCopy.UP_TO_DATE, Metro.typography.subheader)
+            is CleanupResult.Rejected -> MetroText(result.reason, Metro.typography.subheader, color = Metro.accent.text)
+            is CleanupResult.NoFunds -> {
+                MetroText(CleanupCopy.NOTES, Metro.typography.subheader)
+                result.warnings.forEach { MetroText(it, Metro.typography.body, color = Metro.accent.text) }
+            }
+        }
     }
 }
 

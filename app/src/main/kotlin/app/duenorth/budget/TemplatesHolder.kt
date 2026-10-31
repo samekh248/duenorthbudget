@@ -1,6 +1,7 @@
 package app.duenorth.budget
 
 import app.duenorth.budget.core.CategoryAutomations
+import app.duenorth.budget.core.CleanupResult
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplateChip
 import app.duenorth.budget.core.TemplateKind
@@ -37,6 +38,8 @@ data class TemplatesUi(
     val plan: TemplatePlan? = null,
     /** Apply's before and after list, while it shows. */
     val applyPreview: TemplateApplyPreview? = null,
+    /** What the last end-of-month cleanup did. */
+    val cleanup: CleanupResult? = null,
 )
 
 // Spec 010 US5 (T062): budget templates from category notes. See contracts/templates.md.
@@ -57,7 +60,7 @@ class TemplatesHolder internal constructor(
     fun open() {
         if (!state.formatPrefs.templatesOn) return
         host.push(ShellRoute.Templates)
-        host.mutate { it.copy(templates = it.templates.copy(result = null, confirm = null, applyPreview = null)) }
+        host.mutate { it.copy(templates = it.templates.copy(result = null, confirm = null, applyPreview = null, cleanup = null)) }
         check()
         refreshPlan()
     }
@@ -103,6 +106,19 @@ class TemplatesHolder internal constructor(
     }
 
     fun confirmOverwrite() = apply(overwrite = true, confirmed = true)
+
+    /** Templates ••• → end-of-month cleanup: `#cleanup` notes move what is left over, as one undo step. */
+    fun cleanup() {
+        val budgetId = state.settings.openBudgetId ?: return
+        if (state.budgetEdit != null) return
+        val month = host.editorMonth()
+        host.mutate { it.copy(templates = it.templates.copy(busy = true, confirm = null, cleanup = null)) }
+        host.scope.launch {
+            val result = withContext(host.io) { host.library.cleanupMonth(budgetId, month) }
+            host.mutate { it.copy(templates = it.templates.copy(cleanup = result, busy = false)) }
+            if (result !is CleanupResult.Rejected) host.afterMonthWrite(budgetId)
+        }
+    }
 
     fun keep() {
         host.mutate { it.copy(templates = it.templates.copy(confirm = null)) }

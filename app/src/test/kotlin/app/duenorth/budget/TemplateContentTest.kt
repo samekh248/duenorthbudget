@@ -12,6 +12,8 @@ import app.duenorth.budget.ParityTestSupport.await
 import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryRow
+import app.duenorth.budget.core.CleanupCopy
+import app.duenorth.budget.core.CleanupResult
 import app.duenorth.budget.core.LimitPeriod
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.Template
@@ -120,6 +122,59 @@ class TemplateContentTest {
             MetroTheme { CategoryBudgetScreen(TemplateSamples.shell, "c-food", null, {}, {}, {}) }
         }
         compose.onNodeWithTag("category-note").assertDoesNotExist()
+    }
+
+    @Test
+    fun cleanupGivesBackWhatASourceHasLeftAsOneUndoStep() {
+        val (model, library) = household("cleanup")
+        model.settingsUi.setExperimental(true)
+        model.settingsUi.setGoalTemplates(true)
+        await { model.state.value.formatPrefs.templatesOn }
+        model.envelopes.openBudget("c-gas")
+        await { model.state.value.templates.note != null }
+        model.templates.saveNote("fill up on fridays\n#cleanup source")
+        await { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }
+        val before =
+            model.state.value.shell!!
+                .category("c-gas")!!
+        model.templates.open()
+        model.templates.cleanup()
+        await { model.state.value.templates.cleanup != null }
+        val result = model.state.value.templates.cleanup
+        assertTrue("$result", result !is CleanupResult.Rejected)
+        assertEquals(UndoCopy.CLEANUP, library.undoLabel(model.state.value.settings.openBudgetId!!))
+        if (before.availableMinor >= 0) {
+            await {
+                model.state.value.shell
+                    ?.category("c-gas")
+                    ?.availableMinor == 0L
+            }
+        } else {
+            assertTrue("$result", result is CleanupResult.NoFunds)
+        }
+    }
+
+    @Test
+    fun cleanupNotesSayWhatCouldNotMove() {
+        compose.setContent {
+            MetroTheme {
+                TemplatesScreen(
+                    month = TemplateSamples.october,
+                    result = TemplateResult.Valid,
+                    busy = false,
+                    confirm = null,
+                    onCheck = {},
+                    onApply = {},
+                    onOverwrite = {},
+                    onConfirm = {},
+                    onKeep = {},
+                    cleanup = CleanupResult.NoFunds(listOf("Leftover B does not have available funds.")),
+                    onCleanup = {},
+                )
+            }
+        }
+        compose.onNodeWithText(CleanupCopy.NOTES).assertExists()
+        compose.onNodeWithText("Leftover B does not have available funds.").assertExists()
     }
 
     @Test

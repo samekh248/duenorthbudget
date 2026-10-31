@@ -257,6 +257,9 @@ object ActualSchema {
                 "CREATE TABLE banks (id TEXT PRIMARY KEY, bank_id TEXT, name TEXT, tombstone INTEGER NOT NULL DEFAULT 0)",
             )
         }
+        if ("cleanup_groups" !in tables) {
+            session.exec("CREATE TABLE cleanup_groups (id TEXT PRIMARY KEY, name TEXT NOT NULL, tombstone INTEGER DEFAULT 0)")
+        }
     }
 
     /** Spec 010: columns the sync funnel writes, added where a phone file lacks them. */
@@ -271,7 +274,7 @@ object ActualSchema {
                         "balance_limit" to "INTEGER",
                         "last_sync" to "TEXT",
                     ),
-                "categories" to listOf("goal_def" to "TEXT", "template_settings" to "TEXT"),
+                "categories" to listOf("goal_def" to "TEXT", "template_settings" to "TEXT", "cleanup_def" to "TEXT"),
                 "zero_budgets" to listOf("goal" to "INTEGER", "long_goal" to "INTEGER"),
                 "reflect_budgets" to listOf("goal" to "INTEGER", "long_goal" to "INTEGER"),
                 "schedules" to listOf("active" to "INTEGER NOT NULL DEFAULT 0"),

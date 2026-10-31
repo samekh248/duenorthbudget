@@ -1,0 +1,790 @@
+{
+  "scenario": "cleanup-short",
+  "base": "base.zip",
+  "actualVersion": "26.8.1",
+  "today": "2026-10-07",
+  "action": {
+    "steps": [
+      {
+        "handler": "budget/budget-amount",
+        "args": {
+          "month": "2026-10",
+          "category": "Big",
+          "amount": 480000
+        }
+      },
+      {
+        "handler": "budget/cleanup-goal-template",
+        "args": {
+          "month": "2026-10"
+        }
+      }
+    ]
+  },
+  "ids": {
+    "accounts": {
+      "Checking": "8811d4d1-87c9-4605-a6bc-11b810103703"
+    },
+    "categories": {
+      "Food": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "General": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "Bills": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "Bills (Flexible)": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "Income": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "Starting Balances": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "Savings": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+      "Salary": "8fa9f0d8-d0e3-463c-b4f3-67ec7bb1eec3",
+      "Leftover A": "3a052d95-78e1-4068-9011-1cdfecb40f59",
+      "Leftover B": "633af8e0-bb9e-49e7-975f-73e349622133",
+      "Savings Sink": "cee912d9-f4f7-46cc-9149-ed01e9109167",
+      "Vacation Sink": "01e37cb8-1936-4786-857e-798cb7277977",
+      "Overspent": "0268ba3b-3f8d-4b3a-a97a-47902d8ee27a",
+      "Rollover Over": "faed0721-ed0d-456f-bc85-caf6d40be503",
+      "Fun Source": "de6fb142-1257-4cd6-9847-85d0ec44c3ca",
+      "Fun Sink": "6b33ae3d-2d4d-481a-8430-7f9d90ed0efc",
+      "Fun Sink Too": "14bde730-564b-4729-a550-f3e5ff1a9011",
+      "Fun Over": "143a5268-846d-4d39-9c72-51e6e06769c2",
+      "Fun Over Big": "ebb83120-a3b1-47a1-85f4-1fdde73ec3b5",
+      "Lonely Source": "e91a08c6-6aea-455c-b612-b556c50088e5",
+      "Gift Source": "a259e4a0-ecf0-4791-89b0-b38cb68c2a07",
+      "Gift Sink": "4808ac3a-666e-4e67-a684-0a380c9f8431",
+      "Managed": "8d5cd12a-ed3f-42b4-98c7-b610cbbd1a78",
+      "Big": "daa099ac-2cf2-45ca-83bc-5f897c6a1700",
+      "Lines": "6a7a0058-e08b-4494-84b0-dc687c351d37"
+    },
+    "groups": {
+      "Usual Expenses": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "Income": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "Investments and Savings": "a137772f-cf2f-4089-9432-822d2ddc1466"
+    },
+    "payees": {
+      "Employer": "88ea8d7a-7aa4-4702-9011-cd148b7b8a87",
+      "Store": "c27324e6-b931-47a6-88fc-44dc3796c43e"
+    },
+    "schedules": {}
+  },
+  "tables": {
+    "zero_budgets": [
+      {
+        "id": "202610-01e37cb8-1936-4786-857e-798cb7277977",
+        "month": 202610,
+        "category": "01e37cb8-1936-4786-857e-798cb7277977",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-0268ba3b-3f8d-4b3a-a97a-47902d8ee27a",
+        "month": 202610,
+        "category": "0268ba3b-3f8d-4b3a-a97a-47902d8ee27a",
+        "amount": 10000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-143a5268-846d-4d39-9c72-51e6e06769c2",
+        "month": 202610,
+        "category": "143a5268-846d-4d39-9c72-51e6e06769c2",
+        "amount": 4000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-3a052d95-78e1-4068-9011-1cdfecb40f59",
+        "month": 202610,
+        "category": "3a052d95-78e1-4068-9011-1cdfecb40f59",
+        "amount": 10000,
+        "carryover": 0,
+        "goal": 10000,
+        "long_goal": 0
+      },
+      {
+        "id": "202610-4808ac3a-666e-4e67-a684-0a380c9f8431",
+        "month": 202610,
+        "category": "4808ac3a-666e-4e67-a684-0a380c9f8431",
+        "amount": 2000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-633af8e0-bb9e-49e7-975f-73e349622133",
+        "month": 202610,
+        "category": "633af8e0-bb9e-49e7-975f-73e349622133",
+        "amount": -30400,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-6b33ae3d-2d4d-481a-8430-7f9d90ed0efc",
+        "month": 202610,
+        "category": "6b33ae3d-2d4d-481a-8430-7f9d90ed0efc",
+        "amount": 1000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-8d5cd12a-ed3f-42b4-98c7-b610cbbd1a78",
+        "month": 202610,
+        "category": "8d5cd12a-ed3f-42b4-98c7-b610cbbd1a78",
+        "amount": 900,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-a259e4a0-ecf0-4791-89b0-b38cb68c2a07",
+        "month": 202610,
+        "category": "a259e4a0-ecf0-4791-89b0-b38cb68c2a07",
+        "amount": 500,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-cee912d9-f4f7-46cc-9149-ed01e9109167",
+        "month": 202610,
+        "category": "cee912d9-f4f7-46cc-9149-ed01e9109167",
+        "amount": 2000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-daa099ac-2cf2-45ca-83bc-5f897c6a1700",
+        "month": 202610,
+        "category": "daa099ac-2cf2-45ca-83bc-5f897c6a1700",
+        "amount": 480000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-de6fb142-1257-4cd6-9847-85d0ec44c3ca",
+        "month": 202610,
+        "category": "de6fb142-1257-4cd6-9847-85d0ec44c3ca",
+        "amount": 3000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-e91a08c6-6aea-455c-b612-b556c50088e5",
+        "month": 202610,
+        "category": "e91a08c6-6aea-455c-b612-b556c50088e5",
+        "amount": 4000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-ebb83120-a3b1-47a1-85f4-1fdde73ec3b5",
+        "month": 202610,
+        "category": "ebb83120-a3b1-47a1-85f4-1fdde73ec3b5",
+        "amount": 8000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202610,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 5000,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202611-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202611,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202612-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202612,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202701-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202701,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202702-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202702,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202703-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202703,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202704-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202704,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202705-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202705,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202706-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202706,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202707-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202707,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202708-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202708,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202709-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202709,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202710-faed0721-ed0d-456f-bc85-caf6d40be503",
+        "month": 202710,
+        "category": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "amount": 0,
+        "carryover": 1,
+        "goal": null,
+        "long_goal": null
+      }
+    ],
+    "categories": [
+      {
+        "id": "01e37cb8-1936-4786-857e-798cb7277977",
+        "name": "Vacation Sink",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 212992,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"sink\",\"groupId\":null,\"weight\":3}]"
+      },
+      {
+        "id": "0268ba3b-3f8d-4b3a-a97a-47902d8ee27a",
+        "name": "Overspent",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 196608,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "143a5268-846d-4d39-9c72-51e6e06769c2",
+        "name": "Fun Over",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 114688,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"overspend\",\"groupId\":\"2790c7ad-8108-48f5-a7fe-f2c0898e3640\"}]"
+      },
+      {
+        "id": "14bde730-564b-4729-a550-f3e5ff1a9011",
+        "name": "Fun Sink Too",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 131072,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"sink\",\"groupId\":\"2790c7ad-8108-48f5-a7fe-f2c0898e3640\",\"weight\":1}]"
+      },
+      {
+        "id": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+        "name": "Bills (Flexible)",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 327680,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "3a052d95-78e1-4068-9011-1cdfecb40f59",
+        "name": "Leftover A",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 262144,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"source\",\"groupId\":null}]"
+      },
+      {
+        "id": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+        "name": "Income",
+        "is_income": 1,
+        "cat_group": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+        "sort_order": 32768,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "4808ac3a-666e-4e67-a684-0a380c9f8431",
+        "name": "Gift Sink",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 49152,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"sink\",\"groupId\":\"ae101333-bc6a-476e-80a0-41d6ed0e06ad\",\"weight\":1}]"
+      },
+      {
+        "id": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+        "name": "Starting Balances",
+        "is_income": 1,
+        "cat_group": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+        "sort_order": 32768,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "name": "Food",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 278528,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "633af8e0-bb9e-49e7-975f-73e349622133",
+        "name": "Leftover B",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 245760,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"source\",\"groupId\":null}]"
+      },
+      {
+        "id": "6a7a0058-e08b-4494-84b0-dc687c351d37",
+        "name": "Lines",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 0.125,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "6b33ae3d-2d4d-481a-8430-7f9d90ed0efc",
+        "name": "Fun Sink",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 147456,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"sink\",\"groupId\":\"2790c7ad-8108-48f5-a7fe-f2c0898e3640\",\"weight\":2}]"
+      },
+      {
+        "id": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+        "name": "Savings",
+        "is_income": 0,
+        "cat_group": "a137772f-cf2f-4089-9432-822d2ddc1466",
+        "sort_order": 32768,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "8d5cd12a-ed3f-42b4-98c7-b610cbbd1a78",
+        "name": "Managed",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 32768,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": "[{\"type\":\"simple\",\"monthly\":9,\"priority\":0,\"directive\":\"template\"}]",
+        "template_settings": "{\"source\":\"ui\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "8fa9f0d8-d0e3-463c-b4f3-67ec7bb1eec3",
+        "name": "Salary",
+        "is_income": 1,
+        "cat_group": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+        "sort_order": 16384,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "a259e4a0-ecf0-4791-89b0-b38cb68c2a07",
+        "name": "Gift Source",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 65536,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"source\",\"groupId\":\"ae101333-bc6a-476e-80a0-41d6ed0e06ad\"}]"
+      },
+      {
+        "id": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "name": "General",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 294912,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "cee912d9-f4f7-46cc-9149-ed01e9109167",
+        "name": "Savings Sink",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 229376,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"sink\",\"groupId\":null,\"weight\":1}]"
+      },
+      {
+        "id": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "name": "Bills",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 311296,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "daa099ac-2cf2-45ca-83bc-5f897c6a1700",
+        "name": "Big",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 16384,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      },
+      {
+        "id": "de6fb142-1257-4cd6-9847-85d0ec44c3ca",
+        "name": "Fun Source",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 163840,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"source\",\"groupId\":\"2790c7ad-8108-48f5-a7fe-f2c0898e3640\"}]"
+      },
+      {
+        "id": "e91a08c6-6aea-455c-b612-b556c50088e5",
+        "name": "Lonely Source",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 81920,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"source\",\"groupId\":\"3172f044-3ada-4f5c-ba49-1c4ab0c6fa00\"}]"
+      },
+      {
+        "id": "ebb83120-a3b1-47a1-85f4-1fdde73ec3b5",
+        "name": "Fun Over Big",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 98304,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": "[{\"role\":\"overspend\",\"groupId\":\"2790c7ad-8108-48f5-a7fe-f2c0898e3640\"}]"
+      },
+      {
+        "id": "faed0721-ed0d-456f-bc85-caf6d40be503",
+        "name": "Rollover Over",
+        "is_income": 0,
+        "cat_group": "fc3825fd-b982-4b72-b768-5b30844cf832",
+        "sort_order": 180224,
+        "tombstone": 0,
+        "hidden": 0,
+        "goal_def": null,
+        "template_settings": "{\"source\": \"notes\"}",
+        "cleanup_def": null
+      }
+    ],
+    "cleanup_groups": [
+      {
+        "id": "2790c7ad-8108-48f5-a7fe-f2c0898e3640",
+        "name": "Fun",
+        "tombstone": 0
+      },
+      {
+        "id": "3172f044-3ada-4f5c-ba49-1c4ab0c6fa00",
+        "name": "NoSink",
+        "tombstone": 0
+      },
+      {
+        "id": "ae101333-bc6a-476e-80a0-41d6ed0e06ad",
+        "name": "Gifts",
+        "tombstone": 0
+      }
+    ]
+  },
+  "values": {
+    "result": {
+      "type": "warning",
+      "message": "cleanup-no-funds",
+      "pre": "Cleanup group \"NoSink\" has no matching sink categories.\n\nLeftover B does not have available funds."
+    },
+    "2026-10": {
+      "month": "2026-10",
+      "incomeAvailable": 500000,
+      "lastMonthOverspent": 0,
+      "forNextMonth": 0,
+      "totalBudgeted": -500000,
+      "toBudget": 0,
+      "fromLastMonth": 0,
+      "totalIncome": 500000,
+      "totalSpent": -120600,
+      "totalBalance": 379400,
+      "bufferedAuto": 0,
+      "bufferedSelected": 0,
+      "categories": {
+        "Lines": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Big": {
+          "budgeted": 480000,
+          "spent": 0,
+          "balance": 480000,
+          "carryover": false
+        },
+        "Managed": {
+          "budgeted": 900,
+          "spent": -100,
+          "balance": 800,
+          "carryover": false
+        },
+        "Gift Sink": {
+          "budgeted": 2000,
+          "spent": 0,
+          "balance": 2000,
+          "carryover": false
+        },
+        "Gift Source": {
+          "budgeted": 500,
+          "spent": -500,
+          "balance": 0,
+          "carryover": false
+        },
+        "Lonely Source": {
+          "budgeted": 4000,
+          "spent": -1000,
+          "balance": 3000,
+          "carryover": false
+        },
+        "Fun Over Big": {
+          "budgeted": 8000,
+          "spent": -60000,
+          "balance": -52000,
+          "carryover": false
+        },
+        "Fun Over": {
+          "budgeted": 4000,
+          "spent": -4000,
+          "balance": 0,
+          "carryover": false
+        },
+        "Fun Sink Too": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Fun Sink": {
+          "budgeted": 1000,
+          "spent": 0,
+          "balance": 1000,
+          "carryover": false
+        },
+        "Fun Source": {
+          "budgeted": 3000,
+          "spent": -3000,
+          "balance": 0,
+          "carryover": false
+        },
+        "Rollover Over": {
+          "budgeted": 5000,
+          "spent": -9000,
+          "balance": -4000,
+          "carryover": true
+        },
+        "Overspent": {
+          "budgeted": 10000,
+          "spent": -25000,
+          "balance": -15000,
+          "carryover": false
+        },
+        "Vacation Sink": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Savings Sink": {
+          "budgeted": 2000,
+          "spent": 0,
+          "balance": 2000,
+          "carryover": false
+        },
+        "Leftover B": {
+          "budgeted": -30400,
+          "spent": -8000,
+          "balance": -38400,
+          "carryover": false
+        },
+        "Leftover A": {
+          "budgeted": 10000,
+          "spent": -10000,
+          "balance": 0,
+          "carryover": false
+        },
+        "Food": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "General": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Bills": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Bills (Flexible)": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Savings": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Salary": {},
+        "Income": {},
+        "Starting Balances": {}
+      }
+    }
+  }
+}

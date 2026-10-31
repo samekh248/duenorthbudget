@@ -13,7 +13,7 @@ class ParityFixtureTest {
     fun everyScenarioLoadsAndItsBaseOpensOnThePhone() {
         val areas = ParityFixture.areas()
         assertEquals(
-            listOf("accounts", "automations", "month", "reports", "schedule-templates", "schedules-rules", "templates", "undo"),
+            listOf("accounts", "automations", "cleanup", "month", "reports", "schedule-templates", "schedules-rules", "templates", "undo"),
             areas,
         )
         for (area in areas) {
