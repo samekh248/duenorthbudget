@@ -93,6 +93,10 @@ class AssistantScreenshotTest {
         )
 
     @Test
+    fun oneKindStartsOpenLight() =
+        snap("assistant_one_kind_light", dark = false, report = AssistantReport(sampleAssistantBudget().findings.take(1)))
+
+    @Test
     fun clearLight() = snap("assistant_clear_light", dark = false, report = AssistantReport.EMPTY)
 
     @Test

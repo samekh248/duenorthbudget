@@ -51,7 +51,7 @@ import kotlin.math.abs
 
 /**
  * The assistant pivot item: a count of what needs a look, then a card for each kind of finding with its count in a
- * circle. The cards start collapsed so every kind shows at once; a tap opens one to its findings, each with its fix
+ * circle. The cards start collapsed so every kind shows at once (a lone kind starts open); a tap opens one to its findings, each with its fix
  * and its "that's fine" side by side.
  */
 @Composable
@@ -91,8 +91,10 @@ fun AssistantSection(
                 "assistant-count",
             )
         }
+        // With one kind there is nothing to scan past, so it starts open; a tap still closes it.
+        val alone = byKind.size == 1
         byKind.forEach { (kind, all) ->
-            val open = kind in expanded
+            val open = (kind in expanded) != alone
             item(key = "kind-${kind.name}") {
                 KindCard(kind, all.size, open, Modifier.padding(top = 12.dp)) { onToggleExpanded(kind) }
             }
