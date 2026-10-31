@@ -734,6 +734,18 @@ class BudgetLibrary(
 
     fun readSchedules(budgetId: String): List<ScheduleSummary> = open(budgetId) { SchedulesBook(it, clock).listAll() } ?: emptyList()
 
+    /** False until desktop Actual 26.10 has added schedule ordering to this budget. */
+    fun canReorderSchedules(budgetId: String): Boolean = open(budgetId) { SchedulesBook(it, clock).canReorder() } ?: false
+
+    /** Puts [scheduleId] just after [targetId] among schedules due the same day, or first when null; one undo step. */
+    fun moveSchedule(
+        budgetId: String,
+        scheduleId: String,
+        targetId: String?,
+    ): ScheduleWriteResult =
+        edit(budgetId, UndoCopy.MOVE_SCHEDULE) { SchedulesBook(it, clock).move(scheduleId, targetId) }
+            ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     fun readScheduleDetails(
         budgetId: String,
         scheduleId: String,

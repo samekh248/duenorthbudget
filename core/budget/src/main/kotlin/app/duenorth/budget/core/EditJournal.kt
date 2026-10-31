@@ -17,6 +17,7 @@ object UndoCopy {
     const val RECONCILE = "reconcile"
     const val POST_SCHEDULE = "post"
     const val SKIP_SCHEDULE = "skip"
+    const val MOVE_SCHEDULE = "schedule order"
     const val SAVE_SCHEDULE = "schedule"
     const val DELETE_SCHEDULE = "delete schedule"
     const val RENAME_PAYEE = "rename payee"

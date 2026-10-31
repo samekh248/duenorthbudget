@@ -51,6 +51,8 @@ data class ScheduleSummary(
     val repeat: ScheduleRepeat,
     val interval: Int,
     val dates: List<Int>,
+    /** Desktop's `sort_order` (Actual 26.10): higher comes first among schedules due the same day. */
+    val sortOrder: Double = 0.0,
 ) {
     /** The schedule's own name, or its payee's when it has none. */
     val title: String get() = name.ifBlank { payee }
@@ -154,7 +156,7 @@ class SchedulesBook(
         val todayIso = ScheduleDates.toIso(today.toActualDate())
         return loadSchedules()
             .filter { !it.completed && it.nextIso >= todayIso }
-            .sortedWith(compareBy({ it.nextIso }, { it.name }))
+            .sortedWith(compareBy<LoadedSchedule> { it.nextIso }.then(SAME_DAY))
             .map { schedule ->
                 val account = account(schedule.accountId)
                 UpcomingScheduleRow(
@@ -177,7 +179,7 @@ class SchedulesBook(
     fun listAll(): List<ScheduleSummary> {
         val accounts = HashMap<String, String>()
         return loadSchedules()
-            .sortedWith(compareBy({ it.nextIso }, { it.name }))
+            .sortedWith(compareBy<LoadedSchedule> { it.nextIso }.then(SAME_DAY))
             .map { schedule ->
                 val name = accounts.getOrPut(schedule.accountId) { account(schedule.accountId)?.name.orEmpty() }
                 summary(schedule, name)
@@ -258,7 +260,34 @@ class SchedulesBook(
                     ?.intOrNull
                     ?.coerceAtLeast(1) ?: 1,
             dates = dates,
+            sortOrder = schedule.sortOrder,
         )
+    }
+
+    /** True once desktop Actual 26.10 has added `schedules.sort_order` to this file; the phone never adds it. */
+    fun canReorder(): Boolean = "sort_order" in session.query("PRAGMA table_info(schedules)").mapNotNull { it.str("name") }
+
+    /**
+     * Desktop's `schedule/move`: puts [scheduleId] just after [targetId] in the
+     * order schedules due the same day are listed, or first when [targetId] is
+     * null, shoving the ones after it down when there is no room.
+     */
+    fun move(
+        scheduleId: String,
+        targetId: String?,
+    ): ScheduleWriteResult {
+        if (!canReorder()) return ScheduleWriteResult.Rejected(ScheduleCopy.NO_ORDER)
+        session
+            .query("SELECT id FROM schedules WHERE id = ? AND IFNULL(tombstone, 0) = 0", listOf(scheduleId))
+            .firstOrNull() ?: return ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
+        val items =
+            session
+                .query("SELECT id, sort_order FROM schedules WHERE IFNULL(tombstone, 0) = 0 ORDER BY sort_order DESC, id")
+                .map { it.str("id").orEmpty() to it.double("sort_order") }
+        val (updates, order) = shoveSortOrdersDescending(items, targetId, scheduleId)
+        updates.forEach { (id, sort) -> SyncSchema.write(session, "schedules", id, "sort_order", sort) }
+        SyncSchema.write(session, "schedules", scheduleId, "sort_order", order)
+        return ScheduleWriteResult.Posted
     }
 
     fun post(
@@ -671,13 +700,16 @@ class SchedulesBook(
         val conditionsJson: JsonArray,
         val dateCondition: JsonObject,
         val postsTransaction: Boolean = false,
+        val sortOrder: Double = 0.0,
     )
 
     private fun loadSchedules(): List<LoadedSchedule> {
+        val sortOrder = if (canReorder()) "IFNULL(s.sort_order, 0)" else "0"
         val rows =
             session.query(
                 """
                 SELECT
+                    $sortOrder AS sort_order,
                     s.id AS id,
                     s.name AS name,
                     s.rule AS rule,
@@ -741,6 +773,7 @@ class SchedulesBook(
                 conditionsJson = conditions,
                 dateCondition = dateCond,
                 postsTransaction = row.long("posts_transaction") == 1L,
+                sortOrder = row.double("sort_order"),
             )
         }
     }
@@ -862,6 +895,50 @@ class SchedulesBook(
             type = row.str("type") ?: "checking",
             closed = row.long("closed") == 1L,
         )
+    }
+
+    companion object {
+        private const val SORT_INCREMENT = 16384.0
+
+        /** Desktop's order for schedules due the same day: `sort_order` high first, then the smaller amount, then name. */
+        private val SAME_DAY: Comparator<LoadedSchedule> =
+            compareByDescending<LoadedSchedule> { it.sortOrder }.thenBy { it.amountMinor }.thenBy { it.name }
+
+        /**
+         * Actual's `shoveSortOrdersDescending`: the order that puts an item after
+         * [targetId] in a list sorted high to low (first when null, last when
+         * [targetId] is gone), plus the items after it that must move down to
+         * make room. [movingId] is skipped, as it is the one moving.
+         */
+        fun shoveSortOrdersDescending(
+            items: List<Pair<String, Double>>,
+            targetId: String?,
+            movingId: String? = null,
+        ): Pair<List<Pair<String, Double>>, Double> {
+            if (targetId == null) {
+                return emptyList<Pair<String, Double>>() to (items.firstOrNull()?.second?.plus(SORT_INCREMENT) ?: SORT_INCREMENT)
+            }
+            val at = items.indexOfFirst { it.first == targetId }
+            if (at == -1) {
+                return emptyList<Pair<String, Double>>() to (items.lastOrNull()?.second?.minus(SORT_INCREMENT) ?: SORT_INCREMENT)
+            }
+            val target = items[at].second
+            val nextAt = items.indices.firstOrNull { it > at && items[it].first != movingId }
+            val next = nextAt?.let { items[it].second }
+            if (target - (next ?: 0.0) > 2) {
+                val order = if (next == null) target - SORT_INCREMENT else Math.round((target + next) / 2).toDouble()
+                return emptyList<Pair<String, Double>>() to order
+            }
+            val updates = ArrayList<Pair<String, Double>>()
+            var order = target - SORT_INCREMENT
+            for (i in at + 1 until items.size) {
+                if (items[i].first == movingId) continue
+                if (items[i].second < order) break
+                updates.add(items[i].first to order)
+                order -= SORT_INCREMENT
+            }
+            return updates to Math.round(target - SORT_INCREMENT / 2).toDouble()
+        }
     }
 }
 

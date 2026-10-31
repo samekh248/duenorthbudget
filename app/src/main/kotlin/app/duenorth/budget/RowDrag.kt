@@ -1,19 +1,22 @@
 package app.duenorth.budget
 
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
 
 /**
- * Drag to reorder, shared by the accounts list and the categories page. Rows are named by id; a drop hands
+ * Drag to reorder, shared by the accounts list, the categories page and upcoming schedules. Rows are named by id; a drop hands
  * `onMove` the held row and the row it now sits before (null when it lands last). It holds the row a drag has,
  * how far it has travelled, and each row's height, which turns distance into places.
  */
@@ -70,33 +73,39 @@ internal class RowDrag {
             .graphicsLayer { translationY = if (lifted) offset else shift }
     }
 
-    /** The grip's own gesture: a drag straight away, no hold first, so the list keeps its scroll elsewhere. */
+    /**
+     * The grip's own gesture: a drag straight away, no hold first, so the list keeps its scroll elsewhere.
+     * With [hold] the whole row is the grip and a drag starts after a long press, so a swipe still scrolls.
+     */
     fun handle(
         id: String,
         rows: List<String>,
         onMove: (String, String?) -> Unit,
+        hold: Boolean = false,
     ): Modifier {
         groups[id] = rows
-        return Modifier.pointerInput(id) {
-            detectDragGestures(
-                onDragStart = {
-                    held = groups[id].orEmpty()
-                    dragging = id
-                    offset = 0f
-                },
-                onDrag = { change, amount ->
-                    change.consume()
-                    offset += amount.y
-                },
-                onDragEnd = {
-                    val group = held
-                    val from = group.indexOf(id)
-                    val to = target(group) ?: from
-                    drop()
-                    if (from >= 0 && to != from) onMove(id, if (to < from) group[to] else group.getOrNull(to + 1))
-                },
-                onDragCancel = { drop() },
-            )
+        val start: (Offset) -> Unit = {
+            held = groups[id].orEmpty()
+            dragging = id
+            offset = 0f
+        }
+        val end: () -> Unit = {
+            val group = held
+            val from = group.indexOf(id)
+            val to = target(group) ?: from
+            drop()
+            if (from >= 0 && to != from) onMove(id, if (to < from) group[to] else group.getOrNull(to + 1))
+        }
+        val move: (PointerInputChange, Offset) -> Unit = { change, amount ->
+            change.consume()
+            offset += amount.y
+        }
+        return Modifier.pointerInput(id, hold) {
+            if (hold) {
+                detectDragGesturesAfterLongPress(onDragStart = start, onDragEnd = end, onDragCancel = ::drop, onDrag = move)
+            } else {
+                detectDragGestures(onDragStart = start, onDragEnd = end, onDragCancel = ::drop, onDrag = move)
+            }
         }
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -74,7 +75,27 @@ object ScheduleOccurrences {
         schedules
             .filter { !it.completed }
             .flatMap { schedule -> schedule.dates.map { ScheduleOccurrence(schedule, it) } }
-            .sortedWith(compareBy({ it.date }, { it.schedule.title }))
+            .sortedWith(
+                // Desktop's order within a day: its sort order high first, then the smaller amount.
+                compareBy<ScheduleOccurrence> { it.date }
+                    .thenByDescending { it.schedule.sortOrder }
+                    .thenBy { it.schedule.amountMinor }
+                    .thenBy { it.schedule.title },
+            )
+
+    /**
+     * A drop among one day's schedules ([day], top to bottom), as desktop's `schedule/move` takes it: the
+     * schedule [id] now goes after, or null to go first. A drop [before] a row goes after the one above it.
+     */
+    fun moveTarget(
+        day: List<String>,
+        id: String,
+        before: String?,
+    ): String? {
+        val rest = day - id
+        if (before == null) return rest.lastOrNull()
+        return rest.getOrNull(rest.indexOf(before) - 1)
+    }
 
     /** The next 30 days from [today], with anything overdue still waiting on post or skip. */
     fun upcoming(
@@ -107,6 +128,7 @@ fun SchedulesScreen(
     onSkip: (String) -> Unit,
     onGesture: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onMove: ((String, String?) -> Unit)? = null,
 ) {
     MetroPivot(
         title = SectionTitleCopy.SCHEDULES,
@@ -116,7 +138,7 @@ fun SchedulesScreen(
                     if (calendar) {
                         ScheduleCalendar(schedules, currency, today, onOpen, onPost, onSkip)
                     } else {
-                        UpcomingList(schedules, currency, today, onOpen, onPost, onSkip, onGesture)
+                        UpcomingList(schedules, currency, today, onOpen, onPost, onSkip, onGesture, onMove)
                     }
                 },
                 PivotItem(ScheduleScreenCopy.ALL) { AllSchedules(schedules, currency, onOpen, onGesture) },
@@ -137,8 +159,10 @@ private fun UpcomingList(
     onPost: (String) -> Unit,
     onSkip: (String) -> Unit,
     onGesture: (Boolean) -> Unit,
+    onMove: ((String, String?) -> Unit)?,
 ) {
     val rows = ScheduleOccurrences.upcoming(schedules, today)
+    val drag = remember { RowDrag() }
     val options = formatOptions()
     val list = rememberLazyListState()
     LaunchedEffect(list) {
@@ -183,24 +207,49 @@ private fun UpcomingList(
         // What is due today or overdue leads in the featured panel, to post or skip in place.
         val due = rows.filter { it.isNext && it.date <= today }
         val later = rows - due.toSet()
+        if (onMove != null && later.groupBy { it.date }.values.any { it.size > 1 }) {
+            MetroText(
+                ScheduleScreenCopy.ORDER_HINT,
+                Metro.typography.caption,
+                Modifier.padding(top = 4.dp).testTag("schedules-order-hint"),
+                color = Metro.colors.secondary,
+            )
+        }
         LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(top = MetroDimens.Row), state = list) {
             items(due, key = { "due-${it.schedule.id}" }) { DuePanel(it, currency, today, onOpen, onPost, onSkip) }
-            occurrenceDays(later, currency, onOpen)
+            occurrenceDays(later, currency, onOpen, onMove?.let { drag to it })
         }
     }
 }
 
-/** Day headings over each day's schedules, the way the inbox and register head their days. */
+/**
+ * Day headings over each day's schedules, the way the inbox and register head their days. With [reorder],
+ * a schedule held on a day with others can be dragged among them.
+ */
 private fun LazyListScope.occurrenceDays(
     rows: List<ScheduleOccurrence>,
     currency: CurrencySpec,
     onOpen: (String) -> Unit,
+    reorder: Pair<RowDrag, (String, String?) -> Unit>? = null,
 ) {
     rows.groupBy { it.date }.forEach { (date, day) ->
         item(key = "day-$date") { DayHeading(RegisterEntry.registerDateLabel(date)) }
+        val ids = day.map { it.schedule.id }
         day.forEach { row ->
             item(key = "row-${row.schedule.id}-$date") {
+                val id = row.schedule.id
+                val drag = reorder?.first?.takeIf { ids.size > 1 }
                 ScheduleLine(
+                    modifier =
+                        if (drag == null) {
+                            Modifier
+                        } else {
+                            drag.follow(id, ids).then(
+                                drag.handle(id, ids, hold = true, onMove = { moved, before ->
+                                    reorder.second(moved, ScheduleOccurrences.moveTarget(ids, moved, before))
+                                }),
+                            )
+                        },
                     title = row.schedule.title,
                     detail = upcomingDetail(row.schedule),
                     amount = scheduleAmount(row.schedule, currency),
@@ -601,9 +650,10 @@ private fun ScheduleLine(
     banded: Boolean = false,
     dim: Boolean = false,
     onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .ledgerFill(if (banded) ledgerBand else Color.Transparent)

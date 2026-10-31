@@ -22,6 +22,7 @@ object ScheduleCopy {
     const val DUPLICATE = "a matching transaction is already in this account"
     const val NO_SCHEDULE = "no schedule"
     const val SCHEDULE_DONE = "schedule is finished"
+    const val NO_ORDER = "ordering schedules needs Actual 26.10 or later"
 }
 
 private val ruleJson =

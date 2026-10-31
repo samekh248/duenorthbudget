@@ -31,14 +31,23 @@ class FixedDate extends RealDate {
 }
 globalThis.Date = FixedDate;
 
-const api = await import('@actual-app/api');
+// Areas whose desktop handlers are newer than the pinned API run on their own
+// API package (an npm alias in package.json), in a process of their own.
+const NEWER_API = { 'schedule-order': 'api-26-10' };
+const pickedAreas = process.argv.slice(2);
+const newerPicked = pickedAreas.filter(a => NEWER_API[a]);
+if (newerPicked.length > 0 && newerPicked.length !== pickedAreas.length)
+  throw new Error(`run ${newerPicked.join(', ')} on its own: it needs a newer API`);
+const API_PACKAGE = newerPicked.length > 0 ? NEWER_API[newerPicked[0]] : '@actual-app/api';
+
+const api = await import(API_PACKAGE);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
 const outRoot = path.join(repo, 'core/budget/src/test/resources/parity');
 const dataDir = path.join(here, '.data');
 const ACTUAL_VERSION = JSON.parse(
-  fs.readFileSync(path.join(here, 'node_modules/@actual-app/api/package.json'), 'utf8'),
+  fs.readFileSync(path.join(here, 'node_modules', API_PACKAGE, 'package.json'), 'utf8'),
 ).version;
 
 fs.rmSync(dataDir, { recursive: true, force: true });
@@ -57,6 +66,7 @@ const TABLES = {
   automations: ['zero_budgets', 'categories'],
   scheduleTemplates: ['zero_budgets'],
   cleanup: ['zero_budgets', 'categories', 'cleanup_groups'],
+  scheduleOrder: ['schedules'],
 };
 
 async function dump(names) {
@@ -1290,6 +1300,65 @@ async function cleanupScenarios() {
   });
 }
 
+// Schedule ordering (Actual 26.10): four schedules due the same day, all at
+// the column's default order, and one due later.
+const ORDER_SCHEDULES = [
+  ['Rent', -150000, '2026-10-28'],
+  ['Phone', -4500, '2026-10-28'],
+  ['Gym', -3000, '2026-10-28'],
+  ['Water', -2500, '2026-10-28'],
+  ['Power', -9000, '2026-11-03'],
+];
+
+async function buildScheduleOrderBase() {
+  const checking = await api.createAccount({ name: 'Checking', offbudget: false }, 100000);
+  for (const [name, amount, start] of ORDER_SCHEDULES) {
+    const payee = await api.createPayee({ name });
+    await send('schedule/create', {
+      schedule: { name, posts_transaction: false },
+      conditions: [
+        { op: 'is', field: 'account', value: checking },
+        { op: 'is', field: 'payee', value: payee },
+        { op: 'is', field: 'amount', value: amount },
+        {
+          op: 'isapprox',
+          field: 'date',
+          value: { start, frequency: 'monthly', interval: 1, endMode: 'never', patterns: [], skipWeekend: false, weekendSolveMode: 'after' },
+        },
+      ],
+    });
+  }
+}
+
+async function scheduleOrderScenarios() {
+  console.log('schedule-order');
+  const area = 'schedule-order';
+  const base = 'base';
+  const open = await makeBase(area, base, buildScheduleOrderBase);
+  const tables = TABLES.scheduleOrder;
+  const id = name => byName('schedules', name);
+  const move = async (name, target) =>
+    send('schedule/move', { id: await id(name), targetId: target ? await id(target) : null });
+  const moves = {
+    // All at 0: no room after Rent, so the rest are shoved down.
+    'move-after': [['Water', 'Rent']],
+    'move-top': [['Gym', null]],
+    // Gym on top leaves a gap under it, so Water takes the midpoint.
+    'move-top-then-after': [['Gym', null], ['Water', 'Gym']],
+    'move-to-last': [['Rent', 'Power']],
+    'move-after-shoved': [['Water', 'Rent'], ['Phone', 'Water'], ['Rent', 'Phone']],
+  };
+  for (const [name, steps] of Object.entries(moves)) {
+    await scenario(area, base, open, name, {
+      tables,
+      action: { steps: steps.map(([s, t]) => ({ handler: 'schedule/move', args: { id: s, targetId: t } })) },
+      run: async () => {
+        for (const [s, t] of steps) await move(s, t);
+      },
+    });
+  }
+}
+
 async function undoScenarios() {
   console.log('undo');
   // Undo on the phone restores the rows from before an action. Desktop's
@@ -1317,16 +1386,22 @@ const AREAS = {
   automations: automationScenarios,
   'schedule-templates': scheduleTemplateScenarios,
   cleanup: cleanupScenarios,
+  'schedule-order': scheduleOrderScenarios,
   undo: undoScenarios,
 };
-const picked = process.argv.slice(2);
+const picked = pickedAreas;
 for (const name of picked) if (!AREAS[name]) throw new Error(`unknown area ${name}`);
 if (picked.length === 0) fs.rmSync(outRoot, { recursive: true, force: true });
 for (const [name, run] of Object.entries(AREAS)) {
-  if (picked.length > 0 && !picked.includes(name)) continue;
+  if (picked.length > 0 ? !picked.includes(name) : NEWER_API[name]) continue;
   fs.rmSync(path.join(outRoot, name), { recursive: true, force: true });
   await run();
 }
 await api.shutdown();
 fs.rmSync(dataDir, { recursive: true, force: true });
+if (picked.length === 0) {
+  const { execFileSync } = await import('node:child_process');
+  for (const name of Object.keys(NEWER_API))
+    execFileSync(process.execPath, [fileURLToPath(import.meta.url), name], { stdio: 'inherit' });
+}
 console.log(`done: ${path.relative(repo, outRoot)}`);
