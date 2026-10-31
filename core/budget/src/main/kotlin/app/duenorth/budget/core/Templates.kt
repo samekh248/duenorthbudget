@@ -295,7 +295,7 @@ class TemplateEngine(
                         budgeted,
                         sheet,
                         skipAvailableClamp,
-                    ) { template, carried -> schedule(template, month, carried) }
+                    )
                 } catch (failure: TemplateFailure) {
                     errors += TemplateError(category.name, failure.message.orEmpty())
                     continue
@@ -337,74 +337,6 @@ class TemplateEngine(
             if (chips.isNotEmpty()) lanes += TemplateLane(TemplateLane.Kind.REMAINDER, null, chips, available)
         }
         return Computed(contexts, errors, start, lanes)
-    }
-
-    /** The schedule's occurrences this month; one that comes less often is saved for month by month unless `full`. */
-    private fun schedule(
-        template: Template.Schedule,
-        month: YearMonth,
-        carried: Long,
-    ): Long {
-        val id = template.scheduleId
-        val row =
-            session
-                .query(
-                    """
-                    SELECT r.conditions AS conditions FROM schedules s JOIN rules r ON r.id = s.rule
-                    WHERE ${if (id != null) "s.id = ?" else "TRIM(s.name) = ?"} AND IFNULL(s.tombstone, 0) = 0 AND IFNULL(s.completed, 0) = 0
-                    """.trimIndent(),
-                    listOf(id ?: template.name.trim()),
-                ).firstOrNull() ?: return 0L
-        val conditions =
-            runCatching {
-                kotlinx.serialization.json.Json
-                    .parseToJsonElement(row.str("conditions").orEmpty()) as JsonArray
-            }.getOrNull() ?: return 0L
-        val field = { name: String ->
-            conditions.mapNotNull { it as? JsonObject }.firstOrNull {
-                (it["field"] as? JsonPrimitive)?.content ==
-                    name
-            }
-        }
-        val amountValue = field("amount")?.get("value")
-        var scheduled =
-            when (amountValue) {
-                is JsonPrimitive -> amountValue.content.toDoubleOrNull() ?: 0.0
-                is JsonObject -> {
-                    val a = (amountValue["num1"] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0
-                    val b = (amountValue["num2"] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0
-                    jsRound(a + b) / 2.0
-                }
-                else -> 0.0
-            }
-        val adjustment = template.adjustment
-        if (adjustment != null) {
-            scheduled =
-                if (adjustment.percent) {
-                    scheduled * (1 + adjustment.amount.toDouble() / 100)
-                } else {
-                    scheduled + (if (scheduled < 0) -1 else 1) * cents(adjustment.amount)
-                }
-        }
-        val amount = abs(jsRound(scheduled))
-        val date = field("date") ?: return 0L
-        val value = date["value"]
-        val inMonth: Int
-        val next: LocalDate?
-        if (value is JsonObject) {
-            val occurrences = ScheduleRecurrence.occurrences(value, month.atDay(1), limit = 64)
-            inMonth = occurrences.count { YearMonth.from(it) == month }
-            next = occurrences.firstOrNull()
-        } else {
-            next = (value as? JsonPrimitive)?.content?.let { ScheduleDates.parseIso(it) }
-            inMonth = if (next != null && YearMonth.from(next) == month) 1 else 0
-        }
-        if (inMonth > 0) return amount * inMonth
-        if (template.full || next == null) return 0L
-        // A one-off date already past (a missed bill not yet marked done) is due now: what is still missing, in one
-        // month. Counting months to it would divide by zero or by a negative.
-        val left = (ChronoUnit.MONTHS.between(month, YearMonth.from(next)) + 1).coerceAtLeast(1L)
-        return ((amount - carried).coerceAtLeast(0L).toDouble() / left).roundToLong()
     }
 
     private fun categories(): List<Category> {

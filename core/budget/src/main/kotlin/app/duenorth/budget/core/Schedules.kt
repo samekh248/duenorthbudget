@@ -1026,11 +1026,16 @@ object ScheduleRecurrence {
         return false
     }
 
-    /** Occurrences on or after [from], in order, honouring the end mode. */
+    /**
+     * Occurrences on or after [from], in order, honouring the end mode. [byRawDate] compares the date before a
+     * weekend move with [from], as rschedule's `occurrences({start})` does; [moveWeekends] false leaves them unmoved.
+     */
     fun occurrences(
         config: JsonObject,
         from: LocalDate,
         limit: Int = 64,
+        byRawDate: Boolean = false,
+        moveWeekends: Boolean = true,
     ): List<LocalDate> {
         val start = config["start"]?.jsonPrimitive?.contentOrNull?.let { ScheduleDates.parseIso(it) } ?: return emptyList()
         val frequency = config["frequency"]?.jsonPrimitive?.contentOrNull ?: return emptyList()
@@ -1054,8 +1059,8 @@ object ScheduleRecurrence {
                 if (endDate != null && date > endDate) return out
                 count++
                 if (maxCount != null && count > maxCount) return out
-                val moved = if (skipWeekend) moveOffWeekend(date, solveBefore) else date
-                if (moved >= from) out.add(moved)
+                val moved = if (skipWeekend && moveWeekends) moveOffWeekend(date, solveBefore) else date
+                if ((if (byRawDate) date else moved) >= from) out.add(moved)
                 if (out.size >= limit) return out
             }
         }
@@ -1114,6 +1119,23 @@ object ScheduleRecurrence {
         val matches = (1..month.lengthOfMonth()).map { month.atDay(it) }.filter { it.dayOfWeek == weekday }
         return if (value < 0) matches.getOrNull(matches.size + value) else matches.getOrNull(value - 1)
     }
+
+    /** The last time a schedule that ends ever falls; null for one that never ends or never fell. */
+    fun lastOccurrence(
+        config: JsonObject,
+        moveWeekends: Boolean = true,
+    ): LocalDate? {
+        val endMode = config["endMode"]?.jsonPrimitive?.contentOrNull ?: "never"
+        if (endMode != "after_n_occurrences" && endMode != "on_date") return null
+        val start = config["start"]?.jsonPrimitive?.contentOrNull?.let { ScheduleDates.parseIso(it) } ?: return null
+        return occurrences(config, start, limit = 100_000, byRawDate = true, moveWeekends = moveWeekends).lastOrNull()
+    }
+
+    /** `getDateWithSkippedWeekend`: a Saturday or Sunday moved to the Friday before, or the Monday after. */
+    fun offWeekend(
+        date: LocalDate,
+        before: Boolean,
+    ): LocalDate = moveOffWeekend(date, before)
 
     private fun moveOffWeekend(
         date: LocalDate,

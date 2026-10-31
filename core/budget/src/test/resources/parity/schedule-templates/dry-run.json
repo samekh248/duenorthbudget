@@ -1,0 +1,200 @@
+{
+  "scenario": "dry-run",
+  "base": "base.zip",
+  "actualVersion": "26.8.1",
+  "today": "2026-10-07",
+  "action": {
+    "handler": "budget/dry-run-category-template",
+    "args": {
+      "month": "2026-10"
+    }
+  },
+  "ids": {
+    "accounts": {
+      "Checking": "68efd32d-d39f-44d0-8b8a-19d88d366d05"
+    },
+    "categories": {
+      "Food": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "General": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "Bills": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "Bills (Flexible)": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "Income": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "Starting Balances": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "Savings": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+      "Salary": "92b46cd2-22ac-41d7-acb7-0ad46b85bd6e",
+      "Rent": "ae592be0-b080-4c5a-b4ef-880fc8d58d20",
+      "Rent Plus": "da319429-64b5-42d2-9ac5-d308b7094e24",
+      "Rent Fixed": "e709de15-b2b8-483f-8fe2-caa0ecda78ea",
+      "Insurance": "cd72539d-1da9-448f-8026-b04a34bef0b4",
+      "Insurance Full": "2cdd4997-13b8-402f-9cdf-3b1210ef2c47",
+      "Saved Insurance": "edd11f15-8dc0-4b89-ad75-fc5fd5560b5b",
+      "Water": "257e05b9-8564-460a-9e16-b19b70dca9f2",
+      "Groceries": "e3d28b61-6f97-45cb-85ef-28f239f3e10c",
+      "Fortnight": "1e2f97ab-1cbb-4b37-a559-b7b2ce117161",
+      "Coffee": "2cbf7572-6c88-4c31-8623-bf44d8e002a9",
+      "Car Repair": "c3296ca3-e929-4cc9-a2c5-cf8929f2321f",
+      "Old Bill": "5eac66fd-774a-4dda-bf89-ac0d8edf8696",
+      "Electric": "d31e3d85-4101-4f7b-b1a6-5d57ce1926a2",
+      "Ended": "54534872-9324-4fdd-b4e9-56a5889eb0ef",
+      "Done": "e8e6e856-9791-4f92-b80d-710aaa7e7d8d",
+      "Split A": "c99b2e18-1fe8-4c64-9331-d825f8cecb96",
+      "Split B": "3c91c1b8-fd03-46a2-9898-0409cfe625ab",
+      "Split C": "dfb4f346-809d-46f6-b242-1c65ca77744c",
+      "Two Bills": "1f2642d7-6623-4551-b9f8-46607d6bc82c",
+      "With Others": "2a3baee0-f50f-428c-9548-a99af886ad89"
+    },
+    "groups": {
+      "Usual Expenses": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "Income": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "Investments and Savings": "a137772f-cf2f-4089-9432-822d2ddc1466"
+    },
+    "payees": {
+      "Employer": "20f10293-9153-4cd1-8e53-41061dff9617",
+      "Store": "eab3d602-9fb5-4559-a869-d3d22792c16a",
+      "Biller": "a9bdf434-1108-4f14-8a41-8a050a7a54e1"
+    },
+    "schedules": {
+      "Rent": "031e159a-8071-48e6-a1da-03cbf7d63520",
+      "Insurance": "6571725d-8d5d-42cc-a729-695846d59f9c",
+      "Water": "0d0e8a87-da8d-4202-8df0-f99965b1c335",
+      "Groceries": "65be04b1-93fa-4d44-8ca6-598696d203ab",
+      "Fortnight": "92388447-cc6d-4bba-9d54-6cf63c89ba92",
+      "Coffee": "86c4913d-2bb8-4bbe-ab06-20e97033371d",
+      "Car Repair": "172e36bc-c997-44b7-812b-8c9367069b40",
+      "Old Bill": "1ae8adae-48eb-4e87-b7cf-05f82b0b7042",
+      "Electric": "8873107f-581d-4b6a-baa8-c371d27998c2",
+      "Ended": "9a79c156-8490-4cb0-9847-cb9aac755d70",
+      "Done": "55d9401d-2b71-4d32-b6fe-0bf2399b7792",
+      "Utilities": "9c0fc6d7-9d0b-4dd3-b5fd-b8a41a887a62"
+    }
+  },
+  "tables": {},
+  "values": {
+    "dryRun": {
+      "Rent": {
+        "budgeted": 150000,
+        "perTemplate": [
+          150000
+        ]
+      },
+      "Rent Plus": {
+        "budgeted": 165000,
+        "perTemplate": [
+          165000
+        ]
+      },
+      "Rent Fixed": {
+        "budgeted": 147450,
+        "perTemplate": [
+          147450
+        ]
+      },
+      "Insurance": {
+        "budgeted": 20000,
+        "perTemplate": [
+          20000
+        ]
+      },
+      "Insurance Full": {
+        "budgeted": 0,
+        "perTemplate": [
+          0
+        ]
+      },
+      "Saved Insurance": {
+        "budgeted": 13333,
+        "perTemplate": [
+          13333
+        ]
+      },
+      "Water": {
+        "budgeted": 10000,
+        "perTemplate": [
+          10000
+        ]
+      },
+      "Groceries": {
+        "budgeted": 25000,
+        "perTemplate": [
+          25000
+        ]
+      },
+      "Fortnight": {
+        "budgeted": 8000,
+        "perTemplate": [
+          8000
+        ]
+      },
+      "Coffee": {
+        "budgeted": 15500,
+        "perTemplate": [
+          15500
+        ]
+      },
+      "Car Repair": {
+        "budgeted": 15000,
+        "perTemplate": [
+          15000
+        ]
+      },
+      "Old Bill": {
+        "budgeted": 0,
+        "perTemplate": [
+          0
+        ]
+      },
+      "Electric": {
+        "budgeted": 10000,
+        "perTemplate": [
+          10000
+        ]
+      },
+      "Ended": {
+        "budgeted": 0,
+        "perTemplate": [
+          0
+        ]
+      },
+      "Done": {
+        "budgeted": 0,
+        "perTemplate": [
+          0
+        ]
+      },
+      "Split A": {
+        "budgeted": 5000,
+        "perTemplate": [
+          5000
+        ]
+      },
+      "Split B": {
+        "budgeted": 3750,
+        "perTemplate": [
+          3750
+        ]
+      },
+      "Split C": {
+        "budgeted": 11250,
+        "perTemplate": [
+          11250
+        ]
+      },
+      "Two Bills": {
+        "budgeted": 53333,
+        "perTemplate": [
+          8333,
+          20000,
+          25000
+        ]
+      },
+      "With Others": {
+        "budgeted": 47000,
+        "perTemplate": [
+          10000,
+          25000,
+          12000
+        ]
+      }
+    }
+  }
+}
