@@ -3,7 +3,12 @@ package app.duenorth.budget
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
 import app.duenorth.budget.core.AssistantCopy
 import app.duenorth.budget.core.AssistantReport
 import app.duenorth.budget.core.BudgetMode
@@ -118,6 +123,29 @@ class AssistantScreenshotTest {
         )
 
     @Test
+    fun workingLight() = snapWorking("assistant_working_light", dark = false)
+
+    @Test
+    fun workingDark() = snapWorking("assistant_working_dark", dark = true)
+
+    /** A look-alike merge saving: its buttons give way to what it is doing, and dots run under it and along the top. */
+    private fun snapWorking(
+        name: String,
+        dark: Boolean,
+    ) {
+        val merge = sampleAssistantSchedules().findings.single { it.kind == FindingKind.LOOKALIKE_PAYEE }
+        val report = AssistantReport(listOf(merge))
+        snap(
+            name,
+            dark,
+            report,
+            working = AssistantUi.Working(merge.key, AssistantCopy.working(merge.actions.first())),
+        )
+        compose.onNodeWithTag("finding-working-${merge.key}").assertTextEquals("merging payees\u2026")
+        compose.onAllNodesWithTag("finding-action-0-${merge.key}").assertCountEquals(0)
+    }
+
+    @Test
     fun clearLight() = snap("assistant_clear_light", dark = false, report = AssistantReport.EMPTY)
 
     @Test
@@ -129,6 +157,7 @@ class AssistantScreenshotTest {
         dark: Boolean,
         report: AssistantReport,
         expanded: Set<FindingKind> = emptySet(),
+        working: AssistantUi.Working? = null,
     ) {
         val shell =
             MonthShell(
@@ -154,18 +183,21 @@ class AssistantScreenshotTest {
                 ).map { ScreenAction(it.id, it.glyph, it.label, primary = it.primary) {} }
         compose.setContent {
             MetroTheme(darkTheme = dark) {
-                Column(Modifier.fillMaxSize()) {
-                    HomePivot(
-                        shell = shell,
-                        loading = false,
-                        openMonth = shell.month,
-                        monthWindow = MonthWindow.around(shell.month),
-                        initialSection = ScreenBar.HOME_ASSISTANT,
-                        onGesture = {},
-                        modifier = Modifier.weight(1f),
-                        assistant = AssistantUi(report = report, expanded = expanded),
-                    )
-                    MetroAppBar(actions, false, {}, windowInsets = WindowInsets(0))
+                CompositionLocalProvider(LocalWorkingDotsAt provides 1100f) {
+                    Column(Modifier.fillMaxSize()) {
+                        if (working != null) WorkingDots()
+                        HomePivot(
+                            shell = shell,
+                            loading = false,
+                            openMonth = shell.month,
+                            monthWindow = MonthWindow.around(shell.month),
+                            initialSection = ScreenBar.HOME_ASSISTANT,
+                            onGesture = {},
+                            modifier = Modifier.weight(1f),
+                            assistant = AssistantUi(report = report, expanded = expanded, working = working),
+                        )
+                        MetroAppBar(actions, false, {}, windowInsets = WindowInsets(0))
+                    }
                 }
             }
         }

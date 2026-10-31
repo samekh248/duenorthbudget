@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.AssistantCopy
 import app.duenorth.budget.core.AssistantReport
 import app.duenorth.budget.core.Finding
 import app.duenorth.budget.core.FindingAction
@@ -16,9 +17,16 @@ data class AssistantUi(
     val report: AssistantReport? = null,
     /** Kinds showing every finding rather than the first few. */
     val expanded: Set<FindingKind> = emptySet(),
-    /** Findings acted on whose write has not landed yet: hidden at once, so the tap shows. */
+    /** Findings acted on whose write has not landed yet: hidden at once, so the tap shows, except the [working] one. */
     val settling: Set<String> = emptySet(),
-)
+    /** The finding whose fix is saving now, shown with what it is doing in place of its buttons. */
+    val working: Working? = null,
+) {
+    data class Working(
+        val key: String,
+        val label: String,
+    )
+}
 
 /**
  * The assistant: reads what the checks found after every reload, and carries out the button the person taps. It
@@ -46,7 +54,14 @@ class AssistantHolder internal constructor(
             val keys = report.findings.map { it.key }.toSet()
             // A finished write's finding is gone from the new read; one a bank sync is still working on stays hidden.
             val syncing = host.state.value.bankSync.syncing
-            update { it.copy(report = report, settling = if (syncing || host.writing) it.settling intersect keys else emptySet()) }
+            update {
+                it.copy(
+                    report = report,
+                    settling = if (syncing || host.writing) it.settling intersect keys else emptySet(),
+                    // Gone from the read means the fix landed; still there means a read from before it, while it saves.
+                    working = it.working?.takeIf { working -> working.key in keys && host.writing },
+                )
+            }
         }
     }
 
@@ -79,46 +94,58 @@ class AssistantHolder internal constructor(
             else -> Unit
         }
         if (host.writing) return
-        update { it.copy(settling = it.settling + finding.key) }
+        update { it.copy(settling = it.settling + finding.key, working = AssistantUi.Working(finding.key, AssistantCopy.working(action))) }
         host.launchWrite { id ->
             val result =
-                withContext(host.io) {
-                    when (action) {
-                        is FindingAction.Match -> host.library.matchTransactions(id, action.bankId, action.enteredId)
-                        is FindingAction.Merge -> host.library.mergeTransactions(id, action.transactionIds, false)
-                        is FindingAction.MoveAndMatch -> host.library.moveAndMatch(id, action.enteredId, action.bankId)
-                        is FindingAction.Delete -> host.library.deleteTransaction(id, action.transactionId, false)
-                        is FindingAction.Dismiss -> host.library.dismissFinding(id, finding.key)
-                        is FindingAction.MoveTo -> host.library.moveTransaction(id, action.transactionId, action.accountId)
-                        is FindingAction.AdoptAndMatch -> host.library.adoptAndMatch(id, action.enteredId, action.bankId)
-                        is FindingAction.LinkTransfer -> host.library.linkTransfer(id, action.fromId, action.toId)
-                        is FindingAction.MakeSchedule ->
-                            host.library.createScheduleFromTransaction(id, action.transactionId, "monthly", action.nextDateIso).asWrite()
-                        is FindingAction.PostSchedule -> host.library.postSchedule(id, action.scheduleId).asWrite()
-                        is FindingAction.SkipSchedule -> host.library.skipSchedule(id, action.scheduleId).asWrite()
-                        is FindingAction.UpdateScheduleAmount ->
-                            host.library.updateScheduleAmount(id, action.scheduleId, action.amountMinor).asWrite()
-                        is FindingAction.MakeRule -> host.library.makeCategoryRule(id, action.payeeId, action.categoryId)
-                        is FindingAction.MergePayees ->
-                            host.library
-                                .renamePayee(
-                                    id,
-                                    action.payeeId,
-                                    action.intoName,
-                                    confirmMerge = true,
-                                    rememberRule = true,
-                                ).asWrite()
-                        is FindingAction.Open,
-                        is FindingAction.OpenAccount,
-                        is FindingAction.Reconcile,
-                        FindingAction.SyncBank,
-                        is FindingAction.BudgetCategory,
-                        FindingAction.HoldForNext,
-                        FindingAction.OpenSchedules,
-                        -> WriteResult.Saved
+                try {
+                    withContext(host.io) {
+                        when (action) {
+                            is FindingAction.Match -> host.library.matchTransactions(id, action.bankId, action.enteredId)
+                            is FindingAction.Merge -> host.library.mergeTransactions(id, action.transactionIds, false)
+                            is FindingAction.MoveAndMatch -> host.library.moveAndMatch(id, action.enteredId, action.bankId)
+                            is FindingAction.Delete -> host.library.deleteTransaction(id, action.transactionId, false)
+                            is FindingAction.Dismiss -> host.library.dismissFinding(id, finding.key)
+                            is FindingAction.MoveTo -> host.library.moveTransaction(id, action.transactionId, action.accountId)
+                            is FindingAction.AdoptAndMatch -> host.library.adoptAndMatch(id, action.enteredId, action.bankId)
+                            is FindingAction.LinkTransfer -> host.library.linkTransfer(id, action.fromId, action.toId)
+                            is FindingAction.MakeSchedule ->
+                                host.library
+                                    .createScheduleFromTransaction(
+                                        id,
+                                        action.transactionId,
+                                        "monthly",
+                                        action.nextDateIso,
+                                    ).asWrite()
+                            is FindingAction.PostSchedule -> host.library.postSchedule(id, action.scheduleId).asWrite()
+                            is FindingAction.SkipSchedule -> host.library.skipSchedule(id, action.scheduleId).asWrite()
+                            is FindingAction.UpdateScheduleAmount ->
+                                host.library.updateScheduleAmount(id, action.scheduleId, action.amountMinor).asWrite()
+                            is FindingAction.MakeRule -> host.library.makeCategoryRule(id, action.payeeId, action.categoryId)
+                            is FindingAction.MergePayees ->
+                                host.library
+                                    .renamePayee(
+                                        id,
+                                        action.payeeId,
+                                        action.intoName,
+                                        confirmMerge = true,
+                                        rememberRule = true,
+                                    ).asWrite()
+                            is FindingAction.Open,
+                            is FindingAction.OpenAccount,
+                            is FindingAction.Reconcile,
+                            FindingAction.SyncBank,
+                            is FindingAction.BudgetCategory,
+                            FindingAction.HoldForNext,
+                            FindingAction.OpenSchedules,
+                            -> WriteResult.Saved
+                        }
                     }
+                } catch (error: Throwable) {
+                    update { it.copy(settling = it.settling - finding.key, working = null) }
+                    throw error
                 }
-            if (result !is WriteResult.Saved) update { it.copy(settling = it.settling - finding.key) }
+            // A saved fix keeps its working line until the next read of the checks takes the finding away.
+            if (result !is WriteResult.Saved) update { it.copy(settling = it.settling - finding.key, working = null) }
             // A budget finding belongs to no account: a save just reads the budget again.
             if (finding.accountId.isBlank() && result is WriteResult.Saved) {
                 host.reload()

@@ -8,27 +8,38 @@ import app.duenorth.budget.core.SessionOpener
 import app.duenorth.budget.core.SqlRow
 import app.duenorth.budget.core.SqlSession
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 class AndroidSqlSession(
     private val database: SQLiteDatabase,
+    /** Shared by every connection to the same file; see [AndroidSessionOpener]. */
+    private val fileLock: ReentrantLock = ReentrantLock(),
 ) : SqlSession {
     override fun exec(sql: String) {
-        database.execSQL(sql)
+        fileLock.withLock { database.execSQL(sql) }
     }
 
     override fun exec(
         sql: String,
         args: List<Any?>,
-    ) {
+    ) = fileLock.withLock {
         val statement = database.compileStatement(sql)
         statement.use {
             statement.bind(args)
             val verb = sql.trimStart().take(6).uppercase()
             if (verb.startsWith("INSERT")) statement.executeInsert() else statement.executeUpdateDelete()
         }
+        Unit
     }
 
     override fun query(
+        sql: String,
+        args: List<Any?>,
+    ): List<SqlRow> = fileLock.withLock { read(sql, args) }
+
+    private fun read(
         sql: String,
         args: List<Any?>,
     ): List<SqlRow> {
@@ -64,15 +75,16 @@ class AndroidSqlSession(
         }
     }
 
-    override fun transaction(body: () -> Unit) {
-        database.beginTransaction()
-        try {
-            body()
-            database.setTransactionSuccessful()
-        } finally {
-            database.endTransaction()
+    override fun transaction(body: () -> Unit) =
+        fileLock.withLock {
+            database.beginTransaction()
+            try {
+                body()
+                database.setTransactionSuccessful()
+            } finally {
+                database.endTransaction()
+            }
         }
-    }
 }
 
 private fun SQLiteProgram.bind(args: List<Any?>) {
@@ -90,12 +102,34 @@ private fun SQLiteProgram.bind(args: List<Any?>) {
     }
 }
 
+/**
+ * Opens a budget file, one connection per block.
+ *
+ * Android starts every transaction as BEGIN EXCLUSIVE, and a connection that meets another one's lock
+ * gives up with SQLITE_BUSY after 2.5 seconds. A sync applying a long reply (or a big payee merge) on one
+ * thread then crashed a screen reload opening the same file on another. Every connection to one file now
+ * shares a lock that each statement and each whole transaction holds, so they take turns inside the app
+ * instead of racing in SQLite. The lock is not held between statements, so a block that waits on the
+ * network (bank sync) does not hold up readers.
+ */
 class AndroidSessionOpener : SessionOpener {
     override fun <T> use(
         file: File,
         block: (SqlSession) -> T,
     ): T {
-        val database = SQLiteDatabase.openOrCreateDatabase(file, null)
-        database.use { return block(AndroidSqlSession(it)) }
+        val lock = lockFor(file)
+        // Opening sets the journal mode, which needs the file unlocked too.
+        val database = lock.withLock { SQLiteDatabase.openOrCreateDatabase(file, null) }
+        try {
+            return block(AndroidSqlSession(database, lock))
+        } finally {
+            lock.withLock { database.close() }
+        }
+    }
+
+    private companion object {
+        private val locks = ConcurrentHashMap<String, ReentrantLock>()
+
+        fun lockFor(file: File): ReentrantLock = locks.computeIfAbsent(file.absoluteFile.normalize().path) { ReentrantLock() }
     }
 }

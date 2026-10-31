@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
@@ -64,13 +65,14 @@ fun AssistantSection(
     expanded: Set<FindingKind> = emptySet(),
     onToggleExpanded: (FindingKind) -> Unit = {},
     settling: Set<String> = emptySet(),
+    working: AssistantUi.Working? = null,
     formatOptions: FormatOptions = formatOptions(),
 ) {
     if (report == null) {
         Box(modifier.fillMaxSize()) { Placeholder() }
         return
     }
-    val findings = report.findings.filter { it.key !in settling }
+    val findings = report.findings.filter { it.key !in settling || it.key == working?.key }
     if (findings.isEmpty()) {
         AssistantClear(modifier)
         return
@@ -109,7 +111,7 @@ fun AssistantSection(
                                 .height(2.dp)
                                 .background(Metro.colors.background),
                         )
-                        FindingPanel(finding, money, onAct)
+                        FindingPanel(finding, money, onAct, working = working?.takeIf { it.key == finding.key }?.label)
                     }
                 }
             }
@@ -188,6 +190,8 @@ internal fun FindingPanel(
     money: (Long) -> String,
     onAct: (Finding, FindingAction) -> Unit,
     modifier: Modifier = Modifier,
+    /** What its fix is doing while it saves, such as "merging payees…"; the buttons give way to it and the dots. */
+    working: String? = null,
 ) {
     Column(
         modifier
@@ -196,15 +200,17 @@ internal fun FindingPanel(
             .padding(horizontal = CARD_PADDING, vertical = 14.dp)
             .testTag("finding-${finding.key}"),
     ) {
-        if (finding.sure == FindingSure.MAYBE) {
-            MetroText(AssistantCopy.MAYBE, Metro.typography.caption, color = Metro.accent.text)
+        Column(if (working != null) Modifier.alpha(WORKING_DIM) else Modifier) { FindingBody(finding, money) }
+        if (working != null) {
+            MetroText(
+                working,
+                Metro.typography.body,
+                Modifier.padding(top = 12.dp).testTag("finding-working-${finding.key}"),
+                color = Metro.accent.text,
+            )
+            WorkingDots(Modifier.padding(top = 10.dp, bottom = 4.dp), description = working)
+            return@Column
         }
-        MetroText(finding.headline, Metro.typography.body)
-        finding.sides.forEachIndexed { index, side ->
-            FindingSideLine(side, money, showAccount = finding.kind == FindingKind.WRONG_ACCOUNT || index == 0)
-        }
-        if (finding.figures.isNotEmpty()) FindingFigures(finding.figures, money)
-        FindingReasons(finding.reasons + listOfNotNull(finding.difference?.let { AssistantCopy.offBy(money(abs(it))) }))
         MetroButtonGrid(Modifier.padding(top = 12.dp)) {
             finding.actions.forEachIndexed { index, action ->
                 val tag = "finding-action-$index-${finding.key}"
@@ -216,6 +222,25 @@ internal fun FindingPanel(
             }
         }
     }
+}
+
+/** How faint a finding's details go while its fix saves, so the working line stands out. */
+private const val WORKING_DIM = 0.5f
+
+@Composable
+private fun FindingBody(
+    finding: Finding,
+    money: (Long) -> String,
+) {
+    if (finding.sure == FindingSure.MAYBE) {
+        MetroText(AssistantCopy.MAYBE, Metro.typography.caption, color = Metro.accent.text)
+    }
+    MetroText(finding.headline, Metro.typography.body)
+    finding.sides.forEachIndexed { index, side ->
+        FindingSideLine(side, money, showAccount = finding.kind == FindingKind.WRONG_ACCOUNT || index == 0)
+    }
+    if (finding.figures.isNotEmpty()) FindingFigures(finding.figures, money)
+    FindingReasons(finding.reasons + listOfNotNull(finding.difference?.let { AssistantCopy.offBy(money(abs(it))) }))
 }
 
 @Composable

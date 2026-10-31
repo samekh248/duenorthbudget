@@ -248,6 +248,7 @@ fun HomePivot(
                             expanded = assistant.expanded,
                             onToggleExpanded = onAssistantMore,
                             settling = assistant.settling,
+                            working = assistant.working,
                             formatOptions = formatOptions,
                         )
                     }
@@ -1104,6 +1105,8 @@ fun ShellChrome(
     actions: List<ScreenAction>,
     syncing: Boolean = false,
     progress: Float? = null,
+    /** A save is running: the indeterminate dots run along the top of the page, where sync's bar goes. */
+    working: Boolean = false,
     statusBar: WindowInsets = WindowInsets.statusBars,
     /** False while a page puts its own panel where the bar goes, as the budget's keypad does. */
     bar: Boolean = true,
@@ -1126,7 +1129,11 @@ fun ShellChrome(
                 .background(Metro.colors.background)
                 .windowInsetsPadding(statusBar),
         ) {
-            if (syncing) SyncProgressBar(progress)
+            if (syncing) {
+                SyncProgressBar(progress)
+            } else if (working) {
+                WorkingDots()
+            }
             Box(Modifier.weight(1f).aboveKeyboard(keyboard) { if (bar) barHeight else 0 }) {
                 content(Modifier.fillMaxSize())
                 overBar?.invoke(Modifier.align(Alignment.BottomCenter))

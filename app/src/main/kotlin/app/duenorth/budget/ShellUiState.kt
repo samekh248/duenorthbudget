@@ -71,6 +71,8 @@ data class ShellUiState(
     val serverError: String? = null,
     val remoteFiles: List<RemoteFile> = emptyList(),
     val syncing: Boolean = false,
+    /** A save is running (a merge, a move, an edit): the page shows the indeterminate dots along its top. */
+    val writing: Boolean = false,
     val syncProgress: Float? = null,
     val syncStatus: String = "",
     val conflicts: List<BudgetConflict> = emptyList(),
