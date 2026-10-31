@@ -35,6 +35,8 @@ object UndoCopy {
     const val MATCH = "match"
     const val NOT_A_MATCH = "not a match"
     const val MERGE = "merge"
+    const val MOVE_AND_MERGE = "move & merge"
+    const val DISMISS = "dismiss"
 }
 
 /** One person-level action, as the cells it wrote. */

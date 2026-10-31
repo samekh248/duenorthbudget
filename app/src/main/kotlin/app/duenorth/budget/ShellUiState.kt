@@ -112,6 +112,8 @@ data class ShellUiState(
     val homeSection: Int = 0,
     /** The inbox's own state, kept by [InboxHolder]. */
     val inbox: InboxUi = InboxUi(),
+    /** The assistant's own state, kept by [AssistantHolder]. */
+    val assistant: AssistantUi = AssistantUi(),
     /** The budget's edit mode, with the box being typed into; null when not editing. */
     val budgetEdit: BudgetEdit? = null,
     /** Set while a transaction form was opened from home (the inbox or its add), so saving it goes back home. */

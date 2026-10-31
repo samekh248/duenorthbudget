@@ -191,6 +191,9 @@ class ShellViewModel(
     /** The inbox: filing, deleting and opening what came in. */
     val inbox: InboxHolder = InboxHolder(host)
 
+    /** The assistant: what the checks found, and their fixes. */
+    val assistant: AssistantHolder = AssistantHolder(host)
+
     /** Bank sync: every SimpleFIN account fetches, then the budget syncs. */
     val bankSync: BankSyncHolder = BankSyncHolder(host)
 
@@ -881,6 +884,8 @@ class ShellViewModel(
         }
         if (!loaded.locked && loaded.shell != null) {
             warmMonthWindow()
+            // The checks read the whole budget, so they run after the screen has what it needs.
+            assistant.load()
         }
         getStarted.retireFinished()
     }

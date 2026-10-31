@@ -75,6 +75,7 @@ object ScreenBar {
     val HOME_BUDGET = HomeSections.headers.indexOf(HomeSections.BUDGET)
     val HOME_ACCOUNTS = HomeSections.headers.indexOf(HomeSections.ACCOUNTS)
     val HOME_INBOX = HomeSections.headers.indexOf(HomeSections.INBOX)
+    val HOME_ASSISTANT = HomeSections.headers.indexOf(HomeSections.ASSISTANT)
 
     fun specsFor(
         route: ShellRoute,
@@ -193,6 +194,8 @@ object ScreenBar {
                                 if (showClosed) AccountScreenCopy.HIDE_CLOSED else AccountScreenCopy.SHOW_CLOSED,
                             ),
                         ) + undo(undoLabel) + settings()
+                    // The assistant fixes things from its own panels; its bar keeps undo and settings.
+                    homeSection == HOME_ASSISTANT -> listOf(addTransaction()) + undo(undoLabel) + settings()
                     // Add a transaction and edit budget are the budget's buttons; hold and categories head the menu.
                     mode == BudgetMode.TRACKING ->
                         listOf(addTransaction()) + editBudget() + categories() + hidden(showHidden) + rules() +

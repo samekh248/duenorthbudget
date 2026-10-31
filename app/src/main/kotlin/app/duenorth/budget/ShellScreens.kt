@@ -49,6 +49,9 @@ import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.Finding
+import app.duenorth.budget.core.FindingAction
+import app.duenorth.budget.core.FindingKind
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.GetStartedLine
 import app.duenorth.budget.core.GetStartedStep
@@ -124,6 +127,10 @@ fun HomePivot(
     getStarted: List<GetStartedLine>? = null,
     onGetStarted: (GetStartedStep) -> Unit = {},
     onHideGetStarted: () -> Unit = {},
+    /** The assistant's state: what it found and what is showing. */
+    assistant: AssistantUi = AssistantUi(),
+    onAssistant: (Finding, FindingAction) -> Unit = { _, _ -> },
+    onAssistantMore: (FindingKind) -> Unit = {},
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
@@ -218,6 +225,25 @@ fun HomePivot(
                         onMonthReview = onMonthReview,
                         onReport = onReport,
                     )
+                },
+                PivotItem(
+                    HomeSections.ASSISTANT,
+                    count = assistant.report?.findings?.count { it.key !in assistant.settling } ?: 0,
+                ) {
+                    if (shell == null) {
+                        if (loading) Placeholder()
+                    } else {
+                        AssistantSection(
+                            report = assistant.report,
+                            currency = shell.currency,
+                            onListGesture = { listGesture = it },
+                            onAct = onAssistant,
+                            expanded = assistant.expanded,
+                            onToggleExpanded = onAssistantMore,
+                            settling = assistant.settling,
+                            formatOptions = formatOptions,
+                        )
+                    }
                 },
             ),
         modifier = modifier,

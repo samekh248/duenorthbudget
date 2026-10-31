@@ -140,13 +140,13 @@ object MatchFinder {
     private fun samePayee(pair: MatchPair) = pair.bank.payee.equals(pair.entered.payee, ignoreCase = true)
 
     /** A plain transaction that can be matched: alive, not a split or a part of one, not a transfer. */
-    private fun candidate(t: String) =
+    internal fun candidate(t: String) =
         """
         IFNULL($t.tombstone, 0) = 0 AND IFNULL($t.isParent, 0) = 0 AND IFNULL($t.isChild, 0) = 0
             AND $t.transferred_id IS NULL AND IFNULL($t.reconciled, 0) = 0
         """.trimIndent()
 
-    private fun sides(
+    internal fun sides(
         session: SqlSession,
         ids: Set<String>,
     ): Map<String, MatchSide> {
@@ -187,7 +187,7 @@ object MatchFinder {
             }
     }
 
-    private fun toDate(date: Int): LocalDate? = runCatching { LocalDate.of(date / 10000, (date / 100) % 100, date % 100) }.getOrNull()
+    internal fun toDate(date: Int): LocalDate? = runCatching { LocalDate.of(date / 10000, (date / 100) % 100, date % 100) }.getOrNull()
 }
 
 /**
@@ -212,27 +212,37 @@ class MatchBook(
                         box[0] = WriteResult.Rejected(MatchCopy.GONE)
                         return@transaction
                     }
-            val bank = pair.bank
-            val entered = pair.entered
-            val payeeId = payeeOf(entered.id) ?: payeeOf(bank.id)
-            val note =
-                listOf(entered.note, bank.note)
-                    .filter { it.isNotBlank() }
-                    .distinct()
-                    .plus(evidence(bank, entered))
-                    .joinToString("\n")
-            SyncSchema.writeRow(
-                session,
-                "transactions",
-                bank.id,
-                "description" to payeeId,
-                "category" to (entered.categoryId ?: bank.categoryId),
-                "notes" to note,
-                "cleared" to 1,
-            )
-            SyncSchema.writeRow(session, "transactions", entered.id, "tombstone" to 1)
+            settle(pair.bank, pair.entered)
         }
         return box[0]
+    }
+
+    /**
+     * Keeps [bank] with [entered]'s payee, category and note, and deletes [entered]. [movedFrom] names the account
+     * the entry sat in when it was moved over first, so the note says so.
+     */
+    internal fun settle(
+        bank: MatchSide,
+        entered: MatchSide,
+        movedFrom: String? = null,
+    ) {
+        val payeeId = payeeOf(entered.id) ?: payeeOf(bank.id)
+        val note =
+            listOf(entered.note, bank.note)
+                .filter { it.isNotBlank() }
+                .distinct()
+                .plus(evidence(bank, entered, movedFrom))
+                .joinToString("\n")
+        SyncSchema.writeRow(
+            session,
+            "transactions",
+            bank.id,
+            "description" to payeeId,
+            "category" to (entered.categoryId ?: bank.categoryId),
+            "notes" to note,
+            "cleared" to 1,
+        )
+        SyncSchema.writeRow(session, "transactions", entered.id, "tombstone" to 1)
     }
 
     /** Remembers the pair as not a match, in a synced preference, and drops pairs whose transactions are gone. */
@@ -256,9 +266,11 @@ class MatchBook(
     internal fun evidence(
         bank: MatchSide,
         entered: MatchSide,
+        movedFrom: String? = null,
     ): String {
         val bankName = importedPayee(bank.id) ?: bank.payee
-        return "Matched ${short(today)}: bank $bankName (${short(bank.date)}) + entered ${entered.payee} (${short(entered.date)})"
+        val moved = movedFrom?.let { " from $it" }.orEmpty()
+        return "Matched ${short(today)}$moved: bank $bankName (${short(bank.date)}) + entered ${entered.payee} (${short(entered.date)})"
     }
 
     private fun payeeOf(id: String): String? =

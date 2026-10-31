@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import app.duenorth.budget.core.AssistantCopy
 import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.theme.Metro
@@ -19,9 +20,10 @@ object HomeSections {
     const val ACCOUNTS = "accounts"
     const val INBOX = "inbox"
     const val REPORTS = ReportsCopy.TITLE
+    const val ASSISTANT = AssistantCopy.TITLE
 
-    // The inbox leads, so the app opens on what needs filing.
-    val headers = listOf(INBOX, BUDGET, ACCOUNTS, REPORTS)
+    // The inbox leads, so the app opens on what needs filing; the assistant follows reports.
+    val headers = listOf(INBOX, BUDGET, ACCOUNTS, REPORTS, ASSISTANT)
 }
 
 object SectionTitleCopy {
