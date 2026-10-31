@@ -116,19 +116,14 @@ class TemplatePlanTest {
     }
 
     @Test
-    fun remainderLinesWithNoWeightShareNothing() {
+    fun aRemainderWithAWeightOfZeroDoesNotRead() {
         fixture.open().use { opened ->
             opened.library.setPreference(opened.budgetId, "flags.experimental", "true")
             opened.library.saveCategoryNote(opened.budgetId, fixture.id("categories", "Remainder A"), "#template remainder 0")
-            opened.library.saveCategoryNote(opened.budgetId, fixture.id("categories", "Remainder B"), "#template remainder 0")
-            val remainder =
-                opened.library
-                    .templatePlan(opened.budgetId, october)!!
-                    .lanes
-                    .single { it.kind == TemplateLane.Kind.REMAINDER }
-            assertTrue(remainder.chips.all { it.given == 0L })
+            val plan = opened.library.templatePlan(opened.budgetId, october)!!
+            assertEquals(listOf("#template remainder 0"), plan.unreadable.map { it.line })
             val result = opened.library.applyTemplates(opened.budgetId, october, overwrite = true, confirmed = true)
-            assertTrue("$result", result is TemplateResult.Applied)
+            assertTrue("$result", result is TemplateResult.Invalid)
         }
     }
 

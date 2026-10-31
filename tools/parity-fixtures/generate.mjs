@@ -54,6 +54,7 @@ const TABLES = {
   rules: ['rules', 'transactions', 'payees'],
   schedules: ['schedules', 'schedules_next_date', 'rules', 'transactions'],
   templates: ['zero_budgets', 'categories', 'notes'],
+  automations: ['zero_budgets', 'categories'],
 };
 
 async function dump(names) {
@@ -790,6 +791,244 @@ async function templateScenarios() {
   });
 }
 
+// Budget automations (flags.goalTemplatesUIEnabled): every template type,
+// stored as JSON on the category by the automations editor, and the newer
+// note syntax (periodic, spend, copy, limits with hold, per day and per week,
+// adjustments). Jul-Oct 2026 of budgets and spending give carryover, copy,
+// spend and average something to read.
+async function buildAutomationsBase() {
+  await send('preferences/save', { id: 'flags.goalTemplatesEnabled', value: 'true' });
+  await send('preferences/save', { id: 'flags.goalTemplatesUIEnabled', value: 'true' });
+  const checking = await api.createAccount({ name: 'Checking', offbudget: false }, 0);
+  const usual = (await api.getCategoryGroups()).find(g => g.name === 'Usual Expenses').id;
+  const incomeGroup = (await api.getCategoryGroups()).find(g => g.is_income).id;
+  const salary = await api.createCategory({ name: 'Salary', group_id: incomeGroup, is_income: true });
+  const cat = {};
+  for (const name of AUTOMATION_CATEGORIES) {
+    cat[name] = await api.createCategory({ name, group_id: usual });
+  }
+  const tx = [];
+  for (const m of ['2026-07', '2026-08', '2026-09', '2026-10']) {
+    tx.push({ date: `${m}-01`, amount: 900000, payee_name: 'Employer', category: salary });
+  }
+  for (const [m, amt] of [['2026-07', -9000], ['2026-08', -12000], ['2026-09', -15000]]) {
+    tx.push({ date: `${m}-14`, amount: amt, payee_name: 'Store', category: cat['Average Adj'] });
+    tx.push({ date: `${m}-15`, amount: amt, payee_name: 'Store', category: cat['Average Fixed'] });
+  }
+  tx.push({ date: '2026-08-20', amount: -20000, payee_name: 'Travel', category: cat['Spend'] });
+  tx.push({ date: '2026-09-12', amount: -12000, payee_name: 'Store', category: cat['Refill'] });
+  tx.push({ date: '2026-09-12', amount: -1000, payee_name: 'Store', category: cat['Daily Limit'] });
+  await api.addTransactions(checking, tx);
+
+  const budgets = {
+    '2026-08': { [cat['Spend']]: 30000, [cat['Remainder Cap']]: 1000 },
+    '2026-09': {
+      [cat['Spend']]: 30000,
+      [cat['Copy']]: 4321,
+      [cat['Note Copy Cap']]: 4321,
+      [cat['Refill']]: 30000,
+      [cat['Limit Hold']]: 15000,
+      [cat['Limit No Hold']]: 15000,
+      [cat['Simple Hold']]: 12000,
+      [cat['Daily Limit']]: 3000,
+      [cat['Weekly Limit']]: 2000,
+      [cat['By Two']]: 10000,
+    },
+  };
+  await api.batchBudgetUpdates(async () => {
+    for (const [m, rows] of Object.entries(budgets)) {
+      for (const [c, amount] of Object.entries(rows)) await api.setBudgetAmount(m, c, amount);
+    }
+  });
+
+  const landlord = await api.createPayee({ name: 'Landlord' });
+  const rent = await send('schedule/create', {
+    schedule: { name: 'Rent', posts_transaction: false },
+    conditions: [
+      { op: 'is', field: 'account', value: checking },
+      { op: 'is', field: 'payee', value: landlord },
+      { op: 'is', field: 'amount', value: -150000 },
+      {
+        op: 'isapprox',
+        field: 'date',
+        value: { start: '2026-10-28', frequency: 'monthly', interval: 1, endMode: 'never', patterns: [], skipWeekend: false, weekendSolveMode: 'after' },
+      },
+    ],
+  });
+
+  const t = (type, fields, priority = 0) => ({ type, ...fields, priority, directive: 'template' });
+  const limit = (amount, extra = {}) => ({ type: 'limit', amount, hold: false, period: 'monthly', ...extra, directive: 'template', priority: null });
+  const automations = {
+    'Periodic Weekly': [t('periodic', { amount: 25, period: { period: 'week', amount: 1 }, starting: '2026-09-04' })],
+    'Periodic Quarterly': [t('periodic', { amount: 300, period: { period: 'month', amount: 3 }, starting: '2026-07-15' })],
+    'Periodic Off': [t('periodic', { amount: 300, period: { period: 'month', amount: 3 }, starting: '2026-08-15' })],
+    Spend: [t('spend', { amount: 1200, month: '2027-03', from: '2026-08' })],
+    Copy: [t('copy', { lookBack: 1 })],
+    Refill: [limit(300), t('refill', {})],
+    'Limit Hold': [limit(100, { hold: true }), t('periodic', { amount: 50, period: { period: 'month', amount: 1 }, starting: '2026-10-01' })],
+    'Limit No Hold': [limit(100), t('periodic', { amount: 50, period: { period: 'month', amount: 1 }, starting: '2026-10-01' })],
+    'Daily Limit': [limit(5, { period: 'daily' }), t('refill', {})],
+    'Weekly Limit': [limit(20, { period: 'weekly', start: '2026-09-07' }), t('refill', {})],
+    'Average Adj': [t('average', { numMonths: 3, adjustment: 10, adjustmentType: 'percent' })],
+    'Average Fixed': [t('average', { numMonths: 3, adjustment: -20, adjustmentType: 'fixed' })],
+    'Schedule Id': [t('schedule', { name: 'Old Rent Name', scheduleId: rent, full: false })],
+    'Schedule Adj': [t('schedule', { name: 'Rent', scheduleId: rent, full: true, adjustment: 10, adjustmentType: 'percent' })],
+    'Remainder Cap': [{ type: 'remainder', weight: 1, limit: { amount: 50, hold: false, period: 'monthly' }, directive: 'template', priority: null }],
+    'Remainder Rest': [{ type: 'remainder', weight: 1, directive: 'template', priority: null }],
+    'By Two': [t('by', { amount: 600, month: '2026-12' }), t('by', { amount: 1200, month: '2027-09', annual: true })],
+    'Late Priority': [t('simple', { monthly: 100000 }, 5)],
+  };
+  await send('budget/set-category-automations', {
+    categoriesWithTemplates: Object.entries(automations).map(([name, templates]) => ({ id: cat[name], templates })),
+    source: 'ui',
+  });
+  const notes = {
+    'Note Periodic': '#template 10 repeat every 2 weeks starting 2026-10-02 up to 30',
+    'Note Copy Cap': '#template copy from 1 months ago up to 10',
+    'Simple Hold': '#template 50 up to 100 hold',
+  };
+  for (const [name, note] of Object.entries(notes)) await api.updateNote(cat[name], note);
+}
+
+const AUTOMATION_CATEGORIES = [
+  'Periodic Weekly', 'Periodic Quarterly', 'Periodic Off', 'Spend', 'Copy', 'Refill', 'Limit Hold',
+  'Limit No Hold', 'Daily Limit', 'Weekly Limit', 'Average Adj', 'Average Fixed', 'Schedule Id',
+  'Schedule Adj', 'Remainder Cap', 'Remainder Rest', 'By Two', 'Late Priority', 'Note Periodic',
+  'Note Copy Cap', 'Simple Hold', 'Lines',
+];
+
+// Note lines desktop's parser reads, one at a time on the `Lines` category.
+const GRAMMAR_LINES = [
+  '#template 50', '#template $50', '#template €25', '#template 50.5', '#template 50.', '#template-2 50',
+  '#template -2 50', '#template up to 200', '#template up to 200 hold', '#template up to 10 per day',
+  '#template up to 10 per day hold', '#template up to 50 per week starting 2026-10-05',
+  '#template up to 50 per week starting 2026-10-05 hold', '#template 50 up to 300', '#template 50 up to 300 hold',
+  '#template 50 up to 3 per day', '#template 10 repeat every 2 weeks starting 2026-10-02',
+  '#template 10 repeat every week starting 2026-10-02', '#template 10 repeat every day starting 2026-10-02',
+  '#template 10 repeat every 3 days starting 2026-10-02', '#template 100 repeat every 3 months starting 2026-08-15',
+  '#template 100 repeat every year starting 2026-03-01', '#template 100 repeat every 2 years starting 2025-11-01',
+  '#template 100 repeat every 1 months starting 2026-10-01',
+  '#template 10 repeat every 2 weeks starting 2026-10-02 up to 80',
+  '#template 10 repeat every 2 weeks starting 2026-10-02 up to 80 hold', '#template 600 by 2026-12',
+  '#template 600 by 2026-12 repeat every year', '#template 600 by 2026-12 repeat every 2 years',
+  '#template 600 by 2026-12 repeat every month', '#template 600 by 2026-12 repeat every 1 months',
+  '#template 600 by 2026-12 repeat every 3 months', '#template 600 by 2026-12 repeat every 1 year',
+  '#template 600 by 2027-03 spend from 2026-09', '#template 600 by 2027-03 spend from 2026-09 repeat every year',
+  '#template schedule Rent', '#template schedule full Rent', '#template schedule Rent full',
+  '#template schedule Rent [increase 10%]', '#template schedule Rent [decrease 25]',
+  '#template schedule full Rent [increase 2.5%]', '#template schedule Rent [increase 2000%]',
+  '#template-1 schedule Rent', '#template 10% of Salary', '#template 10% of previous Salary',
+  '#template 12.5 % of all income', '#template 5% of available funds', '#template 10% of Salary previous',
+  '#template remainder', '#template remainder 3', '#template remainder up to 400',
+  '#template remainder 2 up to 400 hold', '#template average 3 months', '#template average 6 months [increase 5%]',
+  '#template average 3 months [decrease 20]', '#template average 3', '#template copy from 3 months ago',
+  '#template copy from 12 months ago up to 500', '#goal 500', '#GOAL 500', '#goal $1,000', '#template fifty dollars',
+  '#template  50', '#template 50 ', '  #template 50', 'Rent #template 50', '#Template 50', '#template50', '#templates 50',
+  '#goal500', '#template 10 up to 20 foo', '#template up to 0', '#template 0', '#template 50 up to 30 per week starting 2026-10-05',
+];
+
+// Automation lists desktop writes back into a note when a category returns to notes.
+const RENDER_LISTS = {
+  limitAndRefill: [
+    { type: 'limit', amount: 300, hold: false, period: 'monthly', directive: 'template', priority: null },
+    { type: 'refill', directive: 'template', priority: 2 },
+  ],
+  limitAlone: [{ type: 'limit', amount: 300, hold: true, period: 'daily', directive: 'template', priority: null }],
+  weekly: [{ type: 'limit', amount: 20, hold: false, period: 'weekly', start: '2026-09-07', directive: 'template', priority: null }],
+  periodic: [{ type: 'periodic', amount: 25, period: { period: 'week', amount: 2 }, starting: '2026-09-04', limit: { amount: 80, hold: true, period: 'monthly' }, directive: 'template', priority: 1 }],
+  spend: [{ type: 'spend', amount: 1200, month: '2027-03', from: '2026-08', annual: true, repeat: 2, directive: 'template', priority: 0 }],
+  byRepeat: [{ type: 'by', amount: 600, month: '2026-12', annual: false, repeat: 3, directive: 'template', priority: 0 }],
+  byPlain: [{ type: 'by', amount: 600, month: '2026-12', directive: 'template', priority: 0 }],
+  adjustments: [
+    { type: 'schedule', name: 'Rent', scheduleId: 'x', full: true, adjustment: -10, adjustmentType: 'percent', directive: 'template', priority: 0 },
+    { type: 'average', numMonths: 3, adjustment: 20, adjustmentType: 'fixed', directive: 'template', priority: 3 },
+  ],
+  copy: [{ type: 'copy', lookBack: 2, directive: 'template', priority: 0 }],
+  remainder: [{ type: 'remainder', weight: 2, limit: { amount: 50, hold: false, period: 'daily' }, directive: 'template', priority: null }],
+  percentage: [{ type: 'percentage', percent: 12.5, previous: true, category: 'Salary', directive: 'template', priority: 0 }],
+  goal: [{ type: 'goal', amount: 500, directive: 'goal', priority: null }],
+  simple: [{ type: 'simple', monthly: 50, limit: { amount: 100, hold: true, period: 'monthly' }, directive: 'template', priority: 0 }],
+};
+
+const LATE_PRIORITY_FITS = [{ type: 'simple', monthly: 29000, priority: 5, directive: 'template' }];
+
+async function automationScenarios() {
+  console.log('automations');
+  const area = 'automations';
+  const base = 'base';
+  const open = await makeBase(area, base, buildAutomationsBase);
+  const tables = TABLES.automations;
+  const dryRuns = async () => {
+    const out = {};
+    for (const row of await db.all("SELECT id, name, goal_def FROM categories WHERE goal_def IS NOT NULL AND tombstone = 0")) {
+      out[row.name] = await send('budget/dry-run-category-template', {
+        month: '2026-10',
+        categoryId: row.id,
+        templates: JSON.parse(row.goal_def),
+      });
+    }
+    return out;
+  };
+  await scenario(area, base, open, 'grammar', {
+    tables: [],
+    action: { kind: 'parse', lines: GRAMMAR_LINES, render: RENDER_LISTS },
+    values: async () => {
+      const lines = await db.first("SELECT id FROM categories WHERE name = 'Lines'");
+      const parsed = [];
+      for (const line of GRAMMAR_LINES) {
+        // A line desktop does not read leaves goal_def alone, so clear it first.
+        await send('notes-save', { id: lines.id, note: 'nothing' });
+        await send('budget/store-note-templates', [lines.id]);
+        await send('notes-save', { id: lines.id, note: line });
+        await send('budget/store-note-templates', [lines.id]);
+        const row = await db.first('SELECT goal_def FROM categories WHERE id = ?', [lines.id]);
+        parsed.push({ line, goal_def: row.goal_def });
+      }
+      const rendered = {};
+      for (const [name, list] of Object.entries(RENDER_LISTS)) rendered[name] = await send('budget/render-note-templates', list);
+      return { parsed, rendered };
+    },
+    run: async () => {},
+  });
+  let result;
+  await scenario(area, base, open, 'overwrite', {
+    tables,
+    action: {
+      steps: [
+        { handler: 'budget/set-category-automations', args: { category: 'Late Priority', templates: LATE_PRIORITY_FITS } },
+        { handler: 'budget/overwrite-goal-template', args: { month: '2026-10' } },
+      ],
+    },
+    values: async () => ({ result, '2026-10': await month('2026-10') }),
+    run: async () => {
+      // Leaves some to budget over, so the remainders share it and one stops at its limit.
+      await send('budget/set-category-automations', {
+        categoriesWithTemplates: [{ id: await byName('categories', 'Late Priority'), templates: LATE_PRIORITY_FITS }],
+        source: 'ui',
+      });
+      result = await send('budget/overwrite-goal-template', { month: '2026-10' });
+    },
+  });
+  await scenario(area, base, open, 'dry-run', {
+    tables: [],
+    action: { handler: 'budget/dry-run-category-template', args: { month: '2026-10' } },
+    values: async () => {
+      await send('budget/store-note-templates');
+      return { dryRun: await dryRuns() };
+    },
+    run: async () => {},
+  });
+  await scenario(area, base, open, 'overwrite-whole', {
+    tables,
+    action: { steps: [{ handler: 'preferences/save', args: { id: 'hideFraction', value: 'true' } }, { handler: 'budget/overwrite-goal-template', args: { month: '2026-10' } }] },
+    values: async () => ({ result, '2026-10': await month('2026-10') }),
+    run: async () => {
+      await send('preferences/save', { id: 'hideFraction', value: 'true' });
+      result = await send('budget/overwrite-goal-template', { month: '2026-10' });
+    },
+  });
+}
+
 async function undoScenarios() {
   console.log('undo');
   // Undo on the phone restores the rows from before an action. Desktop's
@@ -807,13 +1046,24 @@ async function undoScenarios() {
   });
 }
 
-fs.rmSync(outRoot, { recursive: true, force: true });
-await monthScenarios();
-await accountScenarios();
-await ruleScenarios();
-await reportScenarios();
-await templateScenarios();
-await undoScenarios();
+// `node generate.mjs automations` regenerates one area and leaves the others' ids alone.
+const AREAS = {
+  month: monthScenarios,
+  accounts: accountScenarios,
+  'schedules-rules': ruleScenarios,
+  reports: reportScenarios,
+  templates: templateScenarios,
+  automations: automationScenarios,
+  undo: undoScenarios,
+};
+const picked = process.argv.slice(2);
+for (const name of picked) if (!AREAS[name]) throw new Error(`unknown area ${name}`);
+if (picked.length === 0) fs.rmSync(outRoot, { recursive: true, force: true });
+for (const [name, run] of Object.entries(AREAS)) {
+  if (picked.length > 0 && !picked.includes(name)) continue;
+  fs.rmSync(path.join(outRoot, name), { recursive: true, force: true });
+  await run();
+}
 await api.shutdown();
 fs.rmSync(dataDir, { recursive: true, force: true });
 console.log(`done: ${path.relative(repo, outRoot)}`);

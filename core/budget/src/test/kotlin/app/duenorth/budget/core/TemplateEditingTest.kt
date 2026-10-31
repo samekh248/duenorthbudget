@@ -17,14 +17,14 @@ class TemplateEditingTest {
         val templates =
             listOf(
                 Template.Simple(n("400"), null, 0),
-                Template.Simple(n("400"), n("600"), 1),
-                Template.Simple(null, n("600"), 2),
+                Template.Simple(n("400"), TemplateLimit(n("600")), 1),
+                Template.Simple(null, TemplateLimit(n("600")), 2),
                 Template.Simple(n("12.5"), null, 0),
-                Template.By(n("1200"), december, null, annual = false, repeat = null, priority = 0),
-                Template.By(n("1200"), december, 12, annual = true, repeat = null, priority = 2),
-                Template.By(n("1200"), december, 24, annual = true, repeat = 2, priority = 0),
-                Template.By(n("300"), december, 1, annual = false, repeat = 1, priority = 0),
-                Template.By(n("300"), december, 6, annual = false, repeat = 6, priority = 3),
+                Template.By(n("1200"), december, annual = null, repeat = null, priority = 0),
+                Template.By(n("1200"), december, annual = true, repeat = null, priority = 2),
+                Template.By(n("1200"), december, annual = true, repeat = 2, priority = 0),
+                Template.By(n("300"), december, annual = false, repeat = null, priority = 0),
+                Template.By(n("300"), december, annual = false, repeat = 6, priority = 3),
                 Template.Schedule("Rent", full = false, priority = 0),
                 Template.Schedule("Car Insurance", full = true, priority = 1),
                 Template.Percentage(n("10"), previous = false, category = "all income", priority = 0),
@@ -44,10 +44,10 @@ class TemplateEditingTest {
 
     @Test
     fun linesUseActualWords() {
-        assertEquals("#template 400 up to 600", TemplateLines.format(Template.Simple(n("400"), n("600"), 0)))
+        assertEquals("#template 400 up to 600", TemplateLines.format(Template.Simple(n("400"), TemplateLimit(n("600")), 0)))
         assertEquals(
             "#template-2 1200 by 2026-12 repeat every year",
-            TemplateLines.format(Template.By(n("1200"), december, 12, true, null, 2)),
+            TemplateLines.format(Template.By(n("1200"), december, true, null, 2)),
         )
         assertEquals("#template 10% of previous all income", TemplateLines.format(Template.Percentage(n("10"), true, "all income", 0)))
         assertEquals("#template remainder", TemplateLines.format(Template.Remainder(n("1"))))

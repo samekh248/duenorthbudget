@@ -213,8 +213,10 @@ class TemplatesHolder internal constructor(
                 val entry = state.templates.note?.let { TemplateNote.parse(it).entries.getOrNull(index) } ?: return
                 entry.template ?: return openKinds(index)
             }
+        // A kind with no form yet: a note line can still be replaced or removed; an automation stays as desktop wrote it.
+        val kind = TemplateKind.of(template) ?: return if (automations == null) openKinds(index) else Unit
         host.mutate { it.copy(templates = it.templates.copy(preview = null)) }
-        host.push(ShellRoute.TemplateEditor(categoryId, index, TemplateKind.of(template)))
+        host.push(ShellRoute.TemplateEditor(categoryId, index, kind))
         loadSchedules()
     }
 
@@ -381,11 +383,12 @@ class TemplatesHolder internal constructor(
                     .getOrNull(chip.index)
                     ?.template
             host.mutate { it.copy(templates = it.templates.copy(note = note, preview = null)) }
+            val kind = template?.let { TemplateKind.of(it) }
             host.push(
-                if (template == null) {
+                if (kind == null) {
                     ShellRoute.TemplateKinds(chip.categoryId, chip.index)
                 } else {
-                    ShellRoute.TemplateEditor(chip.categoryId, chip.index, TemplateKind.of(template))
+                    ShellRoute.TemplateEditor(chip.categoryId, chip.index, kind)
                 },
             )
             loadSchedules()

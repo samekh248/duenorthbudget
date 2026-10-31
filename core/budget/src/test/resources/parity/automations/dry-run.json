@@ -1,0 +1,200 @@
+{
+  "scenario": "dry-run",
+  "base": "base.zip",
+  "actualVersion": "26.8.1",
+  "today": "2026-10-07",
+  "action": {
+    "handler": "budget/dry-run-category-template",
+    "args": {
+      "month": "2026-10"
+    }
+  },
+  "ids": {
+    "accounts": {
+      "Checking": "887e9b62-6548-4644-89c4-696345c4e5eb"
+    },
+    "categories": {
+      "Food": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "General": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "Bills": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "Bills (Flexible)": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "Income": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "Starting Balances": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "Savings": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+      "Salary": "2ba230d9-7db3-4700-b5d6-e2e9c7d85c77",
+      "Periodic Weekly": "1fde388e-280b-469f-83e0-96abcc5936ca",
+      "Periodic Quarterly": "1cee1519-aa9b-40e8-ab3e-ada4fe12b53c",
+      "Periodic Off": "7f24f8e8-af64-4dae-9f48-514b7e0567ed",
+      "Spend": "35b35676-1c3d-4389-a9d2-8f2a763fa09e",
+      "Copy": "7a5bffc2-e506-4071-a28d-00ef81df9fba",
+      "Refill": "d3e293db-66d0-41b7-abf9-1c46392816d5",
+      "Limit Hold": "1a73557f-d2f5-457d-aa9d-4d986e3ec4b4",
+      "Limit No Hold": "d4ca2480-ec3f-45e6-ae70-2d69e780dd69",
+      "Daily Limit": "c6089d81-bfd0-4af2-b9ed-519a43ed86c2",
+      "Weekly Limit": "d8a2d3dd-eee0-4b2e-88c3-92ea3fc9b624",
+      "Average Adj": "e3ac5693-b354-4bc2-8f87-b6879e003d6a",
+      "Average Fixed": "8a32da84-b0f8-48d9-8592-625a069fd73f",
+      "Schedule Id": "a41313f0-6fc6-4ad9-ac62-53745173a753",
+      "Schedule Adj": "36ab0264-d98c-447d-916d-712195ce3318",
+      "Remainder Cap": "2a20b714-d060-4a80-b70c-6e08093ee9dd",
+      "Remainder Rest": "8d9777fe-9e12-46ea-b107-8779a3b0a57d",
+      "By Two": "e71cb517-7773-4485-b2ed-7c6dd1ee9179",
+      "Late Priority": "51efc956-5899-4092-a4ff-9387e0502e2f",
+      "Note Periodic": "d384ac3b-97cd-4d85-8a92-e7b64c67924b",
+      "Note Copy Cap": "4f3609bf-e76b-41f7-bedc-65f899a3f3d1",
+      "Simple Hold": "64e7f837-97ee-42fb-b51b-bb76a242753f",
+      "Lines": "d64723ea-a6ab-4a63-bb83-1d0d8a0e9a3a"
+    },
+    "groups": {
+      "Usual Expenses": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "Income": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "Investments and Savings": "a137772f-cf2f-4089-9432-822d2ddc1466"
+    },
+    "payees": {
+      "Employer": "f4b35902-6807-495d-bb3f-75b24e84a8d2",
+      "Store": "566746e1-41ec-4ea5-9629-15c31cb1c5c7",
+      "Travel": "5eaa042e-6b63-4575-9226-29cf15f77834",
+      "Landlord": "3bc8a31f-9b77-4606-8310-3e3629b9835f"
+    },
+    "schedules": {
+      "Rent": "05968055-8876-4c23-9e24-70dba9841400"
+    }
+  },
+  "tables": {},
+  "values": {
+    "dryRun": {
+      "Periodic Weekly": {
+        "budgeted": 12500,
+        "perTemplate": [
+          12500
+        ]
+      },
+      "Periodic Quarterly": {
+        "budgeted": 30000,
+        "perTemplate": [
+          30000
+        ]
+      },
+      "Periodic Off": {
+        "budgeted": 0,
+        "perTemplate": [
+          0
+        ]
+      },
+      "Spend": {
+        "budgeted": 10000,
+        "perTemplate": [
+          10000
+        ]
+      },
+      "Copy": {
+        "budgeted": 4321,
+        "perTemplate": [
+          4321
+        ]
+      },
+      "Refill": {
+        "budgeted": 12000,
+        "perTemplate": [
+          0,
+          12000
+        ]
+      },
+      "Limit Hold": {
+        "budgeted": 0,
+        "perTemplate": [
+          0,
+          0
+        ]
+      },
+      "Limit No Hold": {
+        "budgeted": -5000,
+        "perTemplate": [
+          0,
+          0
+        ]
+      },
+      "Daily Limit": {
+        "budgeted": 13500,
+        "perTemplate": [
+          0,
+          13500
+        ]
+      },
+      "Weekly Limit": {
+        "budgeted": 6000,
+        "perTemplate": [
+          0,
+          6000
+        ]
+      },
+      "Average Adj": {
+        "budgeted": 13200,
+        "perTemplate": [
+          13200
+        ]
+      },
+      "Average Fixed": {
+        "budgeted": 10000,
+        "perTemplate": [
+          10000
+        ]
+      },
+      "Schedule Id": {
+        "budgeted": 150000,
+        "perTemplate": [
+          150000
+        ]
+      },
+      "Schedule Adj": {
+        "budgeted": 165000,
+        "perTemplate": [
+          165000
+        ]
+      },
+      "Remainder Cap": {
+        "budgeted": 4000,
+        "perTemplate": [
+          4000
+        ]
+      },
+      "Remainder Rest": {
+        "budgeted": 3371358,
+        "perTemplate": [
+          3371358
+        ]
+      },
+      "By Two": {
+        "budgeted": 26667,
+        "perTemplate": [
+          17778,
+          8889
+        ]
+      },
+      "Late Priority": {
+        "budgeted": 10000000,
+        "perTemplate": [
+          10000000
+        ]
+      },
+      "Note Periodic": {
+        "budgeted": 3000,
+        "perTemplate": [
+          3000
+        ]
+      },
+      "Note Copy Cap": {
+        "budgeted": 4321,
+        "perTemplate": [
+          4321
+        ]
+      },
+      "Simple Hold": {
+        "budgeted": 0,
+        "perTemplate": [
+          0
+        ]
+      }
+    }
+  }
+}

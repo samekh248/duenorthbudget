@@ -6,14 +6,18 @@ import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.MonthShell
+import app.duenorth.budget.core.RepeatUnit
 import app.duenorth.budget.core.Template
+import app.duenorth.budget.core.TemplateAdjustment
 import app.duenorth.budget.core.TemplateChip
 import app.duenorth.budget.core.TemplateError
 import app.duenorth.budget.core.TemplateJson
 import app.duenorth.budget.core.TemplateLane
+import app.duenorth.budget.core.TemplateLimit
 import app.duenorth.budget.core.TemplatePlan
 import app.duenorth.budget.core.TemplateResult
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.YearMonth
 
 /** Fixed inputs for the spec 010 US5 template screens. */
@@ -29,6 +33,31 @@ internal object TemplateSamples {
                 TemplateJson.Stored("refill", null),
             ),
         )
+
+    /** The kinds desktop's automations editor adds beyond note templates, and one from a newer desktop. */
+    val newerAutomations =
+        CategoryAutomations(
+            listOf(
+                TemplateJson.Stored.of(Template.Limit(TemplateLimit(BigDecimal("300"), hold = true))),
+                TemplateJson.Stored.of(Template.Refill(0)),
+                TemplateJson.Stored.of(Template.Periodic(BigDecimal("25"), 2, RepeatUnit.WEEK, LocalDate.of(2026, 9, 4), null, 1)),
+                TemplateJson.Stored.of(
+                    Template.Spend(
+                        BigDecimal("1200"),
+                        YearMonth.of(2027, 3),
+                        YearMonth.of(2026, 8),
+                        annual = null,
+                        repeat = null,
+                        priority = 1,
+                    ),
+                ),
+                TemplateJson.Stored.of(Template.Copy(1, 2)),
+                TemplateJson.Stored.of(Template.Average(3, 2, TemplateAdjustment(BigDecimal("10"), percent = true))),
+                TemplateJson.Stored("someday", null),
+            ),
+        )
+
+    val newerAmounts: List<Long?> = listOf(null, 12_000L, 5_000L, 10_000L, 4_321L, 13_200L, null)
 
     val invalid =
         TemplateResult.Invalid(
@@ -74,7 +103,7 @@ internal object TemplateSamples {
         index: Int = 0,
     ) = TemplateChip(id, name, index, template, line, asks, given)
 
-    private val food = Template.Simple(BigDecimal("400"), BigDecimal("600"), 1)
+    private val food = Template.Simple(BigDecimal("400"), TemplateLimit(BigDecimal("600")), 1)
     private val share = Template.Percentage(BigDecimal("10"), false, "all income", 1)
 
     /** A month's lanes: rent and power first, food and fun next, gas short of what it asks, a remainder and a goal. */

@@ -16,6 +16,7 @@ import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.TemplateJson
 import app.duenorth.budget.core.TemplateKind
+import app.duenorth.budget.core.look
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.components.styleCard
@@ -90,7 +91,7 @@ fun AutomationTiles(
             color = Metro.colors.secondary,
         )
         automations.entries.forEachIndexed { index, entry ->
-            val open = if (editable && entry.template != null) ({ onOpen(index) }) else null
+            val open = if (editable && entry.template?.look != null) ({ onOpen(index) }) else null
             AutomationTile(entry, amounts.getOrNull(index), currency, options, Modifier.testTag("automation-tile-$index"), open)
         }
         if (automations.entries.isEmpty()) {
@@ -120,7 +121,7 @@ private fun AutomationTile(
             .padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TemplateGlyph(template?.let { TemplateKind.of(it) }, Metro.accent.text, Modifier.padding(end = 10.dp))
+        TemplateGlyph(template?.look, Metro.accent.text, Modifier.padding(end = 10.dp))
         Column(Modifier.weight(1f)) {
             MetroText(
                 if (template == null) AutomationCopy.typeLabel(entry.type) else TemplateWords.title(template, currency, options),

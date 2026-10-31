@@ -26,281 +26,12 @@ object TemplateCopy {
     const val APPLIED = "templates applied"
 }
 
-/** One parsed line of a category note, with Actual's stored (`goal_def`) form. */
-sealed interface Template {
-    /** Null for remainder and goal lines, which run outside the priority order. */
-    val priority: Int?
-
-    fun toJson(): JsonObject
-
-    data class Simple(
-        val monthly: BigDecimal?,
-        val limit: BigDecimal?,
-        override val priority: Int,
-    ) : Template {
-        override fun toJson() =
-            obj(
-                "type" to "simple",
-                "monthly" to monthly,
-                "limit" to
-                    limit?.let {
-                        obj("amount" to it, "hold" to null, "period" to "monthly", "start" to null)
-                    },
-                "priority" to priority,
-                "directive" to "template",
-            )
-    }
-
-    data class By(
-        val amount: BigDecimal,
-        val month: YearMonth,
-        /** Months between targets when it repeats; null when it does not. */
-        val repeatMonths: Int?,
-        val annual: Boolean,
-        val repeat: Int?,
-        override val priority: Int,
-    ) : Template {
-        override fun toJson() =
-            obj(
-                "type" to "by",
-                "amount" to amount,
-                "month" to month.toString(),
-                *(if (repeat != null) arrayOf("repeat" to repeat) else emptyArray()),
-                "annual" to annual,
-                "from" to null,
-                "priority" to priority,
-                "directive" to "template",
-            )
-    }
-
-    data class Schedule(
-        val name: String,
-        val full: Boolean,
-        override val priority: Int,
-    ) : Template {
-        override fun toJson() =
-            obj(
-                "type" to "schedule",
-                "name" to name,
-                "priority" to priority,
-                "directive" to "template",
-                "full" to if (full) true else null,
-            )
-    }
-
-    data class Percentage(
-        val percent: BigDecimal,
-        val previous: Boolean,
-        /** A category name, `all income`, or `available funds`. */
-        val category: String,
-        override val priority: Int,
-    ) : Template {
-        override fun toJson() =
-            obj(
-                "type" to "percentage",
-                "percent" to percent,
-                "previous" to previous,
-                "category" to category,
-                "priority" to priority,
-                "directive" to "template",
-            )
-    }
-
-    data class Average(
-        val months: Int,
-        override val priority: Int,
-    ) : Template {
-        override fun toJson() = obj("type" to "average", "numMonths" to months, "priority" to priority, "directive" to "template")
-    }
-
-    data class Remainder(
-        val weight: BigDecimal,
-    ) : Template {
-        override val priority: Int? = null
-
-        override fun toJson() =
-            obj("type" to "remainder", "priority" to null, "directive" to "template", "weight" to weight, "limit" to null)
-    }
-
-    data class Goal(
-        val amount: BigDecimal,
-    ) : Template {
-        override val priority: Int? = null
-
-        override fun toJson() = obj("type" to "goal", "amount" to amount, "priority" to null, "directive" to "goal")
-    }
-
-    companion object {
-        private fun obj(vararg pairs: Pair<String, Any?>): JsonObject =
-            JsonObject(linkedMapOf(*pairs.map { (k, v) -> k to json(v) }.toTypedArray()))
-
-        private fun json(value: Any?): JsonElement =
-            when (value) {
-                null -> JsonNull
-                is JsonElement -> value
-                is BigDecimal -> JsonPrimitive(value.stripTrailingZeros().let { if (it.scale() < 0) it.setScale(0) else it })
-                is Number -> JsonPrimitive(value)
-                is Boolean -> JsonPrimitive(value)
-                else -> JsonPrimitive(value.toString())
-            }
-    }
-}
-
 data class TemplateError(
     val categoryName: String,
     val line: String,
 ) {
     /** As desktop shows it: `Fixed: #template fifty dollars`. */
     override fun toString(): String = "$categoryName: $line"
-}
-
-/** Actual 26.8.1's note template grammar, for the forms in `contracts/templates.md`. */
-object TemplateParser {
-    private val head = Regex("""^#(template)(?:-(\d+))?\b\s*(.*)$|^#(goal)\b\s*(.*)$""", RegexOption.IGNORE_CASE)
-    private val number = Regex("""^\$?(\d+(?:\.\d+)?)$""")
-
-    /** True for a line Actual reads as a template or goal. */
-    fun isTemplateLine(line: String): Boolean = head.containsMatchIn(line.trim())
-
-    /** Every template line in [note]; a line that does not parse comes back as its text. */
-    fun parse(note: String): List<Result<Template>> =
-        note
-            .lines()
-            .map { it.trim() }
-            .filter { isTemplateLine(it) }
-            .map { line -> parseLine(line)?.let { Result.success(it) } ?: Result.failure(IllegalArgumentException(line)) }
-
-    fun parseLine(line: String): Template? {
-        val match = head.find(line.trim()) ?: return null
-        if (match.groupValues[4].isNotEmpty()) {
-            val amount = amount(match.groupValues[5].trim()) ?: return null
-            return Template.Goal(amount)
-        }
-        val priority = match.groupValues[2].toIntOrNull() ?: 0
-        val words =
-            match.groupValues[3]
-                .trim()
-                .split(Regex("""\s+"""))
-                .filter { it.isNotEmpty() }
-        if (words.isEmpty()) return null
-        return when (words[0].lowercase()) {
-            "up" -> upTo(words, 0)?.let { Template.Simple(null, it, priority) }
-            "schedule" -> schedule(words.drop(1), priority)
-            "average" -> average(words.drop(1), priority)
-            "remainder" ->
-                when (words.size) {
-                    1 -> Template.Remainder(BigDecimal.ONE)
-                    2 -> amount(words[1])?.let { Template.Remainder(it) }
-                    else -> null
-                }
-            else -> amountLed(words, priority)
-        }
-    }
-
-    private fun amountLed(
-        words: List<String>,
-        priority: Int,
-    ): Template? {
-        val first = words[0]
-        if (first.endsWith("%")) return percentage(words, priority)
-        val value = amount(first) ?: return null
-        if (words.size == 1) return Template.Simple(value, null, priority)
-        return when (words[1].lowercase()) {
-            "up" -> if (words.size == 4) upTo(words, 1)?.let { Template.Simple(value, it, priority) } else null
-            "by" -> by(value, words.drop(2), priority)
-            else -> null
-        }
-    }
-
-    /** `up to N` starting at [at]. */
-    private fun upTo(
-        words: List<String>,
-        at: Int,
-    ): BigDecimal? {
-        if (words.size != at + 3) return null
-        if (!words[at].equals("up", true) || !words[at + 1].equals("to", true)) return null
-        return amount(words[at + 2])
-    }
-
-    /** `by YYYY-MM [repeat every month|year|N months|N years]`. */
-    private fun by(
-        value: BigDecimal,
-        rest: List<String>,
-        priority: Int,
-    ): Template? {
-        val month = rest.firstOrNull()?.let { runCatching { YearMonth.parse(it) }.getOrNull() } ?: return null
-        if (rest.size == 1) return Template.By(value, month, null, annual = false, repeat = null, priority = priority)
-        if (rest.size < 4 || !rest[1].equals("repeat", true) || !rest[2].equals("every", true)) return null
-        val tail = rest.drop(3).map { it.lowercase() }
-        return when {
-            tail == listOf("year") -> Template.By(value, month, 12, annual = true, repeat = null, priority = priority)
-            tail == listOf("month") -> Template.By(value, month, 1, annual = false, repeat = 1, priority = priority)
-            tail.size == 2 && tail[1] == "years" -> {
-                // `repeat every 1 year` is an error in Actual; plural needs 2 or more.
-                val n = tail[0].toIntOrNull()?.takeIf { it >= 2 } ?: return null
-                Template.By(value, month, 12 * n, annual = true, repeat = n, priority = priority)
-            }
-            tail.size == 2 && tail[1] == "months" -> {
-                val n = tail[0].toIntOrNull()?.takeIf { it >= 2 } ?: return null
-                Template.By(value, month, n, annual = false, repeat = n, priority = priority)
-            }
-            else -> null
-        }
-    }
-
-    /** `schedule [full] Name` or `schedule Name full`. */
-    private fun schedule(
-        rest: List<String>,
-        priority: Int,
-    ): Template? {
-        if (rest.isEmpty()) return null
-        var words = rest
-        var full = false
-        if (words.first().equals("full", true) && words.size > 1) {
-            full = true
-            words = words.drop(1)
-        } else if (words.last().equals("full", true) && words.size > 1) {
-            full = true
-            words = words.dropLast(1)
-        }
-        return Template.Schedule(words.joinToString(" "), full, priority)
-    }
-
-    private fun average(
-        rest: List<String>,
-        priority: Int,
-    ): Template? {
-        if (rest.size != 2 || !rest[1].lowercase().startsWith("month")) return null
-        val n = rest[0].toIntOrNull()?.takeIf { it > 0 } ?: return null
-        return Template.Average(n, priority)
-    }
-
-    /** `N% of [previous] Category` (or `of all income`, `of available funds`, `previous` at the end). */
-    private fun percentage(
-        words: List<String>,
-        priority: Int,
-    ): Template? {
-        val percent = amount(words[0].removeSuffix("%")) ?: return null
-        if (words.size < 3 || !words[1].equals("of", true)) return null
-        var rest = words.drop(2)
-        var previous = false
-        if (rest.first().equals("previous", true)) {
-            previous = true
-            rest = rest.drop(1)
-        } else if (rest.last().equals("previous", true)) {
-            previous = true
-            rest = rest.dropLast(1)
-        }
-        if (rest.isEmpty()) return null
-        return Template.Percentage(percent, previous, rest.joinToString(" "), priority)
-    }
-
-    private fun amount(text: String): BigDecimal? =
-        number
-            .find(text.replace(",", ""))
-            ?.groupValues
-            ?.get(1)
-            ?.toBigDecimalOrNull()
 }
 
 /** The templates screen's lanes for one month ([TemplateEngine.plan]). */
@@ -357,9 +88,9 @@ sealed interface TemplateResult {
 }
 
 /**
- * Port of Actual 26.8.1's goal template run (R12, R16 #11): notes are parsed into
- * `categories.goal_def`, then each visible templated category is budgeted, priorities
- * lowest first and each limited by what to-budget has left, remainder lines last by weight.
+ * Port of Actual 26.8.1's goal template run (R12, R16 #11): notes are parsed into `categories.goal_def`, then each
+ * visible templated category gets a [TemplateContext]. Priorities run lowest first, each limited by what to-budget
+ * has left, then remainder lines share the rest by weight.
  */
 class TemplateEngine(
     private val session: SqlSession,
@@ -376,8 +107,20 @@ class TemplateEngine(
         val entries: List<TemplateNote.Entry> = emptyList(),
         /** Desktop's budget automations own it (`template_settings.source = ui`): `goal_def` is the truth, not the note. */
         val managed: Boolean = false,
-        /** A managed category holding an automation this port cannot run yet; runs leave it exactly as it is. */
+        /** A managed category holding an automation this port cannot read; runs leave it exactly as it is. */
         val unsupported: Boolean = false,
+    ) {
+        /** Where each of [templates] sits in [entries]. */
+        val entryIndex: List<Int> get() = entries.indices.filter { entries[it].template != null }
+    }
+
+    /** What a run works out before it writes anything. */
+    private class Computed(
+        val contexts: List<Pair<Category, TemplateContext>>,
+        val errors: List<TemplateError>,
+        /** To budget plus what the templated categories already hold. */
+        val start: Long,
+        val lanes: List<TemplateLane> = emptyList(),
     )
 
     /** Lists bad lines; writes nothing. */
@@ -396,79 +139,21 @@ class TemplateEngine(
         val errors = categories.flatMap { category -> category.errors.map { TemplateError(category.name, it) } }
         if (errors.isNotEmpty()) return TemplateResult.Invalid(errors)
         if (overwrite && !confirmed) return TemplateResult.NeedsConfirm(TemplateCopy.OVERWRITE_CONFIRM)
-        val detailed = ShellReader.loadDetailed(session, month)
-        val stats = detailed.categories
-        val table = if (tracking()) "reflect_budgets" else "zero_budgets"
-        val applied = mutableListOf<Category>()
+        val sheet = TemplateSheet(session, today)
+        val computed = compute(categories, month, sheet, force = overwrite)
+        if (computed.errors.isNotEmpty()) return TemplateResult.Invalid(computed.errors)
+        val table = if (sheet.tracking) "reflect_budgets" else "zero_budgets"
         session.transaction {
             storeDefinitions(categories)
-            // A category holding an automation this port cannot run is left untouched, its goal included.
-            val candidates = categories.filter { it.visible && !it.income && !it.unsupported }
-            val targets =
-                candidates.filter { category ->
-                    category.templates.isNotEmpty() && (overwrite || (stats[category.id]?.budgetedMinor ?: 0L) == 0L)
-                }
-            var available = detailed.figures.headerMinor + targets.sumOf { stats[it.id]?.budgetedMinor ?: 0L }
-            val funded = LinkedHashMap<String, Long>()
-            val goals = HashMap<String, Long>()
-            targets.forEach { funded[it.id] = 0L }
-            val priorities =
-                targets
-                    .flatMap { it.templates.mapNotNull { template -> template.priority } }
-                    .distinct()
-                    .sorted()
-            for (priority in priorities) {
-                for (category in targets) {
-                    val wanted =
-                        category.templates
-                            .filter { it.priority == priority }
-                            .sumOf { amountFor(it, category, month, stats, detailed.figures.headerMinor) }
-                    if (category.templates.any { it.priority == priority }) goals[category.id] = (goals[category.id] ?: 0L) + wanted
-                    val given = wanted.coerceAtMost(available.coerceAtLeast(0L)).coerceAtLeast(0L)
-                    funded[category.id] = funded.getValue(category.id) + given
-                    available -= given
-                }
-            }
-            val remainders =
-                targets.mapNotNull { category ->
-                    category.templates.filterIsInstance<Template.Remainder>().firstOrNull()?.let {
-                        category to
-                            it
-                    }
-                }
-            val totalWeight = remainders.fold(BigDecimal.ZERO) { sum, (_, template) -> sum + template.weight }
-            // `remainder 0` lines alone share nothing, rather than dividing by a zero weight.
-            if (remainders.isNotEmpty() && available > 0 && totalWeight.signum() > 0) {
-                val perWeight = available.toDouble() / totalWeight.toDouble()
-                var left = available
-                remainders.forEachIndexed { index, (category, template) ->
-                    val share = if (index == remainders.lastIndex) left else (perWeight * template.weight.toDouble()).roundToLong()
-                    funded[category.id] = funded.getValue(category.id) + share
-                    left -= share
-                }
-            }
-            for (category in targets) {
-                val row = BudgetEdits.assignmentId(month.toActualMonth(), category.id)
-                setBudget(table, month, category.id, funded.getValue(category.id))
-                val existing = existingRow(table, month, category.id) ?: row
-                val goal = category.templates.filterIsInstance<Template.Goal>().firstOrNull()
-                when {
-                    goal != null -> {
-                        SyncSchema.write(session, table, existing, "goal", toMinor(goal.amount))
-                        SyncSchema.write(session, table, existing, "long_goal", 1)
-                    }
-                    goals.containsKey(category.id) -> {
-                        SyncSchema.write(session, table, existing, "goal", goals.getValue(category.id))
-                        SyncSchema.write(session, table, existing, "long_goal", null)
-                    }
-                    else -> {
-                        SyncSchema.write(session, table, existing, "goal", null)
-                        SyncSchema.write(session, table, existing, "long_goal", null)
-                    }
-                }
+            for ((category, context) in computed.contexts) {
+                val values = context.values()
+                setBudget(table, month, category.id, values.budgeted)
+                val existing = existingRow(table, month, category.id) ?: BudgetEdits.assignmentId(month.toActualMonth(), category.id)
+                SyncSchema.write(session, table, existing, "goal", values.goal)
+                SyncSchema.write(session, table, existing, "long_goal", if (values.longGoal) 1 else null)
             }
             // Desktop clears the goal of every other visible category, which leaves a zero row behind.
-            for (category in candidates) {
+            for (category in candidates(categories, sheet)) {
                 if (category.templates.isNotEmpty()) continue
                 val existing = existingRow(table, month, category.id)
                 if (existing == null) {
@@ -486,116 +171,61 @@ class TemplateEngine(
                     SyncSchema.write(session, table, existing, "long_goal", null)
                 }
             }
-            applied += targets
         }
-        return TemplateResult.Applied(applied.size)
+        return TemplateResult.Applied(computed.contexts.size)
     }
 
     /**
-     * What each of [templates] asks for in [month] on its own, for category [categoryId], before priorities share out
-     * to budget. Remainder and goal lines ask for nothing of their own and come back null.
+     * What each of [templates] gives category [categoryId] in [month], as desktop's automations editor projects it
+     * (`budget/dry-run-category-template`): the category on its own, not held back by other priorities. Remainder,
+     * limit and goal lines have no amount of their own and come back null, as does every line when they cannot run.
      */
     fun preview(
         categoryId: String,
         month: YearMonth,
         templates: List<Template>,
     ): List<Long?> {
-        val detailed = ShellReader.loadDetailed(session, month)
-        val category = Category(categoryId, "", visible = true, income = false, templates = templates, errors = emptyList())
-        return templates.map { template ->
+        val none = templates.map { null }
+        val row =
+            session
+                .query("SELECT IFNULL(is_income, 0) AS is_income FROM categories WHERE id = ?", listOf(categoryId))
+                .firstOrNull() ?: return none
+        val sheet = TemplateSheet(session, today)
+        val category = Category(categoryId, "", visible = true, income = row.bool("is_income"), templates = templates, errors = emptyList())
+        val computed = compute(listOf(category), month, sheet, force = true, skipAvailableClamp = true, only = true)
+        val context = computed.contexts.firstOrNull()?.second ?: return none
+        return templates.mapIndexed { index, template ->
             when (template) {
-                is Template.Remainder, is Template.Goal -> null
-                else -> amountFor(template, category, month, detailed.categories, detailed.figures.headerMinor)
+                is Template.Remainder, is Template.Goal, is Template.Limit -> null
+                else -> context.contribution[index] ?: 0L
             }
         }
     }
 
     /**
-     * The goal a run would write for each visible templated category in [month], as (amount, long goal): a `#goal`
-     * line's target, else what its priority lines ask. Lets the budget rows measure templates that were never
-     * applied this month, as the category page does. Writes nothing.
+     * The goal a run would write for each visible templated category in [month], as (amount, long goal), so the
+     * budget rows can measure templates that were never applied this month, as the category page does. Categories
+     * whose templates cannot run are left out. Writes nothing.
      */
     fun goals(month: YearMonth): Map<String, Pair<Long, Boolean>> {
-        val detailed = ShellReader.loadDetailed(session, month)
-        return categories()
-            .filter { it.visible && !it.income && it.templates.isNotEmpty() }
-            .mapNotNull { category ->
-                val goal = category.templates.filterIsInstance<Template.Goal>().firstOrNull()
-                val asked = category.templates.filter { it.priority != null }
-                when {
-                    goal != null -> category.id to (toMinor(goal.amount) to true)
-                    asked.isNotEmpty() ->
-                        category.id to
-                            (asked.sumOf { amountFor(it, category, month, detailed.categories, detailed.figures.headerMinor) } to false)
-                    else -> null
-                }
+        val computed = compute(categories(), month, TemplateSheet(session, today), force = true, keepGoing = true)
+        return computed.contexts
+            .mapNotNull { (category, context) ->
+                val values = context.values()
+                values.goal?.let { category.id to (it to values.longGoal) }
             }.toMap()
     }
 
     /**
      * Every visible category's templates laid out the way an overwrite would run them (the templates screen's
-     * lanes): priorities lowest first, each template given what it asks while to budget lasts, then remainder lines
+     * lanes): priorities lowest first, each template given what it gets while to budget lasts, then remainder lines
      * by weight, then goals, which budget nothing. Lines that do not read are listed apart. Writes nothing.
      */
     fun plan(month: YearMonth): TemplatePlan {
-        val categories = categories().filter { it.visible && !it.income && !it.unsupported }
-        val detailed = ShellReader.loadDetailed(session, month)
-        val stats = detailed.categories
-        val templated = categories.filter { it.templates.isNotEmpty() }
-        val start = detailed.figures.headerMinor + templated.sumOf { stats[it.id]?.budgetedMinor ?: 0L }
-        var available = start
-
-        fun chips(predicate: (Template) -> Boolean): List<Pair<Category, Int>> =
-            categories.flatMap { category ->
-                category.entries.mapIndexedNotNull { index, entry -> entry.template?.takeIf(predicate)?.let { category to index } }
-            }
-
-        fun chip(
-            category: Category,
-            index: Int,
-            asks: Long?,
-            given: Long?,
-        ): TemplateChip {
-            val entry = category.entries[index]
-            return TemplateChip(category.id, category.name, index, entry.template, entry.line, asks, given, category.managed)
-        }
-        val lanes = mutableListOf<TemplateLane>()
-        val priorities = chips { it.priority != null }.mapNotNull { (c, i) -> c.entries[i].template?.priority }.distinct().sorted()
-        for (priority in priorities) {
-            val laneChips =
-                chips { it.priority == priority }.map { (category, index) ->
-                    val asks = amountFor(category.entries[index].template!!, category, month, stats, detailed.figures.headerMinor)
-                    val given = asks.coerceAtMost(available.coerceAtLeast(0L)).coerceAtLeast(0L)
-                    available -= given
-                    chip(category, index, asks, given)
-                }
-            lanes += TemplateLane(TemplateLane.Kind.PRIORITY, priority, laneChips, available)
-        }
-        // As a run does, only a category's first remainder line takes a share.
-        val remainders = chips { it is Template.Remainder }.distinctBy { (category, _) -> category.id }
-        if (remainders.isNotEmpty()) {
-            val weights = remainders.map { (c, i) -> (c.entries[i].template as Template.Remainder).weight }
-            val total = weights.fold(BigDecimal.ZERO) { sum, w -> sum + w }
-            val pool = available.coerceAtLeast(0L)
-            var left = pool
-            val laneChips =
-                remainders.mapIndexed { n, (category, index) ->
-                    val share =
-                        when {
-                            total.signum() <= 0 -> 0L
-                            n == remainders.lastIndex -> left
-                            else -> (pool.toDouble() * weights[n].toDouble() / total.toDouble()).roundToLong()
-                        }
-                    left -= share
-                    chip(category, index, null, share)
-                }
-            available -= pool - left
-            lanes += TemplateLane(TemplateLane.Kind.REMAINDER, null, laneChips, available)
-        }
-        val goals = chips { it is Template.Goal }
-        if (goals.isNotEmpty()) lanes += TemplateLane(TemplateLane.Kind.GOAL, null, goals.map { (c, i) -> chip(c, i, null, null) }, null)
+        val categories = categories()
+        val computed = compute(categories, month, TemplateSheet(session, today), force = true, keepGoing = true, laneOut = true)
         val unreadable =
-            categories.flatMap { category ->
+            categories.filter { it.visible && !it.unsupported }.flatMap { category ->
                 category.entries.mapIndexedNotNull { index, entry ->
                     if (entry.template ==
                         null
@@ -606,55 +236,107 @@ class TemplateEngine(
                     }
                 }
             }
-        return TemplatePlan(start, lanes, unreadable)
+        val goals =
+            computed.contexts.flatMap { (category, _) ->
+                category.templates.indices
+                    .filter { category.templates[it] is Template.Goal }
+                    .map { chip(category, category.entryIndex[it], null, null) }
+            }
+        val lanes = computed.lanes + if (goals.isEmpty()) emptyList() else listOf(TemplateLane(TemplateLane.Kind.GOAL, null, goals, null))
+        return TemplatePlan(computed.start, lanes, unreadable)
     }
 
-    private fun amountFor(
-        template: Template,
+    private fun chip(
         category: Category,
+        index: Int,
+        asks: Long?,
+        given: Long?,
+    ): TemplateChip {
+        val entry = category.entries[index]
+        return TemplateChip(category.id, category.name, index, entry.template, entry.line, asks, given, category.managed)
+    }
+
+    /** Categories a run looks at: visible ones, income too in a tracking budget, minus any it cannot read. */
+    private fun candidates(
+        categories: List<Category>,
+        sheet: TemplateSheet,
+    ): List<Category> = categories.filter { it.visible && (sheet.tracking || !it.income) && !it.unsupported }
+
+    /**
+     * `computeTemplates`: builds a context for each templated category that is unbudgeted (or every one when
+     * [force]), runs the priorities and then the remainders. A category whose templates fail a check is an error;
+     * with [keepGoing] it is skipped instead and the rest still run. [only] runs [categories] as given.
+     */
+    private fun compute(
+        categories: List<Category>,
         month: YearMonth,
-        stats: Map<String, ActualMonthMath.CategoryMonthStat>,
-        toBudget: Long,
-    ): Long {
-        val stat = stats[category.id]
-        // What the category carries into this month.
-        val carried = stat?.let { it.availableMinor - it.budgetedMinor - it.spentMinor } ?: 0L
-        return when (template) {
-            is Template.Simple -> {
-                val limit = template.limit?.let { toMinor(it) }
-                val monthly = template.monthly?.let { toMinor(it) }
-                when {
-                    limit == null -> monthly ?: 0L
-                    monthly == null -> (limit - carried).coerceAtLeast(0L)
-                    else -> monthly.coerceAtMost((limit - carried).coerceAtLeast(0L))
+        sheet: TemplateSheet,
+        force: Boolean,
+        skipAvailableClamp: Boolean = false,
+        keepGoing: Boolean = false,
+        only: Boolean = false,
+        laneOut: Boolean = false,
+    ): Computed {
+        val detailed = sheet.month(month)
+        var available = detailed.figures.headerMinor
+        val contexts = mutableListOf<Pair<Category, TemplateContext>>()
+        val errors = mutableListOf<TemplateError>()
+        for (category in if (only) categories else candidates(categories, sheet)) {
+            if (category.templates.isEmpty()) continue
+            val budgeted = sheet.budget(month, category.id)
+            if (budgeted != 0L && !force) continue
+            val context =
+                try {
+                    TemplateContext.init(
+                        category.id,
+                        category.income,
+                        category.templates,
+                        month,
+                        budgeted,
+                        sheet,
+                        skipAvailableClamp,
+                    ) { template, carried -> schedule(template, month, carried) }
+                } catch (failure: TemplateFailure) {
+                    errors += TemplateError(category.name, failure.message.orEmpty())
+                    continue
                 }
-            }
-            is Template.By -> {
-                var target = template.month
-                val step = template.repeatMonths
-                if (step != null) {
-                    while (target < month) target = target.plusMonths(step.toLong())
-                }
-                if (target < month) return 0L
-                val left = ChronoUnit.MONTHS.between(month, target) + 1
-                ((toMinor(template.amount) - carried).coerceAtLeast(0L).toDouble() / left).roundToLong()
-            }
-            is Template.Schedule -> schedule(template, month, carried)
-            is Template.Percentage -> {
-                val base =
-                    when (template.category.lowercase()) {
-                        "available funds" -> toBudget
-                        "all income" -> income(null, if (template.previous) month.minusMonths(1) else month)
-                        else -> income(categoryId(template.category), if (template.previous) month.minusMonths(1) else month)
-                    }
-                (base.toDouble() * template.percent.toDouble() / 100.0).roundToLong().coerceAtLeast(0L)
-            }
-            is Template.Average -> {
-                val total = (1..template.months).sumOf { spent(category.id, month.minusMonths(it.toLong())) }
-                (-total.toDouble() / template.months).roundToLong().coerceAtLeast(0L)
-            }
-            is Template.Remainder, is Template.Goal -> 0L
+            // Money budgeted by hand in a goal-only category is not the templates' to share.
+            if (!context.goalOnly) available += budgeted
+            available += context.limitExcess()
+            contexts += category to context
         }
+        if (errors.isNotEmpty() && !keepGoing) return Computed(emptyList(), errors, available)
+        val start = available
+        val lanes = mutableListOf<TemplateLane>()
+        val priorities = contexts.flatMap { it.second.priorities() }.distinct().sorted()
+        for (priority in priorities) {
+            val availStart = available
+            for ((_, context) in contexts) available -= context.runPriority(priority, available, availStart)
+            if (laneOut) {
+                val chips =
+                    contexts.flatMap { (category, context) ->
+                        category.templates.indices
+                            .filter { category.templates[it].priority == priority && category.templates[it] !is Template.Remainder }
+                            .map { chip(category, category.entryIndex[it], context.asked[it] ?: 0L, context.contribution[it] ?: 0L) }
+                    }
+                lanes += TemplateLane(TemplateLane.Kind.PRIORITY, priority, chips, available)
+            }
+        }
+        val before = contexts.associate { (category, context) -> category.id to HashMap(context.contribution) }
+        available = distributeRemainder(contexts.map { it.second }, available)
+        if (laneOut) {
+            val chips =
+                contexts.flatMap { (category, context) ->
+                    category.templates.indices
+                        .filter { category.templates[it] is Template.Remainder }
+                        .map { index ->
+                            val given = (context.contribution[index] ?: 0L) - (before[category.id]?.get(index) ?: 0L)
+                            chip(category, category.entryIndex[index], null, given)
+                        }
+                }
+            if (chips.isNotEmpty()) lanes += TemplateLane(TemplateLane.Kind.REMAINDER, null, chips, available)
+        }
+        return Computed(contexts, errors, start, lanes)
     }
 
     /** The schedule's occurrences this month; one that comes less often is saved for month by month unless `full`. */
@@ -663,14 +345,15 @@ class TemplateEngine(
         month: YearMonth,
         carried: Long,
     ): Long {
+        val id = template.scheduleId
         val row =
             session
                 .query(
                     """
                     SELECT r.conditions AS conditions FROM schedules s JOIN rules r ON r.id = s.rule
-                    WHERE s.name = ? AND IFNULL(s.tombstone, 0) = 0 AND IFNULL(s.completed, 0) = 0
+                    WHERE ${if (id != null) "s.id = ?" else "TRIM(s.name) = ?"} AND IFNULL(s.tombstone, 0) = 0 AND IFNULL(s.completed, 0) = 0
                     """.trimIndent(),
-                    listOf(template.name),
+                    listOf(id ?: template.name.trim()),
                 ).firstOrNull() ?: return 0L
         val conditions =
             runCatching {
@@ -684,16 +367,26 @@ class TemplateEngine(
             }
         }
         val amountValue = field("amount")?.get("value")
-        val amount =
+        var scheduled =
             when (amountValue) {
-                is JsonPrimitive -> abs(amountValue.content.toDoubleOrNull()?.roundToLong() ?: 0L)
+                is JsonPrimitive -> amountValue.content.toDoubleOrNull() ?: 0.0
                 is JsonObject -> {
                     val a = (amountValue["num1"] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0
                     val b = (amountValue["num2"] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: 0.0
-                    abs(((a + b) / 2).roundToLong())
+                    jsRound(a + b) / 2.0
                 }
-                else -> 0L
+                else -> 0.0
             }
+        val adjustment = template.adjustment
+        if (adjustment != null) {
+            scheduled =
+                if (adjustment.percent) {
+                    scheduled * (1 + adjustment.amount.toDouble() / 100)
+                } else {
+                    scheduled + (if (scheduled < 0) -1 else 1) * cents(adjustment.amount)
+                }
+        }
+        val amount = abs(jsRound(scheduled))
         val date = field("date") ?: return 0L
         val value = date["value"]
         val inMonth: Int
@@ -779,59 +472,6 @@ class TemplateEngine(
         }
     }
 
-    private fun income(
-        categoryId: String?,
-        month: YearMonth,
-    ): Long {
-        val actual = month.toActualMonth()
-        val filter = if (categoryId == null) "c.is_income = 1" else "t.category = ?"
-        val args = listOfNotNull(categoryId) + listOf(actual * 100 + 1, actual * 100 + 31)
-        return session
-            .query(
-                """
-                SELECT COALESCE(SUM(t.amount), 0) AS total
-                FROM transactions t
-                LEFT JOIN accounts a ON a.id = t.acct
-                LEFT JOIN categories c ON c.id = t.category
-                WHERE $filter AND t.date >= ? AND t.date <= ?
-                  AND IFNULL(a.offbudget, 1) = 0 AND IFNULL(t.tombstone, 0) = 0 AND IFNULL(t.isParent, 0) = 0
-                """.trimIndent(),
-                args,
-            ).first()
-            .long("total")
-    }
-
-    private fun spent(
-        categoryId: String,
-        month: YearMonth,
-    ): Long {
-        val actual = month.toActualMonth()
-        return session
-            .query(
-                """
-                SELECT COALESCE(SUM(t.amount), 0) AS total
-                FROM transactions t
-                LEFT JOIN accounts a ON a.id = t.acct
-                WHERE t.category = ? AND t.date >= ? AND t.date <= ?
-                  AND IFNULL(a.offbudget, 1) = 0 AND IFNULL(t.tombstone, 0) = 0 AND IFNULL(t.isParent, 0) = 0
-                """.trimIndent(),
-                listOf(categoryId, actual * 100 + 1, actual * 100 + 31),
-            ).first()
-            .long("total")
-    }
-
-    private fun categoryId(name: String): String? =
-        session
-            .query("SELECT id FROM categories WHERE LOWER(name) = LOWER(?) AND IFNULL(tombstone, 0) = 0", listOf(name))
-            .firstOrNull()
-            ?.str("id")
-
-    private fun tracking(): Boolean =
-        session
-            .query("SELECT value FROM preferences WHERE id = 'budgetType'")
-            .firstOrNull()
-            ?.str("value") == "tracking"
-
     private fun existingRow(
         table: String,
         month: YearMonth,
@@ -916,27 +556,33 @@ object CategoryNotes {
     fun migrate(
         session: SqlSession,
         categoryId: String,
+        today: LocalDate,
     ): CategoryAutomations? {
         val entries = TemplateNote.parse(read(session, categoryId)).entries
         if (entries.any { it.template == null }) return null
-        val automations = CategoryAutomations(entries.map { TemplateJson.Stored.of(it.template!!) })
+        val schedules =
+            session
+                .query("SELECT id, name FROM schedules WHERE IFNULL(tombstone, 0) = 0")
+                .map { it.str("id").orEmpty() to it.str("name") }
+        val automations = CategoryAutomations.fromNote(entries.map { it.template!! }, schedules, today)
         saveAutomations(session, categoryId, automations)
         return automations
     }
 
     /**
      * Back to note templates, as desktop's un-migrate does: the automations are written into the note in place of its
-     * template lines and the note owns the category again. False (nothing written) while it holds an automation that
-     * has no note line the phone can write.
+     * template lines and the note owns the category again. False (nothing written) while it holds an automation the
+     * phone cannot read, or a refill with no limit to fold into.
      */
     fun unmigrate(
         session: SqlSession,
         categoryId: String,
     ): Boolean {
         val automations = automations(session, categoryId) ?: return false
-        if (!automations.runnable) return false
+        if (!automations.runnable || !TemplateLines.writable(automations.templates)) return false
         val note = TemplateNote.parse(read(session, categoryId))
-        write(session, categoryId, note.compose(automations.templates.map { TemplateNote.Entry.of(it) }))
+        val lines = TemplateLines.unparse(automations.templates)
+        write(session, categoryId, note.compose(lines.map { TemplateNote.Entry(it, TemplateParser.parseLine(it)) }))
         SyncSchema.write(session, "categories", categoryId, "template_settings", NOTES_SOURCE)
         return true
     }
