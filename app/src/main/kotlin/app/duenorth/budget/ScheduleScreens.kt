@@ -71,6 +71,7 @@ object ScheduleScreenCopy {
     const val DUPLICATE_BODY = "a similar transaction is already in this account within two days of the due date"
     const val POST_ANYWAY = "post anyway"
     const val UPCOMING = "upcoming"
+    const val ORDER_HINT = "hold a schedule and drag it to change the order of ones due the same day"
     const val ALL = "all"
     const val NEW = "new"
     const val LIST = "list"

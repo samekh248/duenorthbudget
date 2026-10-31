@@ -73,6 +73,7 @@ internal fun SchedulesRoute(
             onSkip = model.schedules::skip,
             onGesture = model::setGesture,
             modifier = modifier,
+            onMove = if (state.schedulesUi.canReorder) model.schedules::move else null,
         )
     }
 }

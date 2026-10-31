@@ -13,7 +13,18 @@ class ParityFixtureTest {
     fun everyScenarioLoadsAndItsBaseOpensOnThePhone() {
         val areas = ParityFixture.areas()
         assertEquals(
-            listOf("accounts", "automations", "cleanup", "month", "reports", "schedule-templates", "schedules-rules", "templates", "undo"),
+            listOf(
+                "accounts",
+                "automations",
+                "cleanup",
+                "month",
+                "reports",
+                "schedule-order",
+                "schedule-templates",
+                "schedules-rules",
+                "templates",
+                "undo",
+            ),
             areas,
         )
         for (area in areas) {
@@ -22,7 +33,8 @@ class ParityFixtureTest {
             for (scenario in scenarios) {
                 val fixture = ParityFixture.load(area, scenario)
                 assertEquals(LocalDate.of(2026, 10, 7), fixture.today)
-                assertEquals("26.8.1", fixture.actualVersion)
+                // Schedule ordering first shipped in Actual 26.10.
+                assertEquals(if (area == "schedule-order") "26.10.0" else "26.8.1", fixture.actualVersion)
                 fixture.open().use { opened ->
                     assertNotNull("$area/$scenario shell", opened.library.readShell(opened.budgetId))
                 }

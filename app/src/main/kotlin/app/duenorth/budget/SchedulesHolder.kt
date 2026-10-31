@@ -18,6 +18,8 @@ data class SchedulesUi(
     val duplicateId: String? = null,
     /** The schedule the editor has open; null while it loads. */
     val draft: ScheduleDraft? = null,
+    /** Desktop Actual 26.10 has added schedule ordering to this budget, so same-day schedules can be dragged. */
+    val canReorder: Boolean = false,
 )
 
 // Spec 010 US3 (T049): the schedule editor. See contracts/schedules-rules.md.
@@ -34,6 +36,23 @@ class SchedulesHolder internal constructor(
         host.push(ShellRoute.Schedules)
         host.mutate { it.copy(schedulesUi = it.schedulesUi.copy(section = SchedulesSection.UPCOMING)) }
         host.refresh()
+        val budgetId = state.settings.openBudgetId ?: return
+        host.scope.launch {
+            val canReorder = withContext(host.io) { host.library.canReorderSchedules(budgetId) }
+            host.mutate { it.copy(schedulesUi = it.schedulesUi.copy(canReorder = canReorder)) }
+        }
+    }
+
+    /** Upcoming → a schedule dropped among those due the same day: just after [targetId], or first when null. */
+    fun move(
+        scheduleId: String,
+        targetId: String?,
+    ) {
+        val budgetId = state.settings.openBudgetId ?: return
+        host.scope.launch {
+            val result = withContext(host.io) { host.library.moveSchedule(budgetId, scheduleId, targetId) }
+            if (result is ScheduleWriteResult.Posted) host.refresh()
+        }
     }
 
     fun setSection(index: Int) {

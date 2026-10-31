@@ -23,6 +23,11 @@ npm run generate
 `node generate.mjs <area> [<area> ...]` regenerates only those areas and
 leaves the other areas' ids alone.
 
+`schedule-order` needs desktop handlers newer than 26.8.1, so it runs on
+`@actual-app/api` 26.10.0 (the `api-26-10` alias in `package.json`) in a
+process of its own: name it alone, as `node generate.mjs schedule-order`. A full
+run generates it last the same way.
+
 Output goes to `core/budget/src/test/resources/parity/<area>/`:
 
 | File | Contents |
@@ -46,4 +51,5 @@ close transfers, averages, and schedules are reproducible.
 | `automations` | every template type as budget automations (`source: ui`), the newer note forms, Jul–Oct 2026 budgets and spending, `flags.goalTemplatesUIEnabled` on | how desktop parses 70-odd note lines and writes automations back as notes, overwrite, overwrite with `hideFraction`, the automations editor's dry run per category |
 | `schedule-templates` | schedules that come monthly, weekly, every two weeks, daily, quarterly, yearly and once; a ranged amount moved off a weekend; a split rule across three categories; past, done and ended schedules; savings carried in from September | overwrite in October, overwrite September then October (carried savings and last month's goal), the dry run per category |
 | `cleanup` | sources, sinks with weights, group-scoped lines and an overspending line in notes, Oct 2026 budgets with leftovers and overspending | how desktop parses cleanup note lines, storing cleanup definitions and groups, end-of-month cleanup, cleanup when sources run short |
+| `schedule-order` | generated with Actual 26.10.0, where schedule ordering first shipped: four schedules due the same day at the default order, one due later | move after another with no room (shoves the rest down), move to the top, top then after (midpoint), move after a later one, three moves in a row |
 | `undo` | the month base | one assignment, to undo back to the base |

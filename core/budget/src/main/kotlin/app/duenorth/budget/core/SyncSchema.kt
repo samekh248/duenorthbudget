@@ -178,7 +178,7 @@ object SyncSchema {
             "notes" to setOf("note"),
             "banks" to setOf("bank_id", "name", "tombstone"),
             "rules" to setOf("stage", "conditions_op", "conditions", "actions", "tombstone"),
-            "schedules" to setOf("name", "rule", "active", "completed", "posts_transaction", "tombstone"),
+            "schedules" to setOf("name", "rule", "active", "completed", "posts_transaction", "tombstone", "sort_order"),
             "schedules_next_date" to
                 setOf(
                     "schedule_id",

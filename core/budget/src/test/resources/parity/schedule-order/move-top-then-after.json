@@ -1,0 +1,118 @@
+{
+  "scenario": "move-top-then-after",
+  "base": "base.zip",
+  "actualVersion": "26.10.0",
+  "today": "2026-10-07",
+  "action": {
+    "steps": [
+      {
+        "handler": "schedule/move",
+        "args": {
+          "id": "Gym",
+          "targetId": null
+        }
+      },
+      {
+        "handler": "schedule/move",
+        "args": {
+          "id": "Water",
+          "targetId": "Gym"
+        }
+      }
+    ]
+  },
+  "ids": {
+    "accounts": {
+      "Checking": "4fdd1e21-35dc-4b61-8aeb-80d0a252144e"
+    },
+    "categories": {
+      "Food": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "General": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "Bills": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "Bills (Flexible)": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "Income": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "Starting Balances": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "Savings": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61"
+    },
+    "groups": {
+      "Usual Expenses": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "Income": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "Investments and Savings": "a137772f-cf2f-4089-9432-822d2ddc1466"
+    },
+    "payees": {
+      "Starting Balance": "11019c46-8d84-44d9-975d-a3d9744f3c6a",
+      "Rent": "1568b2ec-18a5-43c6-b421-75faadb86eb5",
+      "Phone": "65a65ea2-f4ae-451e-bfb0-fd5e3c6f2c9f",
+      "Gym": "fa91acb3-e69d-409a-9ba2-1a5f1a12099c",
+      "Water": "a1760d39-f5cd-4e16-809d-9ba782e1b30e",
+      "Power": "d013cfc9-e61b-4b36-b365-0debced47e00"
+    },
+    "schedules": {
+      "Rent": "14a3f895-94e2-4ad2-b4a3-a7a0b2bb1fe2",
+      "Phone": "de037e6b-02ad-499a-998e-35c6fd7fa67f",
+      "Gym": "1248ff34-c027-45d2-a719-a588a4c84881",
+      "Water": "852c3306-dd28-4498-8839-ff069bdcb800",
+      "Power": "12dd2b0c-84ec-4056-a8bb-541a74bf2d9d"
+    }
+  },
+  "tables": {
+    "schedules": [
+      {
+        "id": "1248ff34-c027-45d2-a719-a588a4c84881",
+        "rule": "f402c30e-1c41-4857-b611-57c05adefe35",
+        "active": 0,
+        "completed": 0,
+        "posts_transaction": 0,
+        "tombstone": 0,
+        "name": "Gym",
+        "custom_upcoming_length": null,
+        "sort_order": 16384
+      },
+      {
+        "id": "12dd2b0c-84ec-4056-a8bb-541a74bf2d9d",
+        "rule": "0571ea8d-320a-4e47-a6c9-ac6580543fa8",
+        "active": 0,
+        "completed": 0,
+        "posts_transaction": 0,
+        "tombstone": 0,
+        "name": "Power",
+        "custom_upcoming_length": null,
+        "sort_order": 0
+      },
+      {
+        "id": "14a3f895-94e2-4ad2-b4a3-a7a0b2bb1fe2",
+        "rule": "da66b1f9-d6d7-454b-84e6-a551ffe26396",
+        "active": 0,
+        "completed": 0,
+        "posts_transaction": 0,
+        "tombstone": 0,
+        "name": "Rent",
+        "custom_upcoming_length": null,
+        "sort_order": 0
+      },
+      {
+        "id": "852c3306-dd28-4498-8839-ff069bdcb800",
+        "rule": "f5d932e5-25d5-49f0-a217-74a944a10fce",
+        "active": 0,
+        "completed": 0,
+        "posts_transaction": 0,
+        "tombstone": 0,
+        "name": "Water",
+        "custom_upcoming_length": null,
+        "sort_order": 8192
+      },
+      {
+        "id": "de037e6b-02ad-499a-998e-35c6fd7fa67f",
+        "rule": "b2742b12-61d8-43a3-8cde-5a5ac1a0a5cf",
+        "active": 0,
+        "completed": 0,
+        "posts_transaction": 0,
+        "tombstone": 0,
+        "name": "Phone",
+        "custom_upcoming_length": null,
+        "sort_order": 0
+      }
+    ]
+  },
+  "values": {}
+}
