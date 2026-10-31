@@ -45,6 +45,29 @@ class InboxSelectTest {
     }
 
     @Test
+    fun aRowCategorizedElsewhereLeavesTheSelection() {
+        val (model, library) = household("inbox-select-elsewhere")
+        val shell = model.state.value.shell!!
+        val picked = shell.inbox.take(2).map { it.id }
+        model.inbox.startSelecting()
+        picked.forEach(model.inbox::toggleSelected)
+        // Stands in for a sync that brings in a category set on the desktop.
+        val category =
+            shell.groups
+                .flatMap { it.categories }
+                .first()
+                .id
+        library.setTransactionsCategory(shell.budgetId, mapOf(picked.first() to category), force = true)
+        model.refresh()
+        await {
+            model.state.value.shell!!
+                .inbox
+                .none { it.id == picked.first() }
+        }
+        assertEquals(setOf(picked.last()), model.state.value.inbox.selection)
+    }
+
+    @Test
     fun deleteRemovesEveryCheckedRowAsOneStep() {
         val (model, _) = household("inbox-select-delete")
         val picked =

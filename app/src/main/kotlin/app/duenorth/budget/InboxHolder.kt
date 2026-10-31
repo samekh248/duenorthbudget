@@ -18,6 +18,16 @@ data class InboxUi(
 )
 
 /**
+ * The inbox state with checked rows that are no longer in [inbox] let go, as when a sync brings in
+ * a category set elsewhere, so the selected count only counts rows still on screen.
+ */
+internal fun InboxUi.keptTo(inbox: List<InboxRow>): InboxUi {
+    val picked = selection ?: return this
+    val ids = inbox.mapTo(mutableSetOf()) { it.id }
+    return if (ids.containsAll(picked)) this else copy(selection = picked.filterTo(mutableSetOf()) { it in ids })
+}
+
+/**
  * The inbox: filing, deleting and opening what came in, one row or a selection at a time. It keeps its state in
  * [InboxUi] and reaches the rest of the shell through [host].
  */
