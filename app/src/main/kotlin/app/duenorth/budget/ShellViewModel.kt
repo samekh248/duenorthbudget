@@ -857,6 +857,7 @@ class ShellViewModel(
                 budgets = loaded.budgets,
                 shell = visibleShell,
                 register = register,
+                inbox = visibleShell?.let { current.inbox.keptTo(it.inbox) } ?: current.inbox,
                 schedules = loaded.schedules,
                 route = route,
                 settingsReturn = current.settingsReturn && route != ShellRoute.Home,
