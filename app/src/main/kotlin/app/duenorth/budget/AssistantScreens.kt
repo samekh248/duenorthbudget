@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -99,19 +99,16 @@ fun AssistantSection(
                 KindCard(kind, all.size, open, Modifier.padding(top = 12.dp)) { onToggleExpanded(kind) }
             }
             if (open) {
-                // The open card's tint runs on behind its findings, so the header and what it holds read as one block.
-                itemsIndexed(all, key = { _, it -> it.key }) { index, finding ->
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .background(openTint())
-                            .padding(
-                                start = GROUP_INSET,
-                                end = GROUP_INSET,
-                                top = if (index == 0) 0.dp else 8.dp,
-                                bottom = if (index == all.lastIndex) GROUP_INSET else 0.dp,
-                            ),
-                    ) {
+                // An open card grows downward: its findings carry on in the card itself, each under a thin rule of the page's own colour.
+                items(all, key = { it.key }) { finding ->
+                    Column(Modifier.fillMaxWidth().background(Metro.colors.chrome)) {
+                        Box(
+                            Modifier
+                                .padding(horizontal = CARD_PADDING)
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(Metro.colors.background),
+                        )
                         FindingPanel(finding, money, onAct)
                     }
                 }
@@ -133,10 +130,10 @@ private fun KindCard(
     Row(
         modifier
             .fillMaxWidth()
-            .background(if (open) openTint() else Metro.colors.chrome)
+            .background(Metro.colors.chrome)
             .metroPress(onToggle)
             .semantics { stateDescription = if (open) "open" else "closed" }
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = CARD_PADDING, vertical = 14.dp)
             .testTag("assistant-kind-${kind.name}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -163,12 +160,8 @@ private fun KindCard(
     }
 }
 
-/** How far an open card's findings sit inside its tint. */
-private val GROUP_INSET = 12.dp
-
-/** The open card's tint, shared by its header and the frame around its findings. */
-@Composable
-private fun openTint() = Metro.accent.fill.copy(alpha = 0.14f)
+/** A card's side padding, shared by its header and the findings an open card holds. */
+private val CARD_PADDING = 16.dp
 
 /** Nothing to look at: says so in the middle of the item. */
 @Composable
@@ -200,7 +193,7 @@ internal fun FindingPanel(
         modifier
             .fillMaxWidth()
             .background(Metro.colors.chrome)
-            .padding(horizontal = 14.dp, vertical = 14.dp)
+            .padding(horizontal = CARD_PADDING, vertical = 14.dp)
             .testTag("finding-${finding.key}"),
     ) {
         if (finding.sure == FindingSure.MAYBE) {
