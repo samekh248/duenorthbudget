@@ -62,7 +62,10 @@ class AssistantScreenshotTest {
             "assistant_all_light",
             dark = false,
             report =
-                AssistantReport(sampleAssistant().findings + sampleAssistantBudget().findings + sampleAssistantMore().findings),
+                AssistantReport(
+                    sampleAssistant().findings + sampleAssistantBudget().findings + sampleAssistantSchedules().findings +
+                        sampleAssistantMore().findings,
+                ),
         )
 
     @Test
@@ -95,6 +98,24 @@ class AssistantScreenshotTest {
     @Test
     fun oneKindStartsOpenLight() =
         snap("assistant_one_kind_light", dark = false, report = AssistantReport(sampleAssistantBudget().findings.take(1)))
+
+    @Test
+    fun schedulesLight() =
+        snap(
+            "assistant_schedules_light",
+            dark = false,
+            report = sampleAssistantSchedules(),
+            expanded = setOf(FindingKind.MISSED_SCHEDULE, FindingKind.PRICE_CHANGE),
+        )
+
+    @Test
+    fun tidyDark() =
+        snap(
+            "assistant_tidy_dark",
+            dark = true,
+            report = AssistantReport(sampleAssistantSchedules().findings.drop(2)),
+            expanded = setOf(FindingKind.RECURRING, FindingKind.LOOKALIKE_PAYEE),
+        )
 
     @Test
     fun clearLight() = snap("assistant_clear_light", dark = false, report = AssistantReport.EMPTY)
@@ -343,6 +364,71 @@ internal fun sampleAssistantBudget(): AssistantReport =
                 accountId = "checking",
                 difference = 6000,
                 figures = listOf(FindingFigure(AssistantCopy.AT_THE_BANK, 118900), FindingFigure(AssistantCopy.IN_REGISTER, 112900)),
+            ),
+        ),
+    )
+
+internal fun sampleAssistantSchedules(): AssistantReport =
+    AssistantReport(
+        listOf(
+            Finding(
+                key = "missed:rent|20261020",
+                kind = FindingKind.MISSED_SCHEDULE,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.missed("Rent", "oct 20"),
+                sides = emptyList(),
+                reasons = listOf("Checking"),
+                actions =
+                    listOf(
+                        FindingAction.PostSchedule("rent"),
+                        FindingAction.SkipSchedule("rent"),
+                        FindingAction.Dismiss(AssistantCopy.LATER),
+                    ),
+                accountId = "checking",
+                figures = listOf(FindingFigure(AssistantCopy.AMOUNT, -150000)),
+            ),
+            Finding(
+                key = "price:netflix|-1799",
+                kind = FindingKind.PRICE_CHANGE,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.priceChange("Netflix"),
+                sides = emptyList(),
+                reasons = emptyList(),
+                actions = listOf(FindingAction.UpdateScheduleAmount("netflix", -1799), FindingAction.Dismiss(AssistantCopy.KEEP_IT)),
+                accountId = "visa",
+                difference = -300,
+                figures = listOf(FindingFigure(AssistantCopy.SCHEDULE_SAYS, -1499), FindingFigure(AssistantCopy.LAST_TWO, -1799)),
+            ),
+            Finding(
+                key = "recurring:gym|out",
+                kind = FindingKind.RECURRING,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.recurring("Planet Fitness", 4),
+                sides = emptyList(),
+                reasons = listOf(AssistantCopy.nextAround("nov 1")),
+                actions = listOf(FindingAction.MakeSchedule("gym-oct", "2026-11-01"), FindingAction.Dismiss(AssistantCopy.NOT_A_BILL)),
+                accountId = "",
+                figures = listOf(FindingFigure(AssistantCopy.LAST_PAID, -2499)),
+            ),
+            Finding(
+                key = "rule:shell|gas",
+                kind = FindingKind.RULE_IDEA,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.ruleIdea("Shell", "Gas", 7),
+                sides = emptyList(),
+                reasons = emptyList(),
+                actions = listOf(FindingAction.MakeRule("shell", "gas"), FindingAction.Dismiss(AssistantCopy.NO_THANKS)),
+                accountId = "",
+            ),
+            Finding(
+                key = "lookalike:costco-bank|costco",
+                kind = FindingKind.LOOKALIKE_PAYEE,
+                sure = FindingSure.MAYBE,
+                headline = AssistantCopy.lookalike("COSTCO #1123", "Costco"),
+                sides = emptyList(),
+                reasons = listOf(AssistantCopy.usedTimes("COSTCO #1123", 3), AssistantCopy.usedTimes("Costco", 14)),
+                actions = listOf(FindingAction.MergePayees("costco-bank", "Costco"), FindingAction.Dismiss(AssistantCopy.NOT_THE_SAME)),
+                accountId = "",
             ),
         ),
     )
