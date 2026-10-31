@@ -139,7 +139,18 @@ object SyncSchema {
             "payees" to setOf("name", "transfer_acct", "tombstone", "learn_categories"),
             "category_groups" to setOf("name", "is_income", "hidden", "sort_order", "tombstone"),
             "categories" to
-                setOf("name", "is_income", "hidden", "cat_group", "sort_order", "tombstone", "goal_def", "template_settings"),
+                setOf(
+                    "name",
+                    "is_income",
+                    "hidden",
+                    "cat_group",
+                    "sort_order",
+                    "tombstone",
+                    "goal_def",
+                    "template_settings",
+                    "cleanup_def",
+                ),
+            "cleanup_groups" to setOf("name", "tombstone"),
             "transactions" to
                 setOf(
                     "isParent",
@@ -690,6 +701,7 @@ object SyncSchema {
                 session.exec("INSERT OR IGNORE INTO zero_budget_months (id, buffered) VALUES (?, 0)", listOf(key))
             "notes" -> session.exec("INSERT OR IGNORE INTO notes (id) VALUES (?)", listOf(key))
             "banks" -> session.exec("INSERT OR IGNORE INTO banks (id) VALUES (?)", listOf(key))
+            "cleanup_groups" -> session.exec("INSERT OR IGNORE INTO cleanup_groups (id, name) VALUES (?, '')", listOf(key))
             "rules" -> session.exec("INSERT OR IGNORE INTO rules (id) VALUES (?)", listOf(key))
             "schedules" -> session.exec("INSERT OR IGNORE INTO schedules (id, rule) VALUES (?, '')", listOf(key))
             "schedules_next_date" ->

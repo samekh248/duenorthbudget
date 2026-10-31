@@ -1,0 +1,271 @@
+{
+  "scenario": "grammar",
+  "base": "base.zip",
+  "actualVersion": "26.8.1",
+  "today": "2026-10-07",
+  "action": {
+    "kind": "parse",
+    "lines": [
+      "#cleanup source",
+      "#cleanup sink",
+      "#cleanup sink 3",
+      "#cleanup sink3",
+      "#cleanup sink 0",
+      "#cleanup sink  12",
+      "#cleanup Fun source",
+      "#cleanup fun sink 2",
+      "#cleanup Fun",
+      "#cleanup Big Fun source",
+      "#cleanup Big  Fun sink",
+      "#cleanup Fun  source",
+      "#cleanup source extra",
+      "#cleanup sinkhole",
+      "#cleanup Fun sinker",
+      "#cleanup Fun sink x",
+      "#Cleanup source",
+      "#CLEANUP sink",
+      "  #cleanup source  ",
+      "#cleanup",
+      "#cleanup ",
+      "note #cleanup source",
+      "#cleanupsource",
+      "#cleanup Rent overspend",
+      "#cleanup sink 2.5",
+      "#cleanup Fun sink2"
+    ]
+  },
+  "ids": {
+    "accounts": {
+      "Checking": "8811d4d1-87c9-4605-a6bc-11b810103703"
+    },
+    "categories": {
+      "Food": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "General": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "Bills": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "Bills (Flexible)": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "Income": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "Starting Balances": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "Savings": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+      "Salary": "8fa9f0d8-d0e3-463c-b4f3-67ec7bb1eec3",
+      "Leftover A": "3a052d95-78e1-4068-9011-1cdfecb40f59",
+      "Leftover B": "633af8e0-bb9e-49e7-975f-73e349622133",
+      "Savings Sink": "cee912d9-f4f7-46cc-9149-ed01e9109167",
+      "Vacation Sink": "01e37cb8-1936-4786-857e-798cb7277977",
+      "Overspent": "0268ba3b-3f8d-4b3a-a97a-47902d8ee27a",
+      "Rollover Over": "faed0721-ed0d-456f-bc85-caf6d40be503",
+      "Fun Source": "de6fb142-1257-4cd6-9847-85d0ec44c3ca",
+      "Fun Sink": "6b33ae3d-2d4d-481a-8430-7f9d90ed0efc",
+      "Fun Sink Too": "14bde730-564b-4729-a550-f3e5ff1a9011",
+      "Fun Over": "143a5268-846d-4d39-9c72-51e6e06769c2",
+      "Fun Over Big": "ebb83120-a3b1-47a1-85f4-1fdde73ec3b5",
+      "Lonely Source": "e91a08c6-6aea-455c-b612-b556c50088e5",
+      "Gift Source": "a259e4a0-ecf0-4791-89b0-b38cb68c2a07",
+      "Gift Sink": "4808ac3a-666e-4e67-a684-0a380c9f8431",
+      "Managed": "8d5cd12a-ed3f-42b4-98c7-b610cbbd1a78",
+      "Big": "daa099ac-2cf2-45ca-83bc-5f897c6a1700",
+      "Lines": "6a7a0058-e08b-4494-84b0-dc687c351d37"
+    },
+    "groups": {
+      "Usual Expenses": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "Income": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "Investments and Savings": "a137772f-cf2f-4089-9432-822d2ddc1466"
+    },
+    "payees": {
+      "Employer": "88ea8d7a-7aa4-4702-9011-cd148b7b8a87",
+      "Store": "c27324e6-b931-47a6-88fc-44dc3796c43e"
+    },
+    "schedules": {}
+  },
+  "tables": {},
+  "values": {
+    "parsed": [
+      {
+        "line": "#cleanup source",
+        "def": [
+          {
+            "role": "source",
+            "groupId": null
+          }
+        ]
+      },
+      {
+        "line": "#cleanup sink",
+        "def": [
+          {
+            "role": "sink",
+            "groupId": null,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "line": "#cleanup sink 3",
+        "def": [
+          {
+            "role": "sink",
+            "groupId": null,
+            "weight": 3
+          }
+        ]
+      },
+      {
+        "line": "#cleanup sink3",
+        "def": [
+          {
+            "role": "sink",
+            "groupId": null,
+            "weight": 3
+          }
+        ]
+      },
+      {
+        "line": "#cleanup sink 0",
+        "def": [
+          {
+            "role": "sink",
+            "groupId": null,
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "line": "#cleanup sink  12",
+        "def": [
+          {
+            "role": "sink",
+            "groupId": null,
+            "weight": 12
+          }
+        ]
+      },
+      {
+        "line": "#cleanup Fun source",
+        "def": [
+          {
+            "role": "source",
+            "groupId": "Fun"
+          }
+        ]
+      },
+      {
+        "line": "#cleanup fun sink 2",
+        "def": [
+          {
+            "role": "sink",
+            "groupId": "Fun",
+            "weight": 2
+          }
+        ]
+      },
+      {
+        "line": "#cleanup Fun",
+        "def": [
+          {
+            "role": "overspend",
+            "groupId": "Fun"
+          }
+        ]
+      },
+      {
+        "line": "#cleanup Big Fun source",
+        "def": [
+          {
+            "role": "source",
+            "groupId": "Big Fun"
+          }
+        ]
+      },
+      {
+        "line": "#cleanup Big  Fun sink",
+        "def": [
+          {
+            "role": "sink",
+            "groupId": "Big  Fun",
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "line": "#cleanup Fun  source",
+        "def": [
+          {
+            "role": "source",
+            "groupId": "Fun"
+          }
+        ]
+      },
+      {
+        "line": "#cleanup source extra",
+        "def": null
+      },
+      {
+        "line": "#cleanup sinkhole",
+        "def": null
+      },
+      {
+        "line": "#cleanup Fun sinker",
+        "def": null
+      },
+      {
+        "line": "#cleanup Fun sink x",
+        "def": null
+      },
+      {
+        "line": "#Cleanup source",
+        "def": null
+      },
+      {
+        "line": "#CLEANUP sink",
+        "def": null
+      },
+      {
+        "line": "  #cleanup source  ",
+        "def": [
+          {
+            "role": "source",
+            "groupId": null
+          }
+        ]
+      },
+      {
+        "line": "#cleanup",
+        "def": null
+      },
+      {
+        "line": "#cleanup ",
+        "def": null
+      },
+      {
+        "line": "note #cleanup source",
+        "def": null
+      },
+      {
+        "line": "#cleanupsource",
+        "def": null
+      },
+      {
+        "line": "#cleanup Rent overspend",
+        "def": [
+          {
+            "role": "overspend",
+            "groupId": "Rent overspend"
+          }
+        ]
+      },
+      {
+        "line": "#cleanup sink 2.5",
+        "def": null
+      },
+      {
+        "line": "#cleanup Fun sink2",
+        "def": [
+          {
+            "role": "sink",
+            "groupId": "Fun",
+            "weight": 2
+          }
+        ]
+      }
+    ]
+  }
+}

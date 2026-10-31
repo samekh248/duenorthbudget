@@ -56,6 +56,7 @@ const TABLES = {
   templates: ['zero_budgets', 'categories', 'notes'],
   automations: ['zero_budgets', 'categories'],
   scheduleTemplates: ['zero_budgets'],
+  cleanup: ['zero_budgets', 'categories', 'cleanup_groups'],
 };
 
 async function dump(names) {
@@ -1176,6 +1177,119 @@ async function scheduleTemplateScenarios() {
   });
 }
 
+// End-of-month cleanup (`#cleanup` notes): global sources and weighted sinks,
+// named groups with their own sinks and overspent categories, a group with
+// no sink, a group only a note names, a source that is itself overspent, and
+// overspending with and without rollover for to budget to cover.
+async function buildCleanupBase() {
+  await send('preferences/save', { id: 'flags.goalTemplatesEnabled', value: 'true' });
+  const checking = await api.createAccount({ name: 'Checking', offbudget: false }, 0);
+  const usual = (await api.getCategoryGroups()).find(g => g.name === 'Usual Expenses').id;
+  const incomeGroup = (await api.getCategoryGroups()).find(g => g.is_income).id;
+  const salary = await api.createCategory({ name: 'Salary', group_id: incomeGroup, is_income: true });
+  const cat = {};
+  for (const name of CLEANUP_CATEGORIES) cat[name] = await api.createCategory({ name, group_id: usual });
+  const spent = {
+    'Leftover A': -10000, 'Leftover B': -8000, Overspent: -25000, 'Rollover Over': -9000, 'Fun Source': -3000,
+    'Fun Over': -4000, 'Fun Over Big': -60000, 'Lonely Source': -1000, 'Gift Source': -500, Managed: -100,
+  };
+  const tx = [{ date: '2026-10-01', amount: 500000, payee_name: 'Employer', category: salary }];
+  for (const [name, amount] of Object.entries(spent)) tx.push({ date: '2026-10-10', amount, payee_name: 'Store', category: cat[name] });
+  await api.addTransactions(checking, tx);
+  const budgets = {
+    'Leftover A': 30000, 'Leftover B': 5000, Overspent: 10000, 'Rollover Over': 5000, 'Fun Source': 15000,
+    'Fun Sink': 1000, 'Lonely Source': 4000, 'Gift Source': 2500, Managed: 900, 'Savings Sink': 2000,
+  };
+  await api.batchBudgetUpdates(async () => {
+    for (const [name, amount] of Object.entries(budgets)) await api.setBudgetAmount('2026-10', cat[name], amount);
+  });
+  await send('budget/set-carryover', { startMonth: '2026-10', category: cat['Rollover Over'], flag: true });
+  for (const name of ['Fun', 'NoSink']) await send('budget/create-cleanup-group', { name });
+  await send('budget/set-category-automations', {
+    categoriesWithTemplates: [{ id: cat['Managed'], templates: [{ type: 'simple', monthly: 9, priority: 0, directive: 'template' }] }],
+    source: 'ui',
+  });
+  const notes = {
+    'Leftover A': 'spare money\n#cleanup source',
+    'Leftover B': '#cleanup source',
+    'Savings Sink': '#cleanup sink',
+    'Vacation Sink': '#cleanup sink 3',
+    'Fun Source': '#cleanup Fun source',
+    'Fun Sink': '#cleanup fun sink 2',
+    'Fun Sink Too': '#cleanup FUN sink',
+    'Fun Over': '#cleanup Fun',
+    'Fun Over Big': '#cleanup Fun',
+    'Lonely Source': '#cleanup NoSink source',
+    'Gift Source': '#cleanup Gifts source',
+    'Gift Sink': '#cleanup Gifts sink',
+    Managed: '#cleanup source',
+  };
+  for (const [name, note] of Object.entries(notes)) await api.updateNote(cat[name], note);
+}
+
+const CLEANUP_CATEGORIES = [
+  'Leftover A', 'Leftover B', 'Savings Sink', 'Vacation Sink', 'Overspent', 'Rollover Over', 'Fun Source', 'Fun Sink',
+  'Fun Sink Too', 'Fun Over', 'Fun Over Big', 'Lonely Source', 'Gift Source', 'Gift Sink', 'Managed', 'Big', 'Lines',
+];
+
+// `#cleanup` lines desktop's parser reads, one at a time on the `Lines` category.
+const CLEANUP_LINES = [
+  '#cleanup source', '#cleanup sink', '#cleanup sink 3', '#cleanup sink3', '#cleanup sink 0', '#cleanup sink  12',
+  '#cleanup Fun source', '#cleanup fun sink 2', '#cleanup Fun', '#cleanup Big Fun source', '#cleanup Big  Fun sink',
+  '#cleanup Fun  source', '#cleanup source extra', '#cleanup sinkhole', '#cleanup Fun sinker', '#cleanup Fun sink x',
+  '#Cleanup source', '#CLEANUP sink', '  #cleanup source  ', '#cleanup', '#cleanup ', 'note #cleanup source',
+  '#cleanupsource', '#cleanup Rent overspend', '#cleanup sink 2.5', '#cleanup Fun sink2',
+];
+
+async function cleanupScenarios() {
+  console.log('cleanup');
+  const area = 'cleanup';
+  const base = 'base';
+  const open = await makeBase(area, base, buildCleanupBase);
+  const tables = TABLES.cleanup;
+  await scenario(area, base, open, 'grammar', {
+    tables: [],
+    action: { kind: 'parse', lines: CLEANUP_LINES },
+    values: async () => {
+      const lines = await db.first("SELECT id FROM categories WHERE name = 'Lines'");
+      const parsed = [];
+      for (const line of CLEANUP_LINES) {
+        await send('notes-save', { id: lines.id, note: line });
+        await send('budget/store-note-cleanups', [lines.id]);
+        const row = await db.first('SELECT cleanup_def FROM categories WHERE id = ?', [lines.id]);
+        const def = row.cleanup_def ? JSON.parse(row.cleanup_def) : null;
+        const groups = Object.fromEntries((await db.all('SELECT id, name FROM cleanup_groups')).map(g => [g.id, g.name]));
+        parsed.push({ line, def: def && def.map(r => ({ ...r, groupId: r.groupId == null ? null : groups[r.groupId] })) });
+      }
+      return { parsed };
+    },
+    run: async () => {},
+  });
+  await scenario(area, base, open, 'store', {
+    tables,
+    action: { handler: 'budget/store-note-cleanups' },
+    run: () => send('budget/store-note-cleanups'),
+  });
+  let result;
+  await scenario(area, base, open, 'cleanup', {
+    tables,
+    action: { handler: 'budget/cleanup-goal-template', args: { month: '2026-10' } },
+    values: async () => ({ result, '2026-10': await month('2026-10') }),
+    run: async () => {
+      result = await send('budget/cleanup-goal-template', { month: '2026-10' });
+    },
+  });
+  await scenario(area, base, open, 'cleanup-short', {
+    tables,
+    action: { steps: [{ handler: 'budget/budget-amount', args: { month: '2026-10', category: 'Big', amount: 480000 } }, { handler: 'budget/cleanup-goal-template', args: { month: '2026-10' } }] },
+    values: async () => ({ result, '2026-10': await month('2026-10') }),
+    run: async () => {
+      await send('budget/budget-amount', { month: '2026-10', category: await byName('categories', 'Big'), amount: 480000 });
+      result = await send('budget/cleanup-goal-template', { month: '2026-10' });
+    },
+  });
+}
+
 async function undoScenarios() {
   console.log('undo');
   // Undo on the phone restores the rows from before an action. Desktop's
@@ -1202,6 +1316,7 @@ const AREAS = {
   templates: templateScenarios,
   automations: automationScenarios,
   'schedule-templates': scheduleTemplateScenarios,
+  cleanup: cleanupScenarios,
   undo: undoScenarios,
 };
 const picked = process.argv.slice(2);

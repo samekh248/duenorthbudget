@@ -228,6 +228,9 @@ internal fun TemplatesRoute(
         onMoveChip = model.templates::moveToPriority,
         onConfirmPreview = model.templates::confirmApplyPreview,
         onKeepPreview = model.templates::keepApplyPreview,
+        cleanup = state.templates.cleanup,
+        // Edit mode's boxes are not saved yet; cleanup works on the saved month.
+        onCleanup = if (state.budgetEdit == null) model.templates::cleanup else null,
     )
 }
 

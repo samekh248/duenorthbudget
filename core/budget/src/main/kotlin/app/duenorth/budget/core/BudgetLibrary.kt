@@ -844,6 +844,15 @@ class BudgetLibrary(
             ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
     }
 
+    /** End-of-month cleanup for [month] from the `#cleanup` lines in category notes, as one undo step. */
+    fun cleanupMonth(
+        budgetId: String,
+        month: YearMonth,
+    ): CleanupResult {
+        if (!readFormatPrefs(budgetId).templatesOn) return CleanupResult.Rejected(TemplateCopy.OFF)
+        return edit(budgetId, UndoCopy.CLEANUP) { CleanupEngine(it).run(month) } ?: CleanupResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    }
+
     /**
      * What applying (or, with [overwrite], overwriting) templates would budget for [month], with edit mode's unsaved
      * [budgeted] amounts in place first. Runs the templates and rolls every write back, so nothing is saved.

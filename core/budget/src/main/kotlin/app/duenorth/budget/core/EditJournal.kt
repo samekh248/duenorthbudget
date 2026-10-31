@@ -23,6 +23,7 @@ object UndoCopy {
     const val IMPORT = "import"
     const val AUTO_POST = "auto-post"
     const val TEMPLATES = "templates"
+    const val CLEANUP = "end-of-month cleanup"
     const val CATEGORY_NOTE = "note"
     const val AUTOMATIONS = "automations"
     const val TO_AUTOMATIONS = "switch to automations"
