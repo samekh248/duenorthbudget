@@ -660,7 +660,8 @@ private fun LazyListScope.inboxDayItems(
     inboxDays(entries).forEach { day ->
         val waiting = day.filter { it.filedTo == null }
         val first = day.first()
-        item(key = "day-${first.row.date}-${first.row.id}") {
+        // Each date sticks to the top of the list until the next date pushes it off.
+        stickyHeader(key = "day-${first.row.date}-${first.row.id}") {
             InboxDayHeading(
                 first.row.date,
                 filed = waiting.isEmpty(),
@@ -696,6 +697,8 @@ private fun InboxDayHeading(
         Modifier
             .collapse { height.value * (1f - leaving()) }
             .graphicsLayer { alpha = 1f - leaving() }
+            .fillMaxWidth()
+            .stickyGround(Metro.colors.background)
             .padding(top = DAY_AIR_ABOVE, bottom = 4.dp)
             .testTag("inbox-day-$date"),
         color = Metro.accent.text,
@@ -875,6 +878,13 @@ private fun Modifier.collapse(fraction: () -> Float): Modifier =
         val p = measurable.measure(constraints)
         layout(p.width, (p.height * fraction().coerceIn(0f, 1f)).roundToInt()) { p.place(0, 0) }
     }
+
+/**
+ * Fills a stuck heading's slot, out past the gutter on both sides, so rows scrolling under it
+ * (bands included) stay hidden.
+ */
+private fun Modifier.stickyGround(color: Color): Modifier =
+    drawBehind { drawRect(color, topLeft = Offset(-size.width, 0f), size = Size(size.width * 3, size.height)) }
 
 private val NOT_LEAVING = { 0f }
 
