@@ -9,7 +9,7 @@ import kotlin.math.abs
 object AssistantCopy {
     const val TITLE = "assistant"
     const val ALL_CLEAR = "nothing needs you right now"
-    const val ALL_CLEAR_DETAIL = "No duplicates, nothing in the wrong account, and every account looks current."
+    const val ALL_CLEAR_DETAIL = "No duplicates, nothing in the wrong account, the budget is covered, and every account looks current."
     const val MAYBE = "maybe"
     const val TO_LOOK_AT = "to look at"
 
@@ -32,6 +32,52 @@ object AssistantCopy {
     const val RECONCILE = "reconcile"
     const val LATER = "later"
     const val REVIEW = "review"
+    const val BUDGET_MORE = "budget more"
+    const val HOLD = "hold for next month"
+    const val SEE_BILLS = "see bills"
+    const val GOT_IT = "got it"
+
+    const val BUDGETED = "budgeted"
+    const val SPENT = "spent"
+    const val AVAILABLE = "available"
+    const val GOAL = "goal"
+    const val TO_BUDGET = "to budget"
+    const val AT_THE_BANK = "at the bank"
+    const val IN_REGISTER = "in your register"
+    const val BALANCE_NOW = "balance now"
+    const val LOWEST = "lowest"
+
+    fun overspent(category: String): String = "$category has spent more than it had this month."
+
+    fun underfunded(
+        category: String,
+        longGoal: Boolean,
+    ): String =
+        if (longGoal) {
+            "$category hasn't reached its goal yet."
+        } else {
+            "$category is budgeted under its goal this month."
+        }
+
+    fun toBudget(
+        month: String,
+        over: Boolean,
+    ): String =
+        if (over) {
+            "You've budgeted more in $month than you have."
+        } else {
+            "Some of $month's money isn't budgeted yet."
+        }
+
+    fun billsAhead(
+        account: String,
+        day: String,
+        days: Int,
+    ): String = "$account could run short around $day. Bills in the next $days days add up to more than it has."
+
+    fun dueIn(days: Int): String = "due in $days days"
+
+    fun bankBalance(account: String): String = "The bank's balance for $account doesn't match the register."
 
     const val SAME_AMOUNT = "same amount"
     const val SAME_ACCOUNT = "same account"
@@ -123,6 +169,7 @@ enum class FindingGroup(
     val title: String,
 ) {
     TRANSACTIONS("transactions"),
+    BUDGET("budget"),
     ACCOUNTS("accounts"),
 }
 
@@ -138,6 +185,11 @@ enum class FindingKind(
     NEAR_DUPLICATE(FindingGroup.TRANSACTIONS, "different amount?", "your entry and the bank's differ by a tip or fee"),
     TRANSFER(FindingGroup.TRANSACTIONS, "unlinked transfers", "money moved between your accounts"),
     NO_BANK_MATCH(FindingGroup.TRANSACTIONS, "not at the bank yet", "entries the bank never sent"),
+    OVERSPENT(FindingGroup.BUDGET, "overspent", "categories that spent more than they had"),
+    UNDERFUNDED(FindingGroup.BUDGET, "below goal", "categories budgeted under their goal"),
+    TO_BUDGET(FindingGroup.BUDGET, "to budget", "money with no job yet, or budgeted twice"),
+    BILLS_AHEAD(FindingGroup.BUDGET, "bills ahead", "bills due before the money is there"),
+    BANK_BALANCE(FindingGroup.ACCOUNTS, "balance mismatch", "the bank's balance and yours differ"),
     STALE_SYNC(FindingGroup.ACCOUNTS, "bank sync stale", "linked accounts that stopped syncing"),
     RECONCILE(FindingGroup.ACCOUNTS, "time to reconcile", "not checked against a statement lately"),
     OLD_UNCLEARED(FindingGroup.ACCOUNTS, "old uncleared", "not cleared after a month"),
@@ -150,6 +202,12 @@ enum class FindingSure { HIGH, MAYBE }
 data class FindingSide(
     val source: String,
     val side: MatchSide,
+)
+
+/** A labelled amount on a finding, such as "available" or "at the bank". */
+data class FindingFigure(
+    val label: String,
+    val amountMinor: Long,
 )
 
 /** A button on a finding. The first one a finding lists is its accent button. */
@@ -218,6 +276,23 @@ sealed interface FindingAction {
         override val label = AssistantCopy.RECONCILE
     }
 
+    /** Opens the category's budget page, to budget more into it. */
+    data class BudgetCategory(
+        val categoryId: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.BUDGET_MORE
+    }
+
+    /** Opens hold for next month, for money this month does not need. */
+    data object HoldForNext : FindingAction {
+        override val label = AssistantCopy.HOLD
+    }
+
+    /** Opens the schedules. */
+    data object OpenSchedules : FindingAction {
+        override val label = AssistantCopy.SEE_BILLS
+    }
+
     /** Fetches every linked account from the bank. */
     data object SyncBank : FindingAction {
         override val label = AssistantCopy.SYNC_NOW
@@ -258,6 +333,8 @@ data class Finding(
     val accountId: String,
     /** For a near duplicate: the bank's amount less the entry's, shown as "off by". */
     val difference: Long? = null,
+    /** Amounts that explain the finding, one per line. */
+    val figures: List<FindingFigure> = emptyList(),
 )
 
 data class AssistantReport(
@@ -381,9 +458,10 @@ object AssistantReader {
         val sides = if (drafts.isEmpty()) emptyMap() else MatchFinder.sides(session, drafts.flatMap { it.ids }.toSet())
         val findings =
             drafts.mapNotNull { it.finding(sides) } +
-                AccountChecks
-                    .read(session, today, fed, rows.filter { !it.cleared }.map { it.accountId to it.date })
-                    .filter { it.key !in dismissed }
+                (
+                    BudgetChecks.read(session, today) +
+                        AccountChecks.read(session, today, fed, rows.filter { !it.cleared }.map { it.accountId to it.date })
+                ).filter { it.key !in dismissed }
         if (findings.isEmpty()) return AssistantReport.EMPTY
         return AssistantReport(
             findings.sortedWith(
@@ -1014,10 +1092,14 @@ class AssistantBook(
                 SyncSchema.writeRow(session, "payees", it, "name" to "", "transfer_acct" to accountId, "tombstone" to false)
             }
 
-    /** Remembers [key] as fine, and forgets keys whose transactions are gone. */
+    /** Remembers [key] as fine, and forgets keys whose transactions are gone or whose month or day has passed. */
     fun dismiss(key: String): WriteResult {
         session.transaction {
-            val alive = dismissed(session).filter { known -> !aboutTransactions(known) || idsOf(known).all(::isAlive) }.toSet()
+            val alive =
+                dismissed(session)
+                    .filter { known -> !aboutTransactions(known) || idsOf(known).all(::isAlive) }
+                    .filterNot { known -> passed(known, today) }
+                    .toSet()
             SyncSchema.writeRow(session, "preferences", DISMISSED_PREF, "value" to encode(alive + key))
         }
         return WriteResult.Saved
@@ -1074,6 +1156,21 @@ class AssistantBook(
         private fun aboutTransactions(key: String): Boolean = key.substringBefore(':') in TRANSACTION_KINDS
 
         private val TRANSACTION_KINDS = setOf(MATCH, "dup", "wrong", "nobank", "near", "transfer", "habit")
+
+        /** Budget keys lead with their month (`YYYYMM`) or, for bills ahead, their day (`YYYYMMDD`). */
+        private val MONTH_KINDS = setOf(BudgetChecks.OVERSPENT_KEY, BudgetChecks.UNDERFUNDED_KEY, BudgetChecks.TO_BUDGET_KEY)
+
+        private fun passed(
+            key: String,
+            today: LocalDate,
+        ): Boolean {
+            val lead = idsOf(key).firstOrNull()?.toIntOrNull() ?: return false
+            return when (key.substringBefore(':')) {
+                in MONTH_KINDS -> lead < today.year * 100 + today.monthValue
+                BudgetChecks.BILLS_KEY -> lead < today.year * 10000 + today.monthValue * 100 + today.dayOfMonth
+                else -> false
+            }
+        }
 
         private fun idsOf(key: String): List<String> = key.substringAfter(':').split('|').filter { it.isNotBlank() }
 

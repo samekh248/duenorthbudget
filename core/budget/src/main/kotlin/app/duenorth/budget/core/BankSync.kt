@@ -27,7 +27,21 @@ interface BankSyncTransport {
         bankAccountId: String,
         startDateIso: String,
     ): List<ParsedImportRow>
+
+    /** The rows and the bank's own balance for the account, when the bridge sends one. */
+    fun fetchAccount(
+        serverAddress: String,
+        token: String,
+        bankAccountId: String,
+        startDateIso: String,
+    ): BankFetch = BankFetch(fetchTransactions(serverAddress, token, bankAccountId, startDateIso), null)
 }
+
+/** What one account's fetch brought back: its transactions, and the balance the bank reports, in minor units. */
+data class BankFetch(
+    val rows: List<ParsedImportRow>,
+    val balanceMinor: Long?,
+)
 
 class HttpBankSyncTransport : BankSyncTransport {
     private val json = Json { ignoreUnknownKeys = true }
@@ -37,7 +51,14 @@ class HttpBankSyncTransport : BankSyncTransport {
         token: String,
         bankAccountId: String,
         startDateIso: String,
-    ): List<ParsedImportRow> {
+    ): List<ParsedImportRow> = fetchAccount(serverAddress, token, bankAccountId, startDateIso).rows
+
+    override fun fetchAccount(
+        serverAddress: String,
+        token: String,
+        bankAccountId: String,
+        startDateIso: String,
+    ): BankFetch {
         val base = serverAddress.trimEnd('/')
         val body =
             """
@@ -63,7 +84,7 @@ class HttpBankSyncTransport : BankSyncTransport {
             // Actual answers `{"status":"ok","data":{...}}`, and a bank error comes back inside `data`.
             val root = reply["data"] as? JsonObject ?: reply
             root.string("error_code")?.let { throw SimpleFinError.of(it) }
-            return parseSimpleFinResponse(root, 2)
+            return BankFetch(parseSimpleFinResponse(root, 2), parseBalance(root, 2))
         } catch (error: BankSyncException) {
             throw error
         } catch (_: Exception) {
@@ -85,6 +106,20 @@ class HttpBankSyncTransport : BankSyncTransport {
                 ?: root["transactions"]?.jsonArray
                 ?: JsonArray(emptyList())
         return transactions.mapNotNull { element -> mapTransaction(element, decimals) }
+    }
+
+    /**
+     * The bank's current balance: Actual's server sends `balances`, the `expected` one being the account's balance
+     * as SimpleFIN reports it.
+     */
+    private fun parseBalance(
+        root: JsonObject,
+        decimals: Int,
+    ): Long? {
+        val balances = (root["balances"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+        val pick = balances.firstOrNull { it.string("balanceType") == "expected" } ?: balances.firstOrNull() ?: return null
+        val amount = (pick["balanceAmount"] as? JsonObject)?.string("amount") ?: return null
+        return ImportFileParserAmount.parse(amount, decimals)
     }
 
     private fun mapTransaction(
@@ -279,16 +314,18 @@ class BankSyncBook(
         val failures = mutableListOf<BankSyncFailure>()
         linked.forEach { account ->
             onAccount(account)
-            val rows =
+            val fetch =
                 try {
-                    transport.fetchTransactions(serverAddress, token, account.bankAccountId, startIso)
+                    transport.fetchAccount(serverAddress, token, account.bankAccountId, startIso)
                 } catch (error: BankSyncException) {
                     val failure = BankSyncFailure(account.name, error.message ?: ImportCopy.FETCH_FAILED, account.accountId, error.fix)
                     failures += failure
                     onFailure(failure)
                     return@forEach
                 }
-            added += ImportBook(session, ids).confirm(account.accountId, rows, review = false).addedIds.size
+            added += ImportBook(session, ids).confirm(account.accountId, fetch.rows, review = false).addedIds.size
+            // Kept fresh on every sync, as Actual's own sync does, so the assistant can compare it with the register.
+            fetch.balanceMinor?.let { SyncSchema.write(session, "accounts", account.accountId, "balance_current", it) }
             SyncSchema.write(session, "accounts", account.accountId, "last_sync", nowMillis.toString())
         }
         return BankSyncSummary(accounts = linked.size, added = added, failures = failures)

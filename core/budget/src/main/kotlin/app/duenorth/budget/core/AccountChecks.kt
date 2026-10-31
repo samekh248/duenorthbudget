@@ -37,7 +37,7 @@ internal object AccountChecks {
             session
                 .query(
                     """
-                    SELECT id, name, account_sync_source AS source, account_id AS bank_id, last_sync
+                    SELECT id, name, account_sync_source AS source, account_id AS bank_id, last_sync, balance_current
                     FROM accounts
                     WHERE IFNULL(tombstone, 0) = 0 AND IFNULL(closed, 0) = 0
                     ORDER BY sort_order, id
@@ -48,9 +48,62 @@ internal object AccountChecks {
                         name = row.str("name").orEmpty(),
                         linked = row.str("source") == "simpleFin" && !row.str("bank_id").isNullOrBlank(),
                         lastSync = row.str("last_sync")?.toLongOrNull(),
+                        bankBalance = row.str("balance_current")?.toLongOrNull(),
                     )
                 }
-        return stale(accounts, today, zone) + reconcile(session, accounts, today) + oldUncleared(accounts, fed, uncleared, today)
+        return balance(session, accounts, today, zone) + stale(accounts, today, zone) + reconcile(session, accounts, today) +
+            oldUncleared(accounts, fed, uncleared, today)
+    }
+
+    /**
+     * A linked account that synced lately whose bank balance is neither its register's balance nor its cleared
+     * balance: something is missing, doubled, or entered wrong.
+     */
+    private fun balance(
+        session: SqlSession,
+        accounts: List<Account>,
+        today: LocalDate,
+        zone: ZoneId,
+    ): List<Finding> =
+        accounts
+            .filter { it.linked && it.bankBalance != null && fresh(it, today, zone) }
+            .mapNotNull { account ->
+                val bank = account.bankBalance ?: return@mapNotNull null
+                val row =
+                    session
+                        .query(
+                            """
+                            SELECT IFNULL(SUM(amount), 0) AS total,
+                                IFNULL(SUM(CASE WHEN IFNULL(cleared, 0) = 1 THEN amount ELSE 0 END), 0) AS cleared
+                            FROM transactions
+                            WHERE acct = ? AND IFNULL(tombstone, 0) = 0 AND IFNULL(isParent, 0) = 0
+                            """.trimIndent(),
+                            listOf(account.id),
+                        ).firstOrNull() ?: return@mapNotNull null
+                val total = row.long("total")
+                val cleared = row.long("cleared")
+                if (bank == total || bank == cleared) return@mapNotNull null
+                Finding(
+                    key = AssistantBook.key("balance", account.id, "$bank", "$total"),
+                    kind = FindingKind.BANK_BALANCE,
+                    sure = FindingSure.HIGH,
+                    headline = AssistantCopy.bankBalance(account.name),
+                    sides = emptyList(),
+                    reasons = emptyList(),
+                    actions = listOf(FindingAction.Reconcile(account.id), FindingAction.Dismiss(AssistantCopy.LATER)),
+                    accountId = account.id,
+                    difference = bank - total,
+                    figures = listOf(FindingFigure(AssistantCopy.AT_THE_BANK, bank), FindingFigure(AssistantCopy.IN_REGISTER, total)),
+                )
+            }
+
+    private fun fresh(
+        account: Account,
+        today: LocalDate,
+        zone: ZoneId,
+    ): Boolean {
+        val last = account.lastSync?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() } ?: return false
+        return ChronoUnit.DAYS.between(last, today) < STALE_DAYS
     }
 
     private fun stale(
@@ -152,5 +205,6 @@ internal object AccountChecks {
         val name: String,
         val linked: Boolean,
         val lastSync: Long?,
+        val bankBalance: Long? = null,
     )
 }
