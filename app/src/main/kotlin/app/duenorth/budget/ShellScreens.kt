@@ -141,7 +141,14 @@ fun HomePivot(
         title = SectionTitleCopy.APP,
         items =
             listOf(
-                PivotItem(HomeSections.INBOX) {
+                // Like the assistant's, the inbox header counts what waits: rows to categorize and possible matches.
+                PivotItem(
+                    HomeSections.INBOX,
+                    count =
+                        shell?.let { s ->
+                            inboxQueue(s, inboxLead).count { row -> inboxFiled.none { it.row.id == row.id } } + s.matches.size
+                        } ?: 0,
+                ) {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
