@@ -71,6 +71,7 @@ import app.duenorth.budget.design.components.styleCard
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
@@ -98,6 +99,20 @@ object TemplateEditorCopy {
     const val NEEDS = "fill in the amount"
     const val NO_SCHEDULES = "no schedules yet. add one under accounts, schedules."
     const val NOTE = "description"
+    const val REFILL_HINT = "tops the balance up to the category's cap, in this order. add a cap too, or it gives nothing."
+    const val FROM_AFTER = "start counting on or before the month it's for"
+
+    fun periodLabel(period: LimitPeriod): String =
+        when (period) {
+            LimitPeriod.MONTHLY -> "month"
+            LimitPeriod.WEEKLY -> "week"
+            LimitPeriod.DAILY -> "day"
+        }
+
+    fun unitLabel(
+        unit: RepeatUnit,
+        n: Int,
+    ): String = if (n == 1) unit.json else "${unit.json}s"
 }
 
 /** A tile's two lines: what the template does, and how. */
@@ -464,6 +479,24 @@ fun TemplateGlyph(
                 line(3f, 19f, 23f, 19f)
                 line(13f, 8f, 13f, 19f)
             }
+            TemplateKind.REPEAT -> {
+                drawArc(color, 40f, 290f, false, p(4f, 4f), Size(18f * u, 18f * u), style = stroke)
+                line(17f, 3f, 20.5f, 7f, 16f, 9f)
+            }
+            TemplateKind.SPEND -> {
+                box(3f, 8f, 20f, 14f)
+                line(5f, 8f, 17f, 3f, 19f, 8f)
+                drawCircle(color, 1.6f * u, p(18f, 15f))
+            }
+            TemplateKind.COPY -> {
+                box(3f, 7f, 13f, 16f)
+                line(8f, 7f, 8f, 3f, 23f, 3f, 23f, 18f, 16f, 18f)
+            }
+            TemplateKind.REFILL -> {
+                line(3f, 5f, 23f, 5f)
+                line(13f, 22f, 13f, 10f)
+                line(8f, 15f, 13f, 10f, 18f, 15f)
+            }
             TemplateKind.GOAL -> {
                 drawCircle(color, 10f * u, p(13f, 13f), style = stroke)
                 drawCircle(color, 6f * u, p(13f, 13f), style = stroke)
@@ -478,7 +511,7 @@ fun TemplateGlyph(
     }
 }
 
-/** Add, step one: a grid of kinds, each with an example. With [line], it replaces a line that does not read. */
+/** Add, step one: a grid of [kinds], each with an example. With [line], it replaces a line that does not read. */
 @Composable
 fun TemplateKindsScreen(
     categoryName: String,
@@ -486,16 +519,21 @@ fun TemplateKindsScreen(
     onPick: (TemplateKind) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
+    kinds: List<TemplateKind> = TemplateKind.offered(automations = false),
 ) {
     val examples =
         mapOf(
             TemplateKind.MONTHLY to "\$400 every month",
+            TemplateKind.REPEAT to "\$50 every 2 weeks",
             TemplateKind.BY_DATE to "\$1,200 by december",
+            TemplateKind.SPEND to "\$900 to spend by june",
             TemplateKind.SCHEDULE to "whatever Rent needs",
             TemplateKind.PERCENT to "10% of all income",
             TemplateKind.AVERAGE to "average of 3 months",
+            TemplateKind.COPY to "what was budgeted last month",
             TemplateKind.REMAINDER to "split what remains",
             TemplateKind.CAP to "up to \$600 held",
+            TemplateKind.REFILL to "top up to the cap",
             TemplateKind.GOAL to "\$500, budgets nothing",
         )
     Column(
@@ -516,7 +554,7 @@ fun TemplateKindsScreen(
         } else {
             MetroText(TemplateEditorCopy.KINDS_HINT, Metro.typography.caption, color = Metro.colors.secondary)
         }
-        TemplateKind.entries.chunked(2).forEach { pair ->
+        kinds.chunked(2).forEach { pair ->
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 pair.forEach { kind ->
                     Column(
@@ -552,7 +590,8 @@ data class PercentSource(
 
 /**
  * Add or edit, step two: the blanks for [kind], the template's order, and what it would give this month with the
- * line it will write. Save is on the app bar; a template that is not finished yet saves nothing.
+ * line it will write. Save is on the app bar; a template that is not finished yet saves nothing. Budget
+ * [automations] keep a category's cap as an automation of its own, so their other forms ask for none.
  */
 @Composable
 fun TemplateEditorScreen(
@@ -569,12 +608,17 @@ fun TemplateEditorScreen(
     onSave: (Template) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
+    automations: Boolean = false,
 ) {
     val prefs = LocalFormatPrefs.current
     val options = formatOptions()
     val decimals = currency.decimals
 
-    fun edit(value: BigDecimal?): String = value?.let { prefs.editAmount(TemplateWords.minor(it, currency), decimals) }.orEmpty()
+    fun edit(value: BigDecimal?): String =
+        value
+            ?.let { prefs.editAmount(TemplateWords.minor(it, currency), decimals) }
+            .orEmpty()
+            .let { if (it == prefs.editAmount(0, decimals)) "" else it }
 
     fun read(text: String): BigDecimal? =
         text
@@ -594,36 +638,53 @@ fun TemplateEditorScreen(
 
     var amount by remember(initial) {
         mutableStateOf(
-            when (initial) {
-                is Template.Simple -> edit(initial.monthly ?: initial.limit?.amount)
-                is Template.Periodic -> edit(initial.amount)
-                is Template.By -> edit(initial.amount)
-                is Template.Goal -> edit(initial.amount)
-                else -> ""
-            }.let { if (it == edit(BigDecimal.ZERO)) "" else it },
+            edit(
+                when (initial) {
+                    is Template.Simple -> initial.monthly
+                    is Template.Periodic -> initial.amount
+                    is Template.By -> initial.amount
+                    is Template.Spend -> initial.amount
+                    is Template.Goal -> initial.amount
+                    else -> null
+                },
+            ),
         )
     }
-    var cap by remember(initial) {
-        mutableStateOf(
-            if (initial is Template.Simple &&
-                initial.monthly != null
-            ) {
-                edit(initial.limit?.amount)
-            } else {
-                ""
-            },
-        )
+    val initialLimit =
+        when (initial) {
+            is Template.Simple -> initial.limit
+            is Template.Periodic -> initial.limit
+            is Template.Remainder -> initial.limit
+            is Template.Copy -> initial.limit
+            is Template.Limit -> initial.limit
+            else -> null
+        }
+    var cap by remember(initial) { mutableStateOf(edit(initialLimit?.amount)) }
+    var capPeriod by remember(initial) { mutableStateOf(initialLimit?.period ?: LimitPeriod.MONTHLY) }
+    var capStart by remember(initial) { mutableStateOf(initialLimit?.start ?: month.atDay(1)) }
+    var capHold by remember(initial) { mutableStateOf(initialLimit?.hold ?: false) }
+    var every by remember(initial) { mutableStateOf(((initial as? Template.Periodic)?.every ?: 1).toString()) }
+    var unit by remember(initial) { mutableStateOf((initial as? Template.Periodic)?.unit ?: RepeatUnit.MONTH) }
+    var starting by remember(initial) { mutableStateOf((initial as? Template.Periodic)?.starting ?: month.atDay(1)) }
+    val target: Pair<Boolean?, Int?>? =
+        when (initial) {
+            is Template.By -> initial.annual to initial.repeat
+            is Template.Spend -> initial.annual to initial.repeat
+            else -> null
+        }
+    var byMonth by remember(initial) {
+        mutableStateOf((initial as? Template.By)?.month ?: (initial as? Template.Spend)?.month ?: month.plusMonths(11))
     }
-    var byMonth by remember(initial) { mutableStateOf((initial as? Template.By)?.month ?: month.plusMonths(11)) }
+    var fromMonth by remember(initial) { mutableStateOf((initial as? Template.Spend)?.from ?: month) }
     val repeats = listOf("once", "every month", "every year", "every … months", "every … years")
     var repeat by remember(initial) {
         mutableStateOf(
-            (initial as? Template.By)?.let { by ->
-                val step = by.repeatMonths
+            target?.let { (annual, n) ->
+                val step = Template.repeatMonths(annual, n)
                 when {
                     step == null -> 0
-                    by.annual == true && step == 12 -> 2
-                    by.annual == true -> 4
+                    annual == true && step == 12 -> 2
+                    annual == true -> 4
                     step == 1 -> 1
                     else -> 3
                 }
@@ -632,18 +693,9 @@ fun TemplateEditorScreen(
     }
     var count by remember(initial) {
         mutableStateOf(
-            (initial as? Template.By)
-                ?.let { by ->
-                    by.repeatMonths?.let {
-                        if (by.annual ==
-                            true
-                        ) {
-                            it / 12
-                        } else {
-                            it
-                        }
-                    }
-                }?.takeIf { it >= 2 }
+            target
+                ?.let { (annual, n) -> Template.repeatMonths(annual, n)?.let { if (annual == true) it / 12 else it } }
+                ?.takeIf { it >= 2 }
                 ?.toString()
                 ?: "2",
         )
@@ -654,44 +706,111 @@ fun TemplateEditorScreen(
     var source by remember(initial) { mutableStateOf((initial as? Template.Percentage)?.category ?: TemplateLines.ALL_INCOME) }
     var previous by remember(initial) { mutableStateOf((initial as? Template.Percentage)?.previous ?: false) }
     var months by remember(initial) { mutableStateOf(((initial as? Template.Average)?.months ?: 3).toString()) }
+    var lookBack by remember(initial) { mutableStateOf(((initial as? Template.Copy)?.lookBack ?: 1).toString()) }
     var weight by remember(initial) { mutableStateOf(plain((initial as? Template.Remainder)?.weight ?: BigDecimal.ONE)) }
+    val initialAdjustment = (initial as? Template.Schedule)?.adjustment ?: (initial as? Template.Average)?.adjustment
+    val adjusts = listOf("no change", "increase", "decrease")
+    var adjust by remember(initial) {
+        mutableStateOf(
+            when {
+                initialAdjustment == null -> 0
+                initialAdjustment.amount.signum() < 0 -> 2
+                else -> 1
+            },
+        )
+    }
+    var adjustPercent by remember(initial) { mutableStateOf(initialAdjustment?.percent ?: true) }
+    var adjustBy by remember(initial) {
+        mutableStateOf(
+            initialAdjustment?.let { if (it.percent) plain(it.amount.abs()) else edit(it.amount.abs()) }.orEmpty(),
+        )
+    }
     var priority by remember(initial) { mutableStateOf(initial.priority ?: 0) }
 
+    // A cap on an amount, a cycle or what's left; budget automations keep theirs as an automation of its own.
+    val capped =
+        kind == TemplateKind.CAP || (!automations && kind in setOf(TemplateKind.MONTHLY, TemplateKind.REPEAT, TemplateKind.REMAINDER))
+    val capValue = read(cap)
+    val capBad = capped && cap.isNotBlank() && capValue == null
+    val limit: TemplateLimit? =
+        if (capped) {
+            capValue?.let { TemplateLimit(it, capHold, capPeriod, capStart.takeIf { capPeriod == LimitPeriod.WEEKLY }) }
+        } else {
+            initialLimit
+        }
+    // The repeat clause of a by-date or spend template: annual and how many apart; null while the count is not filled in.
+    val repeatClause: Pair<Boolean?, Int?>? =
+        count.toIntOrNull()?.takeIf { it >= 2 }.let { n ->
+            when (repeat) {
+                0 -> null to null
+                1 -> false to 1
+                2 -> true to null
+                3 -> n?.let { false to it }
+                else -> n?.let { true to it }
+            }
+        }
+    // `[increase 10%]` and the like: desktop reads a percent decrease of 100 or more, or an increase past 1000, as no template.
+    val adjustment: TemplateAdjustment? =
+        if (adjust == 0) {
+            null
+        } else {
+            (if (adjustPercent) number(adjustBy) else read(adjustBy))
+                ?.takeIf { it.signum() > 0 }
+                ?.takeIf { !adjustPercent || (if (adjust == 2) it < BigDecimal(100) else it <= BigDecimal(1000)) }
+                ?.let { TemplateAdjustment(if (adjust == 2) it.negate() else it, adjustPercent) }
+        }
+    val adjustBad = adjust != 0 && adjustment == null
+
     val draft: Template? =
-        when (kind) {
-            TemplateKind.MONTHLY ->
-                read(amount)?.takeIf { it.signum() > 0 }?.let { monthly ->
-                    val limit = read(cap)
-                    when {
-                        cap.isNotBlank() && limit == null -> null
-                        // A monthly repeating automation stays one, keeping the day it started from.
-                        initial is Template.Periodic && limit == null -> initial.copy(amount = monthly, priority = priority)
-                        else -> Template.Simple(monthly, limit?.let { TemplateLimit(it) }, priority)
+        if (capBad) {
+            null
+        } else {
+            when (kind) {
+                TemplateKind.MONTHLY ->
+                    read(amount)?.takeIf { it.signum() > 0 }?.let { monthly ->
+                        when {
+                            // A monthly repeating automation stays one, keeping the day it started from.
+                            initial is Template.Periodic && limit == null -> initial.copy(amount = monthly, priority = priority)
+                            else -> Template.Simple(monthly, limit, priority)
+                        }
                     }
-                }
-            TemplateKind.CAP -> read(amount)?.takeIf { it.signum() > 0 }?.let { Template.Simple(null, TemplateLimit(it), priority) }
-            TemplateKind.BY_DATE ->
-                read(amount)?.takeIf { it.signum() > 0 }?.let { total ->
-                    val n = count.toIntOrNull()?.takeIf { it >= 2 }
-                    when (repeat) {
-                        0 -> Template.By(total, byMonth, annual = null, repeat = null, priority = priority)
-                        1 -> Template.By(total, byMonth, annual = false, repeat = 1, priority = priority)
-                        2 -> Template.By(total, byMonth, annual = true, repeat = null, priority = priority)
-                        3 -> n?.let { Template.By(total, byMonth, annual = false, repeat = it, priority = priority) }
-                        else -> n?.let { Template.By(total, byMonth, annual = true, repeat = it, priority = priority) }
+                TemplateKind.REPEAT ->
+                    read(amount)?.takeIf { it.signum() > 0 }?.let { each ->
+                        every.toIntOrNull()?.takeIf { it >= 1 }?.let { Template.Periodic(each, it, unit, starting, limit, priority) }
                     }
-                }
-            TemplateKind.SCHEDULE -> schedule.takeIf { it.isNotBlank() }?.let { Template.Schedule(it, full, priority) }
-            TemplateKind.PERCENT ->
-                number(percent)?.takeIf { it.signum() > 0 }?.let { Template.Percentage(it, previous, source, priority) }
-            TemplateKind.AVERAGE -> months.toIntOrNull()?.takeIf { it > 0 }?.let { Template.Average(it, priority) }
-            TemplateKind.REMAINDER -> number(weight)?.takeIf { it.signum() > 0 }?.let { Template.Remainder(it) }
-            TemplateKind.GOAL -> read(amount)?.takeIf { it.signum() > 0 }?.let { Template.Goal(it) }
+                TemplateKind.CAP ->
+                    limit?.takeIf { it.amount.signum() > 0 }?.let {
+                        if (initial is Template.Limit) Template.Limit(it) else Template.Simple(null, it, priority)
+                    }
+                TemplateKind.REFILL -> Template.Refill(priority)
+                TemplateKind.BY_DATE ->
+                    read(amount)?.takeIf { it.signum() > 0 }?.let { total ->
+                        repeatClause?.let { (annual, n) -> Template.By(total, byMonth, annual, n, priority) }
+                    }
+                TemplateKind.SPEND ->
+                    read(amount)?.takeIf { it.signum() > 0 && !fromMonth.isAfter(byMonth) }?.let { total ->
+                        repeatClause?.let { (annual, n) -> Template.Spend(total, byMonth, fromMonth, annual, n, priority) }
+                    }
+                TemplateKind.SCHEDULE ->
+                    schedule.takeIf { it.isNotBlank() && !adjustBad }?.let { name ->
+                        // The same schedule keeps its id, so a rename on desktop does not lose it.
+                        val id = (initial as? Template.Schedule)?.takeIf { it.name == name }?.scheduleId
+                        Template.Schedule(name, full, priority, id, adjustment)
+                    }
+                TemplateKind.PERCENT ->
+                    number(percent)?.takeIf { it.signum() > 0 }?.let { Template.Percentage(it, previous, source, priority) }
+                TemplateKind.AVERAGE ->
+                    months.toIntOrNull()?.takeIf { it > 0 && !adjustBad }?.let { Template.Average(it, priority, adjustment) }
+                TemplateKind.COPY -> lookBack.toIntOrNull()?.takeIf { it > 0 }?.let { Template.Copy(it, priority, initialLimit) }
+                TemplateKind.REMAINDER -> number(weight)?.takeIf { it.signum() > 0 }?.let { Template.Remainder(it, limit) }
+                TemplateKind.GOAL -> read(amount)?.takeIf { it.signum() > 0 }?.let { Template.Goal(it) }
+            }
         }
     LaunchedEffect(draft) { draft?.let(onPreview) }
     RememberFormSave { draft?.let(onSave) }
 
     val number = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+    val whole = KeyboardOptions(keyboardType = KeyboardType.Number)
     Column(
         modifier
             .fillMaxSize()
@@ -706,31 +825,110 @@ fun TemplateEditorScreen(
 
         @Composable
         fun label(text: String) = MetroText(text, Metro.typography.caption, Modifier.padding(top = 12.dp), color = Metro.colors.secondary)
+
+        @Composable
+        fun months(
+            selected: YearMonth,
+            tag: String,
+            onPick: (YearMonth) -> Unit,
+        ) {
+            val choices = (-12L until 36L).map { month.plusMonths(it) }.let { if (selected in it) it else listOf(selected) + it }
+            MetroComboBox(choices, selected, { monthLabel(it) }, onPick, tag, fullScreenThreshold = Int.MAX_VALUE)
+        }
+
+        @Composable
+        fun repeatFields() {
+            label("then")
+            MetroComboBox(repeats.indices.toList(), repeat, { repeats[it] }, { repeat = it }, "template-repeat")
+            if (repeat >= 3) {
+                label(if (repeat == 3) "how many months" else "how many years")
+                MetroField(count, { count = it }, "2", Modifier.testTag("template-count"), keyboardOptions = whole)
+            }
+        }
+
+        @Composable
+        fun capFields(optional: Boolean) {
+            label(if (optional) "hold no more than (leave empty for no cap)" else "keep it no more than")
+            MetroField(cap, { cap = it }, if (optional) "no cap" else "0", Modifier.testTag("template-cap"), keyboardOptions = number)
+            if (!optional || cap.isNotBlank()) {
+                label("each")
+                MetroComboBox(
+                    listOf(LimitPeriod.MONTHLY, LimitPeriod.WEEKLY, LimitPeriod.DAILY),
+                    capPeriod,
+                    { TemplateEditorCopy.periodLabel(it) },
+                    { capPeriod = it },
+                    "template-cap-period",
+                )
+                if (capPeriod == LimitPeriod.WEEKLY) {
+                    label("weeks start on")
+                    DayPicker(capStart, month, "template-cap-start") { capStart = it }
+                }
+                label("when the balance is already over")
+                MetroSegmentedToggle("take it back", "keep it", !capHold, { capHold = !it }, "template-cap-hold")
+            }
+        }
+
+        @Composable
+        fun adjustFields() {
+            label("adjust")
+            MetroComboBox(adjusts.indices.toList(), adjust, { adjusts[it] }, { adjust = it }, "template-adjust")
+            if (adjust != 0) {
+                label(if (adjust == 1) "increase by" else "decrease by")
+                MetroField(adjustBy, { adjustBy = it }, "10", Modifier.testTag("template-adjust-by"), keyboardOptions = number)
+                MetroSegmentedToggle("percent", "amount", adjustPercent, { adjustPercent = it }, "template-adjust-percent")
+            }
+        }
         when (kind) {
             TemplateKind.MONTHLY -> {
                 label("amount each month")
                 MetroField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), keyboardOptions = number)
-                label("hold no more than (leave empty for no cap)")
-                MetroField(cap, { cap = it }, "no cap", Modifier.testTag("template-cap"), keyboardOptions = number)
+                if (capped) capFields(optional = true)
             }
-            TemplateKind.CAP -> {
-                label("keep it topped up to")
+            TemplateKind.REPEAT -> {
+                label("amount each time")
                 MetroField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), keyboardOptions = number)
+                label("every")
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                    MetroField(every, { every = it }, "1", Modifier.weight(1f).testTag("template-every"), keyboardOptions = whole)
+                    MetroComboBox(
+                        RepeatUnit.entries,
+                        unit,
+                        { TemplateEditorCopy.unitLabel(it, every.toIntOrNull() ?: 1) },
+                        { unit = it },
+                        "template-unit",
+                        Modifier.weight(1f),
+                    )
+                }
+                label("starting")
+                DayPicker(starting, month, "template-starting") { starting = it }
+                if (capped) capFields(optional = true)
             }
+            TemplateKind.CAP -> capFields(optional = false)
+            TemplateKind.REFILL ->
+                MetroText(
+                    TemplateEditorCopy.REFILL_HINT,
+                    Metro.typography.body,
+                    Modifier.padding(top = 12.dp),
+                    color = Metro.colors.secondary,
+                )
             TemplateKind.BY_DATE -> {
                 label("amount")
                 MetroField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), keyboardOptions = number)
                 label("by")
-                val choices = (0L until 36L).map { month.plusMonths(it) }.let { if (byMonth in it) it else listOf(byMonth) + it }
-                MetroComboBox(choices, byMonth, { monthLabel(it) }, { byMonth = it }, "template-month", fullScreenThreshold = Int.MAX_VALUE)
-                label("then")
-                MetroComboBox(repeats.indices.toList(), repeat, { repeats[it] }, { repeat = it }, "template-repeat")
-                if (repeat >= 3) {
-                    label(if (repeat == 3) "how many months" else "how many years")
-                    MetroField(count, {
-                        count = it
-                    }, "2", Modifier.testTag("template-count"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                months(byMonth, "template-month") { byMonth = it }
+                repeatFields()
+            }
+            TemplateKind.SPEND -> {
+                label("amount to spend")
+                MetroField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), keyboardOptions = number)
+                label("by")
+                months(byMonth, "template-month") { byMonth = it }
+                label("counting what's budgeted from")
+                months(fromMonth, "template-from") { fromMonth = it }
+                if (fromMonth.isAfter(byMonth)) {
+                    MetroText(TemplateEditorCopy.FROM_AFTER, Metro.typography.caption, color = Metro.accent.text)
                 }
+                repeatFields()
             }
             TemplateKind.SCHEDULE -> {
                 label("schedule")
@@ -742,6 +940,7 @@ fun TemplateEditorScreen(
                 }
                 label("when it comes less often than monthly")
                 MetroSegmentedToggle("save up ahead", "only when due", !full, { full = !it }, "template-full")
+                adjustFields()
             }
             TemplateKind.PERCENT -> {
                 label("percent")
@@ -754,13 +953,17 @@ fun TemplateEditorScreen(
             }
             TemplateKind.AVERAGE -> {
                 label("months to average")
-                MetroField(months, {
-                    months = it
-                }, "3", Modifier.testTag("template-months"), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                MetroField(months, { months = it }, "3", Modifier.testTag("template-months"), keyboardOptions = whole)
+                adjustFields()
+            }
+            TemplateKind.COPY -> {
+                label("months ago")
+                MetroField(lookBack, { lookBack = it }, "1", Modifier.testTag("template-look-back"), keyboardOptions = whole)
             }
             TemplateKind.REMAINDER -> {
                 label("shares of what's left (1 is an equal share)")
                 MetroField(weight, { weight = it }, "1", Modifier.testTag("template-weight"), keyboardOptions = number)
+                if (capped) capFields(optional = true)
             }
             TemplateKind.GOAL -> {
                 label("goal")
@@ -785,6 +988,36 @@ fun TemplateEditorScreen(
             Spacer(Modifier.height(12.dp))
             MetroButtonGrid { MetroButton(TemplateEditorCopy.REMOVE, Modifier.testTag("template-remove"), onClick = onRemove) }
         }
+    }
+}
+
+/** A day: its month, from a year back to three years on, and the day in it. */
+@Composable
+private fun DayPicker(
+    date: LocalDate,
+    month: YearMonth,
+    tag: String,
+    onPick: (LocalDate) -> Unit,
+) {
+    val shown = YearMonth.from(date)
+    val choices = (-12L until 36L).map { month.plusMonths(it) }.let { if (shown in it) it else listOf(shown) + it }
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+        MetroComboBox(
+            choices,
+            shown,
+            { monthLabel(it) },
+            { onPick(it.atDay(date.dayOfMonth.coerceAtMost(it.lengthOfMonth()))) },
+            "$tag-month",
+            Modifier.weight(2f),
+        )
+        MetroComboBox(
+            (1..shown.lengthOfMonth()).toList(),
+            date.dayOfMonth,
+            { it.toString() },
+            { onPick(shown.atDay(it)) },
+            "$tag-day",
+            Modifier.weight(1f),
+        )
     }
 }
 
@@ -836,6 +1069,13 @@ private fun TemplatePreview(
             when (kind) {
                 TemplateKind.REMAINDER -> "what's left"
                 TemplateKind.GOAL -> "nothing; it tracks"
+                TemplateKind.CAP ->
+                    if (draft is Template.Limit) {
+                        "nothing; it caps"
+                    } else {
+                        amount?.let { MoneyFormat.format(it, currency, options) }
+                            ?: "…"
+                    }
                 else -> amount?.let { MoneyFormat.format(it, currency, options) } ?: "…"
             }
         Row(verticalAlignment = Alignment.Bottom) {
@@ -875,7 +1115,15 @@ private fun TemplatePreview(
                 }
             }
         }
-        MetroText(TemplateLines.format(draft), Metro.typography.caption, Modifier.testTag("template-line"), color = Metro.colors.secondary)
+        // A refill has no note line of its own; it folds into the cap's.
+        if (draft !is Template.Refill) {
+            MetroText(
+                TemplateLines.format(draft),
+                Metro.typography.caption,
+                Modifier.testTag("template-line"),
+                color = Metro.colors.secondary,
+            )
+        }
     }
 }
 

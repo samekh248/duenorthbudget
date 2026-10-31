@@ -8,8 +8,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.LimitPeriod
+import app.duenorth.budget.core.RepeatUnit
 import app.duenorth.budget.core.Template
+import app.duenorth.budget.core.TemplateAdjustment
 import app.duenorth.budget.core.TemplateKind
+import app.duenorth.budget.core.TemplateLimit
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -22,6 +26,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.YearMonth
 
 /** The template editor (option A, template tiles: tiles, the grid of kinds and a form; option D, the lanes), in every style, light and dark. */
@@ -53,6 +58,64 @@ class TemplateEditorScreenshotTest {
 
     @Test
     fun byDateForm() = every("template_form_by") { Form() }
+
+    @Test
+    fun automationKinds() =
+        every("template_kinds_automations") {
+            TemplateKindsScreen("Food", null, {}, {}, kinds = TemplateKind.offered(automations = true))
+        }
+
+    @Test
+    fun cycleForm() =
+        every("template_form_repeat") {
+            NewerForm(
+                TemplateKind.REPEAT,
+                Template.Periodic(BigDecimal("50"), 2, RepeatUnit.WEEK, LocalDate.of(2026, 10, 2), TemplateLimit(BigDecimal("300")), 1),
+            )
+        }
+
+    @Test
+    fun capForm() =
+        every("template_form_cap") {
+            NewerForm(
+                TemplateKind.CAP,
+                Template.Simple(
+                    null,
+                    TemplateLimit(BigDecimal("80"), hold = true, period = LimitPeriod.WEEKLY, start = LocalDate.of(2026, 10, 5)),
+                    2,
+                ),
+            )
+        }
+
+    @Test
+    fun adjustedScheduleForm() =
+        every("template_form_schedule_adjusted") {
+            NewerForm(
+                TemplateKind.SCHEDULE,
+                Template.Schedule("Rent", full = false, priority = 1, adjustment = TemplateAdjustment(BigDecimal("5"), percent = true)),
+            )
+        }
+
+    @Composable
+    private fun NewerForm(
+        kind: TemplateKind,
+        template: Template,
+    ) {
+        TemplateEditorScreen(
+            categoryName = "Food",
+            kind = kind,
+            initial = template,
+            isNew = false,
+            month = TemplateSamples.october,
+            currency = TemplateSamples.shell.currency,
+            schedules = listOf("Rent"),
+            sources = emptyList(),
+            preview = template to 12_500L,
+            onPreview = {},
+            onSave = {},
+            onRemove = {},
+        )
+    }
 
     @Test
     fun lanes() = every("template_lanes") { Lanes(null) }

@@ -3,6 +3,7 @@ package app.duenorth.budget
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.core.TemplateLines
 import app.duenorth.budget.core.TemplateNote
 
@@ -155,6 +156,7 @@ internal fun TemplateKindsRoute(
                             ?.line
                     }
                 },
+            kinds = TemplateKind.offered(automations = state.templates.automations != null),
             onPick = model.templates::pickKind,
             onRemove = model.templates::remove,
             modifier = modifier,
@@ -179,6 +181,7 @@ internal fun TemplateEditorRoute(
             kind = route.kind,
             initial = state.templateDraftStart(route),
             isNew = route.index == null,
+            automations = state.templates.automations != null,
             month = shell.month,
             currency = shell.currency,
             schedules = state.templates.schedules,
