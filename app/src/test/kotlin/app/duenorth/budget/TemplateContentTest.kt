@@ -6,16 +6,20 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import app.duenorth.budget.ParityTestSupport.await
 import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryRow
+import app.duenorth.budget.core.LimitPeriod
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.Template
+import app.duenorth.budget.core.TemplateAdjustment
 import app.duenorth.budget.core.TemplateChip
 import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.core.TemplateKind
+import app.duenorth.budget.core.TemplateLimit
 import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.UndoCopy
 import app.duenorth.budget.core.monthlyFixed
@@ -29,6 +33,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.math.BigDecimal
+import java.time.LocalDate
+import java.time.YearMonth
 
 /** Spec 010 T063: the templates menu gate, check results, overwrite confirm, and the category note. */
 @RunWith(RobolectricTestRunner::class)
@@ -201,6 +207,96 @@ class TemplateContentTest {
         compose.onNodeWithTag("template-order-up").performClick()
         compose.onNodeWithText("#template-2 400 up to 600").assertExists()
         compose.onNodeWithTag("template-remove").assertDoesNotExist()
+    }
+
+    private fun form(
+        kind: TemplateKind,
+        initial: Template,
+        automations: Boolean = false,
+    ) {
+        compose.setContent {
+            MetroTheme {
+                TemplateEditorScreen(
+                    categoryName = "Food",
+                    kind = kind,
+                    initial = initial,
+                    isNew = false,
+                    month = TemplateSamples.october,
+                    currency = TemplateSamples.shell.currency,
+                    schedules = listOf("Rent"),
+                    sources = emptyList(),
+                    preview = null,
+                    onPreview = {},
+                    onSave = {},
+                    onRemove = {},
+                    automations = automations,
+                )
+            }
+        }
+    }
+
+    private fun type(
+        tag: String,
+        text: String,
+    ) = compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag(tag))).performTextInput(text)
+
+    private fun clear(tag: String) = compose.onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag(tag))).performTextClearance()
+
+    @Test
+    fun aCycleWritesItsRepeatAndStartingDay() {
+        form(TemplateKind.REPEAT, TemplateKind.REPEAT.blank(1, TemplateSamples.october, ""))
+        compose.onNodeWithText(TemplateEditorCopy.NEEDS).assertExists()
+        type("template-amount", "50")
+        compose.onNodeWithText("#template-1 50 repeat every 2 weeks starting 2026-10-01").assertExists()
+        type("template-cap", "300")
+        compose.onNodeWithText("#template-1 50 repeat every 2 weeks starting 2026-10-01 up to 300").assertExists()
+    }
+
+    @Test
+    fun spendingCountsFromItsOwnMonth() {
+        form(
+            TemplateKind.SPEND,
+            Template.Spend(BigDecimal("900"), YearMonth.of(2027, 6), TemplateSamples.october, annual = true, repeat = null, priority = 1),
+        )
+        compose.onNodeWithText("#template-1 900 by 2027-06 spend from 2026-10 repeat every year").assertExists()
+    }
+
+    @Test
+    fun anAdjustmentDesktopWouldRefuseSavesNothing() {
+        form(
+            TemplateKind.SCHEDULE,
+            Template.Schedule(
+                "Rent",
+                full = false,
+                priority = 1,
+                scheduleId = "s-rent",
+                adjustment = TemplateAdjustment(BigDecimal("-10"), percent = true),
+            ),
+        )
+        compose.onNodeWithText("#template-1 schedule Rent [decrease 10%]").assertExists()
+        clear("template-adjust-by")
+        type("template-adjust-by", "100")
+        compose.onNodeWithText(TemplateEditorCopy.NEEDS).assertExists()
+    }
+
+    @Test
+    fun anAutomationsCapIsACapOfItsOwn() {
+        form(
+            TemplateKind.CAP,
+            Template.Limit(TemplateLimit(BigDecimal("80"), hold = true, period = LimitPeriod.WEEKLY, start = LocalDate.of(2026, 10, 5))),
+            automations = true,
+        )
+        compose.onNodeWithText("nothing; it caps").assertExists()
+        compose.onNodeWithTag("template-order").assertDoesNotExist()
+        compose.onNodeWithText("#template 0 up to 80 per week starting 2026-10-05 hold").assertExists()
+    }
+
+    @Test
+    fun anAutomationsMonthlyAmountAsksForNoCap() {
+        form(TemplateKind.MONTHLY, TemplateKind.MONTHLY.blank(1, TemplateSamples.october, "", automations = true), automations = true)
+        compose.onNodeWithTag("template-cap").assertDoesNotExist()
+        type("template-amount", "400")
+        compose.onNodeWithText("#template-1 400 repeat every 1 months starting 2026-10-01").assertExists()
     }
 
     @Test

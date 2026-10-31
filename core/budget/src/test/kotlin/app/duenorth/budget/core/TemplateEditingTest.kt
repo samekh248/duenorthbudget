@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.YearMonth
 
 /** The template editor writes lines Actual reads, and leaves the rest of the note alone. */
@@ -35,11 +36,57 @@ class TemplateEditingTest {
                 Template.Remainder(n("1")),
                 Template.Remainder(n("2")),
                 Template.Goal(n("500")),
+                // The newer forms: cycles, spending, copies, adjustments and every kind of cap.
+                Template.Periodic(n("50"), 2, RepeatUnit.WEEK, LocalDate.of(2026, 10, 2), null, 1),
+                Template.Periodic(n("50"), 1, RepeatUnit.DAY, LocalDate.of(2026, 10, 1), TemplateLimit(n("400")), 0),
+                Template.Spend(n("900"), december, YearMonth.of(2026, 6), annual = null, repeat = null, priority = 1),
+                Template.Spend(n("900"), december, YearMonth.of(2026, 6), annual = true, repeat = 2, priority = 0),
+                Template.Copy(1, 2),
+                Template.Copy(12, 0),
+                Template.Schedule("Rent", full = false, priority = 0, adjustment = TemplateAdjustment(n("10"), percent = true)),
+                Template.Schedule("Rent", full = true, priority = 1, adjustment = TemplateAdjustment(n("-25"), percent = false)),
+                Template.Average(6, 0, TemplateAdjustment(n("-12.5"), percent = true)),
+                Template.Simple(null, TemplateLimit(n("600"), hold = true), 0),
+                Template.Simple(n("100"), TemplateLimit(n("15"), period = LimitPeriod.DAILY), 0),
+                Template.Simple(null, TemplateLimit(n("80"), period = LimitPeriod.WEEKLY, start = LocalDate.of(2026, 10, 5)), 3),
+                Template.Remainder(n("2"), TemplateLimit(n("300"))),
             )
         for (template in templates) {
             val line = TemplateLines.format(template)
             assertEquals(line, template, TemplateParser.parseLine(line))
         }
+    }
+
+    @Test
+    fun everyTemplateHasAForm() {
+        val templates =
+            listOf(
+                Template.Simple(n("400"), TemplateLimit(n("600"), hold = true, period = LimitPeriod.DAILY), 0) to TemplateKind.MONTHLY,
+                Template.Simple(null, TemplateLimit(n("600")), 0) to TemplateKind.CAP,
+                Template.Periodic(n("400"), 1, RepeatUnit.MONTH, LocalDate.of(2026, 10, 1), null, 0) to TemplateKind.MONTHLY,
+                Template.Periodic(n("50"), 2, RepeatUnit.WEEK, LocalDate.of(2026, 10, 1), null, 0) to TemplateKind.REPEAT,
+                Template.Spend(n("900"), december, YearMonth.of(2026, 6), null, null, 0) to TemplateKind.SPEND,
+                Template.Copy(1, 0) to TemplateKind.COPY,
+                Template.Limit(TemplateLimit(n("600"))) to TemplateKind.CAP,
+                Template.Refill(0) to TemplateKind.REFILL,
+                Template.Average(3, 0, TemplateAdjustment(n("10"), percent = true)) to TemplateKind.AVERAGE,
+                Template.Remainder(n("1"), TemplateLimit(n("100"))) to TemplateKind.REMAINDER,
+            )
+        for ((template, kind) in templates) assertEquals("$template", kind, TemplateKind.of(template))
+        // A refill alone has no note line, so only budget automations offer one.
+        assertEquals(TemplateKind.entries - TemplateKind.REFILL, TemplateKind.offered(automations = false))
+        assertEquals(TemplateKind.entries, TemplateKind.offered(automations = true))
+    }
+
+    @Test
+    fun automationsStartAsDesktopsEditorWritesThem() {
+        val october = YearMonth.of(2026, 10)
+        assertEquals(
+            Template.Periodic(BigDecimal.ZERO, 1, RepeatUnit.MONTH, october.atDay(1), null, 2),
+            TemplateKind.MONTHLY.blank(2, october, "", automations = true),
+        )
+        assertEquals(Template.Limit(TemplateLimit(BigDecimal.ZERO)), TemplateKind.CAP.blank(2, october, "", automations = true))
+        assertEquals(Template.Simple(null, TemplateLimit(BigDecimal.ZERO), 2), TemplateKind.CAP.blank(2, october, ""))
     }
 
     @Test

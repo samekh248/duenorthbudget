@@ -8,77 +8,85 @@ enum class TemplateKind(
     val label: String,
 ) {
     MONTHLY("same each month"),
+    REPEAT("on a cycle"),
     BY_DATE("save by a date"),
+    SPEND("save to spend"),
     SCHEDULE("pay a schedule"),
     PERCENT("share of income"),
     AVERAGE("like before"),
+    COPY("copy a month"),
     REMAINDER("what's left"),
     CAP("cap a balance"),
+    REFILL("refill to the cap"),
     GOAL("long goal"),
     ;
 
-    /** A filled-in starting point for a new template of this kind at [priority]. */
+    /**
+     * A filled-in starting point for a new template of this kind at [priority]. Budget [automations] keep a cap as
+     * an automation of its own and an amount each month as one that repeats monthly, as desktop's editor writes them.
+     */
     fun blank(
         priority: Int,
         month: YearMonth,
         schedule: String,
+        automations: Boolean = false,
     ): Template =
         when (this) {
-            MONTHLY -> Template.Simple(BigDecimal.ZERO, null, priority)
+            MONTHLY ->
+                if (automations) {
+                    Template.Periodic(BigDecimal.ZERO, 1, RepeatUnit.MONTH, month.atDay(1), null, priority)
+                } else {
+                    Template.Simple(BigDecimal.ZERO, null, priority)
+                }
+            REPEAT -> Template.Periodic(BigDecimal.ZERO, 2, RepeatUnit.WEEK, month.atDay(1), null, priority)
             BY_DATE -> Template.By(BigDecimal.ZERO, month.plusMonths(11), annual = null, repeat = null, priority = priority)
+            SPEND -> Template.Spend(BigDecimal.ZERO, month.plusMonths(11), month, annual = null, repeat = null, priority = priority)
             SCHEDULE -> Template.Schedule(schedule, full = false, priority = priority)
             PERCENT -> Template.Percentage(BigDecimal.TEN, previous = false, category = TemplateLines.ALL_INCOME, priority = priority)
             AVERAGE -> Template.Average(3, priority)
+            COPY -> Template.Copy(1, priority)
             REMAINDER -> Template.Remainder(BigDecimal.ONE)
-            CAP -> Template.Simple(null, TemplateLimit(BigDecimal.ZERO), priority)
+            CAP ->
+                if (automations) {
+                    Template.Limit(
+                        TemplateLimit(BigDecimal.ZERO),
+                    )
+                } else {
+                    Template.Simple(null, TemplateLimit(BigDecimal.ZERO), priority)
+                }
+            REFILL -> Template.Refill(priority)
             GOAL -> Template.Goal(BigDecimal.ZERO)
         }
 
     companion object {
-        /**
-         * The form that edits [template]; null for one the phone has no form for yet (a repeating amount, spend,
-         * copy, refill or limit automation, a held or per-day cap, an adjustment), which stays read-only.
-         */
-        fun of(template: Template): TemplateKind? =
+        /** The kinds the add grid offers: a refill alone has no note line, so only budget [automations] can add one. */
+        fun offered(automations: Boolean): List<TemplateKind> = if (automations) entries else entries - REFILL
+
+        /** The form that edits [template]. */
+        fun of(template: Template): TemplateKind =
             when (template) {
-                is Template.Simple ->
-                    when {
-                        template.limit != null && !template.limit.plain -> null
-                        template.monthly == null -> CAP
-                        else -> MONTHLY
-                    }
+                is Template.Simple -> if (template.monthly == null) CAP else MONTHLY
+                // Desktop's switch to automations turns a fixed amount into a monthly repeat; it is the same each month.
+                is Template.Periodic -> if (template.monthlyFixed) MONTHLY else REPEAT
                 is Template.By -> BY_DATE
-                is Template.Schedule -> if (template.adjustment == null) SCHEDULE else null
+                is Template.Spend -> SPEND
+                is Template.Schedule -> SCHEDULE
                 is Template.Percentage -> PERCENT
-                is Template.Average -> if (template.adjustment == null) AVERAGE else null
-                is Template.Remainder -> if (template.limit == null) REMAINDER else null
+                is Template.Average -> AVERAGE
+                is Template.Copy -> COPY
+                is Template.Remainder -> REMAINDER
+                is Template.Limit -> CAP
+                is Template.Refill -> REFILL
                 is Template.Goal -> GOAL
-                // Desktop's switch to automations turns a fixed amount into this; it is the same each month.
-                is Template.Periodic -> if (template.monthlyFixed) MONTHLY else null
-                is Template.Spend, is Template.Copy, is Template.Refill, is Template.Limit -> null
             }
     }
 }
 
-/** The kind [this] looks like, for its glyph, even when no form edits it yet. */
-val Template.look: TemplateKind
-    get() =
-        TemplateKind.of(this) ?: when (this) {
-            is Template.Simple, is Template.Refill, is Template.Limit -> TemplateKind.CAP
-            is Template.Periodic -> TemplateKind.MONTHLY
-            is Template.By, is Template.Spend -> TemplateKind.BY_DATE
-            is Template.Schedule -> TemplateKind.SCHEDULE
-            is Template.Percentage -> TemplateKind.PERCENT
-            is Template.Average, is Template.Copy -> TemplateKind.AVERAGE
-            is Template.Remainder -> TemplateKind.REMAINDER
-            is Template.Goal -> TemplateKind.GOAL
-        }
+/** The kind [this] is, for its glyph. */
+val Template.look: TemplateKind get() = TemplateKind.of(this)
 
 /** Once a month with no cap of its own: the same each month, as desktop's automations write a fixed amount. */
 val Template.Periodic.monthlyFixed: Boolean get() = every == 1 && unit == RepeatUnit.MONTH && limit == null
-
-/** A plain `up to N`: monthly and not held, the only cap the forms write. */
-val TemplateLimit.plain: Boolean get() = !hold && period == LimitPeriod.MONTHLY
 
 /** The same template at [priority]; remainder, limit and goal lines have none and come back unchanged. */
 fun Template.withPriority(priority: Int): Template =
