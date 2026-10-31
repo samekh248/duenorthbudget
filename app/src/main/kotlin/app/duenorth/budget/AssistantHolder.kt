@@ -24,6 +24,9 @@ data class AssistantUi(
  */
 class AssistantHolder internal constructor(
     private val host: ShellHost,
+    private val register: RegisterHolder,
+    private val reconcile: ReconcileHolder,
+    private val bankSync: BankSyncHolder,
 ) {
     private val state get() = host.state.value
 
@@ -37,7 +40,9 @@ class AssistantHolder internal constructor(
             val report = withContext(host.io) { runCatching { host.library.readAssistant(budgetId) }.getOrNull() } ?: return@launch
             if (generation != reads) return@launch
             val keys = report.findings.map { it.key }.toSet()
-            update { it.copy(report = report, settling = it.settling intersect keys) }
+            // A finished write's finding is gone from the new read; one a bank sync is still working on stays hidden.
+            val syncing = host.state.value.bankSync.syncing
+            update { it.copy(report = report, settling = if (syncing || host.writing) it.settling intersect keys else emptySet()) }
         }
     }
 
@@ -51,9 +56,20 @@ class AssistantHolder internal constructor(
         finding: Finding,
         action: FindingAction,
     ) {
-        if (action is FindingAction.Open) {
-            open(action)
-            return
+        when (action) {
+            is FindingAction.Open -> return open(action)
+            is FindingAction.OpenAccount -> return register.openAccount(action.accountId)
+            is FindingAction.Reconcile -> {
+                register.openAccount(action.accountId)
+                reconcile.open()
+                return
+            }
+            FindingAction.SyncBank -> {
+                // Hidden while the sync runs; the reload after it shows the account again if it is still behind.
+                update { it.copy(settling = it.settling + finding.key) }
+                return bankSync.syncAll()
+            }
+            else -> Unit
         }
         if (host.writing) return
         update { it.copy(settling = it.settling + finding.key) }
@@ -66,7 +82,14 @@ class AssistantHolder internal constructor(
                         is FindingAction.MoveAndMatch -> host.library.moveAndMatch(id, action.enteredId, action.bankId)
                         is FindingAction.Delete -> host.library.deleteTransaction(id, action.transactionId, false)
                         is FindingAction.Dismiss -> host.library.dismissFinding(id, finding.key)
-                        is FindingAction.Open -> WriteResult.Saved
+                        is FindingAction.MoveTo -> host.library.moveTransaction(id, action.transactionId, action.accountId)
+                        is FindingAction.AdoptAndMatch -> host.library.adoptAndMatch(id, action.enteredId, action.bankId)
+                        is FindingAction.LinkTransfer -> host.library.linkTransfer(id, action.fromId, action.toId)
+                        is FindingAction.Open,
+                        is FindingAction.OpenAccount,
+                        is FindingAction.Reconcile,
+                        FindingAction.SyncBank,
+                        -> WriteResult.Saved
                     }
                 }
             if (result !is WriteResult.Saved) update { it.copy(settling = it.settling - finding.key) }

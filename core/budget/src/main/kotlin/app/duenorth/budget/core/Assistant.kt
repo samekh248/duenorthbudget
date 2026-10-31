@@ -4,11 +4,12 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
+import kotlin.math.abs
 
 object AssistantCopy {
     const val TITLE = "assistant"
     const val ALL_CLEAR = "nothing needs you right now"
-    const val ALL_CLEAR_DETAIL = "No duplicates, no transactions in the wrong account, and nothing missing at the bank."
+    const val ALL_CLEAR_DETAIL = "No duplicates, nothing in the wrong account, and every account looks current."
     const val MAYBE = "maybe"
     const val TO_LOOK_AT = "to look at"
 
@@ -23,6 +24,14 @@ object AssistantCopy {
     const val OPEN = "open"
     const val DELETE = "delete"
     const val KEEP_WAITING = "keep waiting"
+    const val USE_BANK_AMOUNT = "use bank amount"
+    const val NOT_THE_SAME = "not the same"
+    const val LINK_TRANSFER = "link as transfer"
+    const val NOT_A_TRANSFER = "not a transfer"
+    const val SYNC_NOW = "sync now"
+    const val RECONCILE = "reconcile"
+    const val LATER = "later"
+    const val REVIEW = "review"
 
     const val SAME_AMOUNT = "same amount"
     const val SAME_ACCOUNT = "same account"
@@ -30,6 +39,8 @@ object AssistantCopy {
     const val SAME_BANK_ID = "same bank id"
     const val BOTH_UNMATCHED = "both unmatched"
     const val NOTHING_FROM_BANK = "nothing from the bank"
+    const val OPPOSITE_AMOUNTS = "money out, same money in"
+    const val DIFFERENT_ACCOUNTS = "different accounts"
     const val GONE = "This is already sorted out. Pull to refresh."
 
     fun daysOld(days: Int): String = "$days days old"
@@ -40,6 +51,66 @@ object AssistantCopy {
         from: String,
         to: String,
     ): String = "You entered this in $from, but the bank shows the same charge in $to."
+
+    fun moveTo(account: String): String = "move to $account"
+
+    fun nearDuplicate(
+        entered: String,
+        bank: String,
+    ): String = "You entered $entered, and the bank sent $bank for what looks like the same purchase."
+
+    fun offBy(amount: String): String = "off by $amount"
+
+    fun transfer(
+        from: String,
+        to: String,
+    ): String = "This looks like money moved from $from to $to, but it's counted as spending and income."
+
+    fun payeeHabit(
+        payee: String,
+        usual: String,
+        times: Int,
+        of: Int,
+        here: String,
+    ): String = "$payee is in $usual $times of $of times, but this one is in $here."
+
+    fun usually(
+        account: String,
+        times: Int,
+        of: Int,
+    ): String = "$times of $of in $account"
+
+    fun staleSync(
+        account: String,
+        days: Int?,
+    ): String =
+        when (days) {
+            null -> "$account hasn't synced with the bank yet."
+            1 -> "$account last synced with the bank yesterday."
+            else -> "$account last synced with the bank $days days ago."
+        }
+
+    fun reconcile(
+        account: String,
+        last: String?,
+        since: Int,
+    ): String =
+        if (last == null) {
+            "$account has never been reconciled. $since cleared transactions are waiting."
+        } else {
+            "$account was last reconciled around $last. $since cleared transactions since."
+        }
+
+    fun oldUncleared(
+        account: String,
+        count: Int,
+        days: Int,
+    ): String =
+        if (count == 1) {
+            "1 transaction in $account is still uncleared after $days days."
+        } else {
+            "$count transactions in $account are still uncleared after $days days."
+        }
 
     fun noBankMatch(
         account: String,
@@ -52,6 +123,7 @@ enum class FindingGroup(
     val title: String,
 ) {
     TRANSACTIONS("transactions"),
+    ACCOUNTS("accounts"),
 }
 
 /** What a check found, which decides the heading and the buttons. */
@@ -63,7 +135,12 @@ enum class FindingKind(
 ) {
     DUPLICATE(FindingGroup.TRANSACTIONS, "possible duplicates", "the same transaction twice"),
     WRONG_ACCOUNT(FindingGroup.TRANSACTIONS, "wrong account?", "entered in one account, at the bank in another"),
+    NEAR_DUPLICATE(FindingGroup.TRANSACTIONS, "different amount?", "your entry and the bank's differ by a tip or fee"),
+    TRANSFER(FindingGroup.TRANSACTIONS, "unlinked transfers", "money moved between your accounts"),
     NO_BANK_MATCH(FindingGroup.TRANSACTIONS, "not at the bank yet", "entries the bank never sent"),
+    STALE_SYNC(FindingGroup.ACCOUNTS, "bank sync stale", "linked accounts that stopped syncing"),
+    RECONCILE(FindingGroup.ACCOUNTS, "time to reconcile", "not checked against a statement lately"),
+    OLD_UNCLEARED(FindingGroup.ACCOUNTS, "old uncleared", "not cleared after a month"),
 }
 
 /** How sure a check is: sure findings lead their kind, the rest are labelled maybe. */
@@ -102,6 +179,50 @@ sealed interface FindingAction {
         override val label = AssistantCopy.MOVE_AND_MERGE
     }
 
+    /** Moves the transaction into [accountId], keeping everything else. */
+    data class MoveTo(
+        val transactionId: String,
+        val accountId: String,
+        val accountName: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.moveTo(accountName)
+    }
+
+    /** Gives the entry the bank's amount, then matches the two. */
+    data class AdoptAndMatch(
+        val enteredId: String,
+        val bankId: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.USE_BANK_AMOUNT
+    }
+
+    /** Makes two transactions in different accounts one transfer, as Actual's "make transfer" does. */
+    data class LinkTransfer(
+        val fromId: String,
+        val toId: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.LINK_TRANSFER
+    }
+
+    /** Opens the account's register. */
+    data class OpenAccount(
+        val accountId: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.REVIEW
+    }
+
+    /** Starts a reconcile of the account. */
+    data class Reconcile(
+        val accountId: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.RECONCILE
+    }
+
+    /** Fetches every linked account from the bank. */
+    data object SyncBank : FindingAction {
+        override val label = AssistantCopy.SYNC_NOW
+    }
+
     /** Opens the transaction's form. */
     data class Open(
         val accountId: String,
@@ -135,6 +256,8 @@ data class Finding(
     val actions: List<FindingAction>,
     /** The account a fix lands in, so the shell reloads it. */
     val accountId: String,
+    /** For a near duplicate: the bank's amount less the entry's, shown as "off by". */
+    val difference: Long? = null,
 )
 
 data class AssistantReport(
@@ -171,6 +294,24 @@ object AssistantReader {
 
     /** Older entries are left alone: they were settled long ago, one way or another. */
     const val NO_BANK_MATCH_MAX_DAYS = 90
+
+    /** An entry and a bank copy whose amounts differ by at most this share (a tip, a fee). */
+    const val NEAR_SHARE = 0.25
+
+    /** A card payment or savings move clears within this many days. */
+    const val TRANSFER_DAYS = 3
+
+    /** The payee-habit check looks at entries this recent. */
+    const val HABIT_DAYS = 60L
+
+    /** A payee's habit counts once it has this many other transactions... */
+    const val HABIT_MIN = 5
+
+    /** ...and this share of them in one other account. */
+    const val HABIT_SHARE = 0.8
+
+    /** Leading letters two payee names share to count as alike. */
+    private const val ALIKE = 4
 
     fun read(
         session: SqlSession,
@@ -214,6 +355,15 @@ object AssistantReader {
                 found += Draft.Twin(entry, twin, sure = entry.accountId in fed || samePayee(entry, twin))
             }
 
+        // 3b. An entry and a bank copy of one payee whose amounts differ by a tip or a fee.
+        nearDuplicates(rows, taken, matchable).forEach { found += it }
+
+        // 3c. Money out of one account and the same money into another, neither a transfer.
+        transfers(rows, taken).forEach { found += it }
+
+        // 3d. An entry in an account its payee is almost never in.
+        payeeHabits(session, rows, taken, matchable, today).forEach { found += it }
+
         // 4. An entry, old enough and not yet reconciled, in an account the bank keeps current, with nothing like it there.
         val todayInt = today.toActualDate()
         rows
@@ -226,9 +376,15 @@ object AssistantReader {
             }
 
         val drafts = found.filter { it.key !in dismissed }
-        if (drafts.isEmpty()) return AssistantReport.EMPTY
-        val sides = MatchFinder.sides(session, drafts.flatMap { it.ids }.toSet())
-        val findings = drafts.mapNotNull { it.finding(sides) }
+        val names = accountNames(session)
+        drafts.filterIsInstance<Draft.Habit>().forEach { it.usualName = names[it.usualAccountId].orEmpty() }
+        val sides = if (drafts.isEmpty()) emptyMap() else MatchFinder.sides(session, drafts.flatMap { it.ids }.toSet())
+        val findings =
+            drafts.mapNotNull { it.finding(sides) } +
+                AccountChecks
+                    .read(session, today, fed, rows.filter { !it.cleared }.map { it.accountId to it.date })
+                    .filter { it.key !in dismissed }
+        if (findings.isEmpty()) return AssistantReport.EMPTY
         return AssistantReport(
             findings.sortedWith(
                 compareBy<Finding> { it.kind.ordinal }
@@ -295,6 +451,103 @@ object AssistantReader {
             else -> FindingSure.MAYBE
         }
 
+    /** An entry and a bank copy in one account, a few days apart, one payee, amounts within [NEAR_SHARE] of each other. */
+    private fun nearDuplicates(
+        rows: List<Row>,
+        taken: MutableSet<String>,
+        matchable: Set<String>,
+    ): List<Draft> {
+        val out = mutableListOf<Draft>()
+        val bank = rows.filter { it.bank && it.id !in matchable }
+        rows
+            .filter { !it.bank && it.id !in taken && it.id !in matchable }
+            .forEach { entry ->
+                val twin =
+                    bank
+                        .filter {
+                            it.id !in taken && it.accountId == entry.accountId && it.amount != entry.amount &&
+                                (it.amount < 0) == (entry.amount < 0) && days(it.date, entry.date) <= DUPLICATE_DAYS &&
+                                abs(it.amount - entry.amount) <= abs(entry.amount) * NEAR_SHARE &&
+                                (samePayee(it, entry) || alike(it.payeeName, entry.payeeName))
+                        }.minWithOrNull(compareBy<Row> { abs(it.amount - entry.amount) }.thenBy { days(it.date, entry.date) })
+                        ?: return@forEach
+                taken += setOf(entry.id, twin.id)
+                out += Draft.Near(entry, twin, sure = samePayee(entry, twin))
+            }
+        return out
+    }
+
+    /** Opposite amounts in two accounts a few days apart, closest first; sure when the bank sent both. */
+    private fun transfers(
+        rows: List<Row>,
+        taken: MutableSet<String>,
+    ): List<Draft> {
+        val out = mutableListOf<Draft>()
+        val open = rows.filter { it.id !in taken }
+        open
+            .filter { it.amount < 0 }
+            .forEach { from ->
+                if (from.id in taken) return@forEach
+                val to =
+                    open
+                        .filter {
+                            it.id !in taken && it.accountId != from.accountId && it.amount == -from.amount &&
+                                days(it.date, from.date) <= TRANSFER_DAYS
+                        }.minByOrNull { days(it.date, from.date) }
+                        ?: return@forEach
+                taken += setOf(from.id, to.id)
+                out += Draft.Transfer(from, to, sure = from.bank && to.bank)
+            }
+        return out
+    }
+
+    /** Entries of the last [HABIT_DAYS] whose payee is in one other account at least [HABIT_SHARE] of the time. */
+    private fun payeeHabits(
+        session: SqlSession,
+        rows: List<Row>,
+        taken: MutableSet<String>,
+        matchable: Set<String>,
+        today: LocalDate,
+    ): List<Draft> {
+        val since = today.minusDays(HABIT_DAYS).toActualDate()
+        val entries = rows.filter { !it.bank && it.id !in taken && it.id !in matchable && it.payeeId != null && it.date >= since }
+        if (entries.isEmpty()) return emptyList()
+        val payees = entries.mapNotNull { it.payeeId }.toSet()
+        val counts =
+            session
+                .query(
+                    """
+                    SELECT t.description AS payee, t.acct AS acct, COUNT(*) AS n
+                    FROM transactions t
+                    JOIN accounts a ON a.id = t.acct AND IFNULL(a.tombstone, 0) = 0 AND IFNULL(a.closed, 0) = 0
+                    WHERE IFNULL(t.tombstone, 0) = 0 AND IFNULL(t.isChild, 0) = 0 AND t.transferred_id IS NULL
+                        AND t.description IN (${payees.joinToString(",") { "?" }})
+                    GROUP BY t.description, t.acct
+                    """.trimIndent(),
+                    payees.toList(),
+                ).groupBy({ it.str("payee").orEmpty() }, { it.str("acct").orEmpty() to it.long("n").toInt() })
+        return entries.mapNotNull { entry ->
+            val byAccount = counts[entry.payeeId].orEmpty().toMap()
+            // The entry itself is one of the counts; leave it out.
+            val others = byAccount.mapValues { (acct, n) -> if (acct == entry.accountId) n - 1 else n }
+            val total = others.values.sum()
+            val (usual, times) = others.maxByOrNull { it.value } ?: return@mapNotNull null
+            if (usual == entry.accountId || total < HABIT_MIN || times < total * HABIT_SHARE) return@mapNotNull null
+            taken += entry.id
+            Draft.Habit(entry, usual, times, total)
+        }
+    }
+
+    /** Payee names that start alike once case and punctuation go: "Luigi's" and "LUIGIS TRATT". */
+    private fun alike(
+        a: String,
+        b: String,
+    ): Boolean {
+        val x = a.lowercase().filter { it.isLetterOrDigit() }
+        val y = b.lowercase().filter { it.isLetterOrDigit() }
+        return x.length >= ALIKE && y.length >= ALIKE && x.take(ALIKE) == y.take(ALIKE)
+    }
+
     private fun samePayee(
         a: Row,
         b: Row,
@@ -319,6 +572,11 @@ object AssistantReader {
             .flatMap { listOfNotNull(it.str("b_id"), it.str("e_id")) }
             .toSet()
 
+    private fun accountNames(session: SqlSession): Map<String, String> =
+        session
+            .query("SELECT id, name FROM accounts WHERE IFNULL(tombstone, 0) = 0")
+            .associate { it.str("id").orEmpty() to it.str("name").orEmpty() }
+
     private fun rows(
         session: SqlSession,
         today: LocalDate,
@@ -328,7 +586,7 @@ object AssistantReader {
                 """
                 SELECT t.id AS id, t.acct AS acct, t.amount AS amount, t.date AS date, t.description AS payee_id,
                     COALESCE(p.name, '') AS payee_name, t.financial_id AS financial_id,
-                    t.imported_description AS imported
+                    t.imported_description AS imported, IFNULL(t.cleared, 0) AS cleared
                 FROM transactions t
                 JOIN accounts a ON a.id = t.acct AND IFNULL(a.tombstone, 0) = 0 AND IFNULL(a.closed, 0) = 0
                 LEFT JOIN payees p ON p.id = t.description AND IFNULL(p.tombstone, 0) = 0
@@ -346,6 +604,7 @@ object AssistantReader {
                     payeeName = row.str("payee_name").orEmpty().ifBlank { row.str("imported").orEmpty() },
                     financialId = row.str("financial_id")?.ifBlank { null },
                     imported = row.str("imported")?.ifBlank { null },
+                    cleared = row.bool("cleared"),
                 )
             }
 
@@ -363,6 +622,7 @@ object AssistantReader {
         val payeeName: String,
         val financialId: String?,
         val imported: String?,
+        val cleared: Boolean,
     ) {
         val synced: Boolean get() = financialId != null
 
@@ -490,6 +750,101 @@ object AssistantReader {
             }
         }
 
+        data class Near(
+            val entered: Row,
+            val bank: Row,
+            val sure: Boolean,
+        ) : Draft {
+            override val key = AssistantBook.key("near", entered.id, bank.id)
+            override val ids = listOf(entered.id, bank.id)
+
+            override fun finding(sides: Map<String, MatchSide>): Finding? {
+                val e = sides[entered.id] ?: return null
+                val b = sides[bank.id] ?: return null
+                return Finding(
+                    key = key,
+                    kind = FindingKind.NEAR_DUPLICATE,
+                    sure = if (sure) FindingSure.HIGH else FindingSure.MAYBE,
+                    headline = AssistantCopy.nearDuplicate(e.payee, b.payee),
+                    sides = listOf(FindingSide(entered.source, e), FindingSide(bank.source, b)),
+                    reasons =
+                        listOfNotNull(
+                            AssistantCopy.SAME_ACCOUNT,
+                            MatchCopy.apart(days(entered.date, bank.date)),
+                            AssistantCopy.SAME_PAYEE.takeIf { sure },
+                        ),
+                    actions =
+                        listOf(
+                            FindingAction.AdoptAndMatch(entered.id, bank.id),
+                            FindingAction.Dismiss(AssistantCopy.NOT_THE_SAME),
+                        ),
+                    accountId = bank.accountId,
+                    difference = bank.amount - entered.amount,
+                )
+            }
+        }
+
+        data class Transfer(
+            val from: Row,
+            val to: Row,
+            val sure: Boolean,
+        ) : Draft {
+            override val key = AssistantBook.key("transfer", from.id, to.id)
+            override val ids = listOf(from.id, to.id)
+
+            override fun finding(sides: Map<String, MatchSide>): Finding? {
+                val f = sides[from.id] ?: return null
+                val t = sides[to.id] ?: return null
+                return Finding(
+                    key = key,
+                    kind = FindingKind.TRANSFER,
+                    sure = if (sure) FindingSure.HIGH else FindingSure.MAYBE,
+                    headline = AssistantCopy.transfer(f.accountName, t.accountName),
+                    sides = listOf(FindingSide(from.source, f), FindingSide(to.source, t)),
+                    reasons =
+                        listOf(
+                            AssistantCopy.OPPOSITE_AMOUNTS,
+                            MatchCopy.apart(days(from.date, to.date)),
+                            AssistantCopy.DIFFERENT_ACCOUNTS,
+                        ),
+                    actions = listOf(FindingAction.LinkTransfer(from.id, to.id), FindingAction.Dismiss(AssistantCopy.NOT_A_TRANSFER)),
+                    accountId = from.accountId,
+                )
+            }
+        }
+
+        data class Habit(
+            val entered: Row,
+            val usualAccountId: String,
+            val times: Int,
+            val of: Int,
+        ) : Draft {
+            override val key = AssistantBook.key("habit", entered.id)
+            override val ids = listOf(entered.id)
+
+            /** Reads the usual account's name with the sides, so the button can name it. */
+            var usualName: String = ""
+
+            override fun finding(sides: Map<String, MatchSide>): Finding? {
+                val e = sides[entered.id] ?: return null
+                val usual = usualName.ifBlank { return null }
+                return Finding(
+                    key = key,
+                    kind = FindingKind.WRONG_ACCOUNT,
+                    sure = FindingSure.MAYBE,
+                    headline = AssistantCopy.payeeHabit(e.payee, usual, times, of, e.accountName),
+                    sides = listOf(FindingSide(entered.source, e)),
+                    reasons = listOf(AssistantCopy.usually(usual, times, of)),
+                    actions =
+                        listOf(
+                            FindingAction.MoveTo(entered.id, usualAccountId, usual),
+                            FindingAction.Dismiss(AssistantCopy.ITS_RIGHT),
+                        ),
+                    accountId = usualAccountId,
+                )
+            }
+        }
+
         data class NoBank(
             val entered: Row,
             val age: Int,
@@ -526,6 +881,11 @@ object AssistantReader {
 class AssistantBook(
     private val session: SqlSession,
     private val today: LocalDate,
+    private val ids: () -> String = {
+        java.util.UUID
+            .randomUUID()
+            .toString()
+    },
 ) {
     /**
      * Moves [enteredId] into [bankId]'s account, then matches the two: the bank's copy stays with the entry's payee,
@@ -557,10 +917,107 @@ class AssistantBook(
         return box[0]
     }
 
+    /** Moves [transactionId] into [accountId]; one moved off budget drops its category, as Actual requires. */
+    fun moveTo(
+        transactionId: String,
+        accountId: String,
+    ): WriteResult {
+        if (!plain(transactionId) || !accountOpen(accountId)) return WriteResult.Rejected(AssistantCopy.GONE)
+        session.transaction {
+            SyncSchema.writeRow(session, "transactions", transactionId, "acct" to accountId)
+            if (offBudget(accountId)) SyncSchema.writeRow(session, "transactions", transactionId, "category" to null)
+        }
+        return WriteResult.Saved
+    }
+
+    /** Gives [enteredId] the bank copy's amount, then matches the two: the bank's copy stays with the entry's details. */
+    fun adoptAndMatch(
+        enteredId: String,
+        bankId: String,
+    ): WriteResult {
+        val box = arrayOf<WriteResult>(WriteResult.Saved)
+        session.transaction {
+            val sides = MatchFinder.sides(session, setOf(enteredId, bankId))
+            val entered = sides[enteredId]
+            val bank = sides[bankId]
+            if (entered == null || bank == null || !plain(enteredId) || !plain(bankId) || entered.accountId != bank.accountId) {
+                box[0] = WriteResult.Rejected(AssistantCopy.GONE)
+                return@transaction
+            }
+            SyncSchema.writeRow(session, "transactions", enteredId, "amount" to bank.amountMinor)
+            MatchBook(session, today).settle(bank, entered.copy(amountMinor = bank.amountMinor))
+        }
+        return box[0]
+    }
+
+    /**
+     * Makes [fromId] and [toId] one transfer, as Actual's "make transfer" does: each takes the other account's
+     * transfer payee and points at the other. Between two budget accounts neither keeps a category; to or from an
+     * off-budget account the budget side keeps its own.
+     */
+    fun linkTransfer(
+        fromId: String,
+        toId: String,
+    ): WriteResult {
+        val box = arrayOf<WriteResult>(WriteResult.Saved)
+        session.transaction {
+            val sides = MatchFinder.sides(session, setOf(fromId, toId))
+            val from = sides[fromId]
+            val to = sides[toId]
+            if (from == null || to == null || !plain(fromId) || !plain(toId) || from.accountId == to.accountId ||
+                from.amountMinor != -to.amountMinor
+            ) {
+                box[0] = WriteResult.Rejected(AssistantCopy.GONE)
+                return@transaction
+            }
+            val fromOff = offBudget(from.accountId)
+            val toOff = offBudget(to.accountId)
+            SyncSchema.writeRow(
+                session,
+                "transactions",
+                fromId,
+                "description" to transferPayee(to.accountId),
+                "transferred_id" to toId,
+                "category" to if (fromOff || !toOff) null else from.categoryId,
+            )
+            SyncSchema.writeRow(
+                session,
+                "transactions",
+                toId,
+                "description" to transferPayee(from.accountId),
+                "transferred_id" to fromId,
+                "category" to if (toOff || !fromOff) null else to.categoryId,
+            )
+        }
+        return box[0]
+    }
+
+    private fun offBudget(accountId: String): Boolean =
+        session
+            .query("SELECT offbudget FROM accounts WHERE id = ?", listOf(accountId))
+            .firstOrNull()
+            ?.bool("offbudget") ?: false
+
+    private fun accountOpen(accountId: String): Boolean =
+        session
+            .query(
+                "SELECT id FROM accounts WHERE id = ? AND IFNULL(tombstone, 0) = 0 AND IFNULL(closed, 0) = 0",
+                listOf(accountId),
+            ).isNotEmpty()
+
+    private fun transferPayee(accountId: String): String =
+        session
+            .query("SELECT id FROM payees WHERE transfer_acct = ? AND IFNULL(tombstone, 0) = 0 LIMIT 1", listOf(accountId))
+            .firstOrNull()
+            ?.str("id")
+            ?: ids().also {
+                SyncSchema.writeRow(session, "payees", it, "name" to "", "transfer_acct" to accountId, "tombstone" to false)
+            }
+
     /** Remembers [key] as fine, and forgets keys whose transactions are gone. */
     fun dismiss(key: String): WriteResult {
         session.transaction {
-            val alive = dismissed(session).filter { known -> idsOf(known).all(::isAlive) }.toSet()
+            val alive = dismissed(session).filter { known -> !aboutTransactions(known) || idsOf(known).all(::isAlive) }.toSet()
             SyncSchema.writeRow(session, "preferences", DISMISSED_PREF, "value" to encode(alive + key))
         }
         return WriteResult.Saved
@@ -612,6 +1069,11 @@ class AssistantBook(
         }
 
         internal fun encode(values: Collection<String>): String = json.encodeToString(keys, values.sorted())
+
+        /** Keys of findings about transactions, which go once their transactions do; account keys stay. */
+        private fun aboutTransactions(key: String): Boolean = key.substringBefore(':') in TRANSACTION_KINDS
+
+        private val TRANSACTION_KINDS = setOf(MATCH, "dup", "wrong", "nobank", "near", "transfer", "habit")
 
         private fun idsOf(key: String): List<String> = key.substringAfter(':').split('|').filter { it.isNotBlank() }
 

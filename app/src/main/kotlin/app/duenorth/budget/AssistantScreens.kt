@@ -46,6 +46,7 @@ import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroWeights
+import kotlin.math.abs
 
 /**
  * The assistant pivot item: a count of what needs a look, then a card for each kind of finding with its count in a
@@ -186,7 +187,7 @@ internal fun FindingPanel(
         finding.sides.forEachIndexed { index, side ->
             FindingSideLine(side, money, showAccount = finding.kind == FindingKind.WRONG_ACCOUNT || index == 0)
         }
-        FindingReasons(finding.reasons)
+        FindingReasons(finding.reasons + listOfNotNull(finding.difference?.let { AssistantCopy.offBy(money(abs(it))) }))
         MetroButtonGrid(Modifier.padding(top = 12.dp)) {
             finding.actions.forEachIndexed { index, action ->
                 val tag = "finding-action-$index-${finding.key}"
