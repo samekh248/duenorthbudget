@@ -631,6 +631,31 @@ class BudgetLibrary(
         edit(budgetId, UndoCopy.MERGE) { MergeBook(it).merge(transactionIds, force) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    /** What the assistant found, read from the phone's copy; null when the budget is not on the phone. */
+    fun readAssistant(budgetId: String): AssistantReport? = open(budgetId) { AssistantReader.read(it, clock.today()) }
+
+    /** The assistant's move and merge: an entry goes to the bank copy's account and the two become one, as one undo step. */
+    fun moveAndMatch(
+        budgetId: String,
+        enteredId: String,
+        bankId: String,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.MOVE_AND_MERGE) { session ->
+            AssistantBook(session, clock.today()).moveAndMatch(enteredId, bankId).also {
+                if (it is WriteResult.Saved) CategoryLearning(session, ids).learnFrom(bankId)
+            }
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** Never shows the assistant's finding [key] again; a possible match is the inbox's not a match. */
+    fun dismissFinding(
+        budgetId: String,
+        key: String,
+    ): WriteResult {
+        AssistantBook.matchIds(key)?.let { (bankId, enteredId) -> return notAMatch(budgetId, bankId, enteredId) }
+        return edit(budgetId, UndoCopy.DISMISS) { AssistantBook(it, clock.today()).dismiss(key) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    }
+
     fun notAMatch(
         budgetId: String,
         bankId: String,

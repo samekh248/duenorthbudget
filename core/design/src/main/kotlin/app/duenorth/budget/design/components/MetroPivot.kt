@@ -43,6 +43,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +59,8 @@ import kotlin.math.roundToInt
 @Immutable
 class PivotItem(
     val header: String,
+    /** Things waiting in the item, shown small in the accent beside its header; none when 0. */
+    val count: Int = 0,
     val content: @Composable () -> Unit,
 )
 
@@ -134,6 +137,7 @@ fun MetroPivot(
         val layers = Metro.style.layers
         val headerStyle = if (layers) type.sectionHeader.copy(fontSize = 30.sp) else type.sectionHeader
         val selectorLine = Metro.accent.fill
+        val accentText = Metro.accent.text
         val gapPx = with(LocalDensity.current) { (if (layers) 20.dp else MetroDimens.Grid).roundToPx() }
         val gutterPx = with(LocalDensity.current) { MetroDimens.Gutter.roundToPx() }
         Layout(
@@ -148,21 +152,35 @@ fun MetroPivot(
                             if (animations) tween(MetroMotion.QUICK_MS) else snap(),
                             label = "pivot-header",
                         )
-                        MetroText(
-                            items[index].header,
-                            headerStyle,
+                        Row(
                             Modifier
                                 .heightIn(min = MetroDimens.TouchTarget)
                                 .then(if (layers && isSelected) Modifier.drawBehind { drawSelectorLine(selectorLine) } else Modifier)
-                                .semantics {
+                                .semantics(mergeDescendants = true) {
                                     role = Role.Tab
                                     this.selected = isSelected
                                 }.metroPress { goTo(index) }
                                 .testTag("pivot-header-$index"),
-                            color = color,
-                            maxLines = 1,
-                            softWrap = false,
-                        )
+                        ) {
+                            MetroText(
+                                items[index].header,
+                                headerStyle,
+                                color = color,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                            val count = items[index].count
+                            if (count > 0) {
+                                MetroText(
+                                    "$count",
+                                    type.caption.copy(fontWeight = FontWeight.SemiBold),
+                                    Modifier.padding(start = 4.dp, top = 6.dp).testTag("pivot-count-$index"),
+                                    color = accentText,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                        }
                     }
                 }
             },
