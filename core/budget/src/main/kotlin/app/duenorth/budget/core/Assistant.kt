@@ -11,7 +11,6 @@ object AssistantCopy {
     const val ALL_CLEAR_DETAIL = "No duplicates, no transactions in the wrong account, and nothing missing at the bank."
     const val MAYBE = "maybe"
     const val TO_LOOK_AT = "to look at"
-    const val LESS = "show fewer"
 
     const val BANK_SYNC = "bank sync"
     const val FILE_IMPORT = "file import"
@@ -32,8 +31,6 @@ object AssistantCopy {
     const val BOTH_UNMATCHED = "both unmatched"
     const val NOTHING_FROM_BANK = "nothing from the bank"
     const val GONE = "This is already sorted out. Pull to refresh."
-
-    fun more(count: Int): String = "show $count more"
 
     fun daysOld(days: Int): String = "$days days old"
 
@@ -61,10 +58,12 @@ enum class FindingGroup(
 enum class FindingKind(
     val group: FindingGroup,
     val title: String,
+    /** One line under the title on the kind's collapsed card. */
+    val blurb: String,
 ) {
-    DUPLICATE(FindingGroup.TRANSACTIONS, "possible duplicates"),
-    WRONG_ACCOUNT(FindingGroup.TRANSACTIONS, "wrong account?"),
-    NO_BANK_MATCH(FindingGroup.TRANSACTIONS, "not at the bank yet"),
+    DUPLICATE(FindingGroup.TRANSACTIONS, "possible duplicates", "the same transaction twice"),
+    WRONG_ACCOUNT(FindingGroup.TRANSACTIONS, "wrong account?", "entered in one account, at the bank in another"),
+    NO_BANK_MATCH(FindingGroup.TRANSACTIONS, "not at the bank yet", "entries the bank never sent"),
 }
 
 /** How sure a check is: sure findings lead their kind, the rest are labelled maybe. */

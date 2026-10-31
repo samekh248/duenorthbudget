@@ -8,19 +8,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AssistantCopy
@@ -43,12 +47,10 @@ import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroWeights
 
-/** How many findings of a kind show before "show more". */
-internal const val ASSISTANT_FIRST = 3
-
 /**
- * The assistant pivot item: a count of what needs a look, then each kind of finding under its heading, a few at a
- * time, every one with its fix and its "that's fine" side by side.
+ * The assistant pivot item: a count of what needs a look, then a card for each kind of finding with its count in a
+ * circle. The cards start collapsed so every kind shows at once; a tap opens one to its findings, each with its fix
+ * and its "that's fine" side by side.
  */
 @Composable
 fun AssistantSection(
@@ -89,36 +91,58 @@ fun AssistantSection(
         }
         byKind.forEach { (kind, all) ->
             val open = kind in expanded
-            val shown = if (open) all else all.take(ASSISTANT_FIRST)
             item(key = "kind-${kind.name}") {
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 6.dp).testTag("assistant-kind-${kind.name}"),
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    MetroText(kind.title, Metro.typography.subheader, Modifier.weight(1f), maxLines = 1)
-                    MetroText("${all.size}", Metro.typography.subheader, color = Metro.accent.text, maxLines = 1)
-                }
+                KindCard(kind, all.size, open, Modifier.padding(top = 12.dp)) { onToggleExpanded(kind) }
             }
-            items(shown, key = { it.key }) { finding ->
-                FindingPanel(finding, money, onAct, Modifier.padding(bottom = 12.dp))
-            }
-            if (all.size > ASSISTANT_FIRST) {
-                item(key = "more-${kind.name}") {
-                    MetroText(
-                        if (open) AssistantCopy.LESS else AssistantCopy.more(all.size - ASSISTANT_FIRST),
-                        Metro.typography.body,
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = MetroDimens.TouchTarget)
-                            .metroPress { onToggleExpanded(kind) }
-                            .padding(vertical = 12.dp)
-                            .testTag("assistant-more-${kind.name}"),
-                        color = Metro.accent.text,
-                    )
+            if (open) {
+                items(all, key = { it.key }) { finding ->
+                    FindingPanel(finding, money, onAct, Modifier.padding(top = 12.dp))
                 }
             }
         }
         item(key = "end") { Box(Modifier.height(MetroDimens.Row)) }
+    }
+}
+
+/** A kind of finding, collapsed: its title and what it means, with how many wait in a circle on the right. */
+@Composable
+private fun KindCard(
+    kind: FindingKind,
+    count: Int,
+    open: Boolean,
+    modifier: Modifier = Modifier,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .background(if (open) Metro.accent.fill.copy(alpha = 0.14f) else Metro.colors.chrome)
+            .metroPress(onToggle)
+            .semantics { stateDescription = if (open) "open" else "closed" }
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .testTag("assistant-kind-${kind.name}"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            MetroText(kind.title, Metro.typography.groupHeader, maxLines = 1)
+            MetroText(kind.blurb, Metro.typography.caption, color = Metro.colors.secondary, maxLines = 2)
+        }
+        Box(
+            Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(Metro.accent.fill)
+                .testTag("assistant-kind-count-${kind.name}"),
+            contentAlignment = Alignment.Center,
+        ) {
+            MetroText(
+                "$count",
+                Metro.typography.body.copy(fontWeight = MetroWeights.Semibold),
+                color = Metro.accent.onFill,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
     }
 }
 

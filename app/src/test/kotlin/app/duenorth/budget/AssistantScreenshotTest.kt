@@ -44,8 +44,12 @@ class AssistantScreenshotTest {
     fun findingsDark() = snap("assistant_dark", dark = true, report = sampleAssistant())
 
     @Test
-    fun wrongAccountLight() =
-        snap("assistant_wrong_account_light", dark = false, report = AssistantReport(sampleAssistant().findings.drop(1)))
+    fun wrongAccountOpenLight() =
+        snap("assistant_wrong_account_light", dark = false, report = sampleAssistant(), expanded = setOf(FindingKind.WRONG_ACCOUNT))
+
+    @Test
+    fun wrongAccountOpenDark() =
+        snap("assistant_wrong_account_dark", dark = true, report = sampleAssistant(), expanded = setOf(FindingKind.WRONG_ACCOUNT))
 
     @Test
     fun clearLight() = snap("assistant_clear_light", dark = false, report = AssistantReport.EMPTY)
@@ -58,6 +62,7 @@ class AssistantScreenshotTest {
         name: String,
         dark: Boolean,
         report: AssistantReport,
+        expanded: Set<FindingKind> = emptySet(),
     ) {
         val shell =
             MonthShell(
@@ -92,7 +97,7 @@ class AssistantScreenshotTest {
                         initialSection = ScreenBar.HOME_ASSISTANT,
                         onGesture = {},
                         modifier = Modifier.weight(1f),
-                        assistant = AssistantUi(report = report),
+                        assistant = AssistantUi(report = report, expanded = expanded),
                     )
                     MetroAppBar(actions, false, {}, windowInsets = WindowInsets(0))
                 }
