@@ -225,23 +225,14 @@ class ShellScreenshotTest {
             section = HomeSections.headers.indexOf(HomeSections.ACCOUNTS),
         )
 
-    // Bank sync on the accounts page: a strip just above the bar names the account fetching now.
+    // Bank sync on the accounts page: the working dots run along the top, and nothing covers the page.
     @Test
     fun accountsBankSyncingLight() = bankSyncSnap("accounts_bank_syncing_light", dark = false, BankSyncUi(accountName = "Joint checking"))
 
     @Test
     fun accountsBankSyncingDark() = bankSyncSnap("accounts_bank_syncing_dark", dark = true, BankSyncUi(accountName = "Joint checking"))
 
-    // An account failed mid-sync: its short error shows under the one fetching now.
-    @Test
-    fun accountsBankSyncErrorLight() =
-        bankSyncSnap("accounts_bank_sync_error_light", dark = false, BankSyncUi(accountName = "Savings", failures = listOf(cardFailure)))
-
-    @Test
-    fun accountsBankSyncErrorDark() =
-        bankSyncSnap("accounts_bank_sync_error_dark", dark = true, BankSyncUi(accountName = "Savings", failures = listOf(cardFailure)))
-
-    // Done with an error: the glyph rests and the strip offers retry.
+    // Done with an error: the red tile above the bar names the failed account and offers retry.
     @Test
     fun accountsBankSyncRetryLight() =
         bankSyncSnap("accounts_bank_sync_retry_light", dark = false, BankSyncUi(running = false, failures = listOf(cardFailure)))
@@ -250,7 +241,7 @@ class ShellScreenshotTest {
     fun accountsBankSyncRetryDark() =
         bankSyncSnap("accounts_bank_sync_retry_dark", dark = true, BankSyncUi(running = false, failures = listOf(cardFailure)))
 
-    // The tile stays over every page while it matters: here over the budget.
+    // The dots run over every page while banks fetch: here over the budget.
     @Test
     fun budgetBankSyncingDark() =
         bankSyncSnap("budget_bank_syncing_dark", dark = true, BankSyncUi(accountName = "Checking"), HomeSections.BUDGET)
@@ -448,11 +439,12 @@ class ShellScreenshotTest {
         val accounts = section == ScreenBar.HOME_ACCOUNTS
         val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
         val justFiled = if (filed) listOf(InboxFiled(shell.inbox.first(), 0, "Dining")) else emptyList()
-        // A still of a running sync: a turning glyph never lets the capture settle.
+        // A still of a running sync: the working dots held at one moment, since running dots never let the capture settle.
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark, style = style, animationsEnabled = bankSync?.running != true) {
-                CompositionLocalProvider(LocalFormatPrefs provides prefs) {
+                CompositionLocalProvider(LocalFormatPrefs provides prefs, LocalWorkingDotsAt provides 1100f) {
                     Column(Modifier.width(390.dp).height(780.dp)) {
+                        if (bankSync?.running == true) WorkingDots(description = BankSyncCopy.SYNCING_BANKS)
                         Box(Modifier.weight(1f)) {
                             HomePivot(
                                 shell = shown,
@@ -468,7 +460,7 @@ class ShellScreenshotTest {
                                 showAhead = showAhead,
                                 accountsReorder = accountsReorder,
                             )
-                            bankSync?.let { BankSyncPanel(it, {}, {}, Modifier.align(Alignment.BottomCenter)) }
+                            bankSync?.takeUnless { it.running }?.let { BankSyncPanel(it, {}, {}, Modifier.align(Alignment.BottomCenter)) }
                         }
                         MetroAppBar(
                             actions =

@@ -1107,10 +1107,12 @@ fun ShellChrome(
     progress: Float? = null,
     /** A save is running: the indeterminate dots run along the top of the page, where sync's bar goes. */
     working: Boolean = false,
+    /** What the working dots say to a screen reader. */
+    workingLabel: String = WorkingCopy.WORKING,
     statusBar: WindowInsets = WindowInsets.statusBars,
     /** False while a page puts its own panel where the bar goes, as the budget's keypad does. */
     bar: Boolean = true,
-    /** Laid over the bottom of the page, just above the bar, as the accounts page's bank sync panel is. */
+    /** Laid over the bottom of the page, just above the bar, as a failed bank sync's tile is. */
     overBar: (@Composable (Modifier) -> Unit)? = null,
     content: @Composable (Modifier) -> Unit,
 ) {
@@ -1132,7 +1134,7 @@ fun ShellChrome(
             if (syncing) {
                 SyncProgressBar(progress)
             } else if (working) {
-                WorkingDots()
+                WorkingDots(description = workingLabel)
             }
             Box(Modifier.weight(1f).aboveKeyboard(keyboard) { if (bar) barHeight else 0 }) {
                 content(Modifier.fillMaxSize())
