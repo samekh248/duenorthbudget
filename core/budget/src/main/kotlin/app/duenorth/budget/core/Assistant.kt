@@ -12,6 +12,7 @@ object AssistantCopy {
     const val ALL_CLEAR_DETAIL = "No duplicates, nothing in the wrong account, the budget is covered, and every account looks current."
     const val MAYBE = "maybe"
     const val TO_LOOK_AT = "to look at"
+    const val REFRESH = "refresh"
 
     /** What a finding says in place of its buttons while its fix is being saved. */
     fun working(action: FindingAction): String =

@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.AssistantCopy
 import app.duenorth.budget.core.AutoHoldChoice
 import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BudgetMode
@@ -194,8 +195,10 @@ object ScreenBar {
                                 if (showClosed) AccountScreenCopy.HIDE_CLOSED else AccountScreenCopy.SHOW_CLOSED,
                             ),
                         ) + undo(undoLabel) + settings()
-                    // The assistant fixes things from its own panels; its bar keeps undo and settings.
-                    homeSection == HOME_ASSISTANT -> listOf(addTransaction()) + undo(undoLabel) + settings()
+                    // The assistant fixes things from its own panels; its bar refreshes the checks and keeps undo and settings.
+                    homeSection == HOME_ASSISTANT ->
+                        listOf(spec("refresh-assistant", AppGlyph.Sync, AssistantCopy.REFRESH), addTransaction()) +
+                            undo(undoLabel) + settings()
                     // Add a transaction and edit budget are the budget's buttons; hold and categories head the menu.
                     mode == BudgetMode.TRACKING ->
                         listOf(addTransaction()) + editBudget() + categories() + hidden(showHidden) + rules() +
@@ -455,6 +458,7 @@ object ScreenBar {
             "sync" -> state.import.fetchPending || state.bankSync.syncing
             "bank-sync" -> state.bankSync.syncing
             "refresh" -> state.remoteRefreshing
+            "refresh-assistant" -> state.assistant.refreshing || state.syncing
             else -> false
         }
 
@@ -598,6 +602,7 @@ class ScreenBarHandlers(
     val onMergeSelected: () -> Unit = {},
     val onMergeInboxSelected: () -> Unit = {},
     val onSyncServer: () -> Unit = {},
+    val onRefreshAssistant: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
     val onEditBudget: () -> Unit = {},
@@ -668,6 +673,7 @@ class ScreenBarHandlers(
             "end-selecting" -> onEndSelecting
             "select-inbox" -> onSelectInbox
             "sync-server" -> onSyncServer
+            "refresh-assistant" -> onRefreshAssistant
             "accept-selected" -> onAcceptSelected
             "categorize-selected" -> onCategorizeSelected
             "end-inbox-selecting" -> onEndInboxSelecting

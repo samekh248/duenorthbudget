@@ -21,6 +21,8 @@ data class AssistantUi(
     val settling: Set<String> = emptySet(),
     /** The finding whose fix is saving now, shown with what it is doing in place of its buttons. */
     val working: Working? = null,
+    /** A refresh the person asked for is still reading the checks again. */
+    val refreshing: Boolean = false,
 ) {
     data class Working(
         val key: String,
@@ -39,6 +41,7 @@ class AssistantHolder internal constructor(
     private val bankSync: BankSyncHolder,
     private val envelopes: EnvelopesHolder,
     private val schedules: SchedulesHolder,
+    private val budgetFiles: BudgetFilesHolder,
 ) {
     private val state get() = host.state.value
 
@@ -49,8 +52,9 @@ class AssistantHolder internal constructor(
         val budgetId = state.settings.openBudgetId ?: return
         val generation = ++reads
         host.scope.launch {
-            val report = withContext(host.io) { runCatching { host.library.readAssistant(budgetId) }.getOrNull() } ?: return@launch
+            val report = withContext(host.io) { runCatching { host.library.readAssistant(budgetId) }.getOrNull() }
             if (generation != reads) return@launch
+            if (report == null) return@launch update { it.copy(refreshing = false) }
             val keys = report.findings.map { it.key }.toSet()
             // A finished write's finding is gone from the new read; one a bank sync is still working on stays hidden.
             val syncing = host.state.value.bankSync.syncing
@@ -60,9 +64,20 @@ class AssistantHolder internal constructor(
                     settling = if (syncing || host.writing) it.settling intersect keys else emptySet(),
                     // Gone from the read means the fix landed; still there means a read from before it, while it saves.
                     working = it.working?.takeIf { working -> working.key in keys && host.writing },
+                    refreshing = false,
                 )
             }
         }
+    }
+
+    /**
+     * The refresh button: with a server budget it first pulls in what other devices sent, as the inbox's sync does,
+     * and the reload after it reads the checks again; a budget on this phone only reads the checks again.
+     */
+    fun refresh() {
+        if (state.settings.openBudgetId == null || state.syncing || state.assistant.refreshing) return
+        update { it.copy(refreshing = true) }
+        if (state.signedIn && !state.cloudFileId.isNullOrBlank()) budgetFiles.syncInbox() else load()
     }
 
     private var reads = 0

@@ -287,6 +287,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onMergeSelected = model.register::mergeSelected,
                     onMergeInboxSelected = model.inbox::mergeSelected,
                     onSyncServer = model.budgetFiles::syncInbox,
+                    onRefreshAssistant = model.assistant::refresh,
                     onCancel = {
                         when (state.route) {
                             is ShellRoute.ImportPreviewRoute -> model.import.cancel()

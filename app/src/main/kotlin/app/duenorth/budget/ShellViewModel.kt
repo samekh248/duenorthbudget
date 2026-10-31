@@ -237,7 +237,7 @@ class ShellViewModel(
     val schedules: SchedulesHolder = SchedulesHolder(host, rules)
 
     /** The assistant: what the checks found, and their fixes. */
-    val assistant: AssistantHolder = AssistantHolder(host, register, reconcile, bankSync, envelopes, schedules)
+    val assistant: AssistantHolder = AssistantHolder(host, register, reconcile, bankSync, envelopes, schedules, budgetFiles)
 
     /** Bank link: linking an account to a bank, and repairing a link. */
     val bankLink: BankLinkHolder = BankLinkHolder(host)
