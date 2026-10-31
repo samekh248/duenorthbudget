@@ -143,6 +143,22 @@ class InboxHolder internal constructor(
         }
     }
 
+    /** Merges the checked rows into one, as desktop Actual's merge does, and leaves select mode. */
+    fun mergeSelected() {
+        val picked = state.inbox.selection ?: return
+        val rows =
+            state.shell
+                ?.inbox
+                .orEmpty()
+                .filter { it.id in picked }
+        if (rows.size < 2 || host.writing) return
+        update { it.copy(selection = null) }
+        host.launchWrite { id ->
+            val result = withContext(host.io) { host.library.mergeTransactions(id, rows.map { it.id }, false) }
+            host.publish(result, rows.first().accountId, stayOnRegister = false)
+        }
+    }
+
     /** Opens the picker for every checked row; the category picked files them all. */
     fun categorizeSelected() {
         val picked = state.inbox.selection ?: return

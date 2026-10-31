@@ -16,6 +16,7 @@ import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterPart
 import app.duenorth.budget.core.RegisterRow
 import app.duenorth.budget.core.RegisterSearch
+import app.duenorth.budget.core.TransactionMerge
 import app.duenorth.budget.design.components.AppBarButton
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.MetroAppBar
@@ -88,6 +89,61 @@ class RegisterScreenshotTest {
                                 .specsFor(ShellRoute.Register("visa"), true, BudgetMode.ENVELOPE, bankLinked = true)
                                 .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
                         expanded = expanded,
+                        onExpandedChange = {},
+                    )
+                }
+            }
+        }
+    }
+
+    // Two picked rows of one amount, the bank's copy and the one entered by hand: merge joins the select bar.
+    @Test
+    fun mergeLight() = snapMerge("register_select_merge_light", dark = false)
+
+    @Test
+    fun mergeDark() = snapMerge("register_select_merge_dark", dark = true)
+
+    private fun snapMerge(
+        name: String,
+        dark: Boolean,
+    ) {
+        val base = page()
+        val coffee = base.rows.first { it.id == "coffee" }
+        val bank =
+            coffee.copy(
+                id = "coffee-bank",
+                payee = "CORNER COFFEE #42",
+                date = 20261008,
+                categoryId = null,
+                categoryLabel = "no category",
+            )
+        val shown = base.copy(rows = listOf(bank) + base.rows)
+        val picked = setOf("coffee", "coffee-bank")
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Column(Modifier.width(390.dp).height(780.dp)) {
+                    SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
+                        RegisterScreen(
+                            page = shown,
+                            onGesture = {},
+                            onOpen = {},
+                            onAdd = {},
+                            onReconcile = {},
+                            selection = picked,
+                        )
+                    }
+                    MetroAppBar(
+                        actions =
+                            ScreenBar
+                                .specsFor(
+                                    ShellRoute.Register("visa"),
+                                    hasBudget = true,
+                                    mode = BudgetMode.ENVELOPE,
+                                    selecting = true,
+                                    registerMerge =
+                                        TransactionMerge.canMerge(TransactionMerge.ofRegister(shown.rows.filter { it.id in picked })),
+                                ).map { ScreenAction(it.id, it.glyph, it.label, it.primary, apart = it.apart) {} },
+                        expanded = false,
                         onExpandedChange = {},
                     )
                 }

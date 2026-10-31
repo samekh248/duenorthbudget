@@ -157,6 +157,24 @@ class RegisterHolder internal constructor(
         }
     }
 
+    /** Merges the picked transactions into one, as desktop Actual's merge does, then leaves select mode. */
+    fun mergeSelected() {
+        val accountId = state.openAccountId() ?: return
+        val picked = state.registerUi.selection ?: return
+        // Keep the register's order, newest first, so the merge reads the same each time.
+        val ordered =
+            state.register
+                ?.rows
+                .orEmpty()
+                .map { it.id }
+                .filter { it in picked }
+        if (ordered.size < 2 || host.writing) return
+        host.launchWrite { id ->
+            val result = withContext(host.io) { host.library.mergeTransactions(id, ordered, false) }
+            host.publish(result, accountId, stayOnRegister = true)
+        }
+    }
+
     fun delete(transactionId: String) {
         val accountId = state.openAccountId() ?: return
         host.launchWrite { id ->

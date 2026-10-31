@@ -622,6 +622,15 @@ class BudgetLibrary(
             }
         } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    /** Merges two or more transactions of one account into one, as desktop Actual's merge does, as one undo step. */
+    fun mergeTransactions(
+        budgetId: String,
+        transactionIds: List<String>,
+        force: Boolean,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.MERGE) { MergeBook(it).merge(transactionIds, force) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     fun notAMatch(
         budgetId: String,
         bankId: String,
