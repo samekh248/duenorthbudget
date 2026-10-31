@@ -101,14 +101,18 @@ fun AssistantSection(
                 KindCard(kind, all.size, open, Modifier.padding(top = 12.dp)) { onToggleExpanded(kind) }
             }
             if (open) {
+                // An open card grows downward: its findings carry on in the card itself, each under a thin rule of the page's own colour.
                 items(all, key = { it.key }) { finding ->
-                    FindingPanel(
-                        finding,
-                        money,
-                        onAct,
-                        Modifier.padding(top = 12.dp),
-                        working = working?.takeIf { it.key == finding.key }?.label,
-                    )
+                    Column(Modifier.fillMaxWidth().background(Metro.colors.chrome)) {
+                        Box(
+                            Modifier
+                                .padding(horizontal = CARD_PADDING)
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(Metro.colors.background),
+                        )
+                        FindingPanel(finding, money, onAct, working = working?.takeIf { it.key == finding.key }?.label)
+                    }
                 }
             }
         }
@@ -128,10 +132,10 @@ private fun KindCard(
     Row(
         modifier
             .fillMaxWidth()
-            .background(if (open) Metro.accent.fill.copy(alpha = 0.14f) else Metro.colors.chrome)
+            .background(Metro.colors.chrome)
             .metroPress(onToggle)
             .semantics { stateDescription = if (open) "open" else "closed" }
-            .padding(horizontal = 16.dp, vertical = 14.dp)
+            .padding(horizontal = CARD_PADDING, vertical = 14.dp)
             .testTag("assistant-kind-${kind.name}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -157,6 +161,9 @@ private fun KindCard(
         }
     }
 }
+
+/** A card's side padding, shared by its header and the findings an open card holds. */
+private val CARD_PADDING = 16.dp
 
 /** Nothing to look at: says so in the middle of the item. */
 @Composable
@@ -189,8 +196,8 @@ internal fun FindingPanel(
     Column(
         modifier
             .fillMaxWidth()
-            .ledgerFill(Metro.colors.chrome)
-            .padding(vertical = 14.dp)
+            .background(Metro.colors.chrome)
+            .padding(horizontal = CARD_PADDING, vertical = 14.dp)
             .testTag("finding-${finding.key}"),
     ) {
         Column(if (working != null) Modifier.alpha(WORKING_DIM) else Modifier) { FindingBody(finding, money) }
