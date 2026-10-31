@@ -52,6 +52,28 @@ class AssistantScreenshotTest {
         snap("assistant_wrong_account_dark", dark = true, report = sampleAssistant(), expanded = setOf(FindingKind.WRONG_ACCOUNT))
 
     @Test
+    fun moreLight() =
+        snap("assistant_more_light", dark = false, report = sampleAssistantMore(), expanded = setOf(FindingKind.NEAR_DUPLICATE))
+
+    @Test
+    fun allKindsLight() =
+        snap(
+            "assistant_all_light",
+            dark = false,
+            report =
+                AssistantReport(sampleAssistant().findings + sampleAssistantMore().findings),
+        )
+
+    @Test
+    fun accountsDark() =
+        snap(
+            "assistant_accounts_dark",
+            dark = true,
+            report = AssistantReport(sampleAssistantMore().findings.drop(2)),
+            expanded = setOf(FindingKind.STALE_SYNC, FindingKind.RECONCILE),
+        )
+
+    @Test
     fun clearLight() = snap("assistant_clear_light", dark = false, report = AssistantReport.EMPTY)
 
     @Test
@@ -161,6 +183,70 @@ internal fun sampleAssistant(): AssistantReport {
                         FindingAction.Delete("refund"),
                     ),
                 accountId = "checking",
+            ),
+        ),
+    )
+}
+
+internal fun sampleAssistantMore(): AssistantReport {
+    fun side(
+        id: String,
+        payee: String,
+        date: Int,
+        amount: Long,
+        account: String,
+        category: String = "",
+    ) = MatchSide(id, payee, date, amount, account, account.replaceFirstChar { it.uppercase() }, null, category, "")
+    return AssistantReport(
+        listOf(
+            Finding(
+                key = "near:dinner|bank",
+                kind = FindingKind.NEAR_DUPLICATE,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.nearDuplicate("Luigi's", "LUIGIS TRATT"),
+                sides =
+                    listOf(
+                        FindingSide(AssistantCopy.ENTERED, side("dinner", "Luigi's", 20261020, -4000, "visa", "Dining")),
+                        FindingSide(AssistantCopy.BANK_SYNC, side("bank", "LUIGIS TRATT", 20261022, -4720, "visa")),
+                    ),
+                reasons = listOf(AssistantCopy.SAME_ACCOUNT, "2 days apart"),
+                actions = listOf(FindingAction.AdoptAndMatch("dinner", "bank"), FindingAction.Dismiss(AssistantCopy.NOT_THE_SAME)),
+                accountId = "visa",
+                difference = -720,
+            ),
+            Finding(
+                key = "transfer:out|in",
+                kind = FindingKind.TRANSFER,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.transfer("Checking", "Visa"),
+                sides =
+                    listOf(
+                        FindingSide(AssistantCopy.BANK_SYNC, side("out", "CHASE CARD PAYMENT", 20261020, -50000, "checking", "Bills")),
+                        FindingSide(AssistantCopy.BANK_SYNC, side("in", "PAYMENT THANK YOU", 20261021, 50000, "visa")),
+                    ),
+                reasons = listOf(AssistantCopy.OPPOSITE_AMOUNTS, "1 day apart", AssistantCopy.DIFFERENT_ACCOUNTS),
+                actions = listOf(FindingAction.LinkTransfer("out", "in"), FindingAction.Dismiss(AssistantCopy.NOT_A_TRANSFER)),
+                accountId = "checking",
+            ),
+            Finding(
+                key = "stale:savings|1",
+                kind = FindingKind.STALE_SYNC,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.staleSync("Ally savings", 5),
+                sides = emptyList(),
+                reasons = emptyList(),
+                actions = listOf(FindingAction.SyncBank, FindingAction.Dismiss(AssistantCopy.LATER)),
+                accountId = "savings",
+            ),
+            Finding(
+                key = "reconcile:visa|20260830",
+                kind = FindingKind.RECONCILE,
+                sure = FindingSure.HIGH,
+                headline = AssistantCopy.reconcile("Visa", "aug 30", 41),
+                sides = emptyList(),
+                reasons = emptyList(),
+                actions = listOf(FindingAction.Reconcile("visa"), FindingAction.Dismiss(AssistantCopy.LATER)),
+                accountId = "visa",
             ),
         ),
     )

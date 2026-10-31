@@ -641,10 +641,40 @@ class BudgetLibrary(
         bankId: String,
     ): WriteResult =
         edit(budgetId, UndoCopy.MOVE_AND_MERGE) { session ->
-            AssistantBook(session, clock.today()).moveAndMatch(enteredId, bankId).also {
+            AssistantBook(session, clock.today(), ids).moveAndMatch(enteredId, bankId).also {
                 if (it is WriteResult.Saved) CategoryLearning(session, ids).learnFrom(bankId)
             }
         } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** The assistant's move: a transaction goes to another account, as one undo step. */
+    fun moveTransaction(
+        budgetId: String,
+        transactionId: String,
+        accountId: String,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.MOVE_TRANSACTION) { AssistantBook(it, clock.today(), ids).moveTo(transactionId, accountId) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** The assistant's near-duplicate fix: the entry takes the bank's amount and the two become one. */
+    fun adoptAndMatch(
+        budgetId: String,
+        enteredId: String,
+        bankId: String,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.MATCH) { session ->
+            AssistantBook(session, clock.today(), ids).adoptAndMatch(enteredId, bankId).also {
+                if (it is WriteResult.Saved) CategoryLearning(session, ids).learnFrom(bankId)
+            }
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** The assistant's transfer fix: two transactions in different accounts become one transfer. */
+    fun linkTransfer(
+        budgetId: String,
+        fromId: String,
+        toId: String,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.LINK_TRANSFER) { AssistantBook(it, clock.today(), ids).linkTransfer(fromId, toId) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     /** Never shows the assistant's finding [key] again; a possible match is the inbox's not a match. */
     fun dismissFinding(

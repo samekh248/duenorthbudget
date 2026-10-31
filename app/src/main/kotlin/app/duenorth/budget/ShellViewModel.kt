@@ -191,9 +191,6 @@ class ShellViewModel(
     /** The inbox: filing, deleting and opening what came in. */
     val inbox: InboxHolder = InboxHolder(host)
 
-    /** The assistant: what the checks found, and their fixes. */
-    val assistant: AssistantHolder = AssistantHolder(host)
-
     /** Bank sync: every SimpleFIN account fetches, then the budget syncs. */
     val bankSync: BankSyncHolder = BankSyncHolder(host)
 
@@ -217,6 +214,9 @@ class ShellViewModel(
 
     /** Reconcile: matching an account's cleared transactions to a statement. */
     val reconcile: ReconcileHolder = ReconcileHolder(host, register)
+
+    /** The assistant: what the checks found, and their fixes. */
+    val assistant: AssistantHolder = AssistantHolder(host, register, reconcile, bankSync)
 
     /** Budget files: creating, opening, switching and replacing a budget, unlocking it, signing out and syncing it. */
     val budgetFiles: BudgetFilesHolder = BudgetFilesHolder(host, samples, developerMode, settingsUi)

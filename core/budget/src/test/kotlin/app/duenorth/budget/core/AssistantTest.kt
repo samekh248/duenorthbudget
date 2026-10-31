@@ -147,6 +147,108 @@ class AssistantTest {
         }
     }
 
+    @Test
+    fun anEntryOffByATipFromItsBankCopyTakesTheBankAmount() {
+        db { session ->
+            entered(session, "dinner", date = 20261020, amount = -4000, category = "c-dining")
+            bank(session, "bank-dinner", date = 20261022, amount = -4720, financialId = "f-d")
+            session.exec("UPDATE transactions SET description = 'p-corner' WHERE id = 'bank-dinner'")
+            val finding = read(session).findings.single()
+            assertEquals(FindingKind.NEAR_DUPLICATE, finding.kind)
+            assertEquals(-720L, finding.difference)
+            assertEquals(WriteResult.Saved, AssistantBook(session, TODAY).adoptAndMatch("dinner", "bank-dinner"))
+            val row = session.query("SELECT * FROM transactions WHERE id = 'bank-dinner'").single()
+            assertEquals(-4720L, row.long("amount"))
+            assertEquals("c-dining", row.str("category"))
+            assertEquals(1, session.query("SELECT id FROM transactions WHERE IFNULL(tombstone, 0) = 0").size)
+        }
+    }
+
+    @Test
+    fun moneyOutOfOneAccountAndIntoAnotherLinksAsATransfer() {
+        db { session ->
+            bank(session, "out", date = 20261020, account = "checking", amount = -50000, financialId = "f-out")
+            bank(session, "in", date = 20261021, account = "visa", amount = 50000, financialId = "f-in")
+            session.exec("UPDATE transactions SET category = 'c-dining' WHERE id = 'out'")
+            val finding = read(session).findings.single()
+            assertEquals(FindingKind.TRANSFER, finding.kind)
+            assertEquals(FindingSure.HIGH, finding.sure)
+            assertEquals(
+                WriteResult.Saved,
+                AssistantBook(
+                    session,
+                    TODAY,
+                    generateSequence(1) {
+                        it + 1
+                    }.map { "p-new-$it" }.iterator()::next,
+                ).linkTransfer("out", "in"),
+            )
+            val out = session.query("SELECT * FROM transactions WHERE id = 'out'").single()
+            val into = session.query("SELECT * FROM transactions WHERE id = 'in'").single()
+            assertEquals("in", out.str("transferred_id"))
+            assertEquals("out", into.str("transferred_id"))
+            assertNull(out.str("category"))
+            assertEquals(
+                "visa",
+                session
+                    .query(
+                        "SELECT transfer_acct FROM payees WHERE id = ?",
+                        listOf(out.str("description")),
+                    ).single()
+                    .str("transfer_acct"),
+            )
+            assertTrue(read(session).findings.isEmpty())
+        }
+    }
+
+    @Test
+    fun anEntryWhosePayeeIsAlmostAlwaysElsewhereMayBeInTheWrongAccount() {
+        db { session ->
+            (1..6).forEach { bank(session, "gas-$it", date = 20260900 + it, amount = -3000L - it, payee = "p-gas", financialId = "f-g$it") }
+            entered(session, "gas-cash", date = 20261025, account = "wallet", amount = -2500, payee = "p-gas", category = "c-dining")
+            val finding = read(session).findings.single()
+            assertEquals(FindingKind.WRONG_ACCOUNT, finding.kind)
+            assertEquals(FindingSure.MAYBE, finding.sure)
+            assertEquals(FindingAction.MoveTo("gas-cash", "visa", "Visa"), finding.actions.first())
+            assertEquals(WriteResult.Saved, AssistantBook(session, TODAY).moveTo("gas-cash", "visa"))
+            assertEquals("visa", session.query("SELECT acct FROM transactions WHERE id = 'gas-cash'").single().str("acct"))
+        }
+    }
+
+    @Test
+    fun accountsThatHaveGoneQuietOrUnreconciledAreFlagged() {
+        db { session ->
+            val fiveDaysAgo =
+                TODAY
+                    .minusDays(5)
+                    .atStartOfDay(java.time.ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+            session.exec(
+                "UPDATE accounts SET account_sync_source = 'simpleFin', account_id = 'b-1', last_sync = ? WHERE id = 'visa'",
+                listOf(fiveDaysAgo.toString()),
+            )
+            bank(session, "old", date = 20260801, account = "checking", amount = -100, financialId = "f-old")
+            session.exec("UPDATE transactions SET reconciled = 1 WHERE id = 'old'")
+            bank(session, "new", date = 20261020, account = "checking", amount = -200, financialId = "f-new")
+            bank(session, "stuck", date = 20260920, account = "visa", amount = -300, financialId = "f-stuck")
+            session.exec("UPDATE transactions SET cleared = 0 WHERE id = 'stuck'")
+            val kinds = read(session).findings.map { it.kind to it.accountId }
+            assertEquals(
+                listOf(
+                    FindingKind.STALE_SYNC to "visa",
+                    FindingKind.RECONCILE to "checking",
+                    FindingKind.OLD_UNCLEARED to "visa",
+                ),
+                kinds,
+            )
+            AssistantBook(session, TODAY).dismiss(read(session).findings.first().key)
+            AssistantBook(session, TODAY).dismiss(read(session).findings.first().key)
+            // An account finding's key survives the next dismissal's clean-up.
+            assertEquals(2, AssistantBook.dismissed(session).size)
+        }
+    }
+
     private fun read(session: SqlSession) = AssistantReader.read(session, TODAY)
 
     private fun entered(
@@ -167,7 +269,8 @@ class AssistantTest {
         financialId: String? = "f-1",
         account: String = "visa",
         amount: Long = -575,
-    ) = insert(session, id, date, amount, account, "p-bank", null, null, financialId, "CORNER COFFEE #42")
+        payee: String = "p-bank",
+    ) = insert(session, id, date, amount, account, payee, null, null, financialId, "CORNER COFFEE #42")
 
     private fun insert(
         session: SqlSession,
