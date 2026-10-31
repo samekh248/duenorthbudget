@@ -25,16 +25,6 @@ class BankSyncPanelContentTest {
     @get:Rule
     val compose = createHostComposeRule()
 
-    // While banks fetch the panel names the account and offers nothing to tap.
-    @Test
-    fun runningNamesTheAccountWithoutActions() {
-        compose.mainClock.autoAdvance = false
-        compose.setContent { MetroTheme { BankSyncPanel(BankSyncUi(accountName = "Checking"), {}, {}) } }
-        compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithTag("bank-sync-status").assertTextEquals("Checking")
-        assertEquals(0, compose.onAllNodesWithTagCount("bank-sync-retry"))
-    }
-
     // Done with an error: each failed account shows with its reason, and retry and dismiss answer.
     @Test
     fun finishedWithErrorsOffersRetryAndDismiss() {
@@ -50,19 +40,12 @@ class BankSyncPanelContentTest {
         assertEquals(1, dismissed)
     }
 
-    // A failed sync's tile opens its page on a tap; a running one does not.
+    // A failed sync's tile opens its page on a tap.
     @Test
     fun failedTileOpensItsPage() {
         var opened = 0
-        var ui by androidx.compose.runtime.mutableStateOf(BankSyncUi(accountName = "Checking"))
-        compose.mainClock.autoAdvance = false
+        val ui = BankSyncUi(running = false, failures = listOf(BankSyncFailure("Card", "fetch did not finish")))
         compose.setContent { MetroTheme { BankSyncPanel(ui, {}, {}, onOpen = { opened++ }) } }
-        compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithTag("bank-sync-panel").performClick()
-        assertEquals(0, opened)
-        ui = BankSyncUi(running = false, failures = listOf(BankSyncFailure("Card", "fetch did not finish")))
-        compose.waitForIdle()
-        compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithTag("bank-sync-panel").performClick()
         assertEquals(1, opened)
     }

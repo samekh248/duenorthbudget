@@ -337,16 +337,17 @@ fun DueNorthApp(model: ShellViewModel) {
                 )
             }
         val actions = formSaveHost.bar ?: ScreenBar.forState(state, handlers)
-        // The bank sync tile stays over every page while banks fetch or a failure waits.
+        // While banks fetch the working dots run along the top; a failed sync's tile stays over every page until closed.
         ShellChrome(
             actions,
             syncing = state.syncing || state.import.fetchPending,
             progress = state.syncProgress,
-            working = state.writing || state.assistant.working != null,
+            working = state.writing || state.assistant.working != null || state.bankSync.syncing,
+            workingLabel = if (state.bankSync.syncing) BankSyncCopy.SYNCING_BANKS else WorkingCopy.WORKING,
             bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
             overBar =
                 state.bankSync.panel
-                    ?.takeIf { state.route != ShellRoute.BankSyncReport }
+                    ?.takeIf { !it.running && state.route != ShellRoute.BankSyncReport }
                     ?.let { ui ->
                         { modifier ->
                             BankSyncPanel(

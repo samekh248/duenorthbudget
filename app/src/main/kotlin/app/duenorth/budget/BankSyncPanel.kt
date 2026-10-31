@@ -35,12 +35,11 @@ import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroText
-import app.duenorth.budget.design.components.syncSpin
 import app.duenorth.budget.design.metroTilt
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 
-/** The accounts page's bank sync panel, just above the app bar. */
+/** A bank sync's progress and outcome: the failed sync's tile and its full page show it. */
 data class BankSyncUi(
     val running: Boolean = true,
     /** The linked account fetching now; null until the first one starts. */
@@ -101,10 +100,10 @@ object BankSyncCopy {
 private const val SHOWN_FAILURES = 1
 
 /**
- * The bank sync status, as a WP toast: a solid accent tile floating a gutter in from the edges just
- * above the app bar, over whatever page is showing. While banks fetch it turns a small sync glyph
- * beside the account fetching now, with any account that failed under it. A sync that ends with
- * errors turns the tile red and offers retry and close; a clean sync takes it away.
+ * A failed bank sync, as a WP toast: a solid red tile floating a gutter in from the edges just above
+ * the app bar, over whatever page is showing. It names what went wrong and the first failed account,
+ * and offers retry and close; a tap on it opens the full page. While banks fetch there is no tile:
+ * the working dots run along the top of the page instead, and a clean sync shows nothing.
  */
 @Composable
 fun BankSyncPanel(
@@ -112,13 +111,11 @@ fun BankSyncPanel(
     onRetry: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    /** A tap on a failed sync's tile opens its full page. */
+    /** A tap on the tile opens the failed sync's full page. */
     onOpen: () -> Unit = {},
 ) {
     val colors = Metro.colors
-    val failed = !ui.running
-    val fill = if (failed) colors.errorFill else Metro.accent.fill
-    val on = if (failed) colors.onErrorFill else Metro.accent.onFill
+    val on = colors.onErrorFill
     val failures =
         ui.failures.take(SHOWN_FAILURES).map(BankSyncCopy::failure) +
             listOfNotNull((ui.failures.size - SHOWN_FAILURES).takeIf { it > 0 }?.let(BankSyncCopy::more))
@@ -126,50 +123,29 @@ fun BankSyncPanel(
         modifier
             .fillMaxWidth()
             .padding(MetroDimens.Gutter)
-            .then(
-                if (failed) {
-                    Modifier
-                        .metroTilt()
-                        .clickable(interactionSource = null, indication = null, onClickLabel = BankSyncCopy.DETAILS, onClick = onOpen)
-                } else {
-                    Modifier
-                },
-            ).background(fill)
+            .metroTilt()
+            .clickable(interactionSource = null, indication = null, onClickLabel = BankSyncCopy.DETAILS, onClick = onOpen)
+            .background(colors.errorFill)
             .padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp)
             .semantics { liveRegion = LiveRegionMode.Polite }
             .testTag("bank-sync-panel"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AppGlyphIcon(AppGlyph.Sync, on, Modifier.syncSpin(ui.running), size = 22.dp)
+        AppGlyphIcon(AppGlyph.Sync, on, size = 22.dp)
         Column(Modifier.padding(start = 12.dp, end = 8.dp).weight(1f)) {
             MetroText(
-                when {
-                    !failed -> BankSyncCopy.SYNCING_BANKS
-                    ui.error != null -> ui.error
-                    else -> BankSyncCopy.FINISHED_WITH_ERRORS
-                },
+                ui.error ?: BankSyncCopy.FINISHED_WITH_ERRORS,
                 Metro.typography.body,
                 Modifier.testTag("bank-sync-title"),
                 color = on,
                 maxLines = 1,
             )
-            if (!failed && ui.accountName != null) {
-                MetroText(
-                    ui.accountName,
-                    Metro.typography.caption,
-                    Modifier.testTag("bank-sync-status"),
-                    color = on.copy(alpha = 0.85f),
-                    maxLines = 1,
-                )
-            }
             failures.forEach { line ->
                 MetroText(line, Metro.typography.caption, Modifier.testTag("bank-sync-error"), color = on, maxLines = 1)
             }
         }
-        if (failed) {
-            TileAction(BankSyncCopy.RETRY, BankSyncCopy.RETRY, "bank-sync-retry", Metro.typography.body, on, onRetry)
-            TileAction(BankSyncCopy.CLOSE, BankSyncCopy.DISMISS, "bank-sync-dismiss", Metro.typography.subheader, on, onDismiss)
-        }
+        TileAction(BankSyncCopy.RETRY, BankSyncCopy.RETRY, "bank-sync-retry", Metro.typography.body, on, onRetry)
+        TileAction(BankSyncCopy.CLOSE, BankSyncCopy.DISMISS, "bank-sync-dismiss", Metro.typography.subheader, on, onDismiss)
     }
 }
 
