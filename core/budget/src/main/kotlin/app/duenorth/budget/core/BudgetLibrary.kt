@@ -676,6 +676,29 @@ class BudgetLibrary(
         edit(budgetId, UndoCopy.LINK_TRANSFER) { AssistantBook(it, clock.today(), ids).linkTransfer(fromId, toId) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    /** The assistant's price change: the schedule's amount becomes what it has cost lately. */
+    fun updateScheduleAmount(
+        budgetId: String,
+        scheduleId: String,
+        amountMinor: Long,
+    ): ScheduleWriteResult =
+        edit(budgetId, UndoCopy.SAVE_SCHEDULE) { session ->
+            val book = SchedulesBook(session, clock, ids)
+            val draft = book.draft(scheduleId) ?: return@edit ScheduleWriteResult.Rejected(ScheduleCopy.NO_SCHEDULE)
+            book.save(draft.copy(amountMinor = amountMinor))
+        } ?: ScheduleWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** The assistant's rule idea: transactions from [payeeId] get [categoryId] from now on. */
+    fun makeCategoryRule(
+        budgetId: String,
+        payeeId: String,
+        categoryId: String,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.MAKE_RULE) { session ->
+            RulesBook(session, ids).insertPayeeCategoryRule(payeeId, categoryId)
+            WriteResult.Saved
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     /** Never shows the assistant's finding [key] again; a possible match is the inbox's not a match. */
     fun dismissFinding(
         budgetId: String,

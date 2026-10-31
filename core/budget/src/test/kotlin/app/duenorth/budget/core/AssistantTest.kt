@@ -367,8 +367,77 @@ class AssistantTest {
         }
     }
 
-    /** The transaction and account checks; the budget checks have tests of their own. */
-    private fun read(session: SqlSession) = AssistantReport(readAll(session).findings.filter { it.kind.group != FindingGroup.BUDGET })
+    @Test
+    fun aMonthlyPaymentWithNoScheduleCanBecomeOne() {
+        db { session ->
+            listOf(20260701, 20260801, 20260901, 20261001).forEach { date ->
+                insert(session, "gym-$date", date, -4999, "checking", "p-gas", null, null, "f-$date", "GYM")
+            }
+            val finding = readAll(session).findings.single { it.kind == FindingKind.RECURRING }
+            assertEquals(FindingSure.HIGH, finding.sure)
+            assertEquals(FindingAction.MakeSchedule("gym-20261001", "2026-11-01"), finding.actions.first())
+            val made = SchedulesBook(session, { TODAY }).createFromTransaction("gym-20261001", "monthly", "2026-11-01")
+            assertEquals(ScheduleWriteResult.Posted, made)
+            assertTrue(readAll(session).findings.none { it.kind == FindingKind.RECURRING })
+        }
+    }
+
+    @Test
+    fun aScheduleWhoseDayWentByIsMissedAndAPriceChangeIsSeen() {
+        db { session ->
+            insert(session, "rent", 20260920, -150000, "checking", "p-gas", null, null, "f-rent", "RENT")
+            val book = SchedulesBook(session, { TODAY })
+            assertEquals(ScheduleWriteResult.Posted, book.createFromTransaction("rent", "monthly", "2026-10-20"))
+            val scheduleId = book.listAll().single().id
+            val missed = readAll(session).findings.single { it.kind == FindingKind.MISSED_SCHEDULE }
+            assertEquals(FindingAction.PostSchedule(scheduleId), missed.actions.first())
+            assertEquals(ScheduleWriteResult.Skipped, book.skip(scheduleId))
+            assertTrue(readAll(session).findings.none { it.kind == FindingKind.MISSED_SCHEDULE })
+
+            insert(session, "rent-a", 20260920, -155000, "checking", "p-gas", null, null, "f-a", "RENT")
+            insert(session, "rent-b", 20261020, -155000, "checking", "p-gas", null, null, "f-b", "RENT")
+            session.exec("UPDATE transactions SET schedule = ? WHERE id IN ('rent-a', 'rent-b')", listOf(scheduleId))
+            val price = readAll(session).findings.single { it.kind == FindingKind.PRICE_CHANGE }
+            assertEquals(FindingAction.UpdateScheduleAmount(scheduleId, -155000), price.actions.first())
+            assertEquals(-5000L, price.difference)
+            assertEquals(ScheduleWriteResult.Posted, book.save(book.draft(scheduleId)!!.copy(amountMinor = -155000)))
+            assertTrue(readAll(session).findings.none { it.kind == FindingKind.PRICE_CHANGE })
+        }
+    }
+
+    @Test
+    fun aPayeeAlwaysInOneCategoryGetsARuleIdea() {
+        db { session ->
+            (1..4).forEach { insert(session, "gas-$it", 20261000 + it, -3000, "checking", "p-gas", "c-dining", null, "f-$it", "SHELL") }
+            val idea = readAll(session).findings.single { it.kind == FindingKind.RULE_IDEA }
+            assertEquals("Shell went to Dining all 4 times. A rule could do it for you.", idea.headline)
+            assertEquals(FindingAction.MakeRule("p-gas", "c-dining"), idea.actions.first())
+            RulesBook(session).insertPayeeCategoryRule("p-gas", "c-dining")
+            assertTrue(readAll(session).findings.none { it.kind == FindingKind.RULE_IDEA })
+        }
+    }
+
+    @Test
+    fun oneShopUnderTwoNamesIsALookAlike() {
+        assertEquals("costco", TidyChecks.tidy("COSTCO #1123"))
+        assertEquals("costco", TidyChecks.tidy("Costco."))
+        db { session ->
+            entered(session, "mine", date = 20260901)
+            entered(session, "mine-2", date = 20260905)
+            bank(session, "bank", date = 20261015)
+            val alike = readAll(session).findings.single { it.kind == FindingKind.LOOKALIKE_PAYEE }
+            assertEquals(FindingAction.MergePayees("p-bank", "Corner Coffee"), alike.actions.first())
+            val merged = PayeeBook(session).rename("p-bank", "Corner Coffee", confirmMerge = true, rememberRule = true)
+            assertEquals(PayeeWriteResult.Saved, merged)
+            assertTrue(readAll(session).findings.none { it.kind == FindingKind.LOOKALIKE_PAYEE })
+        }
+    }
+
+    /** The transaction and account checks; the budget, schedule and tidy-up checks have tests of their own. */
+    private fun read(session: SqlSession) =
+        AssistantReport(
+            readAll(session).findings.filter { it.kind.group == FindingGroup.TRANSACTIONS || it.kind.group == FindingGroup.ACCOUNTS },
+        )
 
     private fun readAll(session: SqlSession) = AssistantReader.read(session, TODAY)
 

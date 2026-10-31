@@ -36,6 +36,50 @@ object AssistantCopy {
     const val HOLD = "hold for next month"
     const val SEE_BILLS = "see bills"
     const val GOT_IT = "got it"
+    const val MAKE_SCHEDULE = "make a schedule"
+    const val NOT_A_BILL = "not a bill"
+    const val POST_IT = "post it"
+    const val SKIP_IT = "skip it"
+    const val USE_NEW_PRICE = "use new price"
+    const val KEEP_IT = "keep it"
+    const val MAKE_RULE = "make a rule"
+    const val NO_THANKS = "no thanks"
+    const val MERGE_PAYEES = "merge payees"
+
+    const val LAST_PAID = "last paid"
+    const val AMOUNT = "amount"
+    const val SCHEDULE_SAYS = "schedule says"
+    const val LAST_TWO = "last two"
+
+    fun recurring(
+        payee: String,
+        times: Int,
+    ): String = "$payee has come about once a month, $times times in a row, with no schedule."
+
+    fun nextAround(day: String): String = "next around $day"
+
+    fun missed(
+        schedule: String,
+        day: String,
+    ): String = "$schedule was due $day and nothing has posted."
+
+    fun priceChange(schedule: String): String = "$schedule cost the same new amount the last two times."
+
+    fun ruleIdea(
+        payee: String,
+        category: String,
+        times: Int,
+    ): String = "$payee went to $category all $times times. A rule could do it for you."
+
+    fun lookalike(
+        payee: String,
+        other: String,
+    ): String = "$payee and $other look like the same payee."
+
+    fun usedTimes(
+        payee: String,
+        times: Int,
+    ): String = if (times == 1) "$payee once" else "$payee $times times"
 
     const val BUDGETED = "budgeted"
     const val SPENT = "spent"
@@ -170,7 +214,9 @@ enum class FindingGroup(
 ) {
     TRANSACTIONS("transactions"),
     BUDGET("budget"),
+    SCHEDULES("schedules"),
     ACCOUNTS("accounts"),
+    TIDY("tidy up"),
 }
 
 /** What a check found, which decides the heading and the buttons. */
@@ -189,10 +235,15 @@ enum class FindingKind(
     UNDERFUNDED(FindingGroup.BUDGET, "below goal", "categories budgeted under their goal"),
     TO_BUDGET(FindingGroup.BUDGET, "to budget", "money with no job yet, or budgeted twice"),
     BILLS_AHEAD(FindingGroup.BUDGET, "bills ahead", "bills due before the money is there"),
+    MISSED_SCHEDULE(FindingGroup.SCHEDULES, "missed bills", "a schedule's day went by with nothing posted"),
+    PRICE_CHANGE(FindingGroup.SCHEDULES, "price changed", "bills that now cost something else"),
+    RECURRING(FindingGroup.SCHEDULES, "no schedule yet", "payments that come every month"),
     BANK_BALANCE(FindingGroup.ACCOUNTS, "balance mismatch", "the bank's balance and yours differ"),
     STALE_SYNC(FindingGroup.ACCOUNTS, "bank sync stale", "linked accounts that stopped syncing"),
     RECONCILE(FindingGroup.ACCOUNTS, "time to reconcile", "not checked against a statement lately"),
     OLD_UNCLEARED(FindingGroup.ACCOUNTS, "old uncleared", "not cleared after a month"),
+    RULE_IDEA(FindingGroup.TIDY, "rule ideas", "payees that always get the same category"),
+    LOOKALIKE_PAYEE(FindingGroup.TIDY, "look-alike payees", "one payee under two names"),
 }
 
 /** How sure a check is: sure findings lead their kind, the rest are labelled maybe. */
@@ -291,6 +342,52 @@ sealed interface FindingAction {
     /** Opens the schedules. */
     data object OpenSchedules : FindingAction {
         override val label = AssistantCopy.SEE_BILLS
+    }
+
+    /** Makes a monthly schedule from the latest payment, next due on [nextDateIso]. */
+    data class MakeSchedule(
+        val transactionId: String,
+        val nextDateIso: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.MAKE_SCHEDULE
+    }
+
+    /** Posts the schedule's missed occurrence. */
+    data class PostSchedule(
+        val scheduleId: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.POST_IT
+    }
+
+    /** Skips the schedule's missed occurrence. */
+    data class SkipSchedule(
+        val scheduleId: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.SKIP_IT
+    }
+
+    /** Sets the schedule's amount to what it has cost lately. */
+    data class UpdateScheduleAmount(
+        val scheduleId: String,
+        val amountMinor: Long,
+    ) : FindingAction {
+        override val label = AssistantCopy.USE_NEW_PRICE
+    }
+
+    /** A rule: this payee always gets this category. */
+    data class MakeRule(
+        val payeeId: String,
+        val categoryId: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.MAKE_RULE
+    }
+
+    /** Merges the payee into the one named [intoName], with a rule so the bank's name lands there next time. */
+    data class MergePayees(
+        val payeeId: String,
+        val intoName: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.MERGE_PAYEES
     }
 
     /** Fetches every linked account from the bank. */
@@ -460,6 +557,8 @@ object AssistantReader {
             drafts.mapNotNull { it.finding(sides) } +
                 (
                     BudgetChecks.read(session, today) +
+                        ScheduleChecks.read(session, today) +
+                        TidyChecks.read(session, today) +
                         AccountChecks.read(session, today, fed, rows.filter { !it.cleared }.map { it.accountId to it.date })
                 ).filter { it.key !in dismissed }
         if (findings.isEmpty()) return AssistantReport.EMPTY
@@ -1158,7 +1257,8 @@ class AssistantBook(
         private val TRANSACTION_KINDS = setOf(MATCH, "dup", "wrong", "nobank", "near", "transfer", "habit")
 
         /** Budget keys lead with their month (`YYYYMM`) or, for bills ahead, their day (`YYYYMMDD`). */
-        private val MONTH_KINDS = setOf(BudgetChecks.OVERSPENT_KEY, BudgetChecks.UNDERFUNDED_KEY, BudgetChecks.TO_BUDGET_KEY)
+        private val MONTH_KINDS =
+            setOf(BudgetChecks.OVERSPENT_KEY, BudgetChecks.UNDERFUNDED_KEY, BudgetChecks.TO_BUDGET_KEY)
 
         private fun passed(
             key: String,

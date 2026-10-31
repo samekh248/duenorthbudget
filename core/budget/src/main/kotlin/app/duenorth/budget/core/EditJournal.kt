@@ -39,6 +39,7 @@ object UndoCopy {
     const val DISMISS = "dismiss"
     const val MOVE_TRANSACTION = "move to account"
     const val LINK_TRANSFER = "link transfer"
+    const val MAKE_RULE = "make rule"
 }
 
 /** One person-level action, as the cells it wrote. */

@@ -4,6 +4,8 @@ import app.duenorth.budget.core.AssistantReport
 import app.duenorth.budget.core.Finding
 import app.duenorth.budget.core.FindingAction
 import app.duenorth.budget.core.FindingKind
+import app.duenorth.budget.core.PayeeWriteResult
+import app.duenorth.budget.core.ScheduleWriteResult
 import app.duenorth.budget.core.WriteResult
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -90,6 +92,22 @@ class AssistantHolder internal constructor(
                         is FindingAction.MoveTo -> host.library.moveTransaction(id, action.transactionId, action.accountId)
                         is FindingAction.AdoptAndMatch -> host.library.adoptAndMatch(id, action.enteredId, action.bankId)
                         is FindingAction.LinkTransfer -> host.library.linkTransfer(id, action.fromId, action.toId)
+                        is FindingAction.MakeSchedule ->
+                            host.library.createScheduleFromTransaction(id, action.transactionId, "monthly", action.nextDateIso).asWrite()
+                        is FindingAction.PostSchedule -> host.library.postSchedule(id, action.scheduleId).asWrite()
+                        is FindingAction.SkipSchedule -> host.library.skipSchedule(id, action.scheduleId).asWrite()
+                        is FindingAction.UpdateScheduleAmount ->
+                            host.library.updateScheduleAmount(id, action.scheduleId, action.amountMinor).asWrite()
+                        is FindingAction.MakeRule -> host.library.makeCategoryRule(id, action.payeeId, action.categoryId)
+                        is FindingAction.MergePayees ->
+                            host.library
+                                .renamePayee(
+                                    id,
+                                    action.payeeId,
+                                    action.intoName,
+                                    confirmMerge = true,
+                                    rememberRule = true,
+                                ).asWrite()
                         is FindingAction.Open,
                         is FindingAction.OpenAccount,
                         is FindingAction.Reconcile,
@@ -118,3 +136,18 @@ class AssistantHolder internal constructor(
         host.scope.launch { host.reloadAccount(action.accountId) }
     }
 }
+
+/** A schedule write as the assistant shows it; a duplicate it would post is refused with the reason. */
+private fun ScheduleWriteResult.asWrite(): WriteResult =
+    when (this) {
+        ScheduleWriteResult.Posted, ScheduleWriteResult.Skipped -> WriteResult.Saved
+        is ScheduleWriteResult.Rejected -> WriteResult.Rejected(reason)
+        is ScheduleWriteResult.ConfirmDuplicate -> WriteResult.Rejected(reason)
+    }
+
+private fun PayeeWriteResult.asWrite(): WriteResult =
+    when (this) {
+        PayeeWriteResult.Saved -> WriteResult.Saved
+        is PayeeWriteResult.Rejected -> WriteResult.Rejected(reason)
+        is PayeeWriteResult.ConfirmMerge -> WriteResult.Rejected(reason)
+    }
