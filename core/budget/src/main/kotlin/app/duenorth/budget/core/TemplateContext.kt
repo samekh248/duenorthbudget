@@ -105,6 +105,20 @@ internal class TemplateSheet(
             .map { it.str("id").orEmpty() to it.str("name").orEmpty() }
     }
 
+    /** `goal-<category>`: the goal a run wrote for [month], or nothing. */
+    fun goal(
+        month: YearMonth,
+        categoryId: String,
+    ): Long =
+        session
+            .query(
+                "SELECT goal FROM ${if (tracking) "reflect_budgets" else "zero_budgets"} WHERE month = ? AND category = ?",
+                listOf(month.toActualMonth(), categoryId),
+            ).firstOrNull()
+            ?.long("goal") ?: 0L
+
+    val schedules by lazy { ScheduleTemplates(session, this) }
+
     /** Schedules `getActiveSchedules` lists: named and not deleted, as (id, name). */
     val activeSchedules: List<Pair<String, String>> by lazy {
         session
@@ -127,8 +141,6 @@ internal class TemplateContext private constructor(
     private val previouslyBudgeted: Long,
     private val sheet: TemplateSheet,
     private val skipAvailableClamp: Boolean,
-    /** What one schedule template asks for this month; the schedule math itself is ported separately. */
-    private val scheduleAmount: (Template.Schedule, Long) -> Long,
 ) {
     /** Template indexes that run in a priority. */
     private val templates = all.indices.filter { all[it].priority != null && all[it] !is Template.Remainder && all[it] !is Template.Limit }
@@ -178,6 +190,8 @@ internal class TemplateContext private constructor(
         val local = LinkedHashMap<Int, Long>()
         var byDone = false
         var byNeed: Map<Int, Long> = emptyMap()
+        var scheduleDone = false
+        var scheduleShare: Map<Int, Double> = emptyMap()
         for (index in at) {
             val newBudget =
                 when (val template = all[index]) {
@@ -196,7 +210,17 @@ internal class TemplateContext private constructor(
                             byNeed = need
                             total
                         }
-                    is Template.Schedule -> scheduleAmount(template, fromLastMonth)
+                    is Template.Schedule ->
+                        if (scheduleDone) {
+                            0L
+                        } else {
+                            scheduleDone = true
+                            val schedules = at.mapNotNull { i -> (all[i] as? Template.Schedule)?.let { i to it } }
+                            val entries = sheet.schedules.list(schedules, month, categoryId, income)
+                            val result = sheet.schedules.run(entries, month, categoryId, fromLastMonth + toBudget, fromLastMonth, toBudget)
+                            scheduleShare = result.perSchedule
+                            result.toBudget - toBudget
+                        }
                     is Template.Average -> average(template)
                     is Template.Remainder, is Template.Limit, is Template.Goal -> 0L
                 }
@@ -205,6 +229,7 @@ internal class TemplateContext private constructor(
             local[index] = (local[index] ?: 0L) + newBudget
         }
         redistribute(local, at.filter { all[it] is Template.By }) { (byNeed[it] ?: 0L).coerceAtLeast(0L).toDouble() }
+        redistribute(local, at.filter { all[it] is Template.Schedule }) { (scheduleShare[it] ?: 0.0).coerceAtLeast(0.0) }
         local.forEach { (index, value) -> asked[index] = (asked[index] ?: 0L) + value }
 
         var scale = 1.0
@@ -492,7 +517,6 @@ internal class TemplateContext private constructor(
             budgeted: Long,
             sheet: TemplateSheet,
             skipAvailableClamp: Boolean = false,
-            scheduleAmount: (Template.Schedule, Long) -> Long,
         ): TemplateContext {
             val last = month.minusMonths(1)
             var fromLastMonth = sheet.leftover(last, categoryId)
@@ -509,7 +533,6 @@ internal class TemplateContext private constructor(
                 budgeted,
                 sheet,
                 skipAvailableClamp,
-                scheduleAmount,
             )
         }
 

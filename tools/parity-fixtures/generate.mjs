@@ -55,6 +55,7 @@ const TABLES = {
   schedules: ['schedules', 'schedules_next_date', 'rules', 'transactions'],
   templates: ['zero_budgets', 'categories', 'notes'],
   automations: ['zero_budgets', 'categories'],
+  scheduleTemplates: ['zero_budgets'],
 };
 
 async function dump(names) {
@@ -1029,6 +1030,152 @@ async function automationScenarios() {
   });
 }
 
+// Schedule templates (`runSchedule`, the same from 26.8 through 26.10): bills
+// that come monthly, weekly, daily, quarterly, yearly and once; a ranged
+// amount on a weekend day moved to Monday; a split rule that puts part of a
+// bill in each of two categories; one past, one done, one ended; savings
+// already carried in; and two schedules sharing one category.
+async function buildScheduleTemplatesBase() {
+  await send('preferences/save', { id: 'flags.goalTemplatesEnabled', value: 'true' });
+  const checking = await api.createAccount({ name: 'Checking', offbudget: false }, 0);
+  const usual = (await api.getCategoryGroups()).find(g => g.name === 'Usual Expenses').id;
+  const incomeGroup = (await api.getCategoryGroups()).find(g => g.is_income).id;
+  const salary = await api.createCategory({ name: 'Salary', group_id: incomeGroup, is_income: true });
+  const cat = {};
+  for (const name of SCHEDULE_CATEGORIES) cat[name] = await api.createCategory({ name, group_id: usual });
+  const tx = [];
+  for (const m of ['2026-07', '2026-08', '2026-09', '2026-10']) {
+    tx.push({ date: `${m}-01`, amount: 900000, payee_name: 'Employer', category: salary });
+  }
+  tx.push({ date: '2026-09-20', amount: -10000, payee_name: 'Store', category: cat['Saved Insurance'] });
+  await api.addTransactions(checking, tx);
+  await api.setBudgetAmount('2026-09', cat['Saved Insurance'], 50000);
+  await api.setBudgetAmount('2026-09', cat['Two Bills'], 5000);
+
+  const payee = await api.createPayee({ name: 'Biller' });
+  const recur = (start, frequency, extra = {}) => ({
+    start, frequency, interval: 1, endMode: 'never', patterns: [], skipWeekend: false, weekendSolveMode: 'after', ...extra,
+  });
+  const schedule = async (name, amount, date, { op = 'is', dateOp = 'isapprox' } = {}) =>
+    send('schedule/create', {
+      schedule: { name, posts_transaction: false },
+      conditions: [
+        { op: 'is', field: 'account', value: checking },
+        { op: 'is', field: 'payee', value: payee },
+        { op, field: 'amount', value: amount },
+        { op: dateOp, field: 'date', value: date },
+      ],
+    });
+  await schedule('Rent', -150000, recur('2026-10-28', 'monthly'));
+  await schedule('Insurance', -120000, recur('2027-03-15', 'yearly'));
+  await schedule('Water', -30000, recur('2026-12-10', 'monthly', { interval: 3 }));
+  await schedule('Groceries', -5000, recur('2026-10-02', 'weekly'));
+  await schedule('Fortnight', -4000, recur('2026-09-25', 'weekly', { interval: 2 }));
+  await schedule('Coffee', -500, recur('2026-10-01', 'daily'));
+  await schedule('Car Repair', -60000, '2027-01-20', { dateOp: 'is' });
+  await schedule('Old Bill', -10000, '2026-09-10', { dateOp: 'is' });
+  await schedule('Electric', { num1: -8000, num2: -12001 }, recur('2026-10-18', 'monthly', { skipWeekend: true }), { op: 'isbetween' });
+  await schedule('Ended', -7000, recur('2026-08-05', 'monthly', { endMode: 'after_n_occurrences', endOccurrences: 2 }));
+  const done = await schedule('Done', -9000, recur('2026-10-12', 'monthly'));
+  await send('schedule/update', { schedule: { id: done, completed: true } });
+  const split = await schedule('Utilities', -20000, recur('2026-10-20', 'monthly'));
+  const ruleId = (await db.first('SELECT rule FROM schedules WHERE id = ?', [split])).rule;
+  const rule = await send('rule-get', { id: ruleId });
+  await send('rule-update', {
+    ...rule,
+    actions: [
+      ...rule.actions,
+      { op: 'set-split-amount', value: -5000, options: { splitIndex: 1, method: 'fixed-amount' } },
+      { op: 'set', field: 'category', value: cat['Split A'], options: { splitIndex: 1 } },
+      { op: 'set-split-amount', value: 25, options: { splitIndex: 2, method: 'fixed-percent' } },
+      { op: 'set', field: 'category', value: cat['Split B'], options: { splitIndex: 2 } },
+      { op: 'set-split-amount', value: null, options: { splitIndex: 3, method: 'remainder' } },
+      { op: 'set', field: 'category', value: cat['Split C'], options: { splitIndex: 3 } },
+    ],
+  });
+
+  const notes = {
+    Rent: '#template schedule Rent',
+    'Rent Plus': '#template schedule Rent [increase 10%]',
+    'Rent Fixed': '#template schedule Rent [decrease 25.5]',
+    Insurance: '#template schedule Insurance',
+    'Insurance Full': '#template schedule full Insurance',
+    'Saved Insurance': '#template schedule Insurance',
+    Water: '#template schedule Water',
+    Groceries: '#template schedule Groceries',
+    Fortnight: '#template schedule Fortnight',
+    Coffee: '#template schedule Coffee',
+    'Car Repair': '#template schedule Car Repair',
+    'Old Bill': '#template schedule Old Bill',
+    Electric: '#template schedule Electric',
+    Ended: '#template schedule Ended',
+    Done: '#template schedule Done',
+    'Split A': '#template schedule Utilities',
+    'Split B': '#template schedule Utilities',
+    'Split C': '#template schedule Utilities',
+    'Two Bills': '#template schedule Water\n#template schedule Insurance\n#template schedule Groceries',
+    'With Others': '#template 100\n#template schedule Groceries\n#template 600 by 2027-02',
+  };
+  for (const [name, note] of Object.entries(notes)) await api.updateNote(cat[name], note);
+}
+
+const SCHEDULE_CATEGORIES = [
+  'Rent', 'Rent Plus', 'Rent Fixed', 'Insurance', 'Insurance Full', 'Saved Insurance', 'Water', 'Groceries',
+  'Fortnight', 'Coffee', 'Car Repair', 'Old Bill', 'Electric', 'Ended', 'Done', 'Split A', 'Split B', 'Split C',
+  'Two Bills', 'With Others',
+];
+
+async function scheduleTemplateScenarios() {
+  console.log('schedule-templates');
+  const area = 'schedule-templates';
+  const base = 'base';
+  const open = await makeBase(area, base, buildScheduleTemplatesBase);
+  const tables = TABLES.scheduleTemplates;
+  const dryRuns = async () => {
+    const out = {};
+    for (const row of await db.all('SELECT id, name, goal_def FROM categories WHERE goal_def IS NOT NULL AND tombstone = 0')) {
+      out[row.name] = await send('budget/dry-run-category-template', {
+        month: '2026-10',
+        categoryId: row.id,
+        templates: JSON.parse(row.goal_def),
+      });
+    }
+    return out;
+  };
+  let result;
+  await scenario(area, base, open, 'overwrite', {
+    tables,
+    action: { handler: 'budget/overwrite-goal-template', args: { month: '2026-10' } },
+    values: async () => ({ result, '2026-10': await month('2026-10') }),
+    run: async () => {
+      result = await send('budget/overwrite-goal-template', { month: '2026-10' });
+    },
+  });
+  await scenario(area, base, open, 'two-months', {
+    tables,
+    action: {
+      steps: [
+        { handler: 'budget/overwrite-goal-template', args: { month: '2026-09' } },
+        { handler: 'budget/overwrite-goal-template', args: { month: '2026-10' } },
+      ],
+    },
+    values: async () => ({ result, '2026-10': await month('2026-10') }),
+    run: async () => {
+      await send('budget/overwrite-goal-template', { month: '2026-09' });
+      result = await send('budget/overwrite-goal-template', { month: '2026-10' });
+    },
+  });
+  await scenario(area, base, open, 'dry-run', {
+    tables: [],
+    action: { handler: 'budget/dry-run-category-template', args: { month: '2026-10' } },
+    values: async () => {
+      await send('budget/store-note-templates');
+      return { dryRun: await dryRuns() };
+    },
+    run: async () => {},
+  });
+}
+
 async function undoScenarios() {
   console.log('undo');
   // Undo on the phone restores the rows from before an action. Desktop's
@@ -1054,6 +1201,7 @@ const AREAS = {
   reports: reportScenarios,
   templates: templateScenarios,
   automations: automationScenarios,
+  'schedule-templates': scheduleTemplateScenarios,
   undo: undoScenarios,
 };
 const picked = process.argv.slice(2);

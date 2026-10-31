@@ -1,0 +1,494 @@
+{
+  "scenario": "overwrite",
+  "base": "base.zip",
+  "actualVersion": "26.8.1",
+  "today": "2026-10-07",
+  "action": {
+    "handler": "budget/overwrite-goal-template",
+    "args": {
+      "month": "2026-10"
+    }
+  },
+  "ids": {
+    "accounts": {
+      "Checking": "68efd32d-d39f-44d0-8b8a-19d88d366d05"
+    },
+    "categories": {
+      "Food": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+      "General": "af375fd4-d759-46b3-bffe-74a856151d57",
+      "Bills": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+      "Bills (Flexible)": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+      "Income": "3c1699a5-522a-435e-86dc-93d900a14f0e",
+      "Starting Balances": "506e8d9d-7ed0-4397-84e4-07a9185dc6b2",
+      "Savings": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+      "Salary": "92b46cd2-22ac-41d7-acb7-0ad46b85bd6e",
+      "Rent": "ae592be0-b080-4c5a-b4ef-880fc8d58d20",
+      "Rent Plus": "da319429-64b5-42d2-9ac5-d308b7094e24",
+      "Rent Fixed": "e709de15-b2b8-483f-8fe2-caa0ecda78ea",
+      "Insurance": "cd72539d-1da9-448f-8026-b04a34bef0b4",
+      "Insurance Full": "2cdd4997-13b8-402f-9cdf-3b1210ef2c47",
+      "Saved Insurance": "edd11f15-8dc0-4b89-ad75-fc5fd5560b5b",
+      "Water": "257e05b9-8564-460a-9e16-b19b70dca9f2",
+      "Groceries": "e3d28b61-6f97-45cb-85ef-28f239f3e10c",
+      "Fortnight": "1e2f97ab-1cbb-4b37-a559-b7b2ce117161",
+      "Coffee": "2cbf7572-6c88-4c31-8623-bf44d8e002a9",
+      "Car Repair": "c3296ca3-e929-4cc9-a2c5-cf8929f2321f",
+      "Old Bill": "5eac66fd-774a-4dda-bf89-ac0d8edf8696",
+      "Electric": "d31e3d85-4101-4f7b-b1a6-5d57ce1926a2",
+      "Ended": "54534872-9324-4fdd-b4e9-56a5889eb0ef",
+      "Done": "e8e6e856-9791-4f92-b80d-710aaa7e7d8d",
+      "Split A": "c99b2e18-1fe8-4c64-9331-d825f8cecb96",
+      "Split B": "3c91c1b8-fd03-46a2-9898-0409cfe625ab",
+      "Split C": "dfb4f346-809d-46f6-b242-1c65ca77744c",
+      "Two Bills": "1f2642d7-6623-4551-b9f8-46607d6bc82c",
+      "With Others": "2a3baee0-f50f-428c-9548-a99af886ad89"
+    },
+    "groups": {
+      "Usual Expenses": "fc3825fd-b982-4b72-b768-5b30844cf832",
+      "Income": "2E1F5BDB-209B-43F9-AF2C-3CE28E380C00",
+      "Investments and Savings": "a137772f-cf2f-4089-9432-822d2ddc1466"
+    },
+    "payees": {
+      "Employer": "20f10293-9153-4cd1-8e53-41061dff9617",
+      "Store": "eab3d602-9fb5-4559-a869-d3d22792c16a",
+      "Biller": "a9bdf434-1108-4f14-8a41-8a050a7a54e1"
+    },
+    "schedules": {
+      "Rent": "031e159a-8071-48e6-a1da-03cbf7d63520",
+      "Insurance": "6571725d-8d5d-42cc-a729-695846d59f9c",
+      "Water": "0d0e8a87-da8d-4202-8df0-f99965b1c335",
+      "Groceries": "65be04b1-93fa-4d44-8ca6-598696d203ab",
+      "Fortnight": "92388447-cc6d-4bba-9d54-6cf63c89ba92",
+      "Coffee": "86c4913d-2bb8-4bbe-ab06-20e97033371d",
+      "Car Repair": "172e36bc-c997-44b7-812b-8c9367069b40",
+      "Old Bill": "1ae8adae-48eb-4e87-b7cf-05f82b0b7042",
+      "Electric": "8873107f-581d-4b6a-baa8-c371d27998c2",
+      "Ended": "9a79c156-8490-4cb0-9847-cb9aac755d70",
+      "Done": "55d9401d-2b71-4d32-b6fe-0bf2399b7792",
+      "Utilities": "9c0fc6d7-9d0b-4dd3-b5fd-b8a41a887a62"
+    }
+  },
+  "tables": {
+    "zero_budgets": [
+      {
+        "id": "202609-1f2642d7-6623-4551-b9f8-46607d6bc82c",
+        "month": 202609,
+        "category": "1f2642d7-6623-4551-b9f8-46607d6bc82c",
+        "amount": 5000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202609-edd11f15-8dc0-4b89-ad75-fc5fd5560b5b",
+        "month": 202609,
+        "category": "edd11f15-8dc0-4b89-ad75-fc5fd5560b5b",
+        "amount": 50000,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-1e2f97ab-1cbb-4b37-a559-b7b2ce117161",
+        "month": 202610,
+        "category": "1e2f97ab-1cbb-4b37-a559-b7b2ce117161",
+        "amount": 8000,
+        "carryover": 0,
+        "goal": 8000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-1f2642d7-6623-4551-b9f8-46607d6bc82c",
+        "month": 202610,
+        "category": "1f2642d7-6623-4551-b9f8-46607d6bc82c",
+        "amount": 53333,
+        "carryover": 0,
+        "goal": 53333,
+        "long_goal": null
+      },
+      {
+        "id": "202610-257e05b9-8564-460a-9e16-b19b70dca9f2",
+        "month": 202610,
+        "category": "257e05b9-8564-460a-9e16-b19b70dca9f2",
+        "amount": 10000,
+        "carryover": 0,
+        "goal": 10000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+        "month": 202610,
+        "category": "29ec2c58-8cd3-42fe-9187-7b5dfe0f70a6",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-2a3baee0-f50f-428c-9548-a99af886ad89",
+        "month": 202610,
+        "category": "2a3baee0-f50f-428c-9548-a99af886ad89",
+        "amount": 47000,
+        "carryover": 0,
+        "goal": 47000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-2cbf7572-6c88-4c31-8623-bf44d8e002a9",
+        "month": 202610,
+        "category": "2cbf7572-6c88-4c31-8623-bf44d8e002a9",
+        "amount": 15500,
+        "carryover": 0,
+        "goal": 15500,
+        "long_goal": null
+      },
+      {
+        "id": "202610-2cdd4997-13b8-402f-9cdf-3b1210ef2c47",
+        "month": 202610,
+        "category": "2cdd4997-13b8-402f-9cdf-3b1210ef2c47",
+        "amount": 0,
+        "carryover": 0,
+        "goal": 0,
+        "long_goal": null
+      },
+      {
+        "id": "202610-3c91c1b8-fd03-46a2-9898-0409cfe625ab",
+        "month": 202610,
+        "category": "3c91c1b8-fd03-46a2-9898-0409cfe625ab",
+        "amount": 3750,
+        "carryover": 0,
+        "goal": 3750,
+        "long_goal": null
+      },
+      {
+        "id": "202610-541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "month": 202610,
+        "category": "541836f1-e756-4473-a5d0-6c1d3f06c7fa",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-54534872-9324-4fdd-b4e9-56a5889eb0ef",
+        "month": 202610,
+        "category": "54534872-9324-4fdd-b4e9-56a5889eb0ef",
+        "amount": 0,
+        "carryover": 0,
+        "goal": 0,
+        "long_goal": null
+      },
+      {
+        "id": "202610-5eac66fd-774a-4dda-bf89-ac0d8edf8696",
+        "month": 202610,
+        "category": "5eac66fd-774a-4dda-bf89-ac0d8edf8696",
+        "amount": 0,
+        "carryover": 0,
+        "goal": 0,
+        "long_goal": null
+      },
+      {
+        "id": "202610-6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+        "month": 202610,
+        "category": "6bbd8472-25d4-4cee-8a11-5bd9f7e83d61",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-ae592be0-b080-4c5a-b4ef-880fc8d58d20",
+        "month": 202610,
+        "category": "ae592be0-b080-4c5a-b4ef-880fc8d58d20",
+        "amount": 150000,
+        "carryover": 0,
+        "goal": 150000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-af375fd4-d759-46b3-bffe-74a856151d57",
+        "month": 202610,
+        "category": "af375fd4-d759-46b3-bffe-74a856151d57",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-c3296ca3-e929-4cc9-a2c5-cf8929f2321f",
+        "month": 202610,
+        "category": "c3296ca3-e929-4cc9-a2c5-cf8929f2321f",
+        "amount": 15000,
+        "carryover": 0,
+        "goal": 15000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-c99b2e18-1fe8-4c64-9331-d825f8cecb96",
+        "month": 202610,
+        "category": "c99b2e18-1fe8-4c64-9331-d825f8cecb96",
+        "amount": 5000,
+        "carryover": 0,
+        "goal": 5000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-cd72539d-1da9-448f-8026-b04a34bef0b4",
+        "month": 202610,
+        "category": "cd72539d-1da9-448f-8026-b04a34bef0b4",
+        "amount": 20000,
+        "carryover": 0,
+        "goal": 20000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-d31e3d85-4101-4f7b-b1a6-5d57ce1926a2",
+        "month": 202610,
+        "category": "d31e3d85-4101-4f7b-b1a6-5d57ce1926a2",
+        "amount": 10000,
+        "carryover": 0,
+        "goal": 10000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "month": 202610,
+        "category": "d4b0f075-3343-4408-91ed-fae94f74e5bf",
+        "amount": 0,
+        "carryover": 0,
+        "goal": null,
+        "long_goal": null
+      },
+      {
+        "id": "202610-da319429-64b5-42d2-9ac5-d308b7094e24",
+        "month": 202610,
+        "category": "da319429-64b5-42d2-9ac5-d308b7094e24",
+        "amount": 165000,
+        "carryover": 0,
+        "goal": 165000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-dfb4f346-809d-46f6-b242-1c65ca77744c",
+        "month": 202610,
+        "category": "dfb4f346-809d-46f6-b242-1c65ca77744c",
+        "amount": 11250,
+        "carryover": 0,
+        "goal": 11250,
+        "long_goal": null
+      },
+      {
+        "id": "202610-e3d28b61-6f97-45cb-85ef-28f239f3e10c",
+        "month": 202610,
+        "category": "e3d28b61-6f97-45cb-85ef-28f239f3e10c",
+        "amount": 25000,
+        "carryover": 0,
+        "goal": 25000,
+        "long_goal": null
+      },
+      {
+        "id": "202610-e709de15-b2b8-483f-8fe2-caa0ecda78ea",
+        "month": 202610,
+        "category": "e709de15-b2b8-483f-8fe2-caa0ecda78ea",
+        "amount": 147450,
+        "carryover": 0,
+        "goal": 147450,
+        "long_goal": null
+      },
+      {
+        "id": "202610-e8e6e856-9791-4f92-b80d-710aaa7e7d8d",
+        "month": 202610,
+        "category": "e8e6e856-9791-4f92-b80d-710aaa7e7d8d",
+        "amount": 0,
+        "carryover": 0,
+        "goal": 0,
+        "long_goal": null
+      },
+      {
+        "id": "202610-edd11f15-8dc0-4b89-ad75-fc5fd5560b5b",
+        "month": 202610,
+        "category": "edd11f15-8dc0-4b89-ad75-fc5fd5560b5b",
+        "amount": 13333,
+        "carryover": 0,
+        "goal": 13333,
+        "long_goal": null
+      }
+    ]
+  },
+  "values": {
+    "result": {
+      "type": "message",
+      "message": "templates-applied",
+      "count": 20
+    },
+    "2026-10": {
+      "month": "2026-10",
+      "incomeAvailable": 3545000,
+      "lastMonthOverspent": 0,
+      "forNextMonth": 0,
+      "totalBudgeted": -699616,
+      "toBudget": 2845384,
+      "fromLastMonth": 2645000,
+      "totalIncome": 900000,
+      "totalSpent": 0,
+      "totalBalance": 744616,
+      "bufferedAuto": 0,
+      "bufferedSelected": 0,
+      "categories": {
+        "With Others": {
+          "budgeted": 47000,
+          "spent": 0,
+          "balance": 47000,
+          "carryover": false
+        },
+        "Two Bills": {
+          "budgeted": 53333,
+          "spent": 0,
+          "balance": 58333,
+          "carryover": false
+        },
+        "Split C": {
+          "budgeted": 11250,
+          "spent": 0,
+          "balance": 11250,
+          "carryover": false
+        },
+        "Split B": {
+          "budgeted": 3750,
+          "spent": 0,
+          "balance": 3750,
+          "carryover": false
+        },
+        "Split A": {
+          "budgeted": 5000,
+          "spent": 0,
+          "balance": 5000,
+          "carryover": false
+        },
+        "Done": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Ended": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Electric": {
+          "budgeted": 10000,
+          "spent": 0,
+          "balance": 10000,
+          "carryover": false
+        },
+        "Old Bill": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Car Repair": {
+          "budgeted": 15000,
+          "spent": 0,
+          "balance": 15000,
+          "carryover": false
+        },
+        "Coffee": {
+          "budgeted": 15500,
+          "spent": 0,
+          "balance": 15500,
+          "carryover": false
+        },
+        "Fortnight": {
+          "budgeted": 8000,
+          "spent": 0,
+          "balance": 8000,
+          "carryover": false
+        },
+        "Groceries": {
+          "budgeted": 25000,
+          "spent": 0,
+          "balance": 25000,
+          "carryover": false
+        },
+        "Water": {
+          "budgeted": 10000,
+          "spent": 0,
+          "balance": 10000,
+          "carryover": false
+        },
+        "Saved Insurance": {
+          "budgeted": 13333,
+          "spent": 0,
+          "balance": 53333,
+          "carryover": false
+        },
+        "Insurance Full": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Insurance": {
+          "budgeted": 20000,
+          "spent": 0,
+          "balance": 20000,
+          "carryover": false
+        },
+        "Rent Fixed": {
+          "budgeted": 147450,
+          "spent": 0,
+          "balance": 147450,
+          "carryover": false
+        },
+        "Rent Plus": {
+          "budgeted": 165000,
+          "spent": 0,
+          "balance": 165000,
+          "carryover": false
+        },
+        "Rent": {
+          "budgeted": 150000,
+          "spent": 0,
+          "balance": 150000,
+          "carryover": false
+        },
+        "Food": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "General": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Bills": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Bills (Flexible)": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Savings": {
+          "budgeted": 0,
+          "spent": 0,
+          "balance": 0,
+          "carryover": false
+        },
+        "Salary": {},
+        "Income": {},
+        "Starting Balances": {}
+      }
+    }
+  }
+}
