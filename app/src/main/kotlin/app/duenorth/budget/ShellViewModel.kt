@@ -721,6 +721,10 @@ class ShellViewModel(
                             registerUi = it.registerUi.copy(selection = null),
                         )
                     }
+                } else if (history.lastOrNull() is ShellRoute.ReportDrill) {
+                    // A transaction fixed from a drilled spending report goes back to that page, which reads itself again.
+                    val drill = history.removeLast()
+                    _state.update { it.copy(route = drill, writeError = null, confirm = null, categoryTarget = null) }
                 } else {
                     history.clear()
                     _state.update {

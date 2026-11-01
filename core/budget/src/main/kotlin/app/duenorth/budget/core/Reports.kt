@@ -20,6 +20,8 @@ object ReportsCopy {
     const val UNCATEGORIZED = "uncategorized"
     const val NO_PAYEE = "no payee"
     const val NOTHING = "nothing in this range"
+    const val BY = "by"
+    const val TRANSACTIONS = "transactions"
 
     // The reports hub: one line per report, under what it shows.
     const val NET_WORTH_TODAY = "on and off budget, as of today"
@@ -168,6 +170,54 @@ data class SpendingReport(
     val totalMinor: Long get() = rows.sumOf { it.amountMinor }
 }
 
+/** One step down the spending report: only the expenses whose [groupBy] key is [id] (null: uncategorized, no payee). */
+data class SpendingFilter(
+    val groupBy: SpendingGroupBy,
+    val id: String?,
+    val label: String,
+)
+
+/** One expense under a drilled spending row. */
+data class SpendingTransaction(
+    val id: String,
+    val accountId: String,
+    /** What the transaction form opens: the split parent for a split line, else [id]. */
+    val openId: String,
+    /** yyyymmdd. */
+    val date: Int,
+    val payee: String,
+    val category: String,
+    /** Negative, as stored. */
+    val amountMinor: Long,
+)
+
+/**
+ * Spending report → a row → ...: the expenses under [path], either broken down one level further
+ * ([breakdown]) or, at the bottom, listed one by one ([transactions]).
+ */
+data class SpendingDrill(
+    val range: ReportRange,
+    val currency: CurrencySpec,
+    val path: List<SpendingFilter>,
+    val breakdown: SpendingReport?,
+    val transactions: List<SpendingTransaction>,
+    val totalMinor: Long,
+)
+
+/** How the spending report drills: group → categories, category → payees, payee → categories, then transactions. */
+object SpendingDrillLevels {
+    /** The grouping one level under [path], or null when [path] lists its transactions. */
+    fun next(path: List<SpendingFilter>): SpendingGroupBy? {
+        if (path.size != 1) return null
+        val top = path.single()
+        return when (top.groupBy) {
+            SpendingGroupBy.GROUP -> if (top.id == null) null else SpendingGroupBy.CATEGORY
+            SpendingGroupBy.CATEGORY -> SpendingGroupBy.PAYEE
+            SpendingGroupBy.PAYEE -> SpendingGroupBy.CATEGORY
+        }
+    }
+}
+
 data class ReportsPage(
     val range: ReportRange,
     val currency: CurrencySpec,
@@ -188,6 +238,8 @@ class ReportsReader(
     private val today: LocalDate,
 ) {
     private data class Line(
+        val id: String,
+        val parentId: String?,
         val date: Int,
         val amount: Long,
         val offBudget: Boolean,
@@ -270,32 +322,76 @@ class ReportsReader(
     fun spending(
         range: ReportRange,
         groupBy: SpendingGroupBy,
-    ): SpendingReport {
+    ): SpendingReport = rowsOf(expenses(range), groupBy)
+
+    /**
+     * The expenses under [path] (see [SpendingDrillLevels]). A level that would show a single row
+     * lists that row's transactions instead, newest first.
+     */
+    fun spendingDrill(
+        range: ReportRange,
+        path: List<SpendingFilter>,
+        currency: CurrencySpec,
+    ): SpendingDrill {
+        val keys = keys()
+        val under = expenses(range).filter { line -> path.all { keys.getValue(it.groupBy)(line) == it.id } }
+        val breakdown = SpendingDrillLevels.next(path)?.let { rowsOf(under, it) }?.takeIf { it.rows.size > 1 }
+        val transactions =
+            if (breakdown != null) {
+                emptyList()
+            } else {
+                under
+                    .sortedWith(compareByDescending<Line> { it.date }.thenBy { it.amount })
+                    .map { line ->
+                        SpendingTransaction(
+                            id = line.id,
+                            accountId = line.accountId,
+                            openId = line.parentId ?: line.id,
+                            date = line.date,
+                            payee = label(line.payeeId, SpendingGroupBy.PAYEE, names),
+                            category = label(line.categoryId, SpendingGroupBy.CATEGORY, names),
+                            amountMinor = line.amount,
+                        )
+                    }
+            }
+        return SpendingDrill(range, currency, path, breakdown, transactions, under.sumOf { it.amount })
+    }
+
+    private fun expenses(range: ReportRange): List<Line> {
         val low = range.start.atDay(1).toInt()
         val high = range.end.atEndOfMonth().toInt()
-        val expenses = lines.filter { it.amount < 0 && !it.offBudget && !it.transfer && it.date in low..high }
-        val names = names()
-        val groupOf = categoryGroups()
-        val key: (Line) -> String? =
-            when (groupBy) {
-                SpendingGroupBy.CATEGORY -> { line -> line.categoryId }
-                SpendingGroupBy.GROUP -> { line -> line.categoryId?.let { groupOf[it] } }
-                SpendingGroupBy.PAYEE -> { line -> line.payeeId }
-            }
+        return lines.filter { it.amount < 0 && !it.offBudget && !it.transfer && it.date in low..high }
+    }
+
+    private fun keys(): Map<SpendingGroupBy, (Line) -> String?> =
+        mapOf(
+            SpendingGroupBy.CATEGORY to { line -> line.categoryId },
+            SpendingGroupBy.GROUP to { line -> line.categoryId?.let { groupOf[it] } },
+            SpendingGroupBy.PAYEE to { line -> line.payeeId },
+        )
+
+    private fun rowsOf(
+        expenses: List<Line>,
+        groupBy: SpendingGroupBy,
+    ): SpendingReport {
         val rows =
             expenses
-                .groupBy(key)
-                .map { (id, group) ->
-                    val label =
-                        when {
-                            id == null && groupBy == SpendingGroupBy.PAYEE -> ReportsCopy.NO_PAYEE
-                            id == null -> ReportsCopy.UNCATEGORIZED
-                            else -> names[id] ?: id
-                        }
-                    SpendingRow(id, label, group.sumOf { it.amount })
-                }.sortedWith(compareByDescending<SpendingRow> { abs(it.amountMinor) }.thenBy { it.label })
+                .groupBy(keys().getValue(groupBy))
+                .map { (id, group) -> SpendingRow(id, label(id, groupBy, names), group.sumOf { it.amount }) }
+                .sortedWith(compareByDescending<SpendingRow> { abs(it.amountMinor) }.thenBy { it.label })
         return SpendingReport(groupBy, rows)
     }
+
+    private fun label(
+        id: String?,
+        groupBy: SpendingGroupBy,
+        names: Map<String, String>,
+    ): String =
+        when {
+            id == null && groupBy == SpendingGroupBy.PAYEE -> ReportsCopy.NO_PAYEE
+            id == null -> ReportsCopy.UNCATEGORIZED
+            else -> names[id] ?: id
+        }
 
     fun page(
         range: ReportRange,
@@ -315,7 +411,7 @@ class ReportsReader(
         session
             .query(
                 """
-                SELECT t.date, t.amount, a.offbudget, a.id AS account, p.transfer_acct, t.category, t.description
+                SELECT t.id, t.parent_id, t.isChild, t.date, t.amount, a.offbudget, a.id AS account, p.transfer_acct, t.category, t.description
                 FROM transactions t
                 JOIN accounts a ON a.id = t.acct AND IFNULL(a.tombstone, 0) = 0
                 LEFT JOIN payees p ON p.id = t.description
@@ -336,6 +432,8 @@ class ReportsReader(
                 """.trimIndent(),
             ).map { row ->
                 Line(
+                    id = row.str("id").orEmpty(),
+                    parentId = row.str("parent_id")?.takeIf { it.isNotEmpty() && row.values["isChild"] != null && row.bool("isChild") },
                     date = row.long("date").toInt(),
                     amount = row.long("amount"),
                     offBudget = row.values["offbudget"] != null && row.bool("offbudget"),
@@ -346,7 +444,11 @@ class ReportsReader(
                 )
             }
 
-    private fun names(): Map<String, String> {
+    private val names: Map<String, String> by lazy { readNames() }
+
+    private val groupOf: Map<String, String> by lazy { categoryGroups() }
+
+    private fun readNames(): Map<String, String> {
         val out = HashMap<String, String>()
         for (table in listOf("categories", "category_groups", "payees")) {
             session.query("SELECT id, name FROM $table").forEach { row ->

@@ -2,6 +2,7 @@ package app.duenorth.budget
 
 import app.duenorth.budget.core.SampleBudgets
 import app.duenorth.budget.core.ScheduleDetails
+import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.TemplateKind
 
 sealed interface ShellRoute {
@@ -155,6 +156,12 @@ sealed interface ShellRoute {
     /** Reports → a report over a month range, opened at its pivot [item]. */
     data class ReportPivot(
         val item: Int,
+    ) : ShellRoute,
+        StackRoute
+
+    /** Spending → a row → ...: what that row is made of, one level at a time, down to its transactions. */
+    data class ReportDrill(
+        val path: List<SpendingFilter>,
     ) : ShellRoute,
         StackRoute
 

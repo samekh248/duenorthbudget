@@ -5,6 +5,8 @@ import app.duenorth.budget.core.NetWorthSpan
 import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.ReportsReader
+import app.duenorth.budget.core.SpendingDrillLevels
+import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.SpendingGroupBy
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -15,6 +17,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -101,6 +104,47 @@ class ReportsParityTest {
         assertEquals(listOf("Bills", "Food", ReportsCopy.UNCATEGORIZED, "General"), byCategory.rows.map { it.label })
         // The deleted "Mistake" and the split parent at Market are not counted.
         assertEquals(-830_000L, byCategory.totalMinor)
+    }
+
+    @Test
+    fun eachSpendingRowDrillsDownToTheTransactionsItAdds() {
+        val usd = Currencies.byCode("USD")!!
+        read { reader ->
+            for (groupBy in SpendingGroupBy.entries) {
+                for (row in reader.spending(range, groupBy).rows) {
+                    val path = listOf(SpendingFilter(groupBy, row.id, row.label))
+                    val drill = reader.spendingDrill(range, path, usd)
+                    assertEquals("$groupBy ${row.label}", row.amountMinor, drill.totalMinor)
+                    val breakdown = drill.breakdown
+                    if (breakdown == null) {
+                        assertEquals(row.amountMinor, drill.transactions.sumOf { it.amountMinor })
+                        assertEquals(drill.transactions.map { it.date }.sortedDescending(), drill.transactions.map { it.date })
+                        continue
+                    }
+                    assertEquals(SpendingDrillLevels.next(path), breakdown.groupBy)
+                    assertTrue("a single row lists its transactions instead", breakdown.rows.size > 1)
+                    assertEquals(row.amountMinor, breakdown.totalMinor)
+                    for (sub in breakdown.rows) {
+                        val deeper = reader.spendingDrill(range, path + SpendingFilter(breakdown.groupBy, sub.id, sub.label), usd)
+                        assertNull("two levels down lists transactions", deeper.breakdown)
+                        assertEquals(sub.amountMinor, deeper.transactions.sumOf { it.amountMinor })
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun drillLevels() {
+        fun at(
+            groupBy: SpendingGroupBy,
+            id: String? = "x",
+        ) = listOf(SpendingFilter(groupBy, id, "x"))
+        assertEquals(SpendingGroupBy.CATEGORY, SpendingDrillLevels.next(at(SpendingGroupBy.GROUP)))
+        assertEquals(SpendingGroupBy.PAYEE, SpendingDrillLevels.next(at(SpendingGroupBy.CATEGORY)))
+        assertEquals(SpendingGroupBy.CATEGORY, SpendingDrillLevels.next(at(SpendingGroupBy.PAYEE)))
+        assertNull("uncategorized has no categories under it", SpendingDrillLevels.next(at(SpendingGroupBy.GROUP, null)))
+        assertNull(SpendingDrillLevels.next(at(SpendingGroupBy.GROUP) + at(SpendingGroupBy.CATEGORY)))
     }
 
     @Test

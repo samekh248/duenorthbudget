@@ -908,6 +908,14 @@ class BudgetLibrary(
             ReportsReader(session, clock.today()).page(range, includeOffBudget, groupBy, reportCurrency(session))
         }
 
+    /** Spending report → a row: the expenses under [path], one level further down or one by one. */
+    fun readSpendingDrill(
+        budgetId: String,
+        range: ReportRange,
+        path: List<SpendingFilter>,
+    ): SpendingDrill? =
+        open(budgetId) { session -> ReportsReader(session, clock.today()).spendingDrill(range, path, reportCurrency(session)) }
+
     /** The net worth graph over [span], ending today. */
     fun readNetWorthHistory(
         budgetId: String,

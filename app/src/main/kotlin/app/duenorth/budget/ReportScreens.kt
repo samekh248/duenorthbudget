@@ -26,11 +26,16 @@ import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.NetWorthPage
+import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.ReportsPage
+import app.duenorth.budget.core.SpendingDrill
+import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.SpendingGroupBy
+import app.duenorth.budget.core.SpendingRow
+import app.duenorth.budget.core.SpendingTransaction
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroComboBox
 import app.duenorth.budget.design.components.MetroPivot
@@ -126,6 +131,7 @@ fun ReportsScreen(
     onGroupBy: (SpendingGroupBy) -> Unit,
     modifier: Modifier = Modifier,
     initialItem: Int = 0,
+    onRow: (SpendingRow) -> Unit = {},
 ) {
     MetroPivot(
         title = ReportsCopy.TITLE.uppercase(),
@@ -135,7 +141,7 @@ fun ReportsScreen(
                     ReportBody(page, loading, preset, onPreset, onCustom, "report-cashflow") { CashFlow(it) }
                 },
                 PivotItem(ReportsCopy.SPENDING) {
-                    ReportBody(page, loading, preset, onPreset, onCustom, "report-spending") { Spending(it, groupBy, onGroupBy) }
+                    ReportBody(page, loading, preset, onPreset, onCustom, "report-spending") { Spending(it, groupBy, onGroupBy, onRow) }
                 },
             ),
         modifier = modifier.background(Metro.colors.background),
@@ -252,6 +258,7 @@ private fun Spending(
     page: ReportsPage,
     groupBy: SpendingGroupBy,
     onGroupBy: (SpendingGroupBy) -> Unit,
+    onRow: (SpendingRow) -> Unit,
 ) {
     val report = page.spending
     val scale = report.rows.maxOfOrNull { abs(it.amountMinor) }?.takeIf { it > 0 } ?: 1L
@@ -272,19 +279,135 @@ private fun Spending(
             }
         }
         items(report.rows, key = { it.id ?: "none" }) { row ->
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
-                    .testTag("report-spending-row-${row.id ?: "none"}"),
-            ) {
-                Row(Modifier.fillMaxWidth()) {
-                    MetroText(row.label, Metro.typography.subheader, Modifier.weight(1f), maxLines = 2)
-                    MetroText(MoneyFormat.format(row.amountMinor, page.currency, formatOptions()), Metro.typography.subheader)
+            SpendingLine(row, scale, page.currency, "report-spending-row-${row.id ?: "none"}") { onRow(row) }
+        }
+    }
+}
+
+/** One spending row: its name and amount over a bar; tapping it drills in. */
+@Composable
+private fun SpendingLine(
+    row: SpendingRow,
+    scale: Long,
+    currency: CurrencySpec,
+    tag: String,
+    onOpen: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .metroPress(onOpen)
+            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
+            .testTag(tag),
+    ) {
+        Row(Modifier.fillMaxWidth()) {
+            MetroText(row.label, Metro.typography.subheader, Modifier.weight(1f), maxLines = 2)
+            MetroText(MoneyFormat.format(row.amountMinor, currency, formatOptions()), Metro.typography.subheader)
+        }
+        Bar(abs(row.amountMinor), scale, Metro.accent.fill)
+    }
+}
+
+/**
+ * Spending → a row → ...: the row's name as the page header under the trail tapped to reach it, its
+ * total over the report's range, then either what it is made of one level down (group → categories,
+ * category → payees, payee → categories; each row drills on) or, at the bottom, its transactions, each
+ * opening its form. Back walks up the trail.
+ */
+@Composable
+fun SpendingDrillScreen(
+    path: List<SpendingFilter>,
+    drill: SpendingDrill?,
+    onRow: (SpendingRow, SpendingGroupBy) -> Unit,
+    onTransaction: (SpendingTransaction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxSize().background(Metro.colors.background).testTag("report-drill")) {
+        val trail = (listOf(ReportsCopy.SPENDING) + path.dropLast(1).map { it.label }).joinToString(DRILL_TRAIL_SEPARATOR)
+        MetroText(
+            trail,
+            Metro.typography.caption,
+            Modifier.padding(horizontal = MetroDimens.Gutter).testTag("report-drill-trail"),
+            color = Metro.colors.secondary,
+            maxLines = 1,
+        )
+        MetroText(
+            path.lastOrNull()?.label.orEmpty(),
+            Metro.typography.header,
+            Modifier.padding(horizontal = MetroDimens.Gutter).testTag("report-drill-title"),
+            maxLines = 1,
+        )
+        if (drill == null) {
+            AnimatedVisibility(visible = true, enter = fadeIn()) { Placeholder() }
+            return@Column
+        }
+        LazyColumn(Modifier.fillMaxSize()) {
+            item {
+                Column(Modifier.fillMaxWidth().padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Grid)) {
+                    MetroText(
+                        "${drill.range.start.format(MONTH)} – ${drill.range.end.format(MONTH)}".lowercase(),
+                        Metro.typography.caption,
+                        color = Metro.colors.secondary,
+                    )
+                    MetroText(
+                        MoneyFormat.format(drill.totalMinor, drill.currency, formatOptions()),
+                        Metro.typography.subheader,
+                        Modifier.testTag("report-drill-total"),
+                    )
                 }
-                Bar(abs(row.amountMinor), scale, Metro.accent.fill)
+                val breakdown = drill.breakdown
+                MetroText(
+                    if (breakdown != null) "${ReportsCopy.BY} ${breakdown.groupBy.label}" else ReportsCopy.TRANSACTIONS,
+                    Metro.typography.caption,
+                    Modifier.padding(horizontal = MetroDimens.Gutter).padding(top = MetroDimens.Row).testTag("report-drill-level"),
+                    color = Metro.colors.secondary,
+                )
+                if (breakdown == null && drill.transactions.isEmpty()) {
+                    MetroText(ReportsCopy.NOTHING, Metro.typography.body, Modifier.padding(MetroDimens.Gutter))
+                }
+            }
+            val breakdown = drill.breakdown
+            if (breakdown != null) {
+                val scale = breakdown.rows.maxOfOrNull { abs(it.amountMinor) }?.takeIf { it > 0 } ?: 1L
+                items(breakdown.rows, key = { it.id ?: "none" }) { row ->
+                    SpendingLine(row, scale, drill.currency, "report-drill-row-${row.id ?: "none"}") { onRow(row, breakdown.groupBy) }
+                }
+            } else {
+                // Each line names what the trail has not: its category under a payee, else its payee.
+                val byPayee = path.any { it.groupBy == SpendingGroupBy.PAYEE }
+                items(drill.transactions, key = { it.id }) { line ->
+                    DrillTransaction(line, drill.currency, byPayee) { onTransaction(line) }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun DrillTransaction(
+    line: SpendingTransaction,
+    currency: CurrencySpec,
+    byPayee: Boolean,
+    onOpen: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .metroPress(onOpen)
+            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
+            .testTag("report-drill-transaction-${line.id}"),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            MetroText(if (byPayee) line.category else line.payee, Metro.typography.subheader, maxLines = 2)
+            MetroText(
+                RegisterEntry.registerDateLabel(line.date, dateFormat()),
+                Metro.typography.caption,
+                color = Metro.colors.secondary,
+                maxLines = 1,
+            )
+        }
+        MetroText(MoneyFormat.format(line.amountMinor, currency, formatOptions()), Metro.typography.subheader)
     }
 }
 
@@ -320,6 +443,9 @@ private fun Bar(
         }
     }
 }
+
+/** Between the steps of a drilled page's trail. */
+private const val DRILL_TRAIL_SEPARATOR = " › "
 
 /** How far back the custom range's month pickers reach. */
 private const val CUSTOM_MONTHS = 24L

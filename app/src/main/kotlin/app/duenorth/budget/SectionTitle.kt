@@ -71,6 +71,7 @@ object SectionTitle {
                 ShellRoute.NetWorth,
                 ShellRoute.MonthReview,
                 is ShellRoute.ReviewCategory,
+                is ShellRoute.ReportDrill,
                 -> HomeSections.REPORTS
                 is ShellRoute.ReportPivot -> return null
                 ShellRoute.Create,
