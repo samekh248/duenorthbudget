@@ -275,7 +275,7 @@ fun MonthControl(
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val calendar = YearMonth.now()
+    val calendar = CalendarMonth.now()
     Column(modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             Row(
