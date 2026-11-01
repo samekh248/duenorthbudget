@@ -135,6 +135,35 @@ class ReportsParityTest {
     }
 
     @Test
+    fun eachCashFlowMonthSplitsIntoTheRowsItDrillsTo() {
+        val usd = Currencies.byCode("USD")!!
+        read { reader ->
+            for (month in reader.cashFlow(range).months) {
+                val page = reader.cashFlowMonth(month.month, usd)
+                assertEquals("${month.month}", month.incomeMinor to month.expenseMinor, page.incomeMinor to page.expenseMinor)
+                assertEquals(SpendingGroupBy.CATEGORY, page.income.groupBy)
+                assertEquals(SpendingGroupBy.GROUP, page.expenses.groupBy)
+                val one = ReportRange(month.month, month.month)
+                for ((income, rows) in listOf(true to page.income.rows, false to page.expenses.rows)) {
+                    val groupBy = if (income) SpendingGroupBy.CATEGORY else SpendingGroupBy.GROUP
+                    for (row in rows) {
+                        val drill =
+                            reader.spendingDrill(
+                                one,
+                                listOf(SpendingFilter(groupBy, row.id, row.label)),
+                                usd,
+                                income,
+                                throughToday = true,
+                            )
+                        assertEquals("${month.month} ${row.label}", row.amountMinor, drill.totalMinor)
+                        assertTrue(if (income) row.amountMinor > 0 else row.amountMinor < 0)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
     fun drillLevels() {
         fun at(
             groupBy: SpendingGroupBy,
