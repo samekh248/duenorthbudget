@@ -88,6 +88,58 @@ class CategoryRenameTest {
         assertEquals(EnvelopeCopy.ENTER_NAME, model.state.value.editError)
     }
 
+    @Test
+    fun theCategoryPageRenamesItsCategoryAndTheTitleChangesAtOnce() {
+        val model = household("page")
+        val id =
+            model.state.value.shell!!
+                .groups
+                .first()
+                .categories
+                .first()
+                .id
+        model.envelopes.openBudget(id)
+        model.envelopes.startRenameCategory()
+        assertEquals(id, model.state.value.envelopes.renaming)
+        model.envelopes.renameCategory(id, " Dining out")
+        // The name closes and the page's title (read from the month) shows the new name before the write lands.
+        assertEquals(null, model.state.value.envelopes.renaming)
+        assertEquals("Dining out", model.shellName(id))
+        settleMain()
+        assertEquals("Dining out", model.shellName(id))
+        assertEquals(null, model.state.value.editError)
+    }
+
+    @Test
+    fun cancellingTheCategoryPageRenameKeepsTheName() {
+        val model = household("page-cancel")
+        val category =
+            model.state.value.shell!!
+                .groups
+                .first()
+                .categories
+                .first()
+        model.envelopes.openBudget(category.id)
+        model.envelopes.startRenameCategory()
+        model.envelopes.cancelRenameCategory()
+        assertEquals(null, model.state.value.envelopes.renaming)
+        assertEquals(category.name, model.shellName(category.id))
+    }
+
+    @Test
+    fun renameOnlyOpensOnACategoryPage() {
+        val model = household("page-elsewhere")
+        model.envelopes.startRenameCategory()
+        assertEquals(null, model.state.value.envelopes.renaming)
+    }
+
+    private fun ShellViewModel.shellName(id: String) =
+        state.value.shell!!
+            .groups
+            .flatMap { it.categories }
+            .first { it.id == id }
+            .name
+
     private fun ShellViewModel.page() = state.value.envelopes.manage!!
 
     private fun ShellViewModel.category(id: String) =

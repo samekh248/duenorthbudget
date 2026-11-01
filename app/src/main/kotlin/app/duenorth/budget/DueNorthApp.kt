@@ -278,6 +278,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onToAutomations = model.templates::switchToAutomations,
                     onToNotes = model.templates::switchToNotes,
                     onMoveCategory = model.envelopes::openMove,
+                    onRenameCategory = model.envelopes::startRenameCategory,
                     onAutoHold = model.month::chooseAutoHold,
                     onSelectInbox = model.inbox::startSelecting,
                     onAcceptSelected = model.inbox::acceptSelected,
@@ -490,10 +491,14 @@ internal fun EditorWithMonth(
     onSelectMonth: (YearMonth) -> Unit,
     modifier: Modifier = Modifier,
     title: String? = null,
+    // Drawn in the title's place, such as a category's name open for renaming.
+    titleField: (@Composable (Modifier) -> Unit)? = null,
     content: @Composable (Modifier) -> Unit,
 ) {
     Column(modifier.fillMaxSize().background(Metro.colors.background)) {
-        if (title != null) {
+        if (titleField != null) {
+            titleField(Modifier.padding(start = MetroDimens.Gutter, end = MetroDimens.Gutter, top = MetroDimens.Gutter))
+        } else if (title != null) {
             MetroText(
                 title,
                 Metro.typography.header,

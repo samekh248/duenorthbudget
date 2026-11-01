@@ -18,6 +18,8 @@ import java.time.YearMonth
 data class EnvelopesUi(
     /** The categories page: groups and categories to rename, hide, move and reorder; null until read. */
     val manage: CategoryManagePage? = null,
+    /** The category whose page has its name open for typing, from the page's `•••` rename; null otherwise. */
+    val renaming: String? = null,
 )
 
 /** Envelopes: budgeting into categories, moving and holding money, and managing groups and categories. */
@@ -30,7 +32,13 @@ class EnvelopesHolder internal constructor(
 
     fun openBudget(categoryId: String) {
         host.push(ShellRoute.CategoryBudget(categoryId))
-        host.mutate { it.copy(editError = null, templates = it.templates.copy(note = null, automations = null)) }
+        host.mutate {
+            it.copy(
+                editError = null,
+                envelopes = it.envelopes.copy(renaming = null),
+                templates = it.templates.copy(note = null, automations = null),
+            )
+        }
         host.loadCategoryNote(categoryId)
     }
 
@@ -188,17 +196,31 @@ class EnvelopesHolder internal constructor(
         applyEdit { host.sync.renameCategoryGroup(budgetId, groupId, name) }
     }
 
+    /** Opens the name on the category's own page for typing, from its `•••` rename. */
+    fun startRenameCategory() {
+        val categoryId = (state.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
+        host.mutate { it.copy(editError = null, envelopes = it.envelopes.copy(renaming = categoryId)) }
+    }
+
+    /** Closes the name on the category's page without saving it. */
+    fun cancelRenameCategory() {
+        update { it.copy(renaming = null) }
+    }
+
     fun renameCategory(
         categoryId: String,
         name: String,
     ) {
         val budgetId = state.settings.openBudgetId ?: return
-        if (name.isNotBlank()) {
+        update { it.copy(renaming = null) }
+        val trimmed = name.trim()
+        if (trimmed.isNotEmpty()) {
             renameOnPage { group ->
-                group.copy(categories = group.categories.map { if (it.id == categoryId) it.copy(name = name.trim()) else it })
+                group.copy(categories = group.categories.map { if (it.id == categoryId) it.copy(name = trimmed) else it })
             }
         }
-        applyEdit { host.sync.renameEnvelopeCategory(budgetId, categoryId, name) }
+        val optimistic = if (trimmed.isEmpty()) null else { shell: MonthShell -> shell.withCategoryName(categoryId, trimmed) }
+        applyEdit(optimistic = optimistic) { host.sync.renameEnvelopeCategory(budgetId, categoryId, name) }
     }
 
     /**
@@ -352,3 +374,30 @@ class EnvelopesHolder internal constructor(
         update { it.copy(manage = manage) }
     }
 }
+
+/** The month with [categoryId] (an expense or an income category) under its new [name], so a rename shows at once. */
+internal fun MonthShell.withCategoryName(
+    categoryId: String,
+    name: String,
+): MonthShell =
+    copy(
+        groups =
+            groups.map { group ->
+                group.copy(
+                    categories =
+                        group.categories.map {
+                            if (it.id ==
+                                categoryId
+                            ) {
+                                it.copy(name = name)
+                            } else {
+                                it
+                            }
+                        },
+                )
+            },
+        incomeGroups =
+            incomeGroups.map { group ->
+                group.copy(categories = group.categories.map { if (it.id == categoryId) it.copy(name = name) else it })
+            },
+    )
