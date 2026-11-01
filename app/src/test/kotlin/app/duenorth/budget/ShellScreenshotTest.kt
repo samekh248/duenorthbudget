@@ -276,6 +276,7 @@ class ShellScreenshotTest {
                 started = listOf("Checking", "Joint checking", "Credit card", "Savings"),
                 failures =
                     listOf(
+                        BankSyncFailure("Joint checking", SimpleFinError.SERVER_DOWN, "joint"),
                         BankSyncFailure("Credit card", SimpleFinError.NEEDS_ATTENTION, "card", BankSyncFix.SIMPLEFIN),
                         BankSyncFailure("Savings", SimpleFinError.ACCOUNT_MISSING, "savings", BankSyncFix.RELINK),
                     ),

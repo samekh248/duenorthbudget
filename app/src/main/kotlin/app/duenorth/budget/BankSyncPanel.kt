@@ -77,14 +77,19 @@ object BankSyncCopy {
     /** The unlink question's title, naming the account. */
     fun unlinkTitle(accountName: String) = "$UNLINK $accountName"
 
-    /** The button that mends a failed account, or null when nothing on the phone can. */
+    /** The button that mends a failed account in the app, beside SimpleFIN's own, or null when the app can't. */
     fun fix(fix: BankSyncFix?) =
         when (fix) {
-            BankSyncFix.SIMPLEFIN -> FIX_SIMPLEFIN
             BankSyncFix.TOKEN -> FIX_TOKEN
             BankSyncFix.RELINK -> FIX_RELINK
-            null -> null
+            BankSyncFix.SIMPLEFIN, BankSyncFix.SIGN_IN, null -> null
         }
+
+    /**
+     * Whether a failed account offers SimpleFIN Bridge: every one does, since a lapsed bank sign-in there is behind
+     * most failures whatever SimpleFIN called them, except when the budget server itself wants a new sign-in.
+     */
+    fun atSimpleFin(failure: BankSyncFailure) = failure.fix != BankSyncFix.SIGN_IN
 
     fun failure(failure: BankSyncFailure) = "${failure.accountName}: ${failure.message}"
 
@@ -180,7 +185,9 @@ private fun TileAction(
 fun BankSyncReportScreen(
     ui: BankSyncUi?,
     modifier: Modifier = Modifier,
-    /** A failed account's fix: SimpleFIN's own site, a new setup token, or linking again. */
+    /** A failed account's fix at SimpleFIN Bridge, where the bank's connection is mended. */
+    onSimpleFin: (BankSyncFailure) -> Unit = {},
+    /** A failed account's fix in the app: a new setup token, or linking again. */
     onFix: (BankSyncFailure) -> Unit = {},
     /** A failed account's unlink: its bank link goes, the account and its transactions stay. */
     onUnlink: (BankSyncFailure) -> Unit = {},
@@ -237,6 +244,7 @@ fun BankSyncReportScreen(
                         error = true,
                         fix = BankSyncCopy.fix(failure.fix),
                         onFix = { onFix(failure) },
+                        onSimpleFin = { onSimpleFin(failure) }.takeIf { BankSyncCopy.atSimpleFin(failure) },
                         onUnlink = { onUnlink(failure) }.takeIf { failure.accountId.isNotEmpty() },
                     )
                 }
@@ -261,7 +269,7 @@ private fun ReportHeading(label: String) {
     MetroText(label, Metro.typography.caption, Modifier.padding(top = 14.dp, bottom = 4.dp), color = Metro.accent.text)
 }
 
-/** An account on a ledger line: its name, why it failed under it, and the buttons that mend it or unlink it. */
+/** An account on a ledger line: its name, why it failed under it, and the buttons that mend it (at SimpleFIN, then in the app) or unlink it. */
 @Composable
 private fun ReportLine(
     name: String,
@@ -270,6 +278,7 @@ private fun ReportLine(
     error: Boolean = false,
     fix: String? = null,
     onFix: () -> Unit = {},
+    onSimpleFin: (() -> Unit)? = null,
     onUnlink: (() -> Unit)? = null,
 ) {
     Column(
@@ -285,8 +294,11 @@ private fun ReportLine(
         if (detail != null) {
             MetroText(detail, Metro.typography.caption, color = if (error) Metro.colors.error else Metro.colors.secondary, maxLines = 2)
         }
-        if (fix != null || onUnlink != null) {
+        if (onSimpleFin != null || fix != null || onUnlink != null) {
             MetroButtonGrid(Modifier.padding(top = 8.dp, bottom = 4.dp)) {
+                if (onSimpleFin != null) {
+                    MetroButton(BankSyncCopy.FIX_SIMPLEFIN, Modifier.testTag("bank-sync-simplefin-$name"), onSimpleFin)
+                }
                 if (fix != null) MetroButton(fix, Modifier.testTag("bank-sync-fix-$name"), onFix)
                 if (onUnlink != null) MetroButton(BankSyncCopy.UNLINK, Modifier.testTag("bank-sync-unlink-$name"), onUnlink)
             }

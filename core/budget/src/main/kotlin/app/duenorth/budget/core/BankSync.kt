@@ -78,7 +78,7 @@ class HttpBankSyncTransport : BankSyncTransport {
             val code = connection.responseCode
             val stream = if (code >= 400) connection.errorStream else connection.inputStream
             val bytes = stream?.readBytes() ?: ByteArray(0)
-            if (code == 401 || code == 403) throw BankSyncException(SyncCopy.SIGN_IN_AGAIN)
+            if (code == 401 || code == 403) throw BankSyncException(SyncCopy.SIGN_IN_AGAIN, BankSyncFix.SIGN_IN)
             if (code != 200) throw BankSyncException(ImportCopy.FETCH_FAILED)
             val reply = json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject
             // Actual answers `{"status":"ok","data":{...}}`, and a bank error comes back inside `data`.
@@ -190,7 +190,10 @@ class BankSyncException(
     val fix: BankSyncFix? = null,
 ) : Exception(message)
 
-/** Where a broken bank connection is mended: none of these can be done from the phone alone. */
+/**
+ * Where a broken bank connection is mended: none of these can be done from the phone alone. Every failure but
+ * [SIGN_IN] also offers SimpleFIN Bridge, where most broken connections are mended whatever the error said.
+ */
 enum class BankSyncFix {
     /** The bank's sign-in at SimpleFIN Bridge lapsed (a changed password, a new MFA prompt, expired consent). */
     SIMPLEFIN,
@@ -200,6 +203,9 @@ enum class BankSyncFix {
 
     /** SimpleFIN no longer has the linked account, so it needs linking again. */
     RELINK,
+
+    /** The budget server, not SimpleFIN, turned the phone away: signing in again mends it, not SimpleFIN. */
+    SIGN_IN,
 }
 
 /** The `error_code`s Actual's server sends back from `/simplefin/transactions`, in the app's words. */
