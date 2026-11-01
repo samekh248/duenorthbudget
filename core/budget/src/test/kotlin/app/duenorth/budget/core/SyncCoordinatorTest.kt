@@ -183,6 +183,43 @@ class SyncCoordinatorTest {
     }
 
     @Test
+    fun aSaveGoesThroughWhileTheBankIsStillAnswering() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            library.useDatabase(remote.fileId) { session ->
+                session.exec(
+                    "UPDATE accounts SET account_sync_source = ?, account_id = ? WHERE id = ?",
+                    listOf("simpleFin", "bank-checking", "checking"),
+                )
+            }
+            opened.bank.rows = listOf(ParsedImportRow(20261005, "Corner Shop", -1_250L, financialId = "sf-1"))
+            val fetching = CountDownLatch(1)
+            val answer = CountDownLatch(1)
+            opened.bank.hold = {
+                fetching.countDown()
+                answer.await(10, TimeUnit.SECONDS)
+            }
+            val bankSync = Thread { sync.syncBanks(remote.fileId) }.apply { start() }
+            assertTrue(fetching.await(10, TimeUnit.SECONDS))
+            // The bank has not answered yet; the save does not wait for it.
+            val saved =
+                java.util.concurrent.Executors
+                    .newSingleThreadExecutor()
+            try {
+                val result = saved.submit<EditResult> { sync.assign(remote.fileId, "c-food", YearMonth.of(2026, 10), "25") }
+                assertEquals(EditResult.Saved, result.get(5, TimeUnit.SECONDS))
+            } finally {
+                answer.countDown()
+                saved.shutdown()
+            }
+            bankSync.join(10_000)
+            assertEquals(2_500L, assigned(remote.fileId))
+            assertEquals(setOf("sf-1"), financialIds(remote.fileId))
+        }
+    }
+
+    @Test
     fun aFailedBankFetchStillSyncsTheBudget() {
         scenario {
             val remote = server.addFile("Home", budgetBytes())
@@ -841,6 +878,9 @@ private class RecordingBankTransport : BankSyncTransport {
     var fails = false
     val asked = mutableListOf<String>()
 
+    /** Runs as each fetch starts, before it answers: a slow bank. */
+    var hold: () -> Unit = {}
+
     override fun fetchTransactions(
         serverAddress: String,
         token: String,
@@ -848,6 +888,7 @@ private class RecordingBankTransport : BankSyncTransport {
         startDateIso: String,
     ): List<ParsedImportRow> {
         asked.add(bankAccountId)
+        hold()
         if (fails) throw BankSyncException(ImportCopy.FETCH_FAILED)
         return rows
     }
