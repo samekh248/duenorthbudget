@@ -14,6 +14,8 @@ Shared across the pivot. Presets: this month, last 3 months, last 6 months, last
 
 On-budget accounts. Transfers between on-budget accounts excluded. Per month: income (sum of amounts > 0), expenses (sum of amounts < 0), net. Totals row. Tag `report-cashflow`.
 
+Tapping a month opens that month alone (`ShellRoute.CashFlowMonth`, tag `report-cashflow-month`): its income, expenses and net, then income by category and expenses by group. Each row drills on as spending does, over that month and through today, so every total matches the month's line.
+
 ## Net worth
 
 Its own page (`NetWorthScreens.kt`, state in `NetWorthHolder`), not part of the shared range. A line of the total over a span ending today; spans `1m`, `3m`, `6m` (default), `ytd`, `1y`, `all` (from the first transaction). Each point is the sum of every account's running balance through the end of that day, at most 120 evenly spaced days so a long span stays one smooth line; transactions after today are left out. Today's total sits above the line with how far it moved over the span; pressing and sliding along the line reads any day. On-budget and off-budget are shown separately under it; off-budget is in the line only when spec 006's include choice is on. Tags `net-worth-graph-screen`, `net-worth-graph`, `net-worth-span-<span>`.
@@ -23,6 +25,8 @@ Its own page (`NetWorthScreens.kt`, state in `NetWorthHolder`), not part of the 
 ## Spending
 
 Expenses only: amount < 0, on-budget, not a transfer. Group by category (default), group, or payee. Sorted by absolute amount, largest first. Uncategorized shown as its own row. Tag `report-spending`.
+
+Tapping a row drills in (`ShellRoute.ReportDrill`, tag `report-drill`): a group opens its categories, a category its payees, a payee its categories, and the next tap lists the transactions, newest first. A level with one row lists its transactions at once. Each page names the trail above it; back goes up one level. A transaction opens its form, and saving returns to the drilled page.
 
 The total sits over one flat bar split by each row's share (`report-spending-share`): the accent, a deeper accent, then greys. Under it, `what stood out` lists up to four highlights (`ReportsReader.spendingHighlights`), each a line with its figure in the accent over a caption, beside an accent rule (`report-spending-highlight-N`):
 

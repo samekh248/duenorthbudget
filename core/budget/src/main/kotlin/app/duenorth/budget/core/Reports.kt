@@ -22,6 +22,7 @@ object ReportsCopy {
     const val NOTHING = "nothing in this range"
     const val BY = "by"
     const val TRANSACTIONS = "transactions"
+    const val NONE = "none this month"
 
     // The spending report's highlights: what stood out over its range.
     const val STOOD_OUT = "what stood out"
@@ -218,6 +219,18 @@ data class SpendingDrill(
     val totalMinor: Long,
 )
 
+/** Cash flow → a month: where its income came from (by category) and where its expenses went (by group). */
+data class CashFlowMonthPage(
+    val month: YearMonth,
+    val currency: CurrencySpec,
+    val income: SpendingReport,
+    val expenses: SpendingReport,
+) {
+    val incomeMinor: Long get() = income.totalMinor
+    val expenseMinor: Long get() = expenses.totalMinor
+    val netMinor: Long get() = incomeMinor + expenseMinor
+}
+
 /** How the spending report drills: group → categories, category → payees, payee → categories, then transactions. */
 object SpendingDrillLevels {
     /** The grouping one level under [path], or null when [path] lists its transactions. */
@@ -384,9 +397,11 @@ class ReportsReader(
         range: ReportRange,
         path: List<SpendingFilter>,
         currency: CurrencySpec,
+        income: Boolean = false,
+        throughToday: Boolean = false,
     ): SpendingDrill {
         val keys = keys()
-        val under = expenses(range).filter { line -> path.all { keys.getValue(it.groupBy)(line) == it.id } }
+        val under = flows(range, income, throughToday).filter { line -> path.all { keys.getValue(it.groupBy)(line) == it.id } }
         val breakdown = SpendingDrillLevels.next(path)?.let { rowsOf(under, it) }?.takeIf { it.rows.size > 1 }
         val transactions =
             if (breakdown != null) {
@@ -458,10 +473,33 @@ class ReportsReader(
             amountMinor = line.amount,
         )
 
-    private fun expenses(range: ReportRange): List<Line> {
+    /** Cash flow → [month]: the same lines as [cashFlow] counts for it, income by category and expenses by group. */
+    fun cashFlowMonth(
+        month: YearMonth,
+        currency: CurrencySpec,
+    ): CashFlowMonthPage {
+        val range = ReportRange(month, month)
+        return CashFlowMonthPage(
+            month = month,
+            currency = currency,
+            income = rowsOf(flows(range, income = true, throughToday = true), SpendingGroupBy.CATEGORY),
+            expenses = rowsOf(flows(range, income = false, throughToday = true), SpendingGroupBy.GROUP),
+        )
+    }
+
+    private fun expenses(range: ReportRange): List<Line> = flows(range, income = false, throughToday = false)
+
+    /** On-budget, not a transfer, in [range]: money in when [income], else money out; nothing after today when [throughToday], as cash flow. */
+    private fun flows(
+        range: ReportRange,
+        income: Boolean,
+        throughToday: Boolean,
+    ): List<Line> {
         val low = range.start.atDay(1).toInt()
-        val high = range.end.atEndOfMonth().toInt()
-        return lines.filter { it.amount < 0 && !it.offBudget && !it.transfer && it.date in low..high }
+        val high = if (throughToday) minOf(range.end.atEndOfMonth().toInt(), today.toInt()) else range.end.atEndOfMonth().toInt()
+        return lines.filter {
+            (if (income) it.amount > 0 else it.amount < 0) && !it.offBudget && !it.transfer && it.date in low..high
+        }
     }
 
     private fun keys(): Map<SpendingGroupBy, (Line) -> String?> =

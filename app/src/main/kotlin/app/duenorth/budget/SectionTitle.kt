@@ -72,6 +72,7 @@ object SectionTitle {
                 ShellRoute.MonthReview,
                 is ShellRoute.ReviewCategory,
                 is ShellRoute.ReportDrill,
+                is ShellRoute.CashFlowMonth,
                 -> HomeSections.REPORTS
                 is ShellRoute.ReportPivot -> return null
                 ShellRoute.Create,

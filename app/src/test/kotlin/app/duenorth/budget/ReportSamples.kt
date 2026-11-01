@@ -1,6 +1,7 @@
 package app.duenorth.budget
 
 import app.duenorth.budget.core.CashFlowMonth
+import app.duenorth.budget.core.CashFlowMonthPage
 import app.duenorth.budget.core.CashFlowReport
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.NetWorthHistory
@@ -134,6 +135,47 @@ internal object ReportSamples {
             transactions =
                 lines.mapIndexed { index, (date, payee, amount) ->
                     SpendingTransaction("t$index", "checking", "t$index", date, payee, "Groceries", amount)
+                },
+            totalMinor = lines.sumOf { it.third },
+        )
+    }
+
+    /** Cash flow → september 2026. */
+    val month: YearMonth = YearMonth.of(2026, 9)
+
+    fun monthPage(): CashFlowMonthPage =
+        CashFlowMonthPage(
+            month = month,
+            currency = usd,
+            income =
+                SpendingReport(
+                    SpendingGroupBy.CATEGORY,
+                    listOf(SpendingRow("paycheck", "Paycheck", 380_000), SpendingRow("interest", "Interest", 20_000)),
+                ),
+            expenses =
+                SpendingReport(
+                    SpendingGroupBy.GROUP,
+                    listOf(
+                        SpendingRow("bills", "Bills", -150_000),
+                        SpendingRow("food", "Food", -51_500),
+                        SpendingRow(null, "uncategorized", -3_500),
+                    ),
+                ),
+        )
+
+    /** ... → september 2026 → income: paycheck, by payee. */
+    val incomePath = listOf(SpendingFilter(SpendingGroupBy.CATEGORY, "paycheck", "Paycheck"))
+
+    fun incomeDrill(): SpendingDrill {
+        val lines = listOf(Triple(20260925, "Acme Corp", 190_000L), Triple(20260911, "Acme Corp", 190_000L))
+        return SpendingDrill(
+            range = ReportRange(month, month),
+            currency = usd,
+            path = incomePath,
+            breakdown = null,
+            transactions =
+                lines.mapIndexed { index, (date, payee, amount) ->
+                    SpendingTransaction("i$index", "checking", "i$index", date, payee, "Paycheck", amount)
                 },
             totalMinor = lines.sumOf { it.third },
         )

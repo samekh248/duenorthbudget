@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import app.duenorth.budget.core.RegisterEntry
+import app.duenorth.budget.core.ReportsCopy
+import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.theme.Metro
 
 // The pages of schedules, rules and reports, each wired to the view model. DueNorthApp picks one per route.
@@ -141,6 +143,7 @@ internal fun ReportPivotRoute(
         onCustom = model.reports::setRange,
         onGroupBy = model.reports::setGroupBy,
         onRow = { model.reports.drill(it) },
+        onMonth = model.reports::openMonth,
         modifier = modifier,
         // A pivot saved before net worth became its own graph may point past the last item.
         initialItem = route.item.coerceIn(0, ReportItems.headers.lastIndex),
@@ -155,12 +158,30 @@ internal fun ReportDrillRoute(
     modifier: Modifier,
 ) {
     // Read again each time the page shows, so a transaction just fixed from here is counted where it now belongs.
-    LaunchedEffect(route.path) { model.reports.loadDrill(route.path) }
+    LaunchedEffect(route) { model.reports.loadDrill(route) }
     SpendingDrillScreen(
         path = route.path,
-        drill = state.reports.drills[route.path],
-        onRow = { row, groupBy -> model.reports.drill(route.path, row, groupBy) },
+        drill = state.reports.drills[route],
+        onRow = { row, groupBy -> model.reports.drill(route, row, groupBy) },
         onTransaction = model.reports::openTransaction,
+        modifier = modifier,
+        root = route.month?.let { listOf(ReportsCopy.CASH_FLOW, monthLabel(it)) } ?: listOf(ReportsCopy.SPENDING),
+    )
+}
+
+@Composable
+internal fun CashFlowMonthRoute(
+    route: ShellRoute.CashFlowMonth,
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    LaunchedEffect(route) { model.reports.loadMonth(route.month) }
+    CashFlowMonthScreen(
+        month = route.month,
+        page = state.reports.months[route.month],
+        onIncome = { model.reports.drillMonth(route.month, it, income = true) },
+        onExpense = { model.reports.drillMonth(route.month, it, income = false) },
         modifier = modifier,
     )
 }

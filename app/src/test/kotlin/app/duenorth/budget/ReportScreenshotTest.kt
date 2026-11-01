@@ -10,6 +10,7 @@ import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportsCopy
 import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.SpendingGroupBy
+import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Test
@@ -64,6 +65,38 @@ class ReportScreenshotTest {
 
     @Test
     fun drillTransactionsDark() = capture("report_drill_transactions_dark", dark = true) { Drill(ReportSamples.categoryPath) }
+
+    @Test
+    fun cashFlowMonthLight() = capture("report_cashflow_month_light", dark = false) { Month() }
+
+    @Test
+    fun cashFlowMonthDark() = capture("report_cashflow_month_dark", dark = true) { Month() }
+
+    @Test
+    fun cashFlowIncomeDrillLight() = capture("report_cashflow_income_drill_light", dark = false) { IncomeDrill() }
+
+    @Test
+    fun cashFlowIncomeDrillDark() = capture("report_cashflow_income_drill_dark", dark = true) { IncomeDrill() }
+
+    @Composable
+    private fun Month() {
+        SectionTitled(ReportsCopy.TITLE.uppercase()) {
+            CashFlowMonthScreen(ReportSamples.month, ReportSamples.monthPage(), {}, {})
+        }
+    }
+
+    @Composable
+    private fun IncomeDrill() {
+        SectionTitled(ReportsCopy.TITLE.uppercase()) {
+            SpendingDrillScreen(
+                ReportSamples.incomePath,
+                ReportSamples.incomeDrill(),
+                { _, _ -> },
+                {},
+                root = listOf(ReportsCopy.CASH_FLOW, monthLabel(ReportSamples.month)),
+            )
+        }
+    }
 
     @Composable
     private fun Drill(path: List<SpendingFilter>) {

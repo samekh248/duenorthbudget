@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.CashFlowMonthPage
 import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsPage
@@ -11,6 +12,7 @@ import app.duenorth.budget.core.SpendingTransaction
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import java.time.YearMonth
 
 /** The reports' own state, inside [ShellUiState.reports]. */
 data class ReportsUi(
@@ -19,8 +21,10 @@ data class ReportsUi(
     val preset: ReportPreset = ReportPreset.LAST_6,
     val custom: ReportRange? = null,
     val groupBy: SpendingGroupBy = SpendingGroupBy.CATEGORY,
-    /** Each drilled spending page read so far, by the rows tapped to reach it; back shows the one before at once. */
-    val drills: Map<List<SpendingFilter>, SpendingDrill> = emptyMap(),
+    /** Each drilled page read so far, by its route; back shows the one before at once. */
+    val drills: Map<ShellRoute.ReportDrill, SpendingDrill> = emptyMap(),
+    /** Each cash flow month opened so far. */
+    val months: Map<YearMonth, CashFlowMonthPage> = emptyMap(),
 )
 
 // Spec 010 US4 (T054): reports, computed on io. See contracts/reports.md.
@@ -59,14 +63,14 @@ class ReportsHolder internal constructor(
         load()
     }
 
-    /** Spending → [row] (under [path], the rows already tapped): what it is made of, a level further down. */
+    /** A drilled page → [row] (grouped by [groupBy]): what it is made of, a level further down. */
     fun drill(
-        path: List<SpendingFilter>,
+        from: ShellRoute.ReportDrill,
         row: SpendingRow,
         groupBy: SpendingGroupBy,
     ) {
-        val next = path + SpendingFilter(groupBy, row.id, row.label)
-        host.push(ShellRoute.ReportDrill(next))
+        val next = from.copy(path = from.path + SpendingFilter(groupBy, row.id, row.label))
+        host.push(next)
         loadDrill(next)
     }
 
@@ -76,18 +80,46 @@ class ReportsHolder internal constructor(
             state.reports.page
                 ?.spending
                 ?.groupBy ?: state.reports.groupBy
-        drill(emptyList(), row, groupBy)
+        drill(ShellRoute.ReportDrill(emptyList()), row, groupBy)
     }
 
-    /** Reads [path]'s page over the report's range; the last one read stays on screen until it lands. */
-    fun loadDrill(path: List<SpendingFilter>) {
+    /** Cash flow → [month]: its income and expenses, each a row to drill into. */
+    fun openMonth(month: YearMonth) {
+        host.push(ShellRoute.CashFlowMonth(month))
+        loadMonth(month)
+    }
+
+    fun loadMonth(month: YearMonth) {
+        val budgetId = state.settings.openBudgetId ?: return
+        host.scope.launch {
+            val page = withContext(host.io) { host.library.readCashFlowMonth(budgetId, month) } ?: return@launch
+            update { it.copy(months = it.months + (month to page)) }
+        }
+    }
+
+    /** Cash flow → a month → an income category or an expense group. */
+    fun drillMonth(
+        month: YearMonth,
+        row: SpendingRow,
+        income: Boolean,
+    ) = drill(
+        ShellRoute.ReportDrill(emptyList(), month, income),
+        row,
+        if (income) SpendingGroupBy.CATEGORY else SpendingGroupBy.GROUP,
+    )
+
+    /** Reads [route]'s page; the last one read stays on screen until it lands. */
+    fun loadDrill(route: ShellRoute.ReportDrill) {
         val budgetId = state.settings.openBudgetId ?: return
         val current = state
         val today = runCatching { LocalDate.parse(current.today) }.getOrElse { LocalDate.now() }
-        val range = current.reports.preset.range(today, current.reports.custom)
+        val range = route.month?.let { ReportRange(it, it) } ?: current.reports.preset.range(today, current.reports.custom)
         host.scope.launch {
-            val drill = withContext(host.io) { host.library.readSpendingDrill(budgetId, range, path) } ?: return@launch
-            update { it.copy(drills = it.drills + (path to drill)) }
+            val drill =
+                withContext(host.io) {
+                    host.library.readSpendingDrill(budgetId, range, route.path, route.income, throughToday = route.month != null)
+                } ?: return@launch
+            update { it.copy(drills = it.drills + (route to drill)) }
         }
     }
 

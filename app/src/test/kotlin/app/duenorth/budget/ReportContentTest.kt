@@ -204,18 +204,18 @@ class ReportContentTest {
         model.reports.drill(top)
         val first = listOf(SpendingFilter(SpendingGroupBy.CATEGORY, top.id, top.label))
         assertEquals(ShellRoute.ReportDrill(first), model.state.value.route)
-        await { model.state.value.reports.drills[first] != null }
-        val drill = model.state.value.reports.drills[first]!!
+        await { model.state.value.reports.drills[ShellRoute.ReportDrill(first)] != null }
+        val drill = model.state.value.reports.drills[ShellRoute.ReportDrill(first)]!!
         assertEquals(top.amountMinor, drill.totalMinor)
         val breakdown = drill.breakdown
         if (breakdown != null) {
             assertEquals(SpendingGroupBy.PAYEE, breakdown.groupBy)
             val sub = breakdown.rows.first()
-            model.reports.drill(first, sub, breakdown.groupBy)
+            model.reports.drill(ShellRoute.ReportDrill(first), sub, breakdown.groupBy)
             val second = first + SpendingFilter(SpendingGroupBy.PAYEE, sub.id, sub.label)
             assertEquals(ShellRoute.ReportDrill(second), model.state.value.route)
-            await { model.state.value.reports.drills[second] != null }
-            val bottom = model.state.value.reports.drills[second]!!
+            await { model.state.value.reports.drills[ShellRoute.ReportDrill(second)] != null }
+            val bottom = model.state.value.reports.drills[ShellRoute.ReportDrill(second)]!!
             assertTrue(bottom.transactions.isNotEmpty())
             model.reports.openTransaction(bottom.transactions.first())
             assertTrue(model.state.value.route is ShellRoute.EditTransaction)
@@ -226,6 +226,72 @@ class ReportContentTest {
         assertEquals(ShellRoute.ReportDrill(first), model.state.value.route)
         model.back()
         assertEquals(ShellRoute.ReportPivot(ReportItems.SPENDING), model.state.value.route)
+    }
+
+    @Test
+    fun aCashFlowMonthOpensAndItsRowsDrillIn() {
+        val months = mutableListOf<YearMonth>()
+        compose.setContent {
+            MetroTheme {
+                ReportsScreen(
+                    ReportSamples.page(),
+                    false,
+                    ReportPreset.LAST_6,
+                    SpendingGroupBy.CATEGORY,
+                    {},
+                    {},
+                    {},
+                    initialItem = ReportItems.CASH_FLOW,
+                    onMonth = { months += it },
+                )
+            }
+        }
+        tapShown("report-cashflow-2026-09")
+        assertEquals(listOf(YearMonth.of(2026, 9)), months)
+    }
+
+    @Test
+    fun aCashFlowMonthListsIncomeAndExpensesToDrillInto() {
+        val income = mutableListOf<String?>()
+        val expenses = mutableListOf<String?>()
+        compose.setContent {
+            MetroTheme {
+                CashFlowMonthScreen(ReportSamples.month, ReportSamples.monthPage(), { income += it.id }, { expenses += it.id })
+            }
+        }
+        compose.onNodeWithTag("report-cashflow-month-totals", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("report-cashflow-month-income-paycheck").performClick()
+        compose.onNodeWithTag("report-cashflow-month-expense-bills").performClick()
+        assertEquals(listOf<String?>("paycheck"), income)
+        assertEquals(listOf<String?>("bills"), expenses)
+    }
+
+    @Test
+    fun cashFlowDrillsThroughTheModelForThatMonthAlone() {
+        val (model, _) = household("reports-cashflow-drill")
+        model.reports.open(ReportItems.CASH_FLOW)
+        await { model.state.value.reports.page != null && !model.state.value.reports.loading }
+        val month =
+            model.state.value.reports.page!!
+                .cashFlow.months
+                .last { it.expenseMinor != 0L }
+        model.reports.openMonth(month.month)
+        assertEquals(ShellRoute.CashFlowMonth(month.month), model.state.value.route)
+        await { model.state.value.reports.months[month.month] != null }
+        val page = model.state.value.reports.months[month.month]!!
+        assertEquals(month.incomeMinor to month.expenseMinor, page.incomeMinor to page.expenseMinor)
+        val group = page.expenses.rows.first()
+        model.reports.drillMonth(month.month, group, income = false)
+        val route = ShellRoute.ReportDrill(listOf(SpendingFilter(SpendingGroupBy.GROUP, group.id, group.label)), month.month)
+        assertEquals(route, model.state.value.route)
+        await { model.state.value.reports.drills[route] != null }
+        val drill = model.state.value.reports.drills[route]!!
+        assertEquals(group.amountMinor, drill.totalMinor)
+        assertEquals(ReportRange(month.month, month.month), drill.range)
+        model.back()
+        assertEquals(ShellRoute.CashFlowMonth(month.month), model.state.value.route)
+        model.back()
+        assertEquals(ShellRoute.ReportPivot(ReportItems.CASH_FLOW), model.state.value.route)
     }
 
     @Test
