@@ -24,7 +24,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -91,6 +93,8 @@ fun RegisterScreen(
     onNotAMatch: (MatchPair) -> Unit = {},
     search: RegisterSearch? = null,
     onSearch: (RegisterSearch) -> Unit = {},
+    /** Whether the pending section starts open; a tap on its heading folds it. */
+    pendingOpen: Boolean = true,
 ) {
     val rows = if (search == null) page.rows else page.searched(search)
     val owed = page.account.type == "credit" && page.balanceMinor < 0
@@ -137,6 +141,7 @@ fun RegisterScreen(
                 onMatch = onMatch,
                 onNotAMatch = onNotAMatch,
                 searching = search?.active == true,
+                pendingOpen = pendingOpen,
             )
         }
     }
@@ -202,6 +207,7 @@ private fun RegisterList(
     onMatch: (MatchPair) -> Unit = {},
     onNotAMatch: (MatchPair) -> Unit = {},
     searching: Boolean = false,
+    pendingOpen: Boolean = true,
 ) {
     // A new visit starts at the newest row. Scroll position is not saved.
     val list = rememberLazyListState()
@@ -219,7 +225,10 @@ private fun RegisterList(
             emptyList()
         }
     val paired = pairs.flatMapTo(mutableSetOf()) { it.ids }
-    val listed = rows.filter { it.id !in paired }
+    // Rows the bank has not posted yet sit apart, above the rest, under a heading that folds them away.
+    val pending = rows.filter { it.pending && it.id !in paired }
+    var showPending by rememberSaveable { mutableStateOf(pendingOpen) }
+    val listed = rows.filter { it.id !in paired && !it.pending }
     val days = registerDays(listed)
     val position = listed.withIndex().associate { it.value.id to it.index }
     val byId = rows.associateBy { it.id }
@@ -236,6 +245,36 @@ private fun RegisterList(
                     onMatch = { onMatch(pair) },
                     onNotAMatch = { onNotAMatch(pair) },
                 )
+            }
+        }
+        if (pending.isNotEmpty()) {
+            item(key = "pending") {
+                PendingHeading(pending, page, showPending) { showPending = !showPending }
+            }
+            if (showPending) {
+                val line: @Composable (RegisterRow, Boolean, Dp) -> Unit = { row, banded, air ->
+                    RegisterLine(
+                        row,
+                        page,
+                        banded = banded,
+                        picked = selection?.let { row.id in it },
+                        onPress = { onPress(row.id) },
+                        onLongPress = { onLongPress(row.id) },
+                        detail = pendingDetail(row),
+                        extraAir = air,
+                    )
+                }
+                if (cards) {
+                    item(key = "pending-rows") {
+                        LedgerGroup(Modifier.padding(top = 8.dp, bottom = 4.dp), bottomAir = false, heading = {}) {
+                            pending.forEach { row -> line(row, false, if (row === pending.last()) MetroDimens.Row else 0.dp) }
+                        }
+                    }
+                } else {
+                    items(pending, key = { "pending-${it.id}" }) { row ->
+                        line(row, ledgerBanded(pending.indexOf(row)), 0.dp)
+                    }
+                }
             }
         }
         if (cards) {
@@ -259,6 +298,7 @@ private fun RegisterList(
                                 onLongPress = { onLongPress(row.id) },
                                 // The last row holds the panel's bottom air, so a picked one is tinted to the edge.
                                 extraAir = if (row === day.last()) MetroDimens.Row else 0.dp,
+                                showLock = true,
                             )
                         }
                     }
@@ -283,11 +323,56 @@ private fun RegisterList(
                     picked = selection?.let { row.id in it },
                     onPress = { onPress(row.id) },
                     onLongPress = { onLongPress(row.id) },
+                    showLock = true,
                 )
             }
         }
     }
 }
+
+/**
+ * The pending section's heading, built like reconcile's locked one: a rule, a clock, "pending" with how many and
+ * what they come to, and a chevron that folds the rows away.
+ */
+@Composable
+private fun PendingHeading(
+    rows: List<RegisterRow>,
+    page: RegisterPage,
+    open: Boolean,
+    onToggle: () -> Unit,
+) {
+    val ink = Metro.colors.secondary
+    Column(
+        Modifier
+            .padding(top = 16.dp)
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress(onToggle)
+            .semantics { stateDescription = if (open) RegisterCopy.PENDING_OPEN else RegisterCopy.PENDING_FOLDED }
+            .testTag("register-pending-heading"),
+    ) {
+        Box(Modifier.fillMaxWidth().height(2.dp).background(ink.copy(alpha = PENDING_RULE_ALPHA)))
+        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Canvas(Modifier.size(16.dp)) { drawClock(center, ink) }
+            MetroText(RegisterCopy.PENDING, Metro.typography.body, Modifier.padding(start = 6.dp))
+            MetroText(
+                "${rows.size} · ${MoneyFormat.format(rows.sumOf { it.amountMinor }, page.currency, formatOptions())}",
+                Metro.typography.caption.copy(textAlign = TextAlign.End),
+                Modifier.weight(1f).padding(start = 8.dp, end = 4.dp).testTag("register-pending-total"),
+                color = ink,
+                maxLines = 1,
+            )
+            AppGlyphIcon(if (open) AppGlyph.ChevronDown else AppGlyph.ChevronRight, ink)
+        }
+        MetroText(RegisterCopy.PENDING_NOTE, Metro.typography.caption, color = ink)
+    }
+}
+
+/** A pending row has no day heading over it, so its date leads the quieter line. */
+private fun pendingDetail(row: RegisterRow): String =
+    listOf(RegisterEntry.registerDateLabel(row.date), registerDetail(row)).filter { it.isNotBlank() }.joinToString(" · ")
+
+private const val PENDING_RULE_ALPHA = 0.45f
 
 /**
  * A possible match on the register: both rows on an accent tint, tied by a bar down the left edge,
@@ -384,6 +469,8 @@ internal fun RegisterLine(
             banded -> ledgerBand
             else -> Color.Transparent
         }
+    val pending = row.pending && !locked
+    val clockInk = Metro.colors.secondary
     val bar =
         when {
             locked -> lockInk
@@ -435,6 +522,10 @@ internal fun RegisterLine(
                         drawLock(Offset(topLeft.x + side / 2, topLeft.y + side / 2), ground)
                         return@drawBehind
                     }
+                    if (pending) {
+                        drawClock(Offset(topLeft.x + side / 2, topLeft.y + side / 2), clockInk)
+                        return@drawBehind
+                    }
                     // Centred on the letter's x-height, not its line box, which leaves room above a lowercase c.
                     val c = measurer.measure(RegisterCopy.CLEARED_MARK, keyMark)
                     val middle = c.firstBaseline - keyMark.fontSize.toPx() * SELAWIK_X_HEIGHT / 2
@@ -449,6 +540,10 @@ internal fun RegisterLine(
                 drawRect(bar, Offset(left, inset), Size(CLEARED_BAR.toPx(), height - 2 * inset))
                 if (locked) {
                     drawLock(Offset(left + CLEARED_BAR.toPx() / 2, height / 2), ground)
+                    return@drawBehind
+                }
+                if (pending) {
+                    drawClock(Offset(left + CLEARED_BAR.toPx() / 2, height / 2), clockInk)
                     return@drawBehind
                 }
                 val c = measurer.measure(RegisterCopy.CLEARED_MARK, mark)
@@ -467,6 +562,7 @@ internal fun RegisterLine(
                 stateDescription =
                     when {
                         locked -> RegisterCopy.LOCKED
+                        pending -> RegisterCopy.PENDING
                         row.cleared -> RegisterCopy.CLEARED
                         else -> RegisterCopy.NOT_CLEARED
                     }
@@ -587,6 +683,18 @@ internal fun DrawScope.drawLock(
             lineTo(center.x + r, top)
         }
     drawPath(shackle, color, style = Stroke(1.5.dp.toPx()))
+}
+
+/** A small clock centred on [center]: a ring with its hands at four o'clock, the mark of a row not posted yet. */
+internal fun DrawScope.drawClock(
+    center: Offset,
+    color: Color,
+) {
+    val r = 4.5.dp.toPx()
+    val stroke = 1.3.dp.toPx()
+    drawCircle(color, r, center, style = Stroke(stroke))
+    drawLine(color, center, Offset(center.x, center.y - r * 0.62f), stroke, StrokeCap.Round)
+    drawLine(color, center, Offset(center.x + r * 0.5f, center.y + r * 0.3f), stroke, StrokeCap.Round)
 }
 
 /** The cleared key of a relief style: a touch smaller than the payee's two lines. */

@@ -152,11 +152,14 @@ class BankLinkBookTest {
                 HttpBankSyncTransport().fetchTransactions(server.baseUrl, phone.sync.syncToken()!!, "ACT-1", "2026-08-01")
             assertEquals(
                 listOf(
-                    ParsedImportRow(20261028, "Streamer", -999, "TRN-2", "Streamer", "STREAMING"),
+                    ParsedImportRow(20261028, "Streamer", -999, "TRN-2", "Streamer", "STREAMING", pending = true),
                     ParsedImportRow(20261027, "Coffee Shop", -4250, "TRN-1", "Coffee Shop", "COFFEE SHOP 123"),
                 ),
-                rows,
+                rows.map { it.copy(raw = null) },
             )
+            // The bank's own copy is kept for raw_synced_data, its booked flag with it.
+            assertEquals(true, BankPending.unbooked(rows[0].raw))
+            assertEquals(false, BankPending.unbooked(rows[1].raw))
         }
     }
 

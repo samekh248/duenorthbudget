@@ -232,6 +232,10 @@ object ActualSchema {
         if ("imported_description" !in names) {
             session.exec("ALTER TABLE transactions ADD COLUMN imported_description TEXT")
         }
+        // Actual keeps the bank's copy of a synced row here; its `booked` says whether the bank had posted it.
+        if ("raw_synced_data" !in names) {
+            session.exec("ALTER TABLE transactions ADD COLUMN raw_synced_data TEXT")
+        }
     }
 
     private fun ensureAccountBankColumns(session: SqlSession) {
