@@ -171,6 +171,7 @@ object SyncSchema {
                     "schedule",
                     "financial_id",
                     "imported_description",
+                    "raw_synced_data",
                 ),
             "zero_budgets" to setOf("month", "category", "amount", "carryover", "goal", "long_goal"),
             "reflect_budgets" to setOf("month", "category", "amount", "carryover", "goal", "long_goal"),

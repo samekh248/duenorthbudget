@@ -20,6 +20,7 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasParent
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
@@ -31,6 +32,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
@@ -88,6 +90,47 @@ class RegisterContentTest {
         compose.onNodeWithTag("register-day-20261007", useUnmergedTree = true).assertTextEquals("oct 7")
         compose.onNodeWithTag("register-balance").assertIsDisplayed()
         compose.onNodeWithText("balance ${RegisterCopy.OWED}").assertIsDisplayed()
+    }
+
+    // Pending rows sit under their own heading, which folds them away; locked rows read as locked.
+    @Test
+    fun pendingFoldsAndLockedReadsLocked() {
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(1000.dp)) {
+                    RegisterScreen(
+                        page =
+                            sample().copy(
+                                rows =
+                                    listOf(
+                                        row("stream", "Streamer", 20261031).copy(pending = true),
+                                        row("cafe", "Cafe").copy(cleared = true),
+                                        row("bus", "Bus", 20261001).copy(cleared = true, reconciled = true),
+                                    ),
+                            ),
+                        onGesture = {},
+                        onOpen = {},
+                        onAdd = {},
+                        onReconcile = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("register-pending-total", useUnmergedTree = true).assertTextEquals("1 · -\$12.40")
+        compose
+            .onNodeWithTag("register-row-stream")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, RegisterCopy.PENDING))
+        compose.onNodeWithTag("register-detail-stream", useUnmergedTree = true).assertTextEquals("oct 31 · Groceries")
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("register-row-bus"))
+        compose
+            .onNodeWithTag("register-row-bus")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, RegisterCopy.LOCKED))
+        compose.onNode(hasScrollAction()).performScrollToNode(hasTestTag("register-pending-heading"))
+        compose.onNodeWithTag("register-pending-heading").performClick()
+        compose.onNodeWithTag("register-row-stream").assertDoesNotExist()
+        compose.onNodeWithTag("register-row-cafe").assertIsDisplayed()
+        compose.onNodeWithTag("register-pending-heading").performClick()
+        compose.onNodeWithTag("register-row-stream").assertIsDisplayed()
     }
 
     @Test

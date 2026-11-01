@@ -71,6 +71,58 @@ class ImportBookTest {
         }
     }
 
+    // A row the bank has not posted comes in not cleared and reads as pending, as Actual imports it.
+    @Test
+    fun pendingBankRowComesInPendingAndNotCleared() {
+        withBook { session, register, import ->
+            import.confirm(
+                "checking",
+                listOf(
+                    ParsedImportRow(20261030, "Streamer", -1_599, financialId = "p-1", pending = true, raw = UNBOOKED),
+                    ParsedImportRow(20261029, "Market", -8_420, financialId = "b-1", raw = BOOKED),
+                ),
+                review = false,
+            )
+            val rows = register.read("checking")!!.rows.associateBy { it.payee }
+            assertEquals(true, rows.getValue("Streamer").pending)
+            assertEquals(false, rows.getValue("Streamer").cleared)
+            assertEquals(false, rows.getValue("Market").pending)
+            assertEquals(true, rows.getValue("Market").cleared)
+            assertEquals(2, alive(session))
+        }
+    }
+
+    // Banks give the posted row a new id: it clears the pending row instead of landing beside it.
+    @Test
+    fun postedRowClearsItsPendingCopy() {
+        withBook { session, register, import ->
+            import.confirm(
+                "checking",
+                listOf(ParsedImportRow(20261030, "Streamer", -1_599, financialId = "p-1", pending = true, raw = UNBOOKED)),
+                review = false,
+            )
+            val posted = ParsedImportRow(20261101, "STREAMER.COM", -1_599, financialId = "b-9", raw = BOOKED)
+            val result = import.confirm("checking", listOf(posted), review = false)
+            assertEquals(0, result.addedIds.size)
+            val row = register.read("checking")!!.rows.single()
+            assertEquals(false, row.pending)
+            assertEquals(true, row.cleared)
+            // The next sync knows it by the posted id.
+            assertEquals(0, import.confirm("checking", listOf(posted), review = false).addedIds.size)
+            assertEquals(1, alive(session))
+        }
+    }
+
+    @Test
+    fun lockedOrHandClearedRowsAreNeverPending() {
+        assertEquals(true, BankPending.isPending(UNBOOKED, cleared = false, reconciled = false))
+        assertEquals(false, BankPending.isPending(UNBOOKED, cleared = true, reconciled = false))
+        assertEquals(false, BankPending.isPending(UNBOOKED, cleared = false, reconciled = true))
+        assertEquals(false, BankPending.isPending(BOOKED, cleared = false, reconciled = false))
+        assertEquals(false, BankPending.isPending(null, cleared = false, reconciled = false))
+        assertEquals(false, BankPending.isPending("not json booked", cleared = false, reconciled = false))
+    }
+
     // Every sync fetches the last 90 days again: a bank copy merged away must not come back as a new duplicate.
     @Test
     fun mergedBankCopyStaysMergedOnNextSync() {
@@ -268,3 +320,6 @@ class ImportBookTest {
             .long("n")
             .toInt()
 }
+
+private const val UNBOOKED = """{"booked":false,"transactionId":"p-1","amount":"-15.99"}"""
+private const val BOOKED = """{"booked":true,"transactionId":"b-1"}"""

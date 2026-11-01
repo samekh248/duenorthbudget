@@ -235,6 +235,83 @@ class RegisterScreenshotTest {
         }
     }
 
+    // Bank rows not posted yet under their own folding heading, then the rest with reconciled rows locked.
+    @Test
+    fun pendingLight() = snapPending("register_pending_light", dark = false)
+
+    @Test
+    fun pendingDark() = snapPending("register_pending_dark", dark = true)
+
+    @Test
+    fun pendingFoldedLight() = snapPending("register_pending_folded_light", dark = false, folded = true)
+
+    private fun snapPending(
+        name: String,
+        dark: Boolean,
+        folded: Boolean = false,
+    ) {
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Column(Modifier.width(390.dp).height(780.dp)) {
+                    SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
+                        RegisterScreen(
+                            page = pendingPage(),
+                            onGesture = {},
+                            onOpen = {},
+                            onAdd = {},
+                            onReconcile = {},
+                            pendingOpen = !folded,
+                        )
+                    }
+                    bar()
+                }
+            }
+        }
+    }
+
+    private fun pendingPage(): RegisterPage {
+        fun row(
+            id: String,
+            date: Int,
+            payee: String,
+            category: String?,
+            amount: Long,
+            cleared: Boolean = true,
+            reconciled: Boolean = false,
+            pending: Boolean = false,
+        ) = RegisterRow(
+            id = id,
+            date = date,
+            payee = payee,
+            categoryId = category?.let { "c-$it" },
+            categoryLabel = category ?: "no category",
+            amountMinor = amount,
+            note = "",
+            reconciled = reconciled,
+            transferId = null,
+            partnerOffBudget = null,
+            partnerCategoryId = null,
+            parent = false,
+            parts = emptyList(),
+            cleared = cleared,
+            pending = pending,
+        )
+        return page().copy(
+            account = RegisterAccount("checking", "checking", offBudget = false, type = "checking", closed = false),
+            balanceMinor = 31_870,
+            rows =
+                listOf(
+                    row("p-stream", 20261031, "Streamer", null, -1_599, cleared = false, pending = true),
+                    row("p-gas", 20261030, "Shell Oil 5521", "Gas", -4_812, cleared = false, pending = true),
+                    row("p-coffee", 20261030, "Corner Coffee", "Groceries", -575, cleared = false, pending = true),
+                    row("market", 20261029, "Riverside Market", "Groceries", -8_420),
+                    row("power", 20261024, "City Power", "Utilities", -9_310, reconciled = true),
+                    row("rent", 20261020, "Riverside Property Management", "Household", -145_000, reconciled = true),
+                    row("bus", 20261018, "Metro Transit", "Transit", -250, reconciled = true),
+                ),
+        )
+    }
+
     @Test
     fun entryLight() = snapEntry("entry_light", dark = false)
 

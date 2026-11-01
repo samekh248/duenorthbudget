@@ -24,6 +24,10 @@ object RegisterCopy {
     const val CLEARED = "cleared"
     const val NOT_CLEARED = "not cleared"
     const val LOCKED = "locked"
+    const val PENDING = "pending"
+    const val PENDING_NOTE = "from the bank, not posted yet"
+    const val PENDING_OPEN = "showing pending"
+    const val PENDING_FOLDED = "pending folded"
     const val CLEARED_MARK = "c"
     const val CLEAR = "clear"
     const val UNCLEAR = "unclear"
@@ -64,6 +68,8 @@ data class RegisterRow(
     val cleared: Boolean = false,
     /** The account a transfer payee stands for; the payee line reads "transfer to/from" it. */
     val transferAccountId: String? = null,
+    /** From the bank but not posted there yet: Actual's `booked: false`, and not cleared since. */
+    val pending: Boolean = false,
 )
 
 data class CategoryChoice(

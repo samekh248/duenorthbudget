@@ -9,6 +9,10 @@ data class ParsedImportRow(
     val financialId: String? = null,
     val importedPayee: String? = null,
     val note: String? = null,
+    /** The bank has not posted it yet (`booked: false`); it comes in not cleared, as Actual imports it. */
+    val pending: Boolean = false,
+    /** The bank's own copy of the row, kept as Actual keeps it in `raw_synced_data`. */
+    val raw: String? = null,
 )
 
 sealed interface ParseFileResult {

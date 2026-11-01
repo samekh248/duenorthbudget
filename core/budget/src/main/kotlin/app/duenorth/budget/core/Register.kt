@@ -210,6 +210,7 @@ class RegisterBook(
                         t.isParent AS isParent,
                         t.reconciled AS reconciled,
                         t.cleared AS cleared,
+                        t.raw_synced_data AS raw_synced_data,
                         t.transferred_id AS transferred_id,
                         COALESCE(p.name, '') AS payee,
                         p.transfer_acct AS transfer_acct,
@@ -273,6 +274,7 @@ class RegisterBook(
                         parts = parts[id].orEmpty(),
                         cleared = row.bool("cleared"),
                         transferAccountId = transferAccount,
+                        pending = BankPending.isPending(row.str("raw_synced_data"), row.bool("cleared"), row.bool("reconciled")),
                     )
                 }
         return RegisterPage(
@@ -818,7 +820,10 @@ class RegisterBook(
         scheduleId: String? = null,
         financialId: String? = null,
         importedPayee: String? = null,
+        cleared: Boolean = true,
+        rawSyncedData: String? = null,
     ) {
+        val raw: Array<Pair<String, Any?>> = if (rawSyncedData != null) arrayOf("raw_synced_data" to rawSyncedData) else emptyArray()
         setColumns(
             id,
             "acct" to accountId,
@@ -833,12 +838,13 @@ class RegisterBook(
             "starting_balance_flag" to 0,
             "transferred_id" to transferId,
             "sort_order" to sort,
-            "cleared" to 1,
+            "cleared" to if (cleared) 1 else 0,
             "reconciled" to 0,
             "tombstone" to 0,
             "schedule" to scheduleId,
             "financial_id" to financialId,
             "imported_description" to importedPayee,
+            *raw,
         )
     }
 
@@ -904,6 +910,8 @@ class RegisterBook(
         date: Int,
         financialId: String?,
         importedPayee: String?,
+        cleared: Boolean = true,
+        rawSyncedData: String? = null,
     ) {
         insert(
             id = id,
@@ -916,6 +924,8 @@ class RegisterBook(
             sort = nextSort(),
             financialId = financialId,
             importedPayee = importedPayee,
+            cleared = cleared,
+            rawSyncedData = rawSyncedData,
         )
     }
 

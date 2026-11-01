@@ -120,7 +120,7 @@ class ImportBook(
     ): ImportPreview {
         val rows =
             candidates.mapIndexed { index, row ->
-                val dup = findDuplicate(accountId, row)
+                val dup = findDuplicate(accountId, row) ?: postedPending(accountId, row)
                 ImportPreviewRow(
                     index = index,
                     date = row.date,
@@ -146,7 +146,10 @@ class ImportBook(
         var skipped = 0
         session.transaction {
             candidates.forEach { row ->
-                if (findDuplicate(accountId, row) != null) {
+                val held = findDuplicate(accountId, row) ?: postedPending(accountId, row)
+                if (held != null) {
+                    // A row the bank has posted since clears the pending copy, as Actual's sync does.
+                    if (!row.pending) settlePending(held, row)
                     skipped++
                     return@forEach
                 }
@@ -272,8 +275,56 @@ class ImportBook(
             date = ruled.date,
             financialId = row.financialId,
             importedPayee = row.importedPayee ?: row.payee,
+            cleared = !row.pending,
+            rawSyncedData = row.raw,
         )
         return ruled.id
+    }
+
+    /**
+     * The one pending row a newly posted bank row stands for: banks give the posted row a new id, so it is found by
+     * its amount within a few days, as Actual matches it. With two to choose from, neither is taken.
+     */
+    private fun postedPending(
+        accountId: String,
+        row: ParsedImportRow,
+    ): String? {
+        if (row.pending) return null
+        val found =
+            session
+                .query(
+                    """
+                    SELECT id, date, raw_synced_data FROM transactions
+                    WHERE acct = ? AND amount = ? AND IFNULL(tombstone, 0) = 0
+                        AND IFNULL(cleared, 0) = 0 AND IFNULL(reconciled, 0) = 0
+                        AND IFNULL(isChild, 0) = 0 AND raw_synced_data IS NOT NULL
+                    """.trimIndent(),
+                    listOf(accountId, row.amountMinor),
+                ).filter {
+                    BankPending.unbooked(it.str("raw_synced_data")) &&
+                        MatchFinder.daysBetween(it.long("date").toInt(), row.date) <= BankPending.POSTED_WITHIN_DAYS
+                }
+        return found.singleOrNull()?.str("id")
+    }
+
+    /** Clears a pending row the bank has now posted, and takes the posted row's id so the next sync knows it. */
+    private fun settlePending(
+        id: String,
+        row: ParsedImportRow,
+    ) {
+        val held =
+            session
+                .query(
+                    "SELECT cleared, reconciled, tombstone, raw_synced_data FROM transactions WHERE id = ?",
+                    listOf(id),
+                ).firstOrNull() ?: return
+        if (held.bool("tombstone") || !BankPending.isPending(held.str("raw_synced_data"), held.bool("cleared"), held.bool("reconciled"))) {
+            return
+        }
+        val values = mutableListOf<Pair<String, Any?>>("cleared" to 1)
+        if (!row.financialId.isNullOrBlank()) values += "financial_id" to row.financialId
+        if (row.raw != null) values += "raw_synced_data" to row.raw
+        SyncSchema.writeRow(session, "transactions", id, *values.toTypedArray())
     }
 
     private fun findDuplicate(

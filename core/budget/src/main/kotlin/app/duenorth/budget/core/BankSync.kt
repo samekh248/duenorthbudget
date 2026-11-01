@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
@@ -148,6 +149,7 @@ class HttpBankSyncTransport : BankSyncTransport {
                 ?: row.string("payee")
                 ?: return null
         val financialId = row.string("transactionId") ?: row.string("imported_id") ?: row.string("id")
+        val pending = isPending(row)
         return ParsedImportRow(
             date = date,
             payee = payee,
@@ -155,7 +157,17 @@ class HttpBankSyncTransport : BankSyncTransport {
             financialId = financialId,
             importedPayee = row.string("imported_payee") ?: payee,
             note = row.string("notes"),
+            pending = pending,
+            // `booked` is written either way, so a row that only said `pending` still reads as pending later.
+            raw = JsonObject(row + ("booked" to JsonPrimitive(!pending))).toString(),
         )
+    }
+
+    /** Actual's server marks a row the bank has not posted with `booked: false`; SimpleFIN itself says `pending`. */
+    private fun isPending(row: JsonObject): Boolean {
+        val booked = row["booked"]?.jsonPrimitive?.booleanOrNull
+        if (booked != null) return !booked
+        return row["pending"]?.jsonPrimitive?.booleanOrNull == true
     }
 
     private fun JsonObject.string(name: String): String? = this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
