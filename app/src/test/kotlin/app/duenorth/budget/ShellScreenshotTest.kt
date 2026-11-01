@@ -39,6 +39,8 @@ import app.duenorth.budget.design.components.asScreenActions
 import app.duenorth.budget.design.theme.MetroStyle
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -50,6 +52,17 @@ import java.time.YearMonth
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [33], qualifiers = "w411dp-h891dp-xxhdpi")
 class ShellScreenshotTest {
+    // The samples are October 2026; pin "this month" to it so the month control doesn't change with the run date.
+    @Before
+    fun pinCalendarMonth() {
+        CalendarMonth.pinned = YearMonth.of(2026, 10)
+    }
+
+    @After
+    fun unpinCalendarMonth() {
+        CalendarMonth.pinned = null
+    }
+
     @Test
     fun homeLight() = snap("home_light", dark = false, shell = sample())
 
