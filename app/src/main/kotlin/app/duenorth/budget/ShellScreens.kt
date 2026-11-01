@@ -37,6 +37,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
@@ -563,8 +566,13 @@ fun BudgetSection(
                     }
                 }
                 if (shell.groups.any { it.categories.isNotEmpty() }) {
-                    item(key = "ledger-headings") {
-                        LedgerHeadings(if (cards) Modifier.padding(horizontal = MetroDimens.Gutter) else Modifier)
+                    // The column headings hold at the top of the list while the categories scroll under them.
+                    stickyHeader(key = "ledger-headings") {
+                        LedgerHeadings(
+                            Modifier
+                                .ledgerHeadingsGround(Metro.colors.background, bleed = !cards) { list.canScrollBackward }
+                                .then(if (cards) Modifier.padding(horizontal = MetroDimens.Gutter) else Modifier),
+                        )
                     }
                 }
                 // Bands alternate down the whole list, carrying on across group headings.
@@ -637,6 +645,29 @@ fun BudgetSection(
         }
     }
 }
+
+/**
+ * Page ground behind the column headings once the list has scrolled, so rows (bands included, which bleed
+ * one gutter each side) pass out of sight beneath them. It reaches [LEDGER_HEADINGS_AIR] below the labels
+ * without taking up layout. With [bleed] it reaches out one gutter (a card list is already full width), and
+ * no further, so it never paints over the next pivot page.
+ */
+private fun Modifier.ledgerHeadingsGround(
+    color: Color,
+    bleed: Boolean,
+    scrolled: () -> Boolean,
+): Modifier =
+    drawBehind {
+        if (!scrolled()) return@drawBehind
+        val gutter = if (bleed) MetroDimens.Gutter.toPx() else 0f
+        drawRect(
+            color,
+            topLeft = Offset(-gutter, 0f),
+            size = Size(size.width + 2 * gutter, size.height + LEDGER_HEADINGS_AIR.toPx()),
+        )
+    }
+
+private val LEDGER_HEADINGS_AIR = 6.dp
 
 /** Air after a group's last category, so each group reads as its own block. */
 @Composable
