@@ -310,9 +310,10 @@ object ScreenBar {
                 saveCancel() +
                     if (route.ruleId == null) emptyList() else listOf(menu("delete-rule", AppGlyph.Cancel, RuleScreenCopy.DELETE))
             // Move sits with save, the rest in the menu, add template first; rollover is a switch on the page.
+            // Rename is last in the menu on both kinds of category page.
             is ShellRoute.CategoryBudget ->
                 if (incomeCategory) {
-                    if (mode == BudgetMode.TRACKING) saveCancel() else autoHold()
+                    (if (mode == BudgetMode.TRACKING) saveCancel() else autoHold()) + renameCategory()
                 } else {
                     buildList {
                         addAll(saveCancel())
@@ -330,6 +331,7 @@ object ScreenBar {
                             }
                         }
                         if (mode != BudgetMode.TRACKING) add(menu("to-budget", AppGlyph.Transfer, MonthActionCopy.TRANSFER))
+                        addAll(renameCategory())
                     }
                 }
             ShellRoute.Create -> saveCancel()
@@ -486,6 +488,9 @@ object ScreenBar {
             menu("auto-hold-off", AppGlyph.Hold, "${MonthFillCopy.AUTO_HOLD} ${IncomeCopy.HOLD_OFF}"),
         )
 
+    /** A category's page `•••` → rename, which opens the name over the month for typing. */
+    private fun renameCategory() = listOf(menu("rename-category", AppGlyph.Edit, EnvelopeCopy.RENAME))
+
     /** Edit budget sits on the budget's bar, right of add. */
     private fun editBudget() = listOf(spec("edit-budget", AppGlyph.Edit, BudgetEditCopy.EDIT))
 
@@ -614,6 +619,7 @@ class ScreenBarHandlers(
     val onToAutomations: () -> Unit = {},
     val onToNotes: () -> Unit = {},
     val onMoveCategory: () -> Unit = {},
+    val onRenameCategory: () -> Unit = {},
     val onAutoHold: (AutoHoldChoice) -> Unit = {},
 ) {
     fun bind(
@@ -690,6 +696,7 @@ class ScreenBarHandlers(
             "to-automations" -> onToAutomations
             "to-notes" -> onToNotes
             "move" -> onMoveCategory
+            "rename-category" -> onRenameCategory
             "auto-hold-on" -> ({ onAutoHold(AutoHoldChoice.ON) })
             "auto-hold-off-month" -> ({ onAutoHold(AutoHoldChoice.OFF_THIS_MONTH) })
             "auto-hold-off" -> ({ onAutoHold(AutoHoldChoice.OFF) })

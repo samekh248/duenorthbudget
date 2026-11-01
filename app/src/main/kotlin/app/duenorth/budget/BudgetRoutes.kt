@@ -29,6 +29,19 @@ internal fun CategoryBudgetRoute(
             onSelectMonth = model::selectOpenMonth,
             modifier = modifier,
             title = name,
+            titleField =
+                if (name != null && state.envelopes.renaming == route.categoryId) {
+                    { field ->
+                        CategoryRenameField(
+                            name = name,
+                            onSave = { model.envelopes.renameCategory(route.categoryId, it) },
+                            onCancel = model.envelopes::cancelRenameCategory,
+                            modifier = field,
+                        )
+                    }
+                } else {
+                    null
+                },
         ) { inner ->
             if (income != null) {
                 IncomeCategoryScreen(

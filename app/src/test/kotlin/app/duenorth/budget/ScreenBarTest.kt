@@ -1,9 +1,11 @@
 package app.duenorth.budget
 
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.TemplateKind
+import app.duenorth.budget.design.components.AppGlyph
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -338,10 +340,10 @@ class ScreenBarTest {
     @Test
     fun envelopeIncomeCategoryHasNoSave() {
         val income = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, incomeCategory = true)
-        assertEquals(listOf("auto-hold-on", "auto-hold-off-month", "auto-hold-off", "settings"), income.map { it.id })
+        assertEquals(listOf("auto-hold-on", "auto-hold-off-month", "auto-hold-off", "rename-category", "settings"), income.map { it.id })
         assertTrue(income.none { it.primary })
         val tracking = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.TRACKING, incomeCategory = true)
-        assertEquals(listOf("save", "cancel"), tracking.map { it.id })
+        assertEquals(listOf("save", "cancel", "rename-category", "settings"), tracking.map { it.id })
     }
 
     @Test
@@ -349,10 +351,18 @@ class ScreenBarTest {
         val specs = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE)
         assertEquals(listOf("save", "cancel", "move"), specs.filter { it.primary }.map { it.id })
         // Rollover is a switch on the page now, not a menu item.
-        assertEquals(listOf("to-budget", "settings"), specs.filterNot { it.primary }.map { it.id })
+        assertEquals(listOf("to-budget", "rename-category", "settings"), specs.filterNot { it.primary }.map { it.id })
         // With templates on, add template heads the menu; the page itself has no add button.
         val templates = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, templates = true)
-        assertEquals(listOf("add-template", "to-budget", "settings"), templates.filterNot { it.primary }.map { it.id })
+        assertEquals(listOf("add-template", "to-budget", "rename-category", "settings"), templates.filterNot { it.primary }.map { it.id })
+    }
+
+    @Test
+    fun categoryPageMenuEndsWithRename() {
+        val rename = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE).single { it.id == "rename-category" }
+        assertEquals(EnvelopeCopy.RENAME, rename.label)
+        assertEquals(AppGlyph.Edit, rename.glyph)
+        assertFalse(rename.primary)
     }
 
     @Test
@@ -379,7 +389,7 @@ class ScreenBarTest {
         routes.forEach { route ->
             val ids = ScreenBar.specsFor(route, hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
             assertEquals(route.toString(), listOf("save", "cancel"), ids.take(2))
-            assertTrue(route.toString(), ids.drop(2).all { it in setOf("to-budget", "move", "settings") })
+            assertTrue(route.toString(), ids.drop(2).all { it in setOf("to-budget", "move", "rename-category", "settings") })
             assertFalse(ids.contains("hold"))
             // A form with a menu ends it with settings, like every menu; one without a menu gains none.
             assertEquals(route.toString(), ids.size > 3, ids.contains("settings"))
