@@ -29,8 +29,8 @@ class ReconcileHelpTest {
         assertEquals(
             listOf(
                 ReconcileHint.Pair(spotify, parking),
-                ReconcileHint.Late(netflix),
                 ReconcileHint.Uncleared(cleared),
+                ReconcileHint.Late(netflix),
                 ReconcileHint.Missing,
             ),
             hints,
@@ -48,6 +48,68 @@ class ReconcileHelpTest {
         val hints = ReconcileHelp.hints(page(difference = -500, rows = listOf(row("old", -500, cleared = true, reconciled = true))))
         assertTrue(hints.none { it is ReconcileHint.Exact })
         assertEquals(listOf(ReconcileHint.Missing), hints)
+    }
+
+    @Test
+    fun aClearedRowEnteredTheWrongWayRoundIsFlippedToBalance() {
+        val refund = row("amazon", 2_883, cleared = true)
+        val page = page(difference = -5_766, rows = listOf(row("x", -100), refund))
+        val hints = ReconcileHelp.hints(page)
+        assertEquals(ReconcileHint.Flip(refund), hints.first())
+        assertEquals(0L, ReconcileHelp.after(page, hints.first()))
+    }
+
+    @Test
+    fun anUnclearedRowTheWrongWayRoundIsFlippedAndCleared() {
+        val refund = row("amazon", 2_883)
+        val page = page(difference = -2_883, rows = listOf(refund))
+        val flip = ReconcileHelp.hints(page).filterIsInstance<ReconcileHint.Flip>().single()
+        assertEquals(0L, ReconcileHelp.after(page, flip))
+    }
+
+    @Test
+    fun transfersAreNeverFlipped() {
+        val transfer = row("savings", 2_883, cleared = true).copy(transfer = true)
+        assertTrue(ReconcileHelp.hints(page(difference = -5_766, rows = listOf(transfer))).none { it is ReconcileHint.Flip })
+    }
+
+    @Test
+    fun theSamePayeeAndAmountDaysApartIsAPossibleCopy() {
+        val kept = row("safeway", -8_634, date = 20260926, cleared = true).copy(payee = "Safeway")
+        val copy = row("safeway2", -8_634, date = 20260924).copy(payee = "Safeway")
+        val far = row("safeway3", -8_634, date = 20260901).copy(payee = "Safeway")
+        val hints = ReconcileHelp.hints(page(difference = -1, rows = listOf(kept, copy, far)))
+        val duplicate = hints.filterIsInstance<ReconcileHint.Duplicate>().single()
+        assertEquals(kept, duplicate.first)
+        assertEquals(copy, duplicate.second)
+    }
+
+    @Test
+    fun twoClearedCopiesOfferToUnclearOne() {
+        val a = row("a", -1_000, cleared = true)
+        val b = row("b", -1_000, cleared = true).copy(payee = "a")
+        val page = page(difference = 1_000, rows = listOf(a, b))
+        val duplicate = ReconcileHelp.hints(page).filterIsInstance<ReconcileHint.Duplicate>().single()
+        assertEquals(0L, ReconcileHelp.after(page, duplicate))
+    }
+
+    @Test
+    fun oldUnclearedRowsAreCalledOutOldestFirst() {
+        val check = row("check", -12_000, date = 20260714)
+        val older = row("older", -500, date = 20260601)
+        val recent = row("recent", -700, date = 20260920)
+        val page = page(difference = -1, rows = listOf(recent, check, older))
+        val stale = ReconcileHelp.hints(page).filterIsInstance<ReconcileHint.Stale>()
+        assertEquals(listOf(ReconcileHint.Stale(older, 121), ReconcileHint.Stale(check, 78)), stale)
+        assertEquals(11_999L, ReconcileHelp.after(page, stale[1]))
+    }
+
+    @Test
+    fun leadsThatWouldBalanceComeFirst() {
+        val check = row("check", -12_000, date = 20260714)
+        val late = row("late", -5_766, date = 20261002)
+        val hints = ReconcileHelp.hints(page(difference = -5_766, rows = listOf(late, check)))
+        assertEquals(listOf(ReconcileHint.Late(late), ReconcileHint.Stale(check, 78), ReconcileHint.Missing), hints)
     }
 
     private fun row(

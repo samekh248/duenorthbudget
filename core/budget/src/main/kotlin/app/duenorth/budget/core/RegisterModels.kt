@@ -23,6 +23,7 @@ object RegisterCopy {
     const val SELECTED = "selected"
     const val CLEARED = "cleared"
     const val NOT_CLEARED = "not cleared"
+    const val LOCKED = "locked"
     const val CLEARED_MARK = "c"
     const val CLEAR = "clear"
     const val UNCLEAR = "unclear"

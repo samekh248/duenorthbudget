@@ -104,14 +104,30 @@ class ReconcileRegisterTest {
     }
 
     @Test
-    fun reconciledRowsFoldIntoOneLine() {
+    fun lockedRowsShowUnderTheirOwnHeadingAndFoldOnATap() {
         show(page = off())
-        compose.onNodeWithTag("reconcile-list").performScrollToNode(hasTestTag("reconciled-fold"))
-        compose.onNodeWithTag("reconciled-fold").assertIsDisplayed()
-        compose.onNodeWithTag("register-row-old").assertDoesNotExist()
-        compose.onNodeWithTag("reconciled-fold").performClick()
         compose.onNodeWithTag("reconcile-list").performScrollToNode(hasTestTag("register-row-old"))
         compose.onNodeWithTag("register-row-old").assertExists()
+        compose.onNodeWithTag("locked-heading").performClick()
+        compose.onNodeWithTag("register-row-old").assertDoesNotExist()
+    }
+
+    @Test
+    fun theStripCountsLockedClearedAndNotCleared() {
+        show(page = off())
+        compose.onNodeWithText("locked thru aug 30").assertIsDisplayed()
+        compose.onNodeWithTag("strip-cleared").assertIsDisplayed()
+    }
+
+    @Test
+    fun aSignFlipLeadIsFirstAndFlipsTheRow() {
+        val flipped = mutableListOf<String>()
+        show(page = leads(), register = richRegister(), onFlip = { flipped += it })
+        compose.onNodeWithTag("hint-flip-leaves", useUnmergedTree = true).assertTextEquals("→ $0.00")
+        compose.onNodeWithTag("hint-flip").performClick()
+        assertEquals(listOf("amazon"), flipped)
+        compose.onNodeWithTag("hint-duplicate").assertIsDisplayed()
+        compose.onNodeWithTag("hint-stale").assertIsDisplayed()
     }
 
     @Test
@@ -152,6 +168,21 @@ class ReconcileRegisterTest {
 
     @Test fun snapAdjustDark() = snap("reconcile_adjust_dark", off(), dark = true, finish = true)
 
+    @Test fun snapLeadsLight() = snap("reconcile_leads_light", leads(), dark = false, register = richRegister())
+
+    @Test fun snapLeadsDark() = snap("reconcile_leads_dark", leads(), dark = true, register = richRegister())
+
+    @Test fun snapLockedLight() =
+        snap(
+            "reconcile_locked_light",
+            leads(),
+            dark = false,
+            register = richRegister(),
+            scrollTo = "locked-heading",
+        )
+
+    @Test fun snapLockedDark() = snap("reconcile_locked_dark", leads(), dark = true, register = richRegister(), scrollTo = "locked-heading")
+
     @Test fun snapBalancedLight() = snap("reconcile_balanced_light", balanced(), dark = false)
 
     @Test fun snapBalancedDark() = snap("reconcile_balanced_dark", balanced(), dark = true)
@@ -163,13 +194,15 @@ class ReconcileRegisterTest {
         onSetCleared: (List<String>, Boolean) -> Unit = { _, _ -> },
         onAddMissing: () -> Unit = {},
         onFinish: (Boolean) -> Unit = {},
+        register: RegisterPage = register(),
+        onFlip: (String) -> Unit = {},
     ): FormSaveHost {
         val host = FormSaveHost()
         compose.setContent {
             MetroTheme {
                 CompositionLocalProvider(LocalFormSaveHost provides host) {
                     Box(Modifier.width(390.dp).height(780.dp)) {
-                        screen(page, onStart, onToggle, onSetCleared, onAddMissing, onFinish)
+                        screen(page, onStart, onToggle, onSetCleared, onAddMissing, onFinish, register = register, onFlip = onFlip)
                     }
                 }
             }
@@ -186,9 +219,11 @@ class ReconcileRegisterTest {
         onAddMissing: () -> Unit = {},
         onFinish: (Boolean) -> Unit = {},
         modifier: Modifier = Modifier,
+        register: RegisterPage = register(),
+        onFlip: (String) -> Unit = {},
     ) {
         ReconcileRegisterScreen(
-            register = register(),
+            register = register,
             page = page,
             error = null,
             onGesture = {},
@@ -199,6 +234,7 @@ class ReconcileRegisterTest {
             onAddMissing = onAddMissing,
             onFinish = onFinish,
             onCancel = {},
+            onFlip = onFlip,
             modifier = modifier,
             today = 20260930,
         )
@@ -209,19 +245,22 @@ class ReconcileRegisterTest {
         page: ReconcilePage?,
         dark: Boolean,
         finish: Boolean = false,
+        register: RegisterPage = register(),
+        scrollTo: String? = null,
     ) {
         val host = FormSaveHost()
         compose.setContent {
             MetroTheme(darkTheme = dark) {
                 CompositionLocalProvider(LocalFormSaveHost provides host) {
                     Column(Modifier.width(390.dp).height(780.dp)) {
-                        SectionTitled("ACCOUNTS", Modifier.weight(1f)) { screen(page) }
+                        SectionTitled("ACCOUNTS", Modifier.weight(1f)) { screen(page, register = register) }
                         MetroAppBar(host.bar.orEmpty(), false, {}, windowInsets = WindowInsets(0))
                     }
                 }
             }
         }
         if (finish) compose.runOnIdle { host.bar!!.first { it.id == "reconcile-finish" }.run() }
+        if (scrollTo != null) compose.onNodeWithTag("reconcile-list").performScrollToNode(hasTestTag(scrollTo))
         compose.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
@@ -245,6 +284,46 @@ class ReconcileRegisterTest {
             categories = emptyList(),
             accounts = emptyList(),
         )
+
+    /** The mockup's account: a refund entered the wrong way round, a doubled Safeway, an old check, and locked rows. */
+    private fun richRegister() =
+        RegisterPage(
+            account = RegisterAccount("checking", "Checking", offBudget = false, type = "checking", closed = false),
+            balanceMinor = 0,
+            currency = Currencies.byCode("USD")!!,
+            rows =
+                listOf(
+                    line("netflix", 20261002, "Netflix", "Subscriptions", -1_549),
+                    line("shell", 20260929, "Shell", "Gas", -4_217, cleared = true),
+                    line("spotify", 20260929, "Spotify", "Subscriptions", -1_099),
+                    line("amazon", 20260928, "Amazon", "Refund", 2_883, cleared = true),
+                    line("employer", 20260928, "Employer", "Paycheck", 155_000, cleared = true),
+                    line("safeway", 20260926, "Safeway", "Groceries", -8_634, cleared = true),
+                    line("safeway2", 20260926, "Safeway", "Groceries", -8_634),
+                    line("water", 20260922, "City Water", "Utilities", -6_120, cleared = true),
+                    line("check", 20260714, "Check #1043", "Rent share", -12_000),
+                    line("old", 20260830, "Employer", "Paycheck", 175_000, cleared = true, reconciled = true),
+                    line("old2", 20260828, "Safeway", "Groceries", -9_386, cleared = true, reconciled = true),
+                    line("old3", 20260820, "Comcast", "Internet", -7_999, cleared = true, reconciled = true),
+                    line("old4", 20260815, "Employer", "Paycheck", 175_000, cleared = true, reconciled = true),
+                ),
+            categories = emptyList(),
+            accounts = emptyList(),
+        )
+
+    /** Off by -57.66: twice the Amazon refund, so flipping it balances. */
+    private fun leads(): ReconcilePage {
+        val rich = richRegister()
+        val cleared = rich.rows.filter { it.cleared }.sumOf { it.amountMinor }
+        return page(
+            cleared - 5_766,
+            rich.rows
+                .filter { it.cleared }
+                .map { it.id }
+                .toSet(),
+            rich,
+        )
+    }
 
     private fun line(
         id: String,
@@ -275,14 +354,15 @@ class ReconcileRegisterTest {
     private fun page(
         statement: Long,
         cleared: Set<String>,
+        register: RegisterPage = register(),
     ): ReconcilePage {
         val rows =
-            register().rows.map {
+            register.rows.map {
                 ReconcileRow(it.id, it.date, it.payee, it.amountMinor, it.id in cleared || it.reconciled, it.reconciled)
             }
         val total = rows.filter { it.cleared }.sumOf { it.amountMinor }
         return ReconcilePage(
-            account = register().account,
+            account = register.account,
             currency = Currencies.byCode("USD")!!,
             statementMinor = statement,
             statementDate = 20260930,

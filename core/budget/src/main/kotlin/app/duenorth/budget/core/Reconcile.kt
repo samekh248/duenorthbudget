@@ -25,7 +25,7 @@ object ReconcileCopy {
     const val BALANCED = "balanced"
     const val TAP_TO_CLEAR = "tap each transaction you find on your statement"
     const val AFTER_STATEMENT = "after the statement"
-    const val RECONCILED_THROUGH = "reconciled through"
+    const val BEFORE_LAST = "before your last reconcile"
     const val FINISH_LOCKS = "finish locks"
     const val FINISH_ANYWAY = "finish anyway?"
     const val ADD_AND_FINISH = "add and finish"
@@ -33,32 +33,82 @@ object ReconcileCopy {
     const val CLEAR_IT = "clear it"
     const val CLEAR_BOTH = "clear both"
     const val UNCLEAR_IT = "unclear it"
+    const val UNCLEAR_ONE = "unclear one"
+    const val FLIP_IT = "flip it"
+    const val OPEN_IT = "open it"
     const val ADD_IT = "add it"
-    const val MISSING = "missing from your register?"
-    const val SWAPPED = "a multiple of 9: two digits swapped?"
-    const val PLACES_TO_LOOK = "some places to look"
     const val NO_CATEGORY_LATER = "it has no category; you can give it one later."
+    const val LOCKED = "locked"
+    const val NOT_CLEARED = "not cleared"
+    const val LOCKED_NOTE = "matched an earlier statement, so they stay as they are"
+
+    // Lead tags: what kind of problem each one is.
+    const val TAG_EXACT = "exact match"
+    const val TAG_FLIP = "sign flip"
+    const val TAG_PAIR = "two add up"
+    const val TAG_MAYBE_NOT = "maybe not on it"
+    const val TAG_LATE = "after statement"
+    const val TAG_DUPLICATE = "duplicate?"
+    const val TAG_SWAPPED = "swapped digits?"
+    const val TAG_MISSING = "never entered?"
+
+    const val MISSING = "something on your statement may not be in your register"
 
     fun adjustExplain(account: String) = "add an adjustment so $account matches your bank. it is marked so you can find it later."
 
+    fun leads(count: Int) = if (count == 1) "1 lead" else "$count leads, most likely first"
+
+    fun lockedThrough(date: String) = "locked thru $date"
+
+    fun reconciledThrough(
+        date: String,
+        count: Int,
+    ) = "reconciled through $date · $count"
+
+    fun staleTag(days: Int) = "$days days old"
+
     fun exact(
         payee: String,
-        date: String,
         amount: String,
-    ) = "$payee on $date is exactly $amount and isn't cleared"
+        date: String,
+    ) = "$payee $amount on $date isn't cleared"
 
-    fun nothingExact(amount: String) = "nothing is exactly $amount · $PLACES_TO_LOOK"
+    fun flip(
+        payee: String,
+        amount: String,
+        cleared: Boolean,
+    ): String {
+        val turned = "$payee $amount the other way round"
+        return if (cleared) "$turned would balance exactly" else "$payee $amount isn't cleared; the other way round it would balance"
+    }
 
     fun late(
         payee: String,
         amount: String,
         date: String,
-    ) = "$payee $amount is dated $date, after the statement"
+    ) = "$payee $amount is dated $date"
 
     fun maybeNot(
         payee: String,
         amount: String,
-    ) = "$payee $amount is cleared but may not be on it"
+    ) = "$payee $amount is cleared but may not be on this statement"
+
+    fun duplicate(
+        payee: String,
+        amount: String,
+        first: String,
+        second: String,
+    ) = if (first == second) "$payee $amount twice on $first" else "$payee $amount on $second and again $first"
+
+    fun stale(
+        payee: String,
+        amount: String,
+        date: String,
+    ) = "$payee $amount, not cleared since $date"
+
+    fun swapped(amount: String) = "$amount divides by 9, the mark of two digits swapped"
+
+    fun leaves(amount: String) = "→ $amount"
 }
 
 @Serializable
@@ -81,6 +131,8 @@ data class ReconcileRow(
     val amountMinor: Long,
     val cleared: Boolean,
     val reconciled: Boolean,
+    /** A transfer: its sign is tied to the other account's half, so the helper never offers to flip it. */
+    val transfer: Boolean = false,
 )
 
 data class ReconcilePage(
@@ -197,6 +249,41 @@ class ReconcileBook(
     }
 
     /**
+     * Turns [transactionId]'s amount around, money in for money out, as a helper's "flip it" does; a split's
+     * parts turn with it. Reconciled rows and transfers are left alone.
+     */
+    fun flipSign(
+        accountId: String,
+        transactionId: String,
+    ): ReconcilePage? {
+        val account = account(accountId) ?: return null
+        val sessionData = loadSession(accountId) ?: return null
+        val row =
+            session
+                .query(
+                    """
+                    SELECT t.amount AS amount, t.reconciled AS reconciled, p.transfer_acct AS transfer_acct
+                    FROM transactions t
+                    LEFT JOIN payees p ON p.id = t.description
+                    WHERE t.id = ? AND t.acct = ? AND IFNULL(t.tombstone, 0) = 0
+                    """.trimIndent(),
+                    listOf(transactionId, accountId),
+                ).firstOrNull() ?: return page(account, sessionData)
+        if (row.bool("reconciled") || row.str("transfer_acct") != null) return page(account, sessionData)
+        session.transaction {
+            SyncSchema.write(session, "transactions", transactionId, "amount", -row.long("amount"))
+            session
+                .query(
+                    "SELECT id, amount FROM transactions WHERE parent_id = ? AND IFNULL(tombstone, 0) = 0",
+                    listOf(transactionId),
+                ).forEach { part ->
+                    SyncSchema.write(session, "transactions", part.str("id").orEmpty(), "amount", -part.long("amount"))
+                }
+        }
+        return page(account, sessionData)
+    }
+
+    /**
      * Locks the cleared rows. When the cleared total is still off and [adjust] is set, a cleared
      * "reconciliation balance adjustment" for the difference is added on the statement date first, as Actual does.
      */
@@ -304,6 +391,7 @@ class ReconcileBook(
                         amountMinor = row.long("amount"),
                         cleared = row.bool("cleared"),
                         reconciled = row.bool("reconciled"),
+                        transfer = row.str("transfer_name") != null,
                     )
                 }
         return ReconcilePage(

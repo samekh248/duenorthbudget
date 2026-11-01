@@ -32,6 +32,7 @@ object UndoCopy {
     const val BANK_LINK = "bank link"
     const val CLEAR = "clear"
     const val UNCLEAR = "unclear"
+    const val FLIP_SIGN = "flip sign"
     const val MATCH = "match"
     const val NOT_A_MATCH = "not a match"
     const val MERGE = "merge"

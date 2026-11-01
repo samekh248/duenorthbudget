@@ -87,6 +87,29 @@ class ReconcileHolder internal constructor(
         }
     }
 
+    /**
+     * A lead's "flip it": the row's amount turned around, and cleared if it was not, so it counts the way the
+     * statement shows it. The register reloads to show the new sign.
+     */
+    fun flip(transactionId: String) {
+        val accountId = reconcilingAccount() ?: return
+        val budgetId = state.settings.openBudgetId ?: return
+        host.scope.launch {
+            val page =
+                withContext(host.io) {
+                    val flipped = host.library.flipReconcileSign(budgetId, accountId, transactionId)
+                    val row = flipped?.rows?.firstOrNull { it.id == transactionId }
+                    if (row != null && !row.cleared) {
+                        host.library.setReconcileCleared(budgetId, accountId, listOf(transactionId), true)
+                    } else {
+                        flipped
+                    }
+                }
+            if (page != null) update { it.copy(page = page) }
+            host.reloadAccount(accountId)
+        }
+    }
+
     fun finish(adjust: Boolean = false) {
         val accountId = reconcilingAccount() ?: return
         val budgetId = state.settings.openBudgetId ?: return

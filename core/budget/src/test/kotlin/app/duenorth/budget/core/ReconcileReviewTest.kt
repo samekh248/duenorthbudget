@@ -124,6 +124,24 @@ class ReconcileReviewTest {
     }
 
     @Test
+    fun flipSignTurnsTheAmountAroundButLeavesReconciledRows() {
+        db { session, register ->
+            register.save(draft("refund", amount = 2_883))
+            register.save(draft("r", amount = 300))
+            session.exec("UPDATE transactions SET cleared = 1")
+            session.exec("UPDATE transactions SET reconciled = 1 WHERE id = 'r'")
+            val reconcile = ReconcileBook(session)
+            // The bank shows the refund as a charge: 3.00 - 28.83.
+            reconcile.start("checking", "-25.83", "2026-10-07")
+            val page = reconcile.flipSign("checking", "refund")!!
+            assertEquals(0L, page.differenceMinor)
+            assertEquals(-2_883L, page.rows.first { it.id == "refund" }.amountMinor)
+            reconcile.flipSign("checking", "r")
+            assertEquals(300L, session.query("SELECT amount FROM transactions WHERE id = 'r'").first().long("amount"))
+        }
+    }
+
+    @Test
     fun resumeDoesNotStartSecondSession() {
         db { session, register ->
             register.save(draft("a", amount = 100))

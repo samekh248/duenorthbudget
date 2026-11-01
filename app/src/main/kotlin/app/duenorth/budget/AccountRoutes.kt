@@ -169,6 +169,7 @@ internal fun ReconcileRoute(
             onStart = model.reconcile::start,
             onToggle = model.reconcile::toggleCleared,
             onSetCleared = model.reconcile::setCleared,
+            onFlip = model.reconcile::flip,
             onOpen = model.register::openEdit,
             onAddMissing = model.reconcile::addMissing,
             onFinish = model.reconcile::finish,
