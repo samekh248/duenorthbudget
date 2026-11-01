@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.CashFlowMonthPage
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.NetWorthPage
@@ -34,6 +36,7 @@ import app.duenorth.budget.core.ReportsPage
 import app.duenorth.budget.core.SpendingDrill
 import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.SpendingGroupBy
+import app.duenorth.budget.core.SpendingReport
 import app.duenorth.budget.core.SpendingRow
 import app.duenorth.budget.core.SpendingTransaction
 import app.duenorth.budget.core.monthLabel
@@ -132,13 +135,14 @@ fun ReportsScreen(
     modifier: Modifier = Modifier,
     initialItem: Int = 0,
     onRow: (SpendingRow) -> Unit = {},
+    onMonth: (YearMonth) -> Unit = {},
 ) {
     MetroPivot(
         title = ReportsCopy.TITLE.uppercase(),
         items =
             listOf(
                 PivotItem(ReportsCopy.CASH_FLOW) {
-                    ReportBody(page, loading, preset, onPreset, onCustom, "report-cashflow") { CashFlow(it) }
+                    ReportBody(page, loading, preset, onPreset, onCustom, "report-cashflow") { CashFlow(it, onMonth) }
                 },
                 PivotItem(ReportsCopy.SPENDING) {
                     ReportBody(page, loading, preset, onPreset, onCustom, "report-spending") { Spending(it, groupBy, onGroupBy, onRow) }
@@ -214,7 +218,10 @@ private fun RangePicker(
 }
 
 @Composable
-private fun CashFlow(page: ReportsPage) {
+private fun CashFlow(
+    page: ReportsPage,
+    onMonth: (YearMonth) -> Unit,
+) {
     val report = page.cashFlow
     val scale = report.months.maxOfOrNull { maxOf(it.incomeMinor, abs(it.expenseMinor)) }?.takeIf { it > 0 } ?: 1L
     LazyColumn(Modifier.fillMaxSize()) {
@@ -233,6 +240,7 @@ private fun CashFlow(page: ReportsPage) {
             Column(
                 Modifier
                     .fillMaxWidth()
+                    .metroPress { onMonth(month.month) }
                     .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
                     .testTag("report-cashflow-${month.month}"),
             ) {
@@ -321,9 +329,10 @@ fun SpendingDrillScreen(
     onRow: (SpendingRow, SpendingGroupBy) -> Unit,
     onTransaction: (SpendingTransaction) -> Unit,
     modifier: Modifier = Modifier,
+    root: List<String> = listOf(ReportsCopy.SPENDING),
 ) {
     Column(modifier.fillMaxSize().background(Metro.colors.background).testTag("report-drill")) {
-        val trail = (listOf(ReportsCopy.SPENDING) + path.dropLast(1).map { it.label }).joinToString(DRILL_TRAIL_SEPARATOR)
+        val trail = (root + path.dropLast(1).map { it.label }).joinToString(DRILL_TRAIL_SEPARATOR)
         MetroText(
             trail,
             Metro.typography.caption,
@@ -345,7 +354,7 @@ fun SpendingDrillScreen(
             item {
                 Column(Modifier.fillMaxWidth().padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Grid)) {
                     MetroText(
-                        "${drill.range.start.format(MONTH)} – ${drill.range.end.format(MONTH)}".lowercase(),
+                        rangeLabel(drill.range),
                         Metro.typography.caption,
                         color = Metro.colors.secondary,
                     )
@@ -441,6 +450,93 @@ private fun Bar(
         } else {
             Box(Modifier.width(2.dp).height(10.dp).background(Metro.colors.chrome))
         }
+    }
+}
+
+/** One month as `sep 2026`, else `jun 2026 – sep 2026`. */
+private fun rangeLabel(range: ReportRange): String =
+    if (range.start == range.end) {
+        range.start.format(MONTH).lowercase()
+    } else {
+        "${range.start.format(MONTH)} – ${range.end.format(MONTH)}".lowercase()
+    }
+
+/**
+ * Cash flow → a month: its income, expenses and net, then where the income came from (by category)
+ * and where the expenses went (by group). Each row drills on as the spending report does.
+ */
+@Composable
+fun CashFlowMonthScreen(
+    month: YearMonth,
+    page: CashFlowMonthPage?,
+    onIncome: (SpendingRow) -> Unit,
+    onExpense: (SpendingRow) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxSize().background(Metro.colors.background).testTag("report-cashflow-month")) {
+        MetroText(
+            ReportsCopy.CASH_FLOW,
+            Metro.typography.caption,
+            Modifier.padding(horizontal = MetroDimens.Gutter),
+            color = Metro.colors.secondary,
+        )
+        MetroText(monthLabel(month), Metro.typography.header, Modifier.padding(horizontal = MetroDimens.Gutter), maxLines = 1)
+        if (page == null) {
+            AnimatedVisibility(visible = true, enter = fadeIn()) { Placeholder() }
+            return@Column
+        }
+        val scale =
+            (page.income.rows + page.expenses.rows).maxOfOrNull { abs(it.amountMinor) }?.takeIf { it > 0 } ?: 1L
+        LazyColumn(Modifier.fillMaxSize()) {
+            item {
+                Totals(
+                    listOf(
+                        ReportsCopy.INCOME to page.incomeMinor,
+                        ReportsCopy.EXPENSES to page.expenseMinor,
+                        ReportsCopy.NET to page.netMinor,
+                    ),
+                    page.currency,
+                    "report-cashflow-month-totals",
+                )
+            }
+            flowSection(ReportsCopy.INCOME, page.income, scale, page.currency, "income", onIncome)
+            flowSection(
+                "${ReportsCopy.EXPENSES} ${ReportsCopy.BY} ${page.expenses.groupBy.label}",
+                page.expenses,
+                scale,
+                page.currency,
+                "expense",
+                onExpense,
+            )
+        }
+    }
+}
+
+private fun LazyListScope.flowSection(
+    title: String,
+    report: SpendingReport,
+    scale: Long,
+    currency: CurrencySpec,
+    tag: String,
+    onRow: (SpendingRow) -> Unit,
+) {
+    item(key = "title-$tag") {
+        MetroText(
+            title,
+            Metro.typography.caption,
+            Modifier.padding(horizontal = MetroDimens.Gutter).padding(top = MetroDimens.Row).testTag("report-cashflow-month-$tag"),
+            color = Metro.colors.secondary,
+        )
+        if (report.rows.isEmpty()) {
+            MetroText(
+                ReportsCopy.NONE,
+                Metro.typography.body,
+                Modifier.padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row),
+            )
+        }
+    }
+    items(report.rows, key = { "$tag-${it.id ?: "none"}" }) { row ->
+        SpendingLine(row, scale, currency, "report-cashflow-month-$tag-${row.id ?: "none"}") { onRow(row) }
     }
 }
 

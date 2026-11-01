@@ -422,6 +422,7 @@ fun DueNorthApp(model: ShellViewModel) {
                         ShellRoute.NetWorth -> NetWorthRoute(state, model, fill)
                         is ShellRoute.ReportPivot -> ReportPivotRoute(route, state, model, fill)
                         is ShellRoute.ReportDrill -> ReportDrillRoute(route, state, model, fill)
+                        is ShellRoute.CashFlowMonth -> CashFlowMonthRoute(route, state, model, fill)
                         is ShellRoute.BankLink -> BankLinkRoute(route, state, model, fill)
                         is ShellRoute.TemplateKinds -> TemplateKindsRoute(route, state, model, fill)
                         is ShellRoute.TemplateEditor -> TemplateEditorRoute(route, state, model, fill)

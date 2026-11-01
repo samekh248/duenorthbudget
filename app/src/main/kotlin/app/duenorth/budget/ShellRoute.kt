@@ -4,6 +4,7 @@ import app.duenorth.budget.core.SampleBudgets
 import app.duenorth.budget.core.ScheduleDetails
 import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.TemplateKind
+import java.time.YearMonth
 
 sealed interface ShellRoute {
     data object Home : ShellRoute
@@ -162,6 +163,16 @@ sealed interface ShellRoute {
     /** Spending → a row → ...: what that row is made of, one level at a time, down to its transactions. */
     data class ReportDrill(
         val path: List<SpendingFilter>,
+        /** Opened from cash flow → this month: read over it alone, through today, rather than the report's range. */
+        val month: YearMonth? = null,
+        /** Money in (cash flow's income) rather than money out. */
+        val income: Boolean = false,
+    ) : ShellRoute,
+        StackRoute
+
+    /** Cash flow → a month: its income by category and its expenses by group, each drilling on. */
+    data class CashFlowMonth(
+        val month: YearMonth,
     ) : ShellRoute,
         StackRoute
 

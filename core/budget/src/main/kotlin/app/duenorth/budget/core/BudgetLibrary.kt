@@ -913,8 +913,19 @@ class BudgetLibrary(
         budgetId: String,
         range: ReportRange,
         path: List<SpendingFilter>,
+        income: Boolean = false,
+        throughToday: Boolean = false,
     ): SpendingDrill? =
-        open(budgetId) { session -> ReportsReader(session, clock.today()).spendingDrill(range, path, reportCurrency(session)) }
+        open(budgetId) { session ->
+            ReportsReader(session, clock.today()).spendingDrill(range, path, reportCurrency(session), income, throughToday)
+        }
+
+    /** Cash flow → a month: its income by category and its expenses by group. */
+    fun readCashFlowMonth(
+        budgetId: String,
+        month: YearMonth,
+    ): CashFlowMonthPage? =
+        open(budgetId) { session -> ReportsReader(session, clock.today()).cashFlowMonth(month, reportCurrency(session)) }
 
     /** The net worth graph over [span], ending today. */
     fun readNetWorthHistory(
