@@ -2,6 +2,7 @@ package app.duenorth.budget
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -15,6 +16,7 @@ import app.duenorth.budget.core.NetWorthPage
 import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsCopy
+import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
@@ -116,6 +118,88 @@ class ReportContentTest {
         compose.waitForIdle()
         assertEquals(SpendingGroupBy.PAYEE, groupBy.value)
         compose.onNodeWithTag("report-spending-row-landlord", useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun aSpendingRowDrillsIn() {
+        val tapped = mutableListOf<String?>()
+        compose.setContent {
+            MetroTheme {
+                ReportsScreen(
+                    ReportSamples.page(),
+                    false,
+                    ReportPreset.LAST_6,
+                    SpendingGroupBy.CATEGORY,
+                    {},
+                    {},
+                    {},
+                    initialItem = ReportItems.SPENDING,
+                    onRow = { tapped += it.id },
+                )
+            }
+        }
+        tapShown("report-spending-row-food")
+        tapShown("report-spending-row-none")
+        assertEquals(listOf("food", null), tapped)
+    }
+
+    @Test
+    fun aDrilledPageShowsItsTrailAndDrillsOnOrOpensATransaction() {
+        val drill = mutableStateOf(ReportSamples.groupDrill())
+        val rows = mutableListOf<Pair<String?, SpendingGroupBy>>()
+        val opened = mutableListOf<String>()
+        compose.setContent {
+            MetroTheme {
+                SpendingDrillScreen(drill.value.path, drill.value, { row, by -> rows += row.id to by }, { opened += it.openId })
+            }
+        }
+        compose.onNodeWithTag("report-drill-trail", useUnmergedTree = true).assertTextEquals(ReportsCopy.SPENDING)
+        compose.onNodeWithTag("report-drill-title", useUnmergedTree = true).assertTextEquals("Food")
+        compose.onNodeWithTag("report-drill-level", useUnmergedTree = true).assertTextEquals("by category")
+        compose.onNodeWithTag("report-drill-row-dining").performClick()
+        assertEquals(listOf<Pair<String?, SpendingGroupBy>>("dining" to SpendingGroupBy.CATEGORY), rows)
+
+        drill.value = ReportSamples.categoryDrill()
+        compose.waitForIdle()
+        compose.onNodeWithTag("report-drill-trail", useUnmergedTree = true).assertTextEquals("spending › Food")
+        compose.onNodeWithTag("report-drill-level", useUnmergedTree = true).assertTextEquals(ReportsCopy.TRANSACTIONS)
+        compose.onNodeWithTag("report-drill-transaction-t0").performClick()
+        assertEquals(listOf("t0"), opened)
+    }
+
+    @Test
+    fun drillingThroughTheModelGoesDownAndBackUp() {
+        val (model, _) = household("reports-drill")
+        model.reports.open(ReportItems.SPENDING)
+        model.reports.setPreset(ReportPreset.LAST_12)
+        await { model.state.value.reports.page != null && !model.state.value.reports.loading }
+        val page = model.state.value.reports.page!!
+        val top = page.spending.rows.first()
+        model.reports.drill(top)
+        val first = listOf(SpendingFilter(SpendingGroupBy.CATEGORY, top.id, top.label))
+        assertEquals(ShellRoute.ReportDrill(first), model.state.value.route)
+        await { model.state.value.reports.drills[first] != null }
+        val drill = model.state.value.reports.drills[first]!!
+        assertEquals(top.amountMinor, drill.totalMinor)
+        val breakdown = drill.breakdown
+        if (breakdown != null) {
+            assertEquals(SpendingGroupBy.PAYEE, breakdown.groupBy)
+            val sub = breakdown.rows.first()
+            model.reports.drill(first, sub, breakdown.groupBy)
+            val second = first + SpendingFilter(SpendingGroupBy.PAYEE, sub.id, sub.label)
+            assertEquals(ShellRoute.ReportDrill(second), model.state.value.route)
+            await { model.state.value.reports.drills[second] != null }
+            val bottom = model.state.value.reports.drills[second]!!
+            assertTrue(bottom.transactions.isNotEmpty())
+            model.reports.openTransaction(bottom.transactions.first())
+            assertTrue(model.state.value.route is ShellRoute.EditTransaction)
+            model.back()
+            assertEquals(ShellRoute.ReportDrill(second), model.state.value.route)
+            model.back()
+        }
+        assertEquals(ShellRoute.ReportDrill(first), model.state.value.route)
+        model.back()
+        assertEquals(ShellRoute.ReportPivot(ReportItems.SPENDING), model.state.value.route)
     }
 
     @Test

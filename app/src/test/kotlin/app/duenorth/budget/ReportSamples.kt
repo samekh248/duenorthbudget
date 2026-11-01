@@ -10,9 +10,12 @@ import app.duenorth.budget.core.NetWorthReport
 import app.duenorth.budget.core.NetWorthSpan
 import app.duenorth.budget.core.ReportRange
 import app.duenorth.budget.core.ReportsPage
+import app.duenorth.budget.core.SpendingDrill
+import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.core.SpendingReport
 import app.duenorth.budget.core.SpendingRow
+import app.duenorth.budget.core.SpendingTransaction
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
@@ -67,6 +70,59 @@ internal object ReportSamples {
                     },
                 ),
         )
+
+    private val food = SpendingFilter(SpendingGroupBy.GROUP, "food", "Food")
+    private val groceries = SpendingFilter(SpendingGroupBy.CATEGORY, "groceries", "Groceries")
+
+    /** Spending by group → food: its categories. */
+    val groupPath = listOf(food)
+
+    /** ... → food → groceries: its transactions. */
+    val categoryPath = listOf(food, groceries)
+
+    fun groupDrill(): SpendingDrill =
+        SpendingDrill(
+            range = range,
+            currency = usd,
+            path = groupPath,
+            breakdown =
+                SpendingReport(
+                    SpendingGroupBy.CATEGORY,
+                    listOf(
+                        SpendingRow("groceries", "Groceries", -168_000),
+                        SpendingRow("dining", "Dining out", -32_000),
+                        SpendingRow("coffee", "Coffee", -6_000),
+                    ),
+                ),
+            transactions = emptyList(),
+            totalMinor = -206_000,
+        )
+
+    fun categoryDrill(): SpendingDrill {
+        val lines =
+            listOf(
+                Triple(20260927, "Grocer", -21_400L),
+                Triple(20260920, "Market", -8_650L),
+                Triple(20260913, "Grocer", -19_875L),
+                Triple(20260906, "Grocer", -22_310L),
+                Triple(20260830, "Market", -6_120L),
+                Triple(20260823, "Grocer", -24_045L),
+                Triple(20260816, "Grocer", -18_900L),
+                Triple(20260809, "Market", -9_300L),
+                Triple(20260802, "Grocer", -37_400L),
+            )
+        return SpendingDrill(
+            range = range,
+            currency = usd,
+            path = categoryPath,
+            breakdown = null,
+            transactions =
+                lines.mapIndexed { index, (date, payee, amount) ->
+                    SpendingTransaction("t$index", "checking", "t$index", date, payee, "Groceries", amount)
+                },
+            totalMinor = lines.sumOf { it.third },
+        )
+    }
 
     fun empty(): ReportsPage {
         val months = ReportRange(YearMonth.of(2025, 1), YearMonth.of(2025, 3)).months

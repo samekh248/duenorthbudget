@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.ReportPreset
 import app.duenorth.budget.core.ReportsCopy
+import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.SpendingGroupBy
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -51,6 +52,26 @@ class ReportScreenshotTest {
 
     @Test
     fun netWorthOnBudgetOnlyDark() = capture("report_networth_on_budget_dark", dark = true) { NetWorthGraph(include = false) }
+
+    @Test
+    fun drillBreakdownLight() = capture("report_drill_breakdown_light", dark = false) { Drill(ReportSamples.groupPath) }
+
+    @Test
+    fun drillBreakdownDark() = capture("report_drill_breakdown_dark", dark = true) { Drill(ReportSamples.groupPath) }
+
+    @Test
+    fun drillTransactionsLight() = capture("report_drill_transactions_light", dark = false) { Drill(ReportSamples.categoryPath) }
+
+    @Test
+    fun drillTransactionsDark() = capture("report_drill_transactions_dark", dark = true) { Drill(ReportSamples.categoryPath) }
+
+    @Composable
+    private fun Drill(path: List<SpendingFilter>) {
+        val drill = if (path == ReportSamples.groupPath) ReportSamples.groupDrill() else ReportSamples.categoryDrill()
+        SectionTitled(ReportsCopy.TITLE.uppercase()) {
+            SpendingDrillScreen(path, drill, { _, _ -> }, {})
+        }
+    }
 
     @Composable
     private fun NetWorthGraph(include: Boolean = true) {

@@ -2,6 +2,7 @@ package app.duenorth.budget
 
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.design.theme.Metro
@@ -139,9 +140,28 @@ internal fun ReportPivotRoute(
         onPreset = model.reports::setPreset,
         onCustom = model.reports::setRange,
         onGroupBy = model.reports::setGroupBy,
+        onRow = { model.reports.drill(it) },
         modifier = modifier,
         // A pivot saved before net worth became its own graph may point past the last item.
         initialItem = route.item.coerceIn(0, ReportItems.headers.lastIndex),
+    )
+}
+
+@Composable
+internal fun ReportDrillRoute(
+    route: ShellRoute.ReportDrill,
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    // Read again each time the page shows, so a transaction just fixed from here is counted where it now belongs.
+    LaunchedEffect(route.path) { model.reports.loadDrill(route.path) }
+    SpendingDrillScreen(
+        path = route.path,
+        drill = state.reports.drills[route.path],
+        onRow = { row, groupBy -> model.reports.drill(route.path, row, groupBy) },
+        onTransaction = model.reports::openTransaction,
+        modifier = modifier,
     )
 }
 
