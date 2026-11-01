@@ -3,7 +3,6 @@ package app.duenorth.budget
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import app.duenorth.budget.core.BankSyncFix
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.SimpleFinError
 
@@ -24,14 +23,9 @@ internal fun BankSyncReportRoute(
     BankSyncReportScreen(
         state.bankSync.panel,
         modifier,
-        onFix = { failure ->
-            // The bank's own sign-in lives at SimpleFIN Bridge; the rest is mended on the bank link.
-            if (failure.fix == BankSyncFix.SIMPLEFIN) {
-                openWebPage(context, SimpleFinError.BRIDGE_URL)
-            } else {
-                model.bankLink.repair(failure)
-            }
-        },
+        // The bank's own connection is mended at SimpleFIN Bridge; a token or a lost account on the bank link.
+        onSimpleFin = { openWebPage(context, SimpleFinError.BRIDGE_URL) },
+        onFix = model.bankLink::repair,
         onUnlink = model.bankSync::askUnlink,
     )
 }

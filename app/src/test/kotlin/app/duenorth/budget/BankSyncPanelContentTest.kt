@@ -65,19 +65,25 @@ class BankSyncPanelContentTest {
         compose.onNodeWithTag("bank-sync-report-synced", useUnmergedTree = true).assertTextEquals(BankSyncCopy.syncedOf(1, 2))
     }
 
-    // A failed account that something can mend carries the button for it; one that nothing can carries none.
+    // Every SimpleFIN failure offers SimpleFIN Bridge, whatever the error; one the app can also mend carries that button too.
     @Test
     fun reportOffersEachFailuresFix() {
         val attention = BankSyncFailure("Card", SimpleFinError.NEEDS_ATTENTION, "card", BankSyncFix.SIMPLEFIN)
         val token = BankSyncFailure("Joint", SimpleFinError.TOKEN_REFUSED, "joint", BankSyncFix.TOKEN)
         val down = BankSyncFailure("Savings", SimpleFinError.SERVER_DOWN, "savings")
+        val signIn = BankSyncFailure("Loan", "sign in again", "loan", BankSyncFix.SIGN_IN)
         val fixed = mutableListOf<BankSyncFailure>()
-        val ui = BankSyncUi(running = false, failures = listOf(attention, token, down))
-        compose.setContent { MetroTheme { BankSyncReportScreen(ui, onFix = { fixed += it }) } }
-        compose.onNodeWithTag("bank-sync-fix-Card").assert(hasText(BankSyncCopy.FIX_SIMPLEFIN)).performClick()
+        val bridged = mutableListOf<BankSyncFailure>()
+        val ui = BankSyncUi(running = false, failures = listOf(attention, token, down, signIn))
+        compose.setContent { MetroTheme { BankSyncReportScreen(ui, onSimpleFin = { bridged += it }, onFix = { fixed += it }) } }
+        listOf("Card", "Joint", "Savings").forEach {
+            compose.onNodeWithTag("bank-sync-simplefin-$it").assert(hasText(BankSyncCopy.FIX_SIMPLEFIN)).performClick()
+        }
+        assertEquals(0, compose.onAllNodesWithTagCount("bank-sync-simplefin-Loan"))
         compose.onNodeWithTag("bank-sync-fix-Joint").assert(hasText(BankSyncCopy.FIX_TOKEN)).performClick()
-        assertEquals(0, compose.onAllNodesWithTagCount("bank-sync-fix-Savings"))
-        assertEquals(listOf(attention, token), fixed)
+        listOf("Card", "Savings", "Loan").forEach { assertEquals(0, compose.onAllNodesWithTagCount("bank-sync-fix-$it")) }
+        assertEquals(listOf(attention, token, down), bridged)
+        assertEquals(listOf(token), fixed)
     }
 
     // Every failed account the page can name by id offers unlink beside its fix, after a single failed sync.
