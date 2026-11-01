@@ -13,6 +13,7 @@ import app.duenorth.budget.core.ReportsPage
 import app.duenorth.budget.core.SpendingDrill
 import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.SpendingGroupBy
+import app.duenorth.budget.core.SpendingHighlight
 import app.duenorth.budget.core.SpendingReport
 import app.duenorth.budget.core.SpendingRow
 import app.duenorth.budget.core.SpendingTransaction
@@ -69,6 +70,20 @@ internal object ReportSamples {
                             )
                     },
                 ),
+            highlights = if (groupBy == SpendingGroupBy.PAYEE) emptyList() else highlights(),
+        )
+
+    /** What stood out in the category report: bills' share, food up on feb – may, august, and the largest grocery run. */
+    fun highlights(): List<SpendingHighlight> =
+        listOf(
+            SpendingHighlight.Share(SpendingRow("bills", "Bills", -600_000), 72, 4, -150_000),
+            SpendingHighlight.Change(
+                SpendingRow("food", "Food", -206_000),
+                -174_000,
+                ReportRange(YearMonth.of(2026, 2), YearMonth.of(2026, 5)),
+            ),
+            SpendingHighlight.BiggestMonth(YearMonth.of(2026, 8), -231_000, -207_500),
+            SpendingHighlight.LargestPurchase(SpendingTransaction("t8", "checking", "t8", 20260802, "Grocer", "Groceries", -37_400)),
         )
 
     private val food = SpendingFilter(SpendingGroupBy.GROUP, "food", "Food")

@@ -23,6 +23,20 @@ object ReportsCopy {
     const val BY = "by"
     const val TRANSACTIONS = "transactions"
 
+    // The spending report's highlights: what stood out over its range.
+    const val STOOD_OUT = "what stood out"
+    const val TOOK = "took"
+    const val A_MONTH = "a month"
+    const val ABOUT = "about"
+    const val IS_UP = "is up"
+    const val IS_DOWN = "is down"
+    const val VS = "vs"
+    const val IN = "in"
+    const val BIGGEST_MONTH = "biggest month:"
+    const val ABOVE_AVERAGE = "above your average"
+    const val LARGEST_PURCHASE = "largest purchase:"
+    const val OF_SPENDING = "of spending"
+
     // The reports hub: one line per report, under what it shows.
     const val NET_WORTH_TODAY = "on and off budget, as of today"
     const val NET_WORTH_SINCE = "since"
@@ -218,12 +232,50 @@ object SpendingDrillLevels {
     }
 }
 
+/**
+ * One thing that stood out in the spending report's range (`contracts/reports.md`). Amounts are
+ * negative, as stored; the report shows them as spent.
+ */
+sealed interface SpendingHighlight {
+    /** The largest row's share of all spending, and about how much that is a month over [months]. */
+    data class Share(
+        val row: SpendingRow,
+        val percent: Int,
+        val months: Int,
+        val perMonthMinor: Long,
+    ) : SpendingHighlight
+
+    /** The row that moved the most against the same number of months just before the range. */
+    data class Change(
+        val row: SpendingRow,
+        val beforeMinor: Long,
+        val before: ReportRange,
+    ) : SpendingHighlight {
+        /** How far spending moved, in whole percent: positive when more was spent. */
+        val percent: Int get() = Math.round((abs(row.amountMinor) - abs(beforeMinor)) * 100.0 / abs(beforeMinor)).toInt()
+    }
+
+    /** The range's costliest month, and how far it sat over the range's monthly average. */
+    data class BiggestMonth(
+        val month: YearMonth,
+        val amountMinor: Long,
+        val averageMinor: Long,
+    ) : SpendingHighlight
+
+    /** The range's single largest expense. */
+    data class LargestPurchase(
+        val transaction: SpendingTransaction,
+    ) : SpendingHighlight
+}
+
 data class ReportsPage(
     val range: ReportRange,
     val currency: CurrencySpec,
     val cashFlow: CashFlowReport,
     val netWorth: NetWorthReport,
     val spending: SpendingReport,
+    /** What stood out in [spending], most telling first; empty when nothing did. */
+    val highlights: List<SpendingHighlight> = emptyList(),
 ) {
     val empty: Boolean
         get() = cashFlow.months.all { it.incomeMinor == 0L && it.expenseMinor == 0L } && spending.rows.isEmpty()
@@ -342,20 +394,69 @@ class ReportsReader(
             } else {
                 under
                     .sortedWith(compareByDescending<Line> { it.date }.thenBy { it.amount })
-                    .map { line ->
-                        SpendingTransaction(
-                            id = line.id,
-                            accountId = line.accountId,
-                            openId = line.parentId ?: line.id,
-                            date = line.date,
-                            payee = label(line.payeeId, SpendingGroupBy.PAYEE, names),
-                            category = label(line.categoryId, SpendingGroupBy.CATEGORY, names),
-                            amountMinor = line.amount,
-                        )
-                    }
+                    .map { transactionOf(it) }
             }
         return SpendingDrill(range, currency, path, breakdown, transactions, under.sumOf { it.amount })
     }
+
+    /**
+     * What stood out in [report] over [range]: the largest row's share, the row that moved most against the
+     * months just before, the costliest month, and the largest purchase. Each is left out when it says nothing:
+     * a share with one row, a change with nothing before, a month that matches the rest.
+     */
+    fun spendingHighlights(
+        range: ReportRange,
+        report: SpendingReport,
+    ): List<SpendingHighlight> {
+        val total = abs(report.totalMinor)
+        if (total == 0L) return emptyList()
+        val out = mutableListOf<SpendingHighlight>()
+        val months = range.months
+        val top = report.rows.first()
+        if (report.rows.size > 1) {
+            out +=
+                SpendingHighlight.Share(
+                    top,
+                    Math.round(abs(top.amountMinor) * 100.0 / total).toInt(),
+                    months.size,
+                    top.amountMinor / months.size,
+                )
+        }
+        val before = ReportRange(range.start.minusMonths(months.size.toLong()), range.start.minusMonths(1))
+        val earlier = rowsOf(expenses(before), report.groupBy).rows.associate { it.id to it.amountMinor }
+        report.rows
+            .mapNotNull { row -> earlier[row.id]?.let { SpendingHighlight.Change(row, it, before) } }
+            .filter { it.percent != 0 }
+            .maxWithOrNull(
+                compareBy<SpendingHighlight.Change> {
+                    abs(abs(it.row.amountMinor) - abs(it.beforeMinor))
+                }.thenBy { abs(it.row.amountMinor) },
+            )?.let { out += it }
+        if (months.size > 1) {
+            val spent = expenses(range)
+            val byMonth = months.map { month -> month to spent.filter { it.month() == month }.sumOf { it.amount } }
+            val average = report.totalMinor / months.size
+            val (month, amount) = byMonth.minBy { it.second }
+            if (amount < average) out += SpendingHighlight.BiggestMonth(month, amount, average)
+        }
+        expenses(range)
+            .minWithOrNull(compareBy<Line> { it.amount }.thenByDescending { it.date })
+            ?.let { out += SpendingHighlight.LargestPurchase(transactionOf(it)) }
+        return out
+    }
+
+    private fun Line.month(): YearMonth = YearMonth.of(date / 10_000, date / 100 % 100)
+
+    private fun transactionOf(line: Line): SpendingTransaction =
+        SpendingTransaction(
+            id = line.id,
+            accountId = line.accountId,
+            openId = line.parentId ?: line.id,
+            date = line.date,
+            payee = label(line.payeeId, SpendingGroupBy.PAYEE, names),
+            category = label(line.categoryId, SpendingGroupBy.CATEGORY, names),
+            amountMinor = line.amount,
+        )
 
     private fun expenses(range: ReportRange): List<Line> {
         val low = range.start.atDay(1).toInt()
@@ -398,14 +499,17 @@ class ReportsReader(
         includeOffBudget: Boolean,
         groupBy: SpendingGroupBy,
         currency: CurrencySpec,
-    ): ReportsPage =
-        ReportsPage(
+    ): ReportsPage {
+        val spending = spending(range, groupBy)
+        return ReportsPage(
             range = range,
             currency = currency,
             cashFlow = cashFlow(range),
             netWorth = netWorth(range, includeOffBudget),
-            spending = spending(range, groupBy),
+            spending = spending,
+            highlights = spendingHighlights(range, spending),
         )
+    }
 
     private fun load(): List<Line> =
         session

@@ -7,21 +7,30 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.MoneyFormat
@@ -34,6 +43,7 @@ import app.duenorth.budget.core.ReportsPage
 import app.duenorth.budget.core.SpendingDrill
 import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.SpendingGroupBy
+import app.duenorth.budget.core.SpendingHighlight
 import app.duenorth.budget.core.SpendingRow
 import app.duenorth.budget.core.SpendingTransaction
 import app.duenorth.budget.core.monthLabel
@@ -42,10 +52,12 @@ import app.duenorth.budget.design.components.MetroPivot
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.PivotItem
 import app.duenorth.budget.design.components.metroPress
+import app.duenorth.budget.design.components.sentenceCase
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.util.Locale
 import kotlin.math.abs
 
@@ -253,6 +265,11 @@ private fun CashFlow(page: ReportsPage) {
     }
 }
 
+/**
+ * Spending: the range's total over a bar split by each row's share, then what stood out (the largest
+ * row's share, the biggest change against the months before, the costliest month, the largest
+ * purchase), then every row with its swatch and share. Tapping a row drills in.
+ */
 @Composable
 private fun Spending(
     page: ReportsPage,
@@ -261,7 +278,8 @@ private fun Spending(
     onRow: (SpendingRow) -> Unit,
 ) {
     val report = page.spending
-    val scale = report.rows.maxOfOrNull { abs(it.amountMinor) }?.takeIf { it > 0 } ?: 1L
+    val total = abs(report.totalMinor)
+    val swatches = shareSwatches()
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal = MetroDimens.Gutter)) {
@@ -269,22 +287,203 @@ private fun Spending(
                     Choice(option.label, option == groupBy, "report-spending-by-${option.name.lowercase()}") { onGroupBy(option) }
                 }
             }
-            Totals(listOf(ReportsCopy.TOTAL to report.totalMinor), page.currency, "report-spending-total")
             if (report.rows.isEmpty()) {
+                Totals(listOf(ReportsCopy.TOTAL to report.totalMinor), page.currency, "report-spending-total")
                 MetroText(
                     ReportsCopy.NOTHING,
                     Metro.typography.body,
                     Modifier.padding(MetroDimens.Gutter).testTag("report-spending-empty"),
                 )
+            } else {
+                Column(Modifier.fillMaxWidth().padding(MetroDimens.Gutter).testTag("report-spending-total")) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                        MetroText(
+                            MoneyFormat.format(report.totalMinor, page.currency, formatOptions()),
+                            Metro.typography.subheader,
+                            Modifier.weight(1f),
+                        )
+                        MetroText(
+                            "${report.rows.size} ${rowsNoun(report.groupBy, report.rows.size)}",
+                            Metro.typography.caption,
+                            color = Metro.colors.secondary,
+                        )
+                    }
+                    ShareBar(report.rows, total, swatches)
+                }
+            }
+            if (page.highlights.isNotEmpty()) {
+                MetroText(
+                    ReportsCopy.STOOD_OUT,
+                    Metro.typography.subheader,
+                    Modifier.padding(horizontal = MetroDimens.Gutter).padding(top = MetroDimens.Row, bottom = MetroDimens.Row),
+                )
+                page.highlights.forEachIndexed { index, highlight ->
+                    Highlight(highlight, page.currency, "report-spending-highlight-$index")
+                }
+                Box(Modifier.height(MetroDimens.Row))
             }
         }
-        items(report.rows, key = { it.id ?: "none" }) { row ->
-            SpendingLine(row, scale, page.currency, "report-spending-row-${row.id ?: "none"}") { onRow(row) }
+        itemsIndexed(report.rows, key = { _, row -> row.id ?: "none" }) { index, row ->
+            ShareLine(row, total, swatches[minOf(index, swatches.lastIndex)], page.currency, "report-spending-row-${row.id ?: "none"}") {
+                onRow(row)
+            }
         }
     }
 }
 
-/** One spending row: its name and amount over a bar; tapping it drills in. */
+/** The colors that tell rows apart in the share bar and beside each row: the accent, a deeper accent, then greys. */
+@Composable
+private fun shareSwatches(): List<Color> {
+    val accent = Metro.accent.fill
+    val secondary = Metro.colors.secondary
+    return listOf(accent, lerp(accent, Color.Black, 0.35f), secondary, lerp(secondary, Metro.colors.background, 0.5f))
+}
+
+private fun rowsNoun(
+    groupBy: SpendingGroupBy,
+    count: Int,
+): String =
+    when {
+        count == 1 -> groupBy.label
+        groupBy == SpendingGroupBy.CATEGORY -> "categories"
+        else -> "${groupBy.label}s"
+    }
+
+/** One flat bar split by each row's share of [total], largest first, with a hairline between. */
+@Composable
+private fun ShareBar(
+    rows: List<SpendingRow>,
+    total: Long,
+    swatches: List<Color>,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp)
+            .height(18.dp)
+            .testTag("report-spending-share"),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        rows.forEachIndexed { index, row ->
+            val share = abs(row.amountMinor).toFloat() / total
+            if (share > 0f) {
+                Box(Modifier.weight(share).fillMaxHeight().background(swatches[minOf(index, swatches.lastIndex)]))
+            }
+        }
+    }
+}
+
+/** One thing that stood out: a line with its figure in the accent, over a caption, beside an accent rule. */
+@Composable
+private fun Highlight(
+    highlight: SpendingHighlight,
+    currency: CurrencySpec,
+    tag: String,
+) {
+    val options = formatOptions()
+    val dates = dateFormat()
+    val money: (Long) -> String = { MoneyFormat.format(abs(it), currency, options) }
+    val (lead, figure, note) =
+        when (highlight) {
+            is SpendingHighlight.Share ->
+                Triple(
+                    "${highlight.row.label} ${ReportsCopy.TOOK} ",
+                    "${highlight.percent}%",
+                    money(highlight.row.amountMinor) +
+                        if (highlight.months >
+                            1
+                        ) {
+                            " · ${ReportsCopy.ABOUT} ${money(highlight.perMonthMinor)} ${ReportsCopy.A_MONTH}"
+                        } else {
+                            ""
+                        },
+                )
+            is SpendingHighlight.Change ->
+                Triple(
+                    "${highlight.row.label} ${if (highlight.percent > 0) ReportsCopy.IS_UP else ReportsCopy.IS_DOWN} ",
+                    "${abs(highlight.percent)}%",
+                    "${money(highlight.row.amountMinor)} ${ReportsCopy.VS} ${money(highlight.beforeMinor)} ${ReportsCopy.IN} " +
+                        rangeLabel(highlight.before),
+                )
+            is SpendingHighlight.BiggestMonth ->
+                Triple(
+                    "${ReportsCopy.BIGGEST_MONTH} ",
+                    highlight.month.month
+                        .getDisplayName(TextStyle.FULL, Locale.US)
+                        .lowercase(),
+                    "${money(
+                        highlight.amountMinor,
+                    )} · ${money(highlight.amountMinor - highlight.averageMinor)} ${ReportsCopy.ABOVE_AVERAGE}",
+                )
+            is SpendingHighlight.LargestPurchase ->
+                Triple(
+                    "${ReportsCopy.LARGEST_PURCHASE} ",
+                    money(highlight.transaction.amountMinor),
+                    "${highlight.transaction.payee} · ${RegisterEntry.registerDateLabel(highlight.transaction.date, dates)}",
+                )
+        }
+    val headline =
+        buildAnnotatedString {
+            append(if (Metro.style.mobile10) sentenceCase(lead) else lead)
+            withStyle(SpanStyle(color = Metro.accent.text)) { append(figure) }
+        }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = MetroDimens.Gutter)
+            .padding(bottom = MetroDimens.Row)
+            .height(IntrinsicSize.Min)
+            .testTag(tag),
+    ) {
+        Box(Modifier.width(4.dp).fillMaxHeight().background(Metro.accent.fill))
+        Column(Modifier.padding(start = 10.dp)) {
+            BasicText(headline, style = Metro.typography.groupHeader.copy(color = Metro.colors.foreground))
+            MetroText(note, Metro.typography.caption, color = Metro.colors.secondary)
+        }
+    }
+}
+
+private fun rangeLabel(range: ReportRange): String =
+    if (range.start == range.end) {
+        range.start.format(MONTH).lowercase()
+    } else {
+        "${range.start.format(MONTH)} – ${range.end.format(MONTH)}".lowercase()
+    }
+
+/** One spending row on the report: its swatch, name and amount over its share of all spending; tapping it drills in. */
+@Composable
+private fun ShareLine(
+    row: SpendingRow,
+    total: Long,
+    swatch: Color,
+    currency: CurrencySpec,
+    tag: String,
+    onOpen: () -> Unit,
+) {
+    val percent = if (total == 0L) 0 else Math.round(abs(row.amountMinor) * 100.0 / total).toInt()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .metroPress(onOpen)
+            .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
+            .testTag(tag),
+    ) {
+        Box(Modifier.padding(top = 9.dp, end = 10.dp).size(12.dp).background(swatch))
+        Column(Modifier.weight(1f)) {
+            Row(Modifier.fillMaxWidth()) {
+                MetroText(row.label, Metro.typography.subheader, Modifier.weight(1f), maxLines = 2)
+                MetroText(MoneyFormat.format(row.amountMinor, currency, formatOptions()), Metro.typography.subheader)
+            }
+            MetroText(
+                if (percent == 0 && row.amountMinor != 0L) "<1% ${ReportsCopy.OF_SPENDING}" else "$percent% ${ReportsCopy.OF_SPENDING}",
+                Metro.typography.caption,
+                color = Metro.colors.secondary,
+            )
+        }
+    }
+}
+
+/** One drilled spending row: its name and amount over a bar; tapping it drills in. */
 @Composable
 private fun SpendingLine(
     row: SpendingRow,
