@@ -22,7 +22,9 @@ import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureScreenRoboImage
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,6 +38,17 @@ import java.time.YearMonth
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [33], qualifiers = "w390dp-h780dp-xxhdpi")
 class CategoryRenameScreenshotTest {
+    // The samples are October 2026; pin "this month" to it so the month control doesn't change with the run date.
+    @Before
+    fun pinCalendarMonth() {
+        CalendarMonth.pinned = YearMonth.of(2026, 10)
+    }
+
+    @After
+    fun unpinCalendarMonth() {
+        CalendarMonth.pinned = null
+    }
+
     @get:Rule
     val compose = createHostComposeRule()
 
