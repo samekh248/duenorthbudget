@@ -8,6 +8,7 @@ import app.duenorth.budget.core.ReportsReader
 import app.duenorth.budget.core.SpendingDrillLevels
 import app.duenorth.budget.core.SpendingFilter
 import app.duenorth.budget.core.SpendingGroupBy
+import app.duenorth.budget.core.SpendingHighlight
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
@@ -22,6 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlin.math.abs
 
 /** Spec 010 T051: reports against desktop Actual 26.8.1 (`parity/reports/`). */
 class ReportsParityTest {
@@ -131,6 +133,65 @@ class ReportsParityTest {
                     }
                 }
             }
+        }
+    }
+
+    @Test
+    fun spendingHighlightsNameTheShareTheChangeTheMonthAndThePurchase() {
+        val usd = Currencies.byCode("USD")!!
+        read { reader ->
+            val report = reader.spending(range, SpendingGroupBy.CATEGORY)
+            val highlights = reader.spendingHighlights(range, report)
+            val share = highlights.filterIsInstance<SpendingHighlight.Share>().single()
+            assertEquals("Bills", share.row.label)
+            assertEquals(72, share.percent)
+            assertEquals(-150_000L, share.perMonthMinor)
+
+            val before = ReportRange(YearMonth.of(2026, 2), YearMonth.of(2026, 5))
+            val earlier = reader.spending(before, SpendingGroupBy.CATEGORY).rows.associate { it.id to it.amountMinor }
+            val moved =
+                report.rows
+                    .filter { it.id in earlier }
+                    .map { it to abs(abs(it.amountMinor) - abs(earlier.getValue(it.id))) }
+                    .filter { it.second != 0L }
+            highlights.filterIsInstance<SpendingHighlight.Change>().singleOrNull()?.let { change ->
+                assertEquals(before, change.before)
+                assertEquals(earlier.getValue(change.row.id), change.beforeMinor)
+                assertEquals(moved.maxOf { it.second }, abs(abs(change.row.amountMinor) - abs(change.beforeMinor)))
+            } ?: assertTrue("no change only when nothing moved", moved.isEmpty())
+
+            val month = highlights.filterIsInstance<SpendingHighlight.BiggestMonth>().single()
+            val cash = reader.cashFlow(range).months
+            assertEquals(cash.minBy { it.expenseMinor }.month, month.month)
+            assertEquals(cash.minOf { it.expenseMinor }, month.amountMinor)
+            assertEquals(report.totalMinor / 4, month.averageMinor)
+
+            val purchase = highlights.filterIsInstance<SpendingHighlight.LargestPurchase>().single()
+            val all =
+                report.rows.flatMap { row ->
+                    reader.spendingDrill(range, listOf(SpendingFilter(SpendingGroupBy.CATEGORY, row.id, row.label)), usd).let { drill ->
+                        drill.transactions.ifEmpty {
+                            drill.breakdown!!.rows.flatMap { sub ->
+                                reader
+                                    .spendingDrill(
+                                        range,
+                                        listOf(
+                                            SpendingFilter(SpendingGroupBy.CATEGORY, row.id, row.label),
+                                            SpendingFilter(drill.breakdown!!.groupBy, sub.id, sub.label),
+                                        ),
+                                        usd,
+                                    ).transactions
+                            }
+                        }
+                    }
+                }
+            assertEquals(all.minOf { it.amountMinor }, purchase.transaction.amountMinor)
+
+            val one = ReportRange(YearMonth.of(2026, 8), YearMonth.of(2026, 8))
+            val single = reader.spendingHighlights(one, reader.spending(one, SpendingGroupBy.CATEGORY))
+            assertTrue("one month has no biggest month", single.none { it is SpendingHighlight.BiggestMonth })
+            val empty = ReportRange(YearMonth.of(2020, 1), YearMonth.of(2020, 3))
+            assertTrue(reader.spendingHighlights(empty, reader.spending(empty, SpendingGroupBy.CATEGORY)).isEmpty())
         }
     }
 

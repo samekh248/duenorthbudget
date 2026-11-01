@@ -102,7 +102,8 @@ class ReportContentTest {
         compose.setContent {
             MetroTheme {
                 ReportsScreen(
-                    ReportSamples.page(groupBy.value),
+                    // Without highlights, so every row is on screen.
+                    ReportSamples.page(groupBy.value).copy(highlights = emptyList()),
                     false,
                     ReportPreset.LAST_6,
                     groupBy.value,
@@ -121,12 +122,37 @@ class ReportContentTest {
     }
 
     @Test
+    fun spendingShowsWhatStoodOutAndEachRowsShare() {
+        compose.setContent {
+            MetroTheme {
+                ReportsScreen(
+                    ReportSamples.page(),
+                    false,
+                    ReportPreset.LAST_6,
+                    SpendingGroupBy.CATEGORY,
+                    {},
+                    {},
+                    {},
+                    initialItem = ReportItems.SPENDING,
+                )
+            }
+        }
+        compose.onNodeWithText(ReportsCopy.STOOD_OUT).assertExists()
+        compose.onNodeWithTag("report-spending-share", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Bills took 72%").assertExists()
+        compose.onNodeWithText("Food is up 18%").assertExists()
+        compose.onNodeWithText("biggest month: august").assertExists()
+        compose.onNodeWithText("largest purchase: \$374.00").assertExists()
+        compose.onNodeWithText("72% ${ReportsCopy.OF_SPENDING}").assertExists()
+    }
+
+    @Test
     fun aSpendingRowDrillsIn() {
         val tapped = mutableListOf<String?>()
         compose.setContent {
             MetroTheme {
                 ReportsScreen(
-                    ReportSamples.page(),
+                    ReportSamples.page().copy(highlights = emptyList()),
                     false,
                     ReportPreset.LAST_6,
                     SpendingGroupBy.CATEGORY,

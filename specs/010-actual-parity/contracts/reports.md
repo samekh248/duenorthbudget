@@ -28,6 +28,15 @@ Expenses only: amount < 0, on-budget, not a transfer. Group by category (default
 
 Tapping a row drills in (`ShellRoute.ReportDrill`, tag `report-drill`): a group opens its categories, a category its payees, a payee its categories, and the next tap lists the transactions, newest first. A level with one row lists its transactions at once. Each page names the trail above it; back goes up one level. A transaction opens its form, and saving returns to the drilled page.
 
+The total sits over one flat bar split by each row's share (`report-spending-share`): the accent, a deeper accent, then greys. Under it, `what stood out` lists up to four highlights (`ReportsReader.spendingHighlights`), each a line with its figure in the accent over a caption, beside an accent rule (`report-spending-highlight-N`):
+
+- **share**: the largest row's share of the total, and about how much a month; left out with a single row.
+- **change**: the row that moved the most (in money) against the same number of months just before the range; left out when nothing earlier matches or nothing moved.
+- **biggest month**: the costliest month and how far it sat over the range's monthly average; left out for a one-month range or when no month stands above it.
+- **largest purchase**: the single largest expense, its payee and date.
+
+Each row then shows its swatch, name, amount, and `N% of spending`.
+
 ## Empty and loading
 
 An empty range shows zero totals and no error. While a report computes, content-shaped placeholders fade in; no full-screen spinner.
