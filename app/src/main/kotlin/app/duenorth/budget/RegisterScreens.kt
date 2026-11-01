@@ -33,11 +33,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
@@ -370,15 +372,24 @@ internal fun RegisterLine(
     modifier: Modifier = Modifier,
     /** Air under the row inside its tint: the panel's bottom air, on a day panel's last row. */
     extraAir: Dp = 0.dp,
+    /** Shows a reconciled row's mark as a lock, as Actual does, in place of the cleared "c". */
+    showLock: Boolean = false,
 ) {
     val accent = Metro.accent.text
+    val locked = showLock && row.reconciled
+    val lockInk = Metro.colors.foreground.copy(alpha = LOCK_ALPHA)
     val fill =
         when {
             picked == true -> accent.copy(alpha = 0.10f)
             banded -> ledgerBand
             else -> Color.Transparent
         }
-    val bar = if (row.cleared) accent else Metro.colors.secondary.copy(alpha = 0.22f)
+    val bar =
+        when {
+            locked -> lockInk
+            row.cleared -> accent
+            else -> Metro.colors.secondary.copy(alpha = 0.22f)
+        }
     val letter = if (row.cleared) Metro.colors.background else Metro.colors.secondary.copy(alpha = 0.7f)
     val measurer = rememberTextMeasurer()
     val mark = Metro.typography.caption.copy(color = letter, fontWeight = FontWeight.SemiBold)
@@ -413,9 +424,17 @@ internal fun RegisterLine(
                         topLeft,
                         Size(side, side),
                         if (surface.style.layers) side / 2 else 0f,
-                        if (row.cleared) accentFill else ground,
+                        when {
+                            locked -> lockInk
+                            row.cleared -> accentFill
+                            else -> ground
+                        },
                         small = true,
                     )
+                    if (locked) {
+                        drawLock(Offset(topLeft.x + side / 2, topLeft.y + side / 2), ground)
+                        return@drawBehind
+                    }
                     // Centred on the letter's x-height, not its line box, which leaves room above a lowercase c.
                     val c = measurer.measure(RegisterCopy.CLEARED_MARK, keyMark)
                     val middle = c.firstBaseline - keyMark.fontSize.toPx() * SELAWIK_X_HEIGHT / 2
@@ -428,6 +447,10 @@ internal fun RegisterLine(
                 val left = size.width + gutter - CLEARED_BAR_INSET.toPx() - CLEARED_BAR.toPx()
                 val height = size.height - extraAir.toPx()
                 drawRect(bar, Offset(left, inset), Size(CLEARED_BAR.toPx(), height - 2 * inset))
+                if (locked) {
+                    drawLock(Offset(left + CLEARED_BAR.toPx() / 2, height / 2), ground)
+                    return@drawBehind
+                }
                 val c = measurer.measure(RegisterCopy.CLEARED_MARK, mark)
                 drawText(c, topLeft = Offset(left + (CLEARED_BAR.toPx() - c.size.width) / 2, (height - c.size.height) / 2))
             }.metroPress(onPress, onLongPress)
@@ -441,7 +464,12 @@ internal fun RegisterLine(
                             MetroDimens.Gutter
                     },
             ).semantics {
-                stateDescription = if (row.cleared) RegisterCopy.CLEARED else RegisterCopy.NOT_CLEARED
+                stateDescription =
+                    when {
+                        locked -> RegisterCopy.LOCKED
+                        row.cleared -> RegisterCopy.CLEARED
+                        else -> RegisterCopy.NOT_CLEARED
+                    }
                 if (picked != null) selected = picked
             }.testTag("register-row-${row.id}"),
     ) {
@@ -537,6 +565,29 @@ private fun SelectBox(
 }
 
 private val CLEARED_BAR = 16.dp
+
+/** A locked row's bar: the foreground, a little softened, so it reads apart from the accent of cleared. */
+private const val LOCK_ALPHA = 0.72f
+
+/** A small padlock centred on [center]: a body with a shackle over it, Actual's mark for a reconciled row. */
+internal fun DrawScope.drawLock(
+    center: Offset,
+    color: Color,
+) {
+    val w = 8.dp.toPx()
+    val h = 6.dp.toPx()
+    val top = center.y - h / 2 + 2.dp.toPx()
+    drawRect(color, Offset(center.x - w / 2, top), Size(w, h))
+    val r = 2.4.dp.toPx()
+    val shackle =
+        Path().apply {
+            moveTo(center.x - r, top)
+            lineTo(center.x - r, top - 1.5.dp.toPx())
+            arcTo(Rect(center.x - r, top - 1.5.dp.toPx() - r, center.x + r, top - 1.5.dp.toPx() + r), 180f, 180f, false)
+            lineTo(center.x + r, top)
+        }
+    drawPath(shackle, color, style = Stroke(1.5.dp.toPx()))
+}
 
 /** The cleared key of a relief style: a touch smaller than the payee's two lines. */
 private val CLEARED_KEY = 28.dp

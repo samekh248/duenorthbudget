@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,7 +40,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.duenorth.budget.core.DateFormats
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.ReconcileCopy
@@ -62,9 +67,10 @@ import app.duenorth.budget.design.theme.MetroDimens
 /**
  * Reconcile on the register itself: the account's own rows, with a reconcile header where the balance
  * was. Before a statement is entered the header asks for it, starting at the cleared balance; after,
- * it shows statement, cleared and the difference, tapping a row clears or unclears it, and when the
- * numbers are off a hint under the header points at likely rows. Finishing while still off offers an
- * adjustment instead of refusing.
+ * it shows statement, cleared and the difference over a strip of locked, cleared and not cleared rows,
+ * tapping a row clears or unclears it, and when the numbers are off a numbered list of leads points at the
+ * likeliest causes, each with a one-tap fix and what it would leave. Locked (reconciled) rows sit under their
+ * own heading with a lock for a mark. Finishing while still off offers an adjustment instead of refusing.
  */
 @Composable
 fun ReconcileRegisterScreen(
@@ -78,12 +84,19 @@ fun ReconcileRegisterScreen(
     onOpen: (String) -> Unit,
     onAddMissing: () -> Unit,
     onFinish: (adjust: Boolean) -> Unit,
+    onFlip: (String) -> Unit = {},
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     today: Int = RegisterEntry.parseDate(RegisterEntry.todayIso())!!,
 ) {
     val prefs = LocalFormatPrefs.current
     val decimals = register.currency.decimals
+    // The reconcile page carries the live marks; a row it does not know keeps the register's.
+    val marks = page?.rows?.associateBy { it.id }.orEmpty()
+    val rows =
+        register.rows.map { row ->
+            marks[row.id]?.let { row.copy(cleared = it.cleared, reconciled = it.reconciled) } ?: row
+        }
     val clearedBalance = register.rows.filter { it.cleared || it.reconciled }.sumOf { it.amountMinor }
     var balance by rememberSaveable(register.account.id) { mutableStateOf(prefs.editSignedAmount(clearedBalance, decimals)) }
     var date by rememberSaveable(register.account.id) { mutableIntStateOf(today) }
@@ -146,7 +159,7 @@ fun ReconcileRegisterScreen(
                 error = error,
             )
         } else {
-            ReconcileHeader(page)
+            ReconcileHeader(page, tally(rows))
             if (error != null) {
                 MetroText(error, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
             }
@@ -154,12 +167,14 @@ fun ReconcileRegisterScreen(
         val hints = if (page != null && !confirming) ReconcileHelp.hints(page) else emptyList()
         ReconcileList(
             register = register,
+            rows = rows,
             page = page,
             hints = hints,
             confirming = confirming,
             onGesture = onGesture,
             onToggle = onToggle,
             onSetCleared = onSetCleared,
+            onFlip = onFlip,
             onOpen = onOpen,
             onAddMissing = onAddMissing,
             modifier = Modifier.weight(1f).padding(top = MetroDimens.Grid),
@@ -205,15 +220,38 @@ private fun Label(
     MetroText(text, Metro.typography.caption, modifier.padding(bottom = MetroDimens.FieldLabelGap), color = Metro.colors.secondary)
 }
 
-/** Statement, cleared and the difference, on chrome while it is off and on the accent once it balances. */
+/** How many open rows are locked, cleared and not cleared, with the day the locked ones run through. */
+private data class Tally(
+    val locked: Int,
+    val cleared: Int,
+    val notCleared: Int,
+    val lockedThrough: Int?,
+)
+
+private fun tally(rows: List<RegisterRow>): Tally {
+    val locked = rows.filter { it.reconciled }
+    return Tally(
+        locked = locked.size,
+        cleared = rows.count { it.cleared && !it.reconciled },
+        notCleared = rows.count { !it.cleared && !it.reconciled },
+        lockedThrough = locked.maxOfOrNull { it.date },
+    )
+}
+
+/**
+ * Statement, cleared and the difference, on chrome while it is off and on the accent once it balances, over
+ * a strip that splits the account's transactions into locked, cleared and not cleared.
+ */
 @Composable
-private fun ReconcileHeader(page: ReconcilePage) {
+private fun ReconcileHeader(
+    page: ReconcilePage,
+    tally: Tally,
+) {
     val balanced = page.differenceMinor == 0L
     val fill = if (balanced) Metro.accent.fill else Metro.colors.chrome
     val ink = if (balanced) Metro.accent.onFill else Metro.colors.foreground
     val soft = if (balanced) Metro.accent.onFill.copy(alpha = 0.8f) else Metro.colors.secondary
     val options = formatOptions()
-    val locks = page.rows.count { it.cleared && !it.reconciled }
     Column(
         Modifier
             .padding(top = MetroDimens.Gutter)
@@ -234,7 +272,7 @@ private fun ReconcileHeader(page: ReconcilePage) {
             if (balanced) {
                 AppGlyphIcon(AppGlyph.Save, ink)
                 MetroText(ReconcileCopy.BALANCED, Metro.typography.subheader, Modifier.padding(start = 8.dp).weight(1f), color = ink)
-                MetroText("${ReconcileCopy.FINISH_LOCKS} $locks", Metro.typography.caption, color = ink)
+                MetroText("${ReconcileCopy.FINISH_LOCKS} ${tally.cleared}", Metro.typography.caption, color = ink)
             } else {
                 MetroText(ReconcileCopy.OFF_BY, Metro.typography.subheader, Modifier.weight(1f), color = ink)
                 MetroText(
@@ -245,9 +283,63 @@ private fun ReconcileHeader(page: ReconcilePage) {
                 )
             }
         }
-        if (!balanced) {
-            MetroText(ReconcileCopy.TAP_TO_CLEAR, Metro.typography.caption, Modifier.padding(top = 4.dp), color = soft)
+        StatusStrip(tally, balanced, ink, soft)
+    }
+}
+
+/** Locked, cleared and not cleared as one bar in proportion, with the counts under it. */
+@Composable
+private fun StatusStrip(
+    tally: Tally,
+    balanced: Boolean,
+    ink: Color,
+    soft: Color,
+) {
+    val lockInk = (if (balanced) ink else Metro.colors.foreground).copy(alpha = LOCK_ALPHA)
+    val clearedInk = if (balanced) ink else Metro.accent.fill
+    val openInk = (if (balanced) ink else Metro.colors.secondary).copy(alpha = 0.25f)
+    val parts =
+        listOf(tally.locked to lockInk, tally.cleared to clearedInk, tally.notCleared to openInk).filter { it.first > 0 }
+    Row(
+        Modifier
+            .padding(top = 10.dp)
+            .fillMaxWidth()
+            .height(8.dp)
+            .testTag("reconcile-strip"),
+    ) {
+        parts.forEachIndexed { i, (count, color) ->
+            Box(
+                Modifier
+                    .weight(count.toFloat())
+                    .fillMaxHeight()
+                    .padding(start = if (i == 0) 0.dp else 2.dp)
+                    .background(color),
+            )
         }
+    }
+    Row(Modifier.padding(top = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        val through = tally.lockedThrough?.let { RegisterEntry.registerDateLabel(it) }
+        if (tally.locked > 0 && through != null) {
+            Key(lockInk, "${tally.locked}", ReconcileCopy.lockedThrough(through), ink, soft, "strip-locked")
+        }
+        Key(clearedInk, "${tally.cleared}", ReconcileCopy.CLEARED, ink, soft, "strip-cleared")
+        Key(openInk, "${tally.notCleared}", ReconcileCopy.NOT_CLEARED, ink, soft, "strip-not-cleared")
+    }
+}
+
+@Composable
+private fun Key(
+    swatch: Color,
+    count: String,
+    label: String,
+    ink: Color,
+    soft: Color,
+    tag: String,
+) {
+    Row(Modifier.padding(end = 12.dp).testTag(tag), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(9.dp).background(swatch))
+        MetroText(count, Metro.typography.caption.copy(fontWeight = FontWeight.SemiBold), Modifier.padding(start = 4.dp), color = ink)
+        MetroText(label, Metro.typography.caption, Modifier.padding(start = 3.dp), color = soft, maxLines = 1)
     }
 }
 
@@ -266,18 +358,21 @@ private fun Figure(
 }
 
 /**
- * The register's rows under the header: what is still open, newest first by day, with days after
- * the statement dimmed, then the reconciled rows folded into one line that opens on a tap.
+ * The register's rows under the header: the leads first, then what is still open, newest first by day, with
+ * days after the statement dimmed and rows older than the last reconcile called out, then the locked rows
+ * under their own heading, each with a lock where the cleared mark goes.
  */
 @Composable
 private fun ReconcileList(
     register: RegisterPage,
+    rows: List<RegisterRow>,
     page: ReconcilePage?,
     hints: List<ReconcileHint>,
     confirming: Boolean,
     onGesture: (Boolean) -> Unit,
     onToggle: (String) -> Unit,
     onSetCleared: (List<String>, Boolean) -> Unit,
+    onFlip: (String) -> Unit,
     onOpen: (String) -> Unit,
     onAddMissing: () -> Unit,
     modifier: Modifier = Modifier,
@@ -286,58 +381,62 @@ private fun ReconcileList(
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onGesture(it) }
     }
-    var showReconciled by rememberSaveable { mutableStateOf(false) }
-    // The reconcile page carries the live marks; a row it does not know keeps the register's.
-    val marks = page?.rows?.associateBy { it.id }.orEmpty()
-    val rows =
-        register.rows.map { row ->
-            marks[row.id]?.let { row.copy(cleared = it.cleared, reconciled = it.reconciled) } ?: row
-        }
+    var showLocked by rememberSaveable { mutableStateOf(true) }
     val open = rows.filter { !it.reconciled }
     val done = rows.filter { it.reconciled }
+    val lockedThrough = done.maxOfOrNull { it.date }
     val outlined = ReconcileHelp.rowsOf(hints)
     val statementDate = page?.statementDate
     LazyColumn(modifier.testTag("reconcile-list"), state = list) {
         if (page != null && confirming) {
             item(key = "adjust") { AdjustPanel(register.account.name, page) }
         } else if (page != null && hints.isNotEmpty()) {
-            item(key = "hints") { HintCard(page, hints, onSetCleared, onAddMissing) }
+            item(key = "hints") { LeadsCard(page, hints, onSetCleared, onFlip, onOpen, onAddMissing) }
         }
         ledgerDays(
             rows = open,
             page = register,
             label = { date ->
                 val day = RegisterEntry.registerDateLabel(date)
-                if (statementDate != null && date > statementDate) "$day · ${ReconcileCopy.AFTER_STATEMENT}" else day
+                when {
+                    statementDate != null && date > statementDate -> "$day · ${ReconcileCopy.AFTER_STATEMENT}"
+                    lockedThrough != null && date <= lockedThrough -> "$day · ${ReconcileCopy.BEFORE_LAST}"
+                    else -> day
+                }
             },
             dim = { row -> statementDate != null && row.date > statementDate && row.id !in outlined },
             outlined = outlined,
             onPress = { id -> if (page != null) onToggle(id) },
             onLongPress = onOpen,
         )
-        if (done.isNotEmpty()) {
-            item(key = "reconciled") {
-                Row(
+        if (done.isNotEmpty() && lockedThrough != null) {
+            item(key = "locked") {
+                Column(
                     Modifier
-                        .padding(top = 12.dp)
+                        .padding(top = 18.dp)
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
-                        .background(ledgerBand)
-                        .metroPress({ showReconciled = !showReconciled })
-                        .padding(horizontal = 10.dp)
-                        .testTag("reconciled-fold"),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .metroPress({ showLocked = !showLocked })
+                        .testTag("locked-heading"),
                 ) {
-                    AppGlyphIcon(if (showReconciled) AppGlyph.ChevronDown else AppGlyph.ChevronRight, Metro.colors.secondary)
-                    MetroText(
-                        "${ReconcileCopy.RECONCILED_THROUGH} ${RegisterEntry.registerDateLabel(done.maxOf { it.date })} · ${done.size}",
-                        Metro.typography.body,
-                        Modifier.padding(start = 8.dp),
-                        color = Metro.colors.secondary,
-                    )
+                    Box(Modifier.fillMaxWidth().height(2.dp).background(Metro.colors.foreground.copy(alpha = LOCK_ALPHA)))
+                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        val lockInk = Metro.colors.foreground.copy(alpha = LOCK_ALPHA)
+                        Canvas(Modifier.size(16.dp)) { drawLock(center, lockInk) }
+                        MetroText(ReconcileCopy.LOCKED, Metro.typography.body, Modifier.padding(start = 6.dp))
+                        MetroText(
+                            ReconcileCopy.reconciledThrough(RegisterEntry.registerDateLabel(lockedThrough), done.size),
+                            Metro.typography.caption.copy(textAlign = TextAlign.End),
+                            Modifier.weight(1f).padding(start = 8.dp),
+                            color = Metro.colors.secondary,
+                            maxLines = 1,
+                        )
+                        AppGlyphIcon(if (showLocked) AppGlyph.ChevronDown else AppGlyph.ChevronRight, Metro.colors.secondary)
+                    }
+                    MetroText(ReconcileCopy.LOCKED_NOTE, Metro.typography.caption, color = Metro.colors.secondary)
                 }
             }
-            if (showReconciled) {
+            if (showLocked) {
                 ledgerDays(
                     rows = done,
                     page = register,
@@ -384,6 +483,7 @@ private fun LazyListScope.ledgerDays(
                     onPress = { onPress(row.id) },
                     onLongPress = { onLongPress(row.id) },
                     modifier = Modifier.alpha(if (dim(row)) DIM else 1f),
+                    showLock = true,
                 )
             }
         }
@@ -407,54 +507,186 @@ private fun Modifier.hintOutline(): Modifier {
     }
 }
 
+/**
+ * The leads for the difference, numbered, most likely first: what kind of problem each is, the rows it
+ * points at, and a one-tap fix with the difference it would leave.
+ */
 @Composable
-private fun HintCard(
+private fun LeadsCard(
     page: ReconcilePage,
     hints: List<ReconcileHint>,
     onSetCleared: (List<String>, Boolean) -> Unit,
+    onFlip: (String) -> Unit,
+    onOpen: (String) -> Unit,
     onAddMissing: () -> Unit,
 ) {
     val options = formatOptions()
 
     fun money(minor: Long) = MoneyFormat.format(minor, page.currency, options)
-    val gap = money(kotlin.math.abs(page.differenceMinor))
+
+    fun day(date: Int) = RegisterEntry.registerDateLabel(date)
     Tinted(Modifier.testTag("reconcile-hints")) {
-        val exact = hints.singleOrNull() as? ReconcileHint.Exact
-        if (exact != null) {
-            MetroText(
-                ReconcileCopy.exact(exact.row.payee, RegisterEntry.registerDateLabel(exact.row.date), gap),
-                Metro.typography.body,
-            )
-            HintAction(ReconcileCopy.CLEAR_IT, "hint-clear-${exact.row.id}") { onSetCleared(listOf(exact.row.id), true) }
-            return@Tinted
+        MetroText(
+            ReconcileCopy.leads(hints.size),
+            Metro.typography.caption,
+            Modifier.padding(bottom = 2.dp),
+            color = Metro.colors.secondary,
+        )
+        hints.forEachIndexed { i, hint ->
+            val leaves = ReconcileHelp.after(page, hint)
+            val lead =
+                when (hint) {
+                    is ReconcileHint.Exact ->
+                        Lead(
+                            ReconcileCopy.TAG_EXACT,
+                            ReconcileCopy.exact(hint.row.payee, money(hint.row.amountMinor), day(hint.row.date)),
+                            ReconcileCopy.CLEAR_IT,
+                            "hint-clear-${hint.row.id}",
+                        ) {
+                            onSetCleared(listOf(hint.row.id), true)
+                        }
+                    is ReconcileHint.Flip ->
+                        Lead(
+                            ReconcileCopy.TAG_FLIP,
+                            ReconcileCopy.flip(hint.row.payee, money(hint.row.amountMinor), hint.row.cleared),
+                            ReconcileCopy.FLIP_IT,
+                            "hint-flip",
+                        ) {
+                            onFlip(hint.row.id)
+                        }
+                    is ReconcileHint.Pair ->
+                        Lead(
+                            ReconcileCopy.TAG_PAIR,
+                            "${hint.first.payee} ${money(hint.first.amountMinor)} + ${hint.second.payee} ${money(hint.second.amountMinor)}",
+                            ReconcileCopy.CLEAR_BOTH,
+                            "hint-pair",
+                        ) { onSetCleared(listOf(hint.first.id, hint.second.id), true) }
+                    is ReconcileHint.Uncleared ->
+                        Lead(
+                            ReconcileCopy.TAG_MAYBE_NOT,
+                            ReconcileCopy.maybeNot(hint.row.payee, money(hint.row.amountMinor)),
+                            ReconcileCopy.UNCLEAR_IT,
+                            "hint-unclear",
+                        ) {
+                            onSetCleared(listOf(hint.row.id), false)
+                        }
+                    is ReconcileHint.Late ->
+                        Lead(
+                            ReconcileCopy.TAG_LATE,
+                            ReconcileCopy.late(hint.row.payee, money(hint.row.amountMinor), day(hint.row.date)),
+                            ReconcileCopy.CLEAR_IT,
+                            "hint-late",
+                        ) {
+                            onSetCleared(listOf(hint.row.id), true)
+                        }
+                    is ReconcileHint.Duplicate -> {
+                        val text =
+                            ReconcileCopy.duplicate(
+                                hint.second.payee,
+                                money(hint.second.amountMinor),
+                                day(hint.first.date),
+                                day(hint.second.date),
+                            )
+                        if (leaves != null) {
+                            Lead(
+                                ReconcileCopy.TAG_DUPLICATE,
+                                text,
+                                ReconcileCopy.UNCLEAR_ONE,
+                                "hint-duplicate",
+                            ) { onSetCleared(listOf(hint.second.id), false) }
+                        } else {
+                            Lead(ReconcileCopy.TAG_DUPLICATE, text, ReconcileCopy.OPEN_IT, "hint-duplicate") { onOpen(hint.second.id) }
+                        }
+                    }
+                    is ReconcileHint.Stale ->
+                        Lead(
+                            ReconcileCopy.staleTag(hint.days),
+                            ReconcileCopy.stale(hint.row.payee, money(hint.row.amountMinor), day(hint.row.date)),
+                            ReconcileCopy.CLEAR_IT,
+                            "hint-stale",
+                        ) {
+                            onSetCleared(listOf(hint.row.id), true)
+                        }
+                    ReconcileHint.Swapped ->
+                        Lead(
+                            ReconcileCopy.TAG_SWAPPED,
+                            ReconcileCopy.swapped(money(kotlin.math.abs(page.differenceMinor))),
+                            null,
+                            "hint-swapped",
+                        ) {}
+                    ReconcileHint.Missing ->
+                        Lead(
+                            ReconcileCopy.TAG_MISSING,
+                            ReconcileCopy.MISSING,
+                            ReconcileCopy.ADD_IT,
+                            "hint-missing",
+                            onAddMissing,
+                        )
+                }
+            LeadRow(i + 1, first = i == 0, lead, leaves?.let { ReconcileCopy.leaves(money(it)) }, divider = i > 0)
         }
-        MetroText(ReconcileCopy.nothingExact(gap), Metro.typography.body)
-        hints.forEach { hint ->
-            when (hint) {
-                is ReconcileHint.Pair ->
-                    Clue(
-                        AppGlyph.Select,
-                        "${hint.first.payee} ${money(hint.first.amountMinor)} + ${hint.second.payee} ${money(hint.second.amountMinor)}",
-                        ReconcileCopy.CLEAR_BOTH,
-                        "hint-pair",
-                    ) { onSetCleared(listOf(hint.first.id, hint.second.id), true) }
-                is ReconcileHint.Late ->
-                    Clue(
-                        AppGlyph.Calendar,
-                        ReconcileCopy.late(hint.row.payee, money(hint.row.amountMinor), RegisterEntry.registerDateLabel(hint.row.date)),
-                        ReconcileCopy.CLEAR_IT,
-                        "hint-late",
-                    ) { onSetCleared(listOf(hint.row.id), true) }
-                is ReconcileHint.Uncleared ->
-                    Clue(
-                        AppGlyph.Undo,
-                        ReconcileCopy.maybeNot(hint.row.payee, money(hint.row.amountMinor)),
-                        ReconcileCopy.UNCLEAR_IT,
-                        "hint-unclear",
-                    ) { onSetCleared(listOf(hint.row.id), false) }
-                ReconcileHint.Swapped -> Clue(AppGlyph.Average, ReconcileCopy.SWAPPED, null, "hint-swapped") {}
-                ReconcileHint.Missing -> Clue(AppGlyph.Add, ReconcileCopy.MISSING, ReconcileCopy.ADD_IT, "hint-missing", onAddMissing)
-                is ReconcileHint.Exact -> Unit
+    }
+}
+
+private class Lead(
+    val tag: String,
+    val text: String,
+    val action: String?,
+    val testTag: String,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun LeadRow(
+    number: Int,
+    first: Boolean,
+    lead: Lead,
+    leaves: String?,
+    divider: Boolean,
+) {
+    val accent = Metro.accent.fill
+    if (divider) Box(Modifier.fillMaxWidth().height(1.dp).background(Metro.colors.secondary.copy(alpha = 0.22f)))
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .then(if (lead.action != null) Modifier.metroPress(lead.onClick) else Modifier)
+            .padding(vertical = 7.dp)
+            .testTag(lead.testTag),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            Modifier
+                .padding(top = 1.dp)
+                .size(20.dp)
+                .then(if (first) Modifier.background(accent) else Modifier.border(1.5.dp, accent)),
+            contentAlignment = Alignment.Center,
+        ) {
+            MetroText(
+                "$number",
+                Metro.typography.caption.copy(fontWeight = FontWeight.SemiBold),
+                color = if (first) Metro.accent.onFill else Metro.accent.text,
+            )
+        }
+        Column(Modifier.weight(1f).padding(start = 8.dp, end = 8.dp)) {
+            MetroText(
+                lead.tag.uppercase(),
+                Metro.typography.caption.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp),
+                color = Metro.accent.text,
+            )
+            MetroText(lead.text, Metro.typography.caption.copy(fontSize = 14.sp), maxLines = 3)
+        }
+        if (lead.action != null) {
+            Column(horizontalAlignment = Alignment.End) {
+                MetroText(lead.action, Metro.typography.caption.copy(fontSize = 14.sp), color = Metro.accent.text)
+                if (leaves != null) {
+                    MetroText(
+                        leaves,
+                        Metro.typography.caption.copy(fontSize = 11.sp),
+                        Modifier.testTag("${lead.testTag}-leaves"),
+                        color = Metro.colors.secondary,
+                    )
+                }
             }
         }
     }
@@ -474,46 +706,6 @@ private fun Tinted(
     ) {
         Box(Modifier.width(3.dp).fillMaxHeight().background(Metro.accent.fill))
         Column(Modifier.weight(1f).padding(horizontal = 10.dp, vertical = 8.dp), content = content)
-    }
-}
-
-@Composable
-private fun HintAction(
-    text: String,
-    tag: String,
-    onClick: () -> Unit,
-) {
-    MetroText(
-        text,
-        Metro.typography.control,
-        Modifier
-            .heightIn(min = 40.dp)
-            .metroPress(onClick)
-            .padding(top = 6.dp)
-            .testTag(tag),
-        color = Metro.accent.text,
-    )
-}
-
-@Composable
-private fun Clue(
-    glyph: AppGlyph,
-    text: String,
-    action: String?,
-    tag: String,
-    onClick: () -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = 44.dp)
-            .then(if (action != null) Modifier.metroPress(onClick) else Modifier)
-            .testTag(tag),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AppGlyphIcon(glyph, Metro.colors.secondary)
-        MetroText(text, Metro.typography.caption, Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 2)
-        if (action != null) MetroText(action, Metro.typography.caption, color = Metro.accent.text)
     }
 }
 
@@ -571,4 +763,5 @@ private fun AdjustPanel(
 }
 
 private const val DIM = 0.45f
+private const val LOCK_ALPHA = 0.72f
 private const val HINT_TINT = 0.08f

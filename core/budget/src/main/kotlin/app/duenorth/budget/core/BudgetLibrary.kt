@@ -803,6 +803,12 @@ class BudgetLibrary(
         cleared: Boolean,
     ): ReconcilePage? = open(budgetId) { ReconcileBook(it).setCleared(accountId, transactionIds, cleared) }
 
+    fun flipReconcileSign(
+        budgetId: String,
+        accountId: String,
+        transactionId: String,
+    ): ReconcilePage? = edit(budgetId, UndoCopy.FLIP_SIGN) { ReconcileBook(it).flipSign(accountId, transactionId) }
+
     fun finishReconcile(
         budgetId: String,
         accountId: String,
