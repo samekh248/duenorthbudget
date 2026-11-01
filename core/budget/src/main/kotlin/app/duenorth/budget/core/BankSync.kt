@@ -67,7 +67,7 @@ class HttpBankSyncTransport : BankSyncTransport {
         val connection =
             java.net.URL("$base/simplefin/transactions").openConnection() as java.net.HttpURLConnection
         try {
-            // A bridge that never answers would hold the budget's lock, and every sync behind it, for good.
+            // A bridge that never answers would hold up this bank sync, and every sync behind it, for good.
             connection.connectTimeout = CONNECT_TIMEOUT_MS
             connection.readTimeout = READ_TIMEOUT_MS
             connection.requestMethod = "POST"
@@ -302,39 +302,81 @@ class BankSyncBook(
         onAccount: (BankLinkedAccount) -> Unit = {},
         /** Each account that failed, as it fails. */
         onFailure: (BankSyncFailure) -> Unit = {},
-    ): BankSyncSummary {
-        val linked =
-            session
-                .query(
-                    """
-                    SELECT id FROM accounts
-                    WHERE account_sync_source = ? AND IFNULL(account_id, '') != ''
-                        AND IFNULL(tombstone, 0) = 0 AND IFNULL(closed, 0) = 0
-                    ORDER BY sort_order, id
-                    """.trimIndent(),
-                    listOf("simpleFin"),
-                ).mapNotNull { row -> row.str("id")?.let { linkedAccount(it) } }
-        val start = today.minusDays(89)
-        val startIso = String.format("%04d-%02d-%02d", start.year, start.monthValue, start.dayOfMonth)
-        var added = 0
-        val failures = mutableListOf<BankSyncFailure>()
-        linked.forEach { account ->
-            onAccount(account)
-            val fetch =
-                try {
-                    transport.fetchAccount(serverAddress, token, account.bankAccountId, startIso)
-                } catch (error: BankSyncException) {
-                    val failure = BankSyncFailure(account.name, error.message ?: ImportCopy.FETCH_FAILED, account.accountId, error.fix)
-                    failures += failure
-                    onFailure(failure)
-                    return@forEach
-                }
-            added += ImportBook(session, ids).confirm(account.accountId, fetch.rows, review = false).addedIds.size
-            // Kept fresh on every sync, as Actual's own sync does, so the assistant can compare it with the register.
-            fetch.balanceMinor?.let { SyncSchema.write(session, "accounts", account.accountId, "balance_current", it) }
-            SyncSchema.write(session, "accounts", account.accountId, "last_sync", nowMillis.toString())
+    ): BankSyncSummary =
+        syncAll(
+            transport = transport,
+            serverAddress = serverAddress,
+            token = token,
+            today = today,
+            linked = ::linkedAccounts,
+            store = { account, fetch -> store(account, fetch, nowMillis, ids) },
+            onAccount = onAccount,
+            onFailure = onFailure,
+        )
+
+    /** Every open account linked through SimpleFIN, in the budget's order. */
+    fun linkedAccounts(): List<BankLinkedAccount> =
+        session
+            .query(
+                """
+                SELECT id FROM accounts
+                WHERE account_sync_source = ? AND IFNULL(account_id, '') != ''
+                    AND IFNULL(tombstone, 0) = 0 AND IFNULL(closed, 0) = 0
+                ORDER BY sort_order, id
+                """.trimIndent(),
+                listOf("simpleFin"),
+            ).mapNotNull { row -> row.str("id")?.let { linkedAccount(it) } }
+
+    /** Adds what one account's [fetch] brought that the account does not already hold; the number added. */
+    fun store(
+        account: BankLinkedAccount,
+        fetch: BankFetch,
+        nowMillis: Long,
+        ids: () -> String,
+    ): Int {
+        val added = ImportBook(session, ids).confirm(account.accountId, fetch.rows, review = false).addedIds.size
+        // Kept fresh on every sync, as Actual's own sync does, so the assistant can compare it with the register.
+        fetch.balanceMinor?.let { SyncSchema.write(session, "accounts", account.accountId, "balance_current", it) }
+        SyncSchema.write(session, "accounts", account.accountId, "last_sync", nowMillis.toString())
+        return added
+    }
+
+    companion object {
+        /**
+         * The bank sync loop, with the budget reached only through [linked] and [store]. The fetches run between
+         * them, so a caller that opens the budget (and takes its edit turn) inside each one leaves the budget free
+         * while the banks answer, and a save made meanwhile goes through at once.
+         */
+        fun syncAll(
+            transport: BankSyncTransport,
+            serverAddress: String,
+            token: String,
+            today: LocalDate,
+            linked: () -> List<BankLinkedAccount>,
+            store: (BankLinkedAccount, BankFetch) -> Int,
+            onAccount: (BankLinkedAccount) -> Unit = {},
+            onFailure: (BankSyncFailure) -> Unit = {},
+        ): BankSyncSummary {
+            val accounts = linked()
+            val start = today.minusDays(89)
+            val startIso = String.format("%04d-%02d-%02d", start.year, start.monthValue, start.dayOfMonth)
+            var added = 0
+            val failures = mutableListOf<BankSyncFailure>()
+            accounts.forEach { account ->
+                onAccount(account)
+                val fetch =
+                    try {
+                        transport.fetchAccount(serverAddress, token, account.bankAccountId, startIso)
+                    } catch (error: BankSyncException) {
+                        val failure = BankSyncFailure(account.name, error.message ?: ImportCopy.FETCH_FAILED, account.accountId, error.fix)
+                        failures += failure
+                        onFailure(failure)
+                        return@forEach
+                    }
+                added += store(account, fetch)
+            }
+            return BankSyncSummary(accounts = accounts.size, added = added, failures = failures)
         }
-        return BankSyncSummary(accounts = linked.size, added = added, failures = failures)
     }
 }
 

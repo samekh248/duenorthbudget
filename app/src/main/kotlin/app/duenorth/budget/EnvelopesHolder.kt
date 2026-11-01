@@ -87,8 +87,11 @@ class EnvelopesHolder internal constructor(
             host.mutate { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
             return
         }
-        applyEdit(stayOnRoute = stayOnRoute, optimistic = { it.withBudgetedAssignment(categoryId, budgeted) }) {
-            host.sync.assign(shell.budgetId, categoryId, host.editorMonth(), amountText)
+        // The amount already reads, so the save goes through: the page closes at once, with the new amount
+        // showing, rather than after the write, which can wait its turn behind a bank sync storing what it fetched.
+        val month = host.editorMonth()
+        applyEdit(leaveFirst = !stayOnRoute, optimistic = { it.withBudgetedAssignment(categoryId, budgeted) }) {
+            host.sync.assign(shell.budgetId, categoryId, month, amountText)
         }
     }
 
@@ -311,8 +314,13 @@ class EnvelopesHolder internal constructor(
         return rest.toMutableList().apply { add(to, row) }
     }
 
+    /**
+     * Writes [block] off the main thread. [stayOnRoute] false goes back once the write is saved; [leaveFirst] goes
+     * back straight away, for a write that was checked before it started and that [optimistic] already shows.
+     */
     private fun applyEdit(
         stayOnRoute: Boolean = true,
+        leaveFirst: Boolean = false,
         optimistic: ((MonthShell) -> MonthShell)? = null,
         block: suspend () -> EditResult,
     ) {
@@ -321,6 +329,7 @@ class EnvelopesHolder internal constructor(
         if (optimistic != null && previousShell != null) {
             host.mutate { it.copy(shell = optimistic(previousShell), editError = null) }
         }
+        if (leaveFirst) host.back()
         host.scope.launch {
             val result = withContext(host.io) { block() }
             host.mutate { it.copy(undoLabel = host.library.undoLabel(budgetId)) }

@@ -1170,10 +1170,23 @@ class BudgetLibrary(
         nowMillis: Long,
         onAccount: (BankLinkedAccount) -> Unit = {},
         onFailure: (BankSyncFailure) -> Unit = {},
-    ): BankSyncSummary? =
-        serial {
-            open(budgetId) { BankSyncBook(it, transport).syncAll(serverAddress, token, today, nowMillis, ids, onAccount, onFailure) }
-        }
+    ): BankSyncSummary? {
+        // The budget is opened to read the linked accounts and again to store each one's fetch, never across a
+        // fetch: holding the edit turn while the banks answer made every save wait for the whole bank sync.
+        val linked = open(budgetId) { BankSyncBook(it, transport).linkedAccounts() } ?: return null
+        return BankSyncBook.syncAll(
+            transport = transport,
+            serverAddress = serverAddress,
+            token = token,
+            today = today,
+            linked = { linked },
+            store = { account, fetch ->
+                serial { open(budgetId) { BankSyncBook(it, transport).store(account, fetch, nowMillis, ids) } } ?: 0
+            },
+            onAccount = onAccount,
+            onFailure = onFailure,
+        )
+    }
 
     /**
      * Clears one budget from the phone: its folder, the open-budget pointer when it is the open
