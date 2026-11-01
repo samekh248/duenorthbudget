@@ -71,6 +71,27 @@ class ImportBookTest {
         }
     }
 
+    // Every sync fetches the last 90 days again: a bank copy merged away must not come back as a new duplicate.
+    @Test
+    fun mergedBankCopyStaysMergedOnNextSync() {
+        withBook { session, _, import ->
+            val rows =
+                listOf(
+                    ParsedImportRow(20261001, "Cafe", -500, financialId = "pending-1"),
+                    ParsedImportRow(20261002, "Cafe", -500, financialId = "posted-1"),
+                )
+            val first = import.confirm("checking", rows, review = false)
+            assertEquals(2, first.addedIds.size)
+            assertEquals(WriteResult.Saved, MergeBook(session).merge(first.addedIds, force = false))
+            assertEquals(1, alive(session))
+
+            val again = import.confirm("checking", rows, review = false)
+            assertEquals(0, again.addedIds.size)
+            assertEquals(2, again.skipped)
+            assertEquals(1, alive(session))
+        }
+    }
+
     @Test
     fun reviewBatchUpdatesCategory() {
         withBook { _, _, import ->
