@@ -92,6 +92,39 @@ class ImportBookTest {
         }
     }
 
+    // A copy that came back before deleted rows counted is merged back into the one it was merged into.
+    @Test
+    fun returnedCopyFoldsBackOnNextImport() {
+        withBook { session, _, import ->
+            insert(session, "kept", 20261001, "fit-1")
+            insert(session, "merged-away", 20261002, "fit-2", tombstone = 1)
+            insert(session, "came-back", 20261002, "fit-2")
+            session.exec("UPDATE transactions SET cleared = 0 WHERE id = 'kept'")
+            val result = import.confirm("checking", emptyList(), review = false)
+            assertEquals(0, result.addedIds.size)
+            assertEquals(1, alive(session))
+            val kept = session.query("SELECT tombstone, cleared FROM transactions WHERE id = 'kept'").single()
+            assertEquals(false, kept.bool("tombstone"))
+            // The row it was merged into keeps its own cleared state, though the copy was cleared.
+            assertEquals(false, kept.bool("cleared"))
+        }
+    }
+
+    // With two rows it could belong to, the copy stays for the person to merge; with none, a deleted row stays deleted.
+    @Test
+    fun returnedCopyStaysWhenUnclear() {
+        withBook { session, _, import ->
+            insert(session, "kept-a", 20261001, "fit-1")
+            insert(session, "kept-b", 20261003, "fit-3")
+            insert(session, "merged-away", 20261002, "fit-2", tombstone = 1)
+            insert(session, "came-back", 20261002, "fit-2")
+            insert(session, "deleted", 20261010, "fit-9", tombstone = 1, amount = -900)
+            insert(session, "deleted-back", 20261010, "fit-9", amount = -900)
+            assertEquals(0, import.foldReturned("checking"))
+            assertEquals(4, alive(session))
+        }
+    }
+
     @Test
     fun reviewBatchUpdatesCategory() {
         withBook { _, _, import ->
@@ -212,6 +245,21 @@ class ImportBookTest {
         payee: String,
         amount: Long,
     ) = TransactionDraft(id, "checking", date, payee, amount, "c-food", null)
+
+    private fun insert(
+        session: SqlSession,
+        id: String,
+        date: Int,
+        financialId: String,
+        tombstone: Int = 0,
+        amount: Long = -500,
+    ) = session.exec(
+        """
+        INSERT INTO transactions (
+            id, acct, amount, description, date, financial_id, tombstone, cleared, reconciled, isParent, isChild, sort_order
+        ) VALUES ('$id', 'checking', $amount, 'p-cafe', $date, '$financialId', $tombstone, 1, 0, 0, 0, 1)
+        """.trimIndent(),
+    )
 
     private fun alive(session: SqlSession): Int =
         session

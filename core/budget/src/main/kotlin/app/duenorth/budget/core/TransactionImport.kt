@@ -6,6 +6,9 @@ import kotlinx.serialization.json.Json
 
 enum class PreviewRowStatus { New, Duplicate }
 
+/** A copy that came back sits this close to the one it was merged into, as the assistant's duplicates do. */
+private const val RETURNED_DAYS = AssistantReader.DUPLICATE_DAYS
+
 data class ImportPreviewRow(
     val index: Int,
     val date: Int,
@@ -157,7 +160,45 @@ class ImportBook(
                 )
             }
         }
+        foldReturned(accountId)
         return ImportConfirmResult(batchId, added, skipped)
+    }
+
+    /**
+     * Deletes the bank copies that came back after a merge, from before deleted rows counted as already held: a live
+     * row sharing its bank id with a deleted one, beside another live row of the same amount a few days off, which is
+     * the one it was merged into. That row is not touched, so its cleared state stays; a reconciled copy, or one made
+     * a transfer, is left alone. Returns how many it deleted.
+     */
+    fun foldReturned(accountId: String): Int {
+        val pairs =
+            session
+                .query(
+                    """
+                    SELECT r.id AS r_id, k.id AS k_id, r.date AS r_date, k.date AS k_date
+                    FROM transactions r
+                    JOIN transactions gone
+                        ON gone.acct = r.acct AND gone.financial_id = r.financial_id AND gone.id <> r.id
+                            AND IFNULL(gone.tombstone, 0) = 1
+                    JOIN transactions k
+                        ON k.acct = r.acct AND k.amount = r.amount AND k.id <> r.id
+                            AND IFNULL(k.financial_id, '') <> r.financial_id
+                    WHERE r.acct = ? AND IFNULL(r.financial_id, '') <> '' AND IFNULL(r.transferred_id, '') = ''
+                        AND ${MatchFinder.candidate("r")} AND ${MatchFinder.candidate("k")}
+                        AND IFNULL(r.reconciled, 0) = 0 AND IFNULL(k.reconciled, 0) = 0
+                    ORDER BY r.id, k.id
+                    """.trimIndent(),
+                    listOf(accountId),
+                ).filter { MatchFinder.daysBetween(it.long("r_date").toInt(), it.long("k_date").toInt()) <= RETURNED_DAYS }
+                .map { it.str("r_id").orEmpty() to it.str("k_id").orEmpty() }
+                .distinct()
+        // Only a copy with one partner, and a partner with one copy: with two to choose from, the person picks.
+        val perReturned = pairs.groupingBy { it.first }.eachCount()
+        val perKept = pairs.groupingBy { it.second }.eachCount()
+        val returned = pairs.filter { (copy, kept) -> perReturned[copy] == 1 && perKept[kept] == 1 }.map { it.first }
+        // Only the copy goes: the row it was merged into keeps its cleared state and everything else.
+        returned.forEach { SyncSchema.writeRow(session, "transactions", it, "tombstone" to 1) }
+        return returned.size
     }
 
     fun readReview(): ImportReviewPage? {
