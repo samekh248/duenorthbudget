@@ -240,13 +240,15 @@ class ImportBook(
         row: ParsedImportRow,
     ): String? {
         if (!row.financialId.isNullOrBlank()) {
+            // A deleted row counts too: a copy merged away, or a bank row deleted, keeps its bank id, and every sync
+            // fetches the last 90 days again, so without it the dropped copy would come straight back as a new one.
             val byId =
                 session
                     .query(
                         """
                         SELECT id FROM transactions
-                        WHERE acct = ? AND IFNULL(tombstone, 0) = 0
-                            AND financial_id = ?
+                        WHERE acct = ? AND financial_id = ?
+                        ORDER BY IFNULL(tombstone, 0)
                         LIMIT 1
                         """.trimIndent(),
                         listOf(accountId, row.financialId),
