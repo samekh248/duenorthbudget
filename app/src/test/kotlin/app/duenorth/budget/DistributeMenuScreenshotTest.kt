@@ -34,6 +34,13 @@ class DistributeMenuScreenshotTest {
     @Test
     fun menuDark() = snap("distribute_menu_dark", dark = true)
 
+    // One option off: it keeps the same size as the other.
+    @Test
+    fun menuOffLight() = snap("distribute_menu_off_light", dark = false, off = true)
+
+    @Test
+    fun menuOffDark() = snap("distribute_menu_off_dark", dark = true, off = true)
+
     @Test
     fun closedLight() = snap("distribute_closed_light", dark = false, open = false)
 
@@ -45,6 +52,7 @@ class DistributeMenuScreenshotTest {
         name: String,
         dark: Boolean,
         open: Boolean = true,
+        off: Boolean = false,
     ) {
         val shell = TemplateSamples.shell.copy(ahead = ActualMonthMath.FuturePlans(TemplateSamples.shell.headerMinor - 40_000, 202612))
         val menu =
@@ -53,7 +61,7 @@ class DistributeMenuScreenshotTest {
                 listOf(
                     DistributeOption(false, 3, 31_000L, names = listOf("Power", "Gas", "Groceries")),
                     DistributeOption(true, 5, 48_500L, names = listOf("Rent", "Power", "Gas", "Groceries", "Rainy day")),
-                ),
+                ).let { if (off) listOf(it[0].copy(reason = DistributeCopy.NOTHING, names = emptyList()), it[1]) else it },
             )
         var shown by mutableStateOf(false)
         compose.setContent {

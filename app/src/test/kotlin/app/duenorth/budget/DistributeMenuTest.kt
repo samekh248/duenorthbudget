@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.height
 import app.duenorth.budget.ParityTestSupport.await
 import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.ActualMonthMath
@@ -107,6 +109,11 @@ class DistributeMenuTest {
         compose.onNodeWithText("Rent, Gas").assertExists()
         compose.onNodeWithText(DistributeCopy.NOTHING).assertExists()
         compose.onNodeWithTag("distribute-overwrite").assertIsNotEnabled()
+        // An option that is off is the same size as one that is on.
+        assertEquals(
+            compose.onNodeWithTag("distribute-apply").getBoundsInRoot().height,
+            compose.onNodeWithTag("distribute-overwrite").getBoundsInRoot().height,
+        )
         compose.onNodeWithTag("distribute-apply").performClick()
         assertEquals(false, picked)
     }

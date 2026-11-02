@@ -235,14 +235,19 @@ private fun OptionRow(
                 )
             }
         }
+        // Every row keeps the same three single lines, so the options are all one size, on or off.
         MetroText(
-            option.reason ?: if (option.overwrite) DistributeCopy.OVERWRITE_WHAT else DistributeCopy.APPLY_WHAT,
+            if (option.overwrite) DistributeCopy.OVERWRITE_WHAT else DistributeCopy.APPLY_WHAT,
             Metro.typography.caption,
             color = Metro.colors.secondary,
+            maxLines = 1,
         )
-        if (enabled && option.names.isNotEmpty()) {
-            MetroText(DistributeCopy.names(option.names), Metro.typography.caption, color = ink, maxLines = 1)
-        }
+        MetroText(
+            option.reason ?: DistributeCopy.names(option.names),
+            Metro.typography.caption,
+            color = if (enabled) ink else Metro.accent.text,
+            maxLines = 1,
+        )
     }
 }
 
