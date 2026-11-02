@@ -39,10 +39,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
@@ -74,6 +77,7 @@ import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.MetroAppBarHost
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
+import app.duenorth.budget.design.components.MetroContextMenu
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroPivot
@@ -134,6 +138,8 @@ fun HomePivot(
     assistant: AssistantUi = AssistantUi(),
     onAssistant: (Finding, FindingAction) -> Unit = { _, _ -> },
     onAssistantMore: (FindingKind) -> Unit = {},
+    /** The unassigned figure's menu of template runs. */
+    distribute: DistributeActions = DistributeActions(),
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
@@ -208,6 +214,7 @@ fun HomePivot(
                                 getStarted = getStarted,
                                 onGetStarted = onGetStarted,
                                 onHideGetStarted = onHideGetStarted,
+                                distribute = distribute,
                             )
                         }
                     }
@@ -430,6 +437,7 @@ fun BudgetSection(
     getStarted: List<GetStartedLine>? = null,
     onGetStarted: (GetStartedStep) -> Unit = {},
     onHideGetStarted: () -> Unit = {},
+    distribute: DistributeActions = DistributeActions(),
 ) {
     val list = rememberLazyListState()
     val arrivals = remember { RowArrivals() }
@@ -447,6 +455,16 @@ fun BudgetSection(
     // With unassigned on, the three figures split the row evenly in smaller type: to budget, unassigned centered, held.
     val three = ahead != null
     val raised = if (tiles) Modifier.relief(Relief.Raised, small = true).then(tile) else Modifier
+    // Where the unassigned figure sits, so its menu opens under it with the figure left bright.
+    var unassignedAnchor by remember { mutableStateOf(Rect.Zero) }
+    distribute.menu?.let { menu ->
+        MetroContextMenu(
+            unassignedAnchor,
+            menu.items(shell.currency, formatOptions, distribute.onPick),
+            onDismiss = distribute.onDismiss,
+            tag = "distribute-menu",
+        )
+    }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         Row(
             Modifier
@@ -493,6 +511,8 @@ fun BudgetSection(
                     ),
             )
             if (ahead != null) {
+                // A positive figure opens the month's template runs, as Actual's month menu offers them.
+                val onUnassigned = distribute.onOpen.takeIf { ahead.freeMinor > 0 }
                 // Plain ink, not the accent (which can itself be red); red only once later plans overrun it.
                 BudgetTotal(
                     label = FreeAfterPlansCopy.LABEL,
@@ -501,7 +521,12 @@ fun BudgetSection(
                     amountTag = "free-after-plans",
                     centered = true,
                     compact = true,
-                    modifier = slot.then(raised).testTag("free-after-plans-figure"),
+                    modifier =
+                        slot
+                            .onGloballyPositioned { unassignedAnchor = it.boundsInWindow() }
+                            .then(raised)
+                            .then(if (onUnassigned == null) Modifier else Modifier.metroPress(onClick = onUnassigned))
+                            .testTag("free-after-plans-figure"),
                 )
             }
             if (shell.bufferedMinor != 0L) {
