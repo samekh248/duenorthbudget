@@ -134,14 +134,13 @@ class TemplateEngine(
         month: YearMonth,
         overwrite: Boolean,
         confirmed: Boolean = false,
-        cap: Long? = null,
     ): TemplateResult {
         val categories = categories()
         val errors = categories.flatMap { category -> category.errors.map { TemplateError(category.name, it) } }
         if (errors.isNotEmpty()) return TemplateResult.Invalid(errors)
         if (overwrite && !confirmed) return TemplateResult.NeedsConfirm(TemplateCopy.OVERWRITE_CONFIRM)
         val sheet = TemplateSheet(session, today)
-        val computed = compute(categories, month, sheet, force = overwrite, cap = cap)
+        val computed = compute(categories, month, sheet, force = overwrite)
         if (computed.errors.isNotEmpty()) return TemplateResult.Invalid(computed.errors)
         val table = if (sheet.tracking) "reflect_budgets" else "zero_budgets"
         session.transaction {
@@ -174,6 +173,90 @@ class TemplateEngine(
             }
         }
         return TemplateResult.Applied(computed.contexts.size)
+    }
+
+    /**
+     * App-only (the unassigned figure's "add unassigned only"): what [cap] buys toward this month's targets. Each
+     * templated category's target is what an overwrite would ask for it this month; what it still needs is that less
+     * what it already has. Needs are met lowest priority number first, and a priority the money cannot cover in full
+     * is shared in proportion to need. Nothing is ever lowered. Returns each category it raises, as (before, after),
+     * in budget order. Writes nothing.
+     */
+    fun topUp(
+        month: YearMonth,
+        cap: Long,
+    ): Map<String, Pair<Long, Long>> {
+        val sheet = TemplateSheet(session, today)
+        val computed = compute(categories(), month, sheet, force = true, keepGoing = true)
+
+        data class Need(
+            val id: String,
+            val priority: Int,
+            val before: Long,
+            val need: Long,
+        )
+
+        val needs =
+            computed.contexts.mapNotNull { (category, context) ->
+                val values = context.values()
+                val target = values.goal?.takeIf { !values.longGoal } ?: return@mapNotNull null
+                val before = sheet.budget(month, category.id)
+                val priority =
+                    category.templates
+                        .filter { it !is Template.Remainder && it !is Template.Goal && it !is Template.Limit }
+                        .mapNotNull { it.priority }
+                        .minOrNull() ?: return@mapNotNull null
+                Need(category.id, priority, before, target - before).takeIf { it.need > 0 }
+            }
+        var left = cap.coerceAtLeast(0L)
+        val given = HashMap<String, Long>()
+        for (level in needs.groupBy { it.priority }.toSortedMap().values) {
+            if (left <= 0L) break
+            val total = level.sumOf { it.need }
+            if (total <= left) {
+                level.forEach { given[it.id] = it.need }
+                left -= total
+                continue
+            }
+            // Short: share what is left by need; the last takes what rounding leaves.
+            var share = left
+            level.forEachIndexed { index, item ->
+                val amount =
+                    if (index ==
+                        level.lastIndex
+                    ) {
+                        share
+                    } else {
+                        (item.need.toBigInteger() * left.toBigInteger() / total.toBigInteger()).toLong()
+                    }
+                given[item.id] = amount
+                share -= amount
+            }
+            left = 0L
+        }
+        return needs
+            .filter { (given[it.id] ?: 0L) > 0L }
+            .associate { it.id to (it.before to it.before + given.getValue(it.id)) }
+    }
+
+    /** [need] × [left] ÷ [total], rounded down, without overflowing. */
+    private fun proportion(
+        need: Long,
+        left: Long,
+        total: Long,
+    ): Long = (need.toBigInteger() * left.toBigInteger() / total.toBigInteger()).toLong()
+
+    /** Writes [topUp]'s amounts for [month]. */
+    fun runTopUp(
+        month: YearMonth,
+        cap: Long,
+    ): TemplateResult {
+        val changes = topUp(month, cap)
+        val table = if (TemplateSheet(session, today).tracking) "reflect_budgets" else "zero_budgets"
+        session.transaction {
+            changes.forEach { (id, amounts) -> setBudget(table, month, id, amounts.second) }
+        }
+        return TemplateResult.Applied(changes.size)
     }
 
     /**
@@ -277,11 +360,9 @@ class TemplateEngine(
         keepGoing: Boolean = false,
         only: Boolean = false,
         laneOut: Boolean = false,
-        cap: Long? = null,
     ): Computed {
         val detailed = sheet.month(month)
-        // An app-only cap (the unassigned figure's "just the unassigned" run): to budget, but never more than [cap].
-        var available = detailed.figures.headerMinor.let { header -> cap?.let { minOf(header, it) } ?: header }
+        var available = detailed.figures.headerMinor
         val contexts = mutableListOf<Pair<Category, TemplateContext>>()
         val errors = mutableListOf<TemplateError>()
         for (category in if (only) categories else candidates(categories, sheet)) {
@@ -298,7 +379,6 @@ class TemplateEngine(
                         budgeted,
                         sheet,
                         skipAvailableClamp,
-                        clampAll = cap != null,
                     )
                 } catch (failure: TemplateFailure) {
                     errors += TemplateError(category.name, failure.message.orEmpty())

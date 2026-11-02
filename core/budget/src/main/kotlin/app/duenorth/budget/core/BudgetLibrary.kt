@@ -962,11 +962,34 @@ class BudgetLibrary(
         month: YearMonth,
         overwrite: Boolean,
         confirmed: Boolean = false,
-        cap: Long? = null,
     ): TemplateResult {
         if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF)
-        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).run(month, overwrite, confirmed, cap) }
+        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).run(month, overwrite, confirmed) }
             ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    }
+
+    /** Tops this month's targets up from at most [cap], priority first, as one undo step ([TemplateEngine.topUp]). */
+    fun topUpTemplates(
+        budgetId: String,
+        month: YearMonth,
+        cap: Long,
+    ): TemplateResult {
+        if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF)
+        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).runTopUp(month, cap) }
+            ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    }
+
+    /** What [topUpTemplates] would change, as (before, after) per category; writes nothing. */
+    fun previewTopUp(
+        budgetId: String,
+        month: YearMonth,
+        cap: Long,
+    ): Pair<TemplateResult, Map<String, Pair<Long, Long>>> {
+        if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF) to emptyMap()
+        return open(budgetId) { session ->
+            val changes = TemplateEngine(session, clock.today()).topUp(month, cap)
+            TemplateResult.Applied(changes.size) to changes
+        } ?: (TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS) to emptyMap())
     }
 
     /** End-of-month cleanup for [month] from the `#cleanup` lines in category notes, as one undo step. */
@@ -1002,7 +1025,6 @@ class BudgetLibrary(
         month: YearMonth,
         overwrite: Boolean,
         budgeted: Map<String, Long> = emptyMap(),
-        cap: Long? = null,
     ): Pair<TemplateResult, Map<String, Pair<Long, Long>>> {
         if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF) to emptyMap()
         return serial {
@@ -1027,7 +1049,7 @@ class BudgetLibrary(
                             BudgetEdits.assign(session, SyncSchema.clockFor(session), month.toActualMonth(), id, amount)
                         }
                         before = amounts()
-                        result = TemplateEngine(session, clock.today()).run(month, overwrite, confirmed = true, cap = cap)
+                        result = TemplateEngine(session, clock.today()).run(month, overwrite, confirmed = true)
                         after = amounts()
                         throw PreviewRollback()
                     }
