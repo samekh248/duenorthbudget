@@ -49,12 +49,12 @@ import kotlin.math.roundToInt
 // Tapping a positive unassigned figure: the month's templates, run the way Actual's month menu runs them.
 
 /**
- * The panel's runs: Actual's apply and overwrite, in plain words, and an app-only apply that spends no more than
- * what is unassigned.
+ * The panel's runs: Actual's apply and overwrite, in plain words, and an app-only top-up that raises targets that
+ * are short, by priority, spending no more than what is unassigned.
  */
 enum class DistributeKind(
     val overwrite: Boolean,
-    /** Spends no more than the unassigned figure. */
+    /** Tops targets up from no more than the unassigned figure ([app.duenorth.budget.core.TemplateEngine.topUp]). */
     val capped: Boolean,
     val tag: String,
 ) {
@@ -71,6 +71,14 @@ enum class DistributeKind(
                 OVERWRITE -> DistributeCopy.OVERWRITE
             }
 
+    /** Why this run would change nothing, when there are targets. */
+    val nothing: String
+        get() =
+            when (this) {
+                UNASSIGNED, OVERWRITE -> DistributeCopy.ALL_FUNDED
+                APPLY -> DistributeCopy.NONE_EMPTY
+            }
+
     val what: String
         get() =
             when (this) {
@@ -83,7 +91,7 @@ enum class DistributeKind(
 /** Words for the unassigned figure's panel. */
 object DistributeCopy {
     const val UNASSIGNED = "add unassigned only"
-    const val UNASSIGNED_WHAT = "fills empty targets by priority, only from unassigned"
+    const val UNASSIGNED_WHAT = "tops up targets by priority, only from unassigned"
 
     /** Actual's "Apply budget template". */
     const val APPLY = "fill empty targets"
@@ -93,6 +101,8 @@ object DistributeCopy {
     const val OVERWRITE = "refill all targets"
     const val OVERWRITE_WHAT = "sets every templated category to its target again"
     const val NOTHING = "nothing to fill this month"
+    const val ALL_FUNDED = "every target is already met"
+    const val NONE_EMPTY = "every target already has some money"
     const val NO_TEMPLATES = "no category has a template yet"
 
     fun unreadable(count: Int): String = if (count == 1) "1 template line does not read" else "$count template lines do not read"
@@ -280,11 +290,13 @@ internal fun distributeOption(
     result: TemplateResult,
     changes: Map<String, Pair<Long, Long>>,
     order: List<Pair<String, String>> = emptyList(),
+    /** Whether any visible category has templates or automations at all (an overwrite would touch some). */
+    templated: Boolean = true,
 ): DistributeOption =
     when (result) {
         is TemplateResult.Applied ->
             if (changes.isEmpty()) {
-                DistributeOption(kind, reason = if (result.categories == 0) DistributeCopy.NO_TEMPLATES else DistributeCopy.NOTHING)
+                DistributeOption(kind, reason = if (templated) kind.nothing else DistributeCopy.NO_TEMPLATES)
             } else {
                 DistributeOption(
                     kind,
@@ -317,11 +329,17 @@ internal fun ShellHost.openDistribute() {
     host.scope.launch {
         val options =
             withContext(host.io) {
-                DistributeKind.entries.map { kind ->
-                    val cap = if (kind.capped) unassigned else null
-                    val (result, changes) = host.library.previewTemplateChanges(shell.budgetId, month, kind.overwrite, cap = cap)
-                    distributeOption(kind, result, changes, order)
-                }
+                val previews =
+                    DistributeKind.entries.associateWith { kind ->
+                        if (kind.capped) {
+                            host.library.previewTopUp(shell.budgetId, month, unassigned)
+                        } else {
+                            host.library.previewTemplateChanges(shell.budgetId, month, kind.overwrite)
+                        }
+                    }
+                // An overwrite's run counts every templated category, whether or not it would change one.
+                val templated = (previews.getValue(DistributeKind.OVERWRITE).first as? TemplateResult.Applied)?.categories != 0
+                previews.map { (kind, preview) -> distributeOption(kind, preview.first, preview.second, order, templated) }
             }
         host.mutate {
             // Only while the same month is still showing.
@@ -351,13 +369,11 @@ internal fun ShellHost.distribute(kind: DistributeKind) {
         // The menu already said what overwrite replaces, so picking it is the confirm.
         val result =
             withContext(host.io) {
-                host.library.applyTemplates(
-                    budgetId,
-                    menu.month,
-                    kind.overwrite,
-                    confirmed = true,
-                    cap = menu.unassignedMinor.takeIf { kind.capped },
-                )
+                if (kind.capped) {
+                    host.library.topUpTemplates(budgetId, menu.month, menu.unassignedMinor)
+                } else {
+                    host.library.applyTemplates(budgetId, menu.month, kind.overwrite, confirmed = true)
+                }
             }
         when (result) {
             is TemplateResult.Applied -> host.afterMonthWrite(budgetId)

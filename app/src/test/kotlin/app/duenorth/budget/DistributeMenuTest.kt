@@ -54,8 +54,13 @@ class DistributeMenuTest {
                 order,
             )
         assertEquals(DistributeOption(DistributeKind.APPLY, 2, 15_300L, names = listOf("Bills", "Gas")), filled)
-        assertEquals(DistributeCopy.NOTHING, distributeOption(DistributeKind.OVERWRITE, TemplateResult.Applied(2), emptyMap()).reason)
-        assertEquals(DistributeCopy.NO_TEMPLATES, distributeOption(DistributeKind.APPLY, TemplateResult.Applied(0), emptyMap()).reason)
+        assertEquals(DistributeCopy.ALL_FUNDED, distributeOption(DistributeKind.OVERWRITE, TemplateResult.Applied(2), emptyMap()).reason)
+        // Apply counts only empty categories, so none to fill means every target has money, not that there are none.
+        assertEquals(DistributeCopy.NONE_EMPTY, distributeOption(DistributeKind.APPLY, TemplateResult.Applied(0), emptyMap()).reason)
+        assertEquals(
+            DistributeCopy.NO_TEMPLATES,
+            distributeOption(DistributeKind.APPLY, TemplateResult.Applied(0), emptyMap(), templated = false).reason,
+        )
         val bad = distributeOption(DistributeKind.APPLY, TemplateResult.Invalid(listOf(TemplateError("Car", "#template x"))), emptyMap())
         assertFalse(bad.enabled)
         assertEquals("1 template line does not read", bad.reason)
@@ -70,7 +75,7 @@ class DistributeMenuTest {
                 TemplateSamples.october,
                 listOf(
                     DistributeOption(DistributeKind.APPLY, 2, 15_300L, names = listOf("Rent", "Gas")),
-                    DistributeOption(DistributeKind.OVERWRITE, reason = DistributeCopy.NOTHING),
+                    DistributeOption(DistributeKind.OVERWRITE, reason = DistributeCopy.ALL_FUNDED),
                 ),
             )
         val shell = TemplateSamples.shell.copy(ahead = ActualMonthMath.FuturePlans(40_000, 202612))
@@ -103,7 +108,7 @@ class DistributeMenuTest {
                 TemplateSamples.october,
                 listOf(
                     DistributeOption(DistributeKind.APPLY, 2, 15_300L, names = listOf("Rent", "Gas")),
-                    DistributeOption(DistributeKind.OVERWRITE, reason = DistributeCopy.NOTHING),
+                    DistributeOption(DistributeKind.OVERWRITE, reason = DistributeCopy.ALL_FUNDED),
                 ),
             )
         val shell = TemplateSamples.shell.copy(ahead = ActualMonthMath.FuturePlans(40_000, 202612))
@@ -120,7 +125,7 @@ class DistributeMenuTest {
         compose.onNodeWithText(DistributeCopy.APPLY).assertExists()
         compose.onNodeWithText("\$153.00").assertExists()
         compose.onNodeWithText("Rent, Gas").assertExists()
-        compose.onNodeWithText(DistributeCopy.NOTHING).assertExists()
+        compose.onNodeWithText(DistributeCopy.ALL_FUNDED).assertExists()
         compose.onNodeWithTag("distribute-overwrite").assertIsNotEnabled()
         // An option that is off is the same size as one that is on.
         assertEquals(
@@ -189,49 +194,52 @@ class DistributeMenuTest {
     }
 
     @Test
-    fun justTheUnassignedNeverSpendsMoreThanIt() {
-        val (model, library) = household("distribute-capped")
+    fun addUnassignedOnlyTopsUpAShortTargetFromNoMoreThanUnassigned() {
+        val (model, library) = household("distribute-top-up")
         model.settingsUi.setExperimental(true)
         model.settingsUi.setGoalTemplates(true)
         await { model.state.value.formatPrefs.templatesOn }
         val budgetId = model.state.value.settings.openBudgetId!!
         val month = model.state.value.openMonth
-        val gas =
-            model.state.value.shell!!
-                .groups
-                .flatMap { it.categories }
-                .first { it.id == "c-gas" }
-        // A target far bigger than what is left, on a category with nothing budgeted yet.
-        if (gas.budgetedMinor != 0L) {
-            SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System).assign(budgetId, "c-gas", month, "0")
-            model.refresh()
-        }
+        // Some money already in, and a target far bigger than what is left: apply skips it, the top-up does not.
+        SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System).assign(budgetId, "c-gas", month, "10")
         library.saveCategoryNote(budgetId, "c-gas", "#template 1000000")
+        model.refresh()
         await { library.templatePlan(budgetId, month) != null }
+        await {
+            model.state.value.shell!!
+                .category("c-gas")
+                ?.budgetedMinor == 1_000L
+        }
         await {
             model.state.value.shell!!
                 .headerMinor > 0
         }
-        val before =
-            model.state.value.shell!!
-                .headerMinor
-        val unassigned =
-            model.state.value.shell!!
-                .let { it.ahead?.freeMinor ?: it.headerMinor }
+        val shell = model.state.value.shell!!
+        val before = shell.headerMinor
+        val unassigned = shell.ahead?.freeMinor ?: shell.headerMinor
 
         model.templates.openDistribute()
         await { model.state.value.templates.distribute != null }
-        val capped =
+        val options =
             model.state.value.templates.distribute!!
                 .options
-                .first { it.kind == DistributeKind.UNASSIGNED }
-        assertTrue(capped.reason, capped.enabled)
-        assertTrue(capped.amountMinor in 1..unassigned)
+        val topUp = options.first { it.kind == DistributeKind.UNASSIGNED }
+        assertTrue(topUp.reason, topUp.enabled)
+        assertTrue("Gas" in topUp.names)
+        assertTrue(topUp.amountMinor in 1..unassigned)
 
         model.templates.distribute(DistributeKind.UNASSIGNED)
         await {
             model.state.value.shell!!
-                .headerMinor == before - capped.amountMinor
+                .headerMinor == before - topUp.amountMinor
         }
+        assertTrue(
+            model.state.value.shell!!
+                .category("c-gas")!!
+                .budgetedMinor > 1_000L,
+        )
     }
+
+    private fun app.duenorth.budget.core.MonthShell.category(id: String) = groups.flatMap { it.categories }.firstOrNull { it.id == id }
 }
