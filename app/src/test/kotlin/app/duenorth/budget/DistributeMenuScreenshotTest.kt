@@ -50,7 +50,10 @@ class DistributeMenuScreenshotTest {
         val menu =
             DistributeMenu(
                 shell.month,
-                listOf(DistributeOption(false, 3, 31_000L), DistributeOption(true, 5, 48_500L)),
+                listOf(
+                    DistributeOption(false, 3, 31_000L, names = listOf("Power", "Gas", "Groceries")),
+                    DistributeOption(true, 5, 48_500L, names = listOf("Rent", "Power", "Gas", "Groceries", "Rainy day")),
+                ),
             )
         var shown by mutableStateOf(false)
         compose.setContent {

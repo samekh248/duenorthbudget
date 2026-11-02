@@ -1,46 +1,78 @@
 package app.duenorth.budget
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.core.TemplateResult
-import app.duenorth.budget.design.components.MetroMenuItem
+import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.metroPress
+import app.duenorth.budget.design.theme.Metro
+import app.duenorth.budget.design.theme.MetroDimens
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.YearMonth
-import kotlin.math.abs
+import kotlin.math.roundToInt
 
 // Tapping a positive unassigned figure: the month's templates, run the way Actual's month menu runs them.
 
-/** Words for the unassigned figure's menu, in Actual's own terms. */
+/** Words for the unassigned figure's panel. Apply and overwrite are Actual's two template runs, in plain words. */
 object DistributeCopy {
-    /** Actual's "Apply budget template": fills categories with nothing budgeted yet. */
-    const val APPLY = TemplateCopy.APPLY
+    fun title(amount: String): String = "put $amount toward this month's targets"
 
-    /** Actual's "Overwrite with budget template": sets every templated category again. */
-    const val OVERWRITE = TemplateCopy.OVERWRITE
+    /** Actual's "Apply budget template". */
+    const val APPLY = "fill empty targets"
+    const val APPLY_WHAT = "budgets templated categories that have nothing yet"
+
+    /** Actual's "Overwrite with budget template". */
+    const val OVERWRITE = "refill all targets"
+    const val OVERWRITE_WHAT = "sets every templated category to its target again"
+    const val PRIORITY = "higher priorities are funded first while money lasts"
     const val NOTHING = "nothing to fill this month"
     const val NO_TEMPLATES = "no category has a template yet"
 
     fun unreadable(count: Int): String = if (count == 1) "1 template line does not read" else "$count template lines do not read"
 
-    fun categories(count: Int): String = if (count == 1) "1 category" else "$count categories"
+    /** The categories a run changes, the first few by name. */
+    fun names(names: List<String>): String =
+        when {
+            names.size <= NAMES_SHOWN -> names.joinToString(", ")
+            else -> names.take(NAMES_SHOWN).joinToString(", ") + " +${names.size - NAMES_SHOWN} more"
+        }
 
-    fun detail(
-        option: DistributeOption,
-        currency: CurrencySpec,
-        format: FormatOptions,
-    ): String {
-        option.reason?.let { return it }
-        val money = MoneyFormat.format(abs(option.amountMinor), currency, format)
-        val where = categories(option.categories)
-        // Apply only touches categories with nothing budgeted; overwrite sets every templated one again.
-        val verb = if (option.overwrite) "resets" else "fills"
-        val empty = if (option.overwrite) where else where.replace("categor", "empty categor")
-        val sign = if (option.amountMinor < 0) "returns " else ""
-        return "$sign$money · $verb $empty"
-    }
+    private const val NAMES_SHOWN = 3
 }
 
 /** One way to share out what is unassigned: what it would budget, or why it cannot. */
@@ -52,17 +84,19 @@ data class DistributeOption(
     val amountMinor: Long = 0,
     /** Why it is off; null when it can run. */
     val reason: String? = null,
+    /** The changed categories' names, in budget order. */
+    val names: List<String> = emptyList(),
 ) {
     val enabled: Boolean get() = reason == null
 }
 
-/** The unassigned figure's menu, while it shows. */
+/** The unassigned figure's panel, while it shows. */
 data class DistributeMenu(
     val month: YearMonth,
     val options: List<DistributeOption>,
 )
 
-/** The budget view's hooks for the unassigned figure's menu. */
+/** The budget view's hooks for the unassigned figure's panel. */
 data class DistributeActions(
     /** Shows on a positive unassigned figure; null leaves the figure untappable. */
     val menu: DistributeMenu? = null,
@@ -71,33 +105,168 @@ data class DistributeActions(
     val onDismiss: () -> Unit = {},
 )
 
-/** The menu's lines, apply first, as Actual's month menu lists them. */
-fun DistributeMenu.items(
+/**
+ * The panel under the unassigned figure: a heading with the amount, then one row per run with what it does, what
+ * it would budget on the right, and the categories it reaches. The rest of the screen dims; a tap there closes it.
+ */
+@Composable
+fun DistributePopup(
+    anchor: Rect,
+    menu: DistributeMenu,
+    unassignedMinor: Long,
     currency: CurrencySpec,
     format: FormatOptions,
     onPick: (Boolean) -> Unit,
-): List<MetroMenuItem> =
-    options.map { option ->
-        MetroMenuItem(
-            if (option.overwrite) DistributeCopy.OVERWRITE else DistributeCopy.APPLY,
-            tag = if (option.overwrite) "distribute-overwrite" else "distribute-apply",
-            detail = DistributeCopy.detail(option, currency, format),
-            enabled = option.enabled,
-        ) { onPick(option.overwrite) }
+    onDismiss: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val top = WindowInsets.statusBars.getTop(density)
+    val bottom = WindowInsets.navigationBars.getBottom(density)
+    Popup(popupPositionProvider = WholeWindow, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
+        DistributePanel(anchor, menu, unassignedMinor, currency, format, onPick, onDismiss, top, bottom)
     }
+}
+
+private object WholeWindow : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset = IntOffset.Zero
+}
+
+@Composable
+fun DistributePanel(
+    anchor: Rect,
+    menu: DistributeMenu,
+    unassignedMinor: Long,
+    currency: CurrencySpec,
+    format: FormatOptions,
+    onPick: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    safeTop: Int = 0,
+    safeBottom: Int = 0,
+) {
+    val scrim = Metro.colors.background.copy(alpha = SCRIM)
+    Layout(
+        content = {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Metro.colors.chrome)
+                    .pointerInput(Unit) { detectTapGestures {} }
+                    .padding(vertical = MetroDimens.Row)
+                    .testTag("distribute-menu"),
+            ) {
+                MetroText(
+                    DistributeCopy.title(MoneyFormat.format(unassignedMinor, currency, format)),
+                    Metro.typography.body,
+                    Modifier.padding(horizontal = INSET).padding(top = 4.dp),
+                    color = Metro.colors.foreground,
+                )
+                MetroText(
+                    DistributeCopy.PRIORITY,
+                    Metro.typography.caption,
+                    Modifier.padding(horizontal = INSET).padding(bottom = 8.dp),
+                    color = Metro.colors.secondary,
+                )
+                menu.options.forEach { option ->
+                    OptionRow(option, currency, format) {
+                        onDismiss()
+                        onPick(option.overwrite)
+                    }
+                }
+            }
+        },
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    drawRect(scrim, Offset.Zero, Size(size.width, anchor.top.coerceAtLeast(0f)))
+                    drawRect(scrim, Offset(0f, anchor.bottom), Size(size.width, (size.height - anchor.bottom).coerceAtLeast(0f)))
+                }.pointerInput(Unit) { detectTapGestures { onDismiss() } },
+    ) { measurables, constraints ->
+        val panel = measurables.single().measure(constraints.copy(minWidth = constraints.maxWidth, minHeight = 0))
+        val below = anchor.bottom.roundToInt()
+        val limit = constraints.maxHeight - safeBottom
+        val y =
+            if (below + panel.height <= limit) {
+                below
+            } else {
+                (anchor.top.roundToInt() - panel.height).coerceIn(safeTop, (limit - panel.height).coerceAtLeast(safeTop))
+            }
+        layout(constraints.maxWidth, constraints.maxHeight) { panel.place(0, y) }
+    }
+}
+
+@Composable
+private fun OptionRow(
+    option: DistributeOption,
+    currency: CurrencySpec,
+    format: FormatOptions,
+    onClick: () -> Unit,
+) {
+    val enabled = option.enabled
+    val ink = if (enabled) Metro.colors.foreground else Metro.colors.secondary
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .then(if (enabled) Modifier.metroPress(onClick = onClick) else Modifier.semantics(mergeDescendants = true) { disabled() })
+            .padding(horizontal = INSET, vertical = 10.dp)
+            .testTag(if (option.overwrite) "distribute-overwrite" else "distribute-apply"),
+    ) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            MetroText(
+                if (option.overwrite) DistributeCopy.OVERWRITE else DistributeCopy.APPLY,
+                Metro.typography.subheader,
+                Modifier.weight(1f),
+                color = ink,
+                maxLines = 1,
+            )
+            if (enabled) {
+                MetroText(
+                    MoneyFormat.format(option.amountMinor, currency, format),
+                    Metro.typography.subheader,
+                    Modifier.padding(start = 12.dp),
+                    color = Metro.accent.text,
+                    maxLines = 1,
+                )
+            }
+        }
+        MetroText(
+            option.reason ?: if (option.overwrite) DistributeCopy.OVERWRITE_WHAT else DistributeCopy.APPLY_WHAT,
+            Metro.typography.caption,
+            color = Metro.colors.secondary,
+        )
+        if (enabled && option.names.isNotEmpty()) {
+            MetroText(DistributeCopy.names(option.names), Metro.typography.caption, color = ink, maxLines = 1)
+        }
+    }
+}
+
+private val INSET = 24.dp
+private const val SCRIM = 0.85f
 
 /** What one preview run says about an option. */
 internal fun distributeOption(
     overwrite: Boolean,
     result: TemplateResult,
     changes: Map<String, Pair<Long, Long>>,
+    order: List<Pair<String, String>> = emptyList(),
 ): DistributeOption =
     when (result) {
         is TemplateResult.Applied ->
             if (changes.isEmpty()) {
                 DistributeOption(overwrite, reason = if (result.categories == 0) DistributeCopy.NO_TEMPLATES else DistributeCopy.NOTHING)
             } else {
-                DistributeOption(overwrite, changes.size, changes.values.sumOf { (before, after) -> after - before })
+                DistributeOption(
+                    overwrite,
+                    changes.size,
+                    changes.values.sumOf { (before, after) -> after - before },
+                    names = order.filter { it.first in changes }.map { it.second },
+                )
             }
         is TemplateResult.Invalid -> DistributeOption(overwrite, reason = DistributeCopy.unreadable(result.errors.size))
         is TemplateResult.Rejected -> DistributeOption(overwrite, reason = result.reason)
@@ -117,12 +286,13 @@ internal fun ShellHost.openDistribute() {
         host.mutate { it.copy(templates = it.templates.copy(distribute = DistributeMenu(month, off))) }
         return
     }
+    val order = shell.groups.flatMap { group -> group.categories.map { it.id to it.name } }
     host.scope.launch {
         val options =
             withContext(host.io) {
                 listOf(false, true).map { overwrite ->
                     val (result, changes) = host.library.previewTemplateChanges(shell.budgetId, month, overwrite)
-                    distributeOption(overwrite, result, changes)
+                    distributeOption(overwrite, result, changes, order)
                 }
             }
         host.mutate {

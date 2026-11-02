@@ -11,7 +11,6 @@ import androidx.compose.ui.test.performClick
 import app.duenorth.budget.ParityTestSupport.await
 import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.ActualMonthMath
-import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.core.TemplateError
 import app.duenorth.budget.core.TemplateResult
@@ -37,19 +36,15 @@ class DistributeMenuTest {
 
     @Test
     fun optionsReadWhatAPreviewRunWouldDo() {
-        val filled = distributeOption(false, TemplateResult.Applied(3), mapOf("a" to (0L to 12_300L), "b" to (5_000L to 8_000L)))
-        assertEquals(DistributeOption(false, 2, 15_300L), filled)
+        val order = listOf("b" to "Bills", "x" to "Other", "a" to "Gas")
+        val filled = distributeOption(false, TemplateResult.Applied(3), mapOf("a" to (0L to 12_300L), "b" to (5_000L to 8_000L)), order)
+        assertEquals(DistributeOption(false, 2, 15_300L, names = listOf("Bills", "Gas")), filled)
         assertEquals(DistributeCopy.NOTHING, distributeOption(true, TemplateResult.Applied(2), emptyMap()).reason)
         assertEquals(DistributeCopy.NO_TEMPLATES, distributeOption(false, TemplateResult.Applied(0), emptyMap()).reason)
         val bad = distributeOption(false, TemplateResult.Invalid(listOf(TemplateError("Car", "#template x"))), emptyMap())
         assertFalse(bad.enabled)
         assertEquals("1 template line does not read", bad.reason)
-        val currency = TemplateSamples.shell.currency
-        assertEquals("\$153.00 · fills 2 empty categories", DistributeCopy.detail(filled, currency, FormatOptions()))
-        assertEquals(
-            "returns \$20.00 · resets 1 category",
-            DistributeCopy.detail(DistributeOption(true, 1, -2_000L), currency, FormatOptions()),
-        )
+        assertEquals("Rent, Power, Gas +2 more", DistributeCopy.names(listOf("Rent", "Power", "Gas", "Food", "Fun")))
     }
 
     @Test
@@ -58,7 +53,10 @@ class DistributeMenuTest {
         val menu =
             DistributeMenu(
                 TemplateSamples.october,
-                listOf(DistributeOption(false, 2, 15_300L), DistributeOption(true, reason = DistributeCopy.NOTHING)),
+                listOf(
+                    DistributeOption(false, 2, 15_300L, names = listOf("Rent", "Gas")),
+                    DistributeOption(true, reason = DistributeCopy.NOTHING),
+                ),
             )
         val shell = TemplateSamples.shell.copy(ahead = ActualMonthMath.FuturePlans(40_000, 202612))
         compose.setContent {
@@ -88,7 +86,10 @@ class DistributeMenuTest {
         val menu =
             DistributeMenu(
                 TemplateSamples.october,
-                listOf(DistributeOption(false, 2, 15_300L), DistributeOption(true, reason = DistributeCopy.NOTHING)),
+                listOf(
+                    DistributeOption(false, 2, 15_300L, names = listOf("Rent", "Gas")),
+                    DistributeOption(true, reason = DistributeCopy.NOTHING),
+                ),
             )
         val shell = TemplateSamples.shell.copy(ahead = ActualMonthMath.FuturePlans(40_000, 202612))
         compose.setContent {
@@ -102,7 +103,9 @@ class DistributeMenuTest {
             }
         }
         compose.onNodeWithText(DistributeCopy.APPLY).assertExists()
-        compose.onNodeWithText("\$153.00 · fills 2 empty categories").assertExists()
+        compose.onNodeWithText("\$153.00").assertExists()
+        compose.onNodeWithText("Rent, Gas").assertExists()
+        compose.onNodeWithText(DistributeCopy.NOTHING).assertExists()
         compose.onNodeWithTag("distribute-overwrite").assertIsNotEnabled()
         compose.onNodeWithTag("distribute-apply").performClick()
         assertEquals(false, picked)

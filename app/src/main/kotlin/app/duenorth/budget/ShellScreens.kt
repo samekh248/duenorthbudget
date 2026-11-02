@@ -77,7 +77,6 @@ import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.MetroAppBarHost
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
-import app.duenorth.budget.design.components.MetroContextMenu
 import app.duenorth.budget.design.components.MetroField
 import app.duenorth.budget.design.components.MetroOutlineButton
 import app.duenorth.budget.design.components.MetroPivot
@@ -457,13 +456,10 @@ fun BudgetSection(
     val raised = if (tiles) Modifier.relief(Relief.Raised, small = true).then(tile) else Modifier
     // Where the unassigned figure sits, so its menu opens under it with the figure left bright.
     var unassignedAnchor by remember { mutableStateOf(Rect.Zero) }
-    distribute.menu?.let { menu ->
-        MetroContextMenu(
-            unassignedAnchor,
-            menu.items(shell.currency, formatOptions, distribute.onPick),
-            onDismiss = distribute.onDismiss,
-            tag = "distribute-menu",
-        )
+    if (ahead != null) {
+        distribute.menu?.let { menu ->
+            DistributePopup(unassignedAnchor, menu, ahead.freeMinor, shell.currency, formatOptions, distribute.onPick, distribute.onDismiss)
+        }
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
         Row(
