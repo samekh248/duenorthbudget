@@ -141,8 +141,6 @@ internal class TemplateContext private constructor(
     private val previouslyBudgeted: Long,
     private val sheet: TemplateSheet,
     private val skipAvailableClamp: Boolean,
-    /** App-only: priority 0 is held to what is left too, so a capped run never spends past its cap. */
-    private val clampAll: Boolean = false,
 ) {
     /** Template indexes that run in a priority. */
     private val templates = all.indices.filter { all[it].priority != null && all[it] !is Template.Remainder && all[it] !is Template.Limit }
@@ -248,7 +246,7 @@ internal class TemplateContext private constructor(
             if (preRound != 0L) scale *= toBudget.toDouble() / preRound
         }
         fullAmount = (fullAmount ?: 0L) + toBudget
-        if ((priority > 0 || clampAll) && available < 0 && !income && !skipAvailableClamp) {
+        if (priority > 0 && available < 0 && !income && !skipAvailableClamp) {
             val adjusted = max(0L, toBudget + available)
             if (toBudget > 0) scale *= adjusted.toDouble() / toBudget
             toBudget = adjusted
@@ -519,7 +517,6 @@ internal class TemplateContext private constructor(
             budgeted: Long,
             sheet: TemplateSheet,
             skipAvailableClamp: Boolean = false,
-            clampAll: Boolean = false,
         ): TemplateContext {
             val last = month.minusMonths(1)
             var fromLastMonth = sheet.leftover(last, categoryId)
@@ -536,7 +533,6 @@ internal class TemplateContext private constructor(
                 budgeted,
                 sheet,
                 skipAvailableClamp,
-                clampAll,
             )
         }
 
