@@ -13,6 +13,10 @@ import androidx.compose.ui.unit.height
 import app.duenorth.budget.ParityTestSupport.await
 import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.ActualMonthMath
+import app.duenorth.budget.core.BudgetClock
+import app.duenorth.budget.core.HttpActualTransport
+import app.duenorth.budget.core.MemorySecretStore
+import app.duenorth.budget.core.SyncCoordinator
 import app.duenorth.budget.core.TemplateCopy
 import app.duenorth.budget.core.TemplateError
 import app.duenorth.budget.core.TemplateResult
@@ -39,11 +43,20 @@ class DistributeMenuTest {
     @Test
     fun optionsReadWhatAPreviewRunWouldDo() {
         val order = listOf("b" to "Bills", "x" to "Other", "a" to "Gas")
-        val filled = distributeOption(false, TemplateResult.Applied(3), mapOf("a" to (0L to 12_300L), "b" to (5_000L to 8_000L)), order)
-        assertEquals(DistributeOption(false, 2, 15_300L, names = listOf("Bills", "Gas")), filled)
-        assertEquals(DistributeCopy.NOTHING, distributeOption(true, TemplateResult.Applied(2), emptyMap()).reason)
-        assertEquals(DistributeCopy.NO_TEMPLATES, distributeOption(false, TemplateResult.Applied(0), emptyMap()).reason)
-        val bad = distributeOption(false, TemplateResult.Invalid(listOf(TemplateError("Car", "#template x"))), emptyMap())
+        val filled =
+            distributeOption(
+                DistributeKind.APPLY,
+                TemplateResult.Applied(3),
+                mapOf(
+                    "a" to (0L to 12_300L),
+                    "b" to (5_000L to 8_000L),
+                ),
+                order,
+            )
+        assertEquals(DistributeOption(DistributeKind.APPLY, 2, 15_300L, names = listOf("Bills", "Gas")), filled)
+        assertEquals(DistributeCopy.NOTHING, distributeOption(DistributeKind.OVERWRITE, TemplateResult.Applied(2), emptyMap()).reason)
+        assertEquals(DistributeCopy.NO_TEMPLATES, distributeOption(DistributeKind.APPLY, TemplateResult.Applied(0), emptyMap()).reason)
+        val bad = distributeOption(DistributeKind.APPLY, TemplateResult.Invalid(listOf(TemplateError("Car", "#template x"))), emptyMap())
         assertFalse(bad.enabled)
         assertEquals("1 template line does not read", bad.reason)
         assertEquals("Rent, Power, Gas +2 more", DistributeCopy.names(listOf("Rent", "Power", "Gas", "Food", "Fun")))
@@ -56,8 +69,8 @@ class DistributeMenuTest {
             DistributeMenu(
                 TemplateSamples.october,
                 listOf(
-                    DistributeOption(false, 2, 15_300L, names = listOf("Rent", "Gas")),
-                    DistributeOption(true, reason = DistributeCopy.NOTHING),
+                    DistributeOption(DistributeKind.APPLY, 2, 15_300L, names = listOf("Rent", "Gas")),
+                    DistributeOption(DistributeKind.OVERWRITE, reason = DistributeCopy.NOTHING),
                 ),
             )
         val shell = TemplateSamples.shell.copy(ahead = ActualMonthMath.FuturePlans(40_000, 202612))
@@ -84,13 +97,13 @@ class DistributeMenuTest {
 
     @Test
     fun menuListsApplyAndOverwriteWithWhatEachBudgets() {
-        var picked: Boolean? = null
+        var picked: DistributeKind? = null
         val menu =
             DistributeMenu(
                 TemplateSamples.october,
                 listOf(
-                    DistributeOption(false, 2, 15_300L, names = listOf("Rent", "Gas")),
-                    DistributeOption(true, reason = DistributeCopy.NOTHING),
+                    DistributeOption(DistributeKind.APPLY, 2, 15_300L, names = listOf("Rent", "Gas")),
+                    DistributeOption(DistributeKind.OVERWRITE, reason = DistributeCopy.NOTHING),
                 ),
             )
         val shell = TemplateSamples.shell.copy(ahead = ActualMonthMath.FuturePlans(40_000, 202612))
@@ -115,7 +128,7 @@ class DistributeMenuTest {
             compose.onNodeWithTag("distribute-overwrite").getBoundsInRoot().height,
         )
         compose.onNodeWithTag("distribute-apply").performClick()
-        assertEquals(false, picked)
+        assertEquals(DistributeKind.APPLY, picked)
     }
 
     @Test
@@ -130,7 +143,7 @@ class DistributeMenuTest {
     }
 
     @Test
-    fun templatesOffSaysSoOnBothLines() {
+    fun templatesOffSaysSoOnEveryLine() {
         val (model, _) = household("distribute-off")
         model.templates.openDistribute()
         val menu = model.state.value.templates.distribute
@@ -156,10 +169,10 @@ class DistributeMenuTest {
         val overwrite =
             model.state.value.templates.distribute!!
                 .options
-                .first { it.overwrite }
+                .first { it.kind == DistributeKind.OVERWRITE }
         assertTrue(overwrite.reason, overwrite.enabled)
 
-        model.templates.distribute(overwrite = true)
+        model.templates.distribute(DistributeKind.OVERWRITE)
         assertNull(model.state.value.templates.distribute)
         await {
             model.state.value.shell!!
@@ -173,5 +186,52 @@ class DistributeMenuTest {
                 .first { it.id == "c-gas" }
                 .budgetedMinor,
         )
+    }
+
+    @Test
+    fun justTheUnassignedNeverSpendsMoreThanIt() {
+        val (model, library) = household("distribute-capped")
+        model.settingsUi.setExperimental(true)
+        model.settingsUi.setGoalTemplates(true)
+        await { model.state.value.formatPrefs.templatesOn }
+        val budgetId = model.state.value.settings.openBudgetId!!
+        val month = model.state.value.openMonth
+        val gas =
+            model.state.value.shell!!
+                .groups
+                .flatMap { it.categories }
+                .first { it.id == "c-gas" }
+        // A target far bigger than what is left, on a category with nothing budgeted yet.
+        if (gas.budgetedMinor != 0L) {
+            SyncCoordinator(library, HttpActualTransport(), MemorySecretStore(), BudgetClock.System).assign(budgetId, "c-gas", month, "0")
+            model.refresh()
+        }
+        library.saveCategoryNote(budgetId, "c-gas", "#template 1000000")
+        await { library.templatePlan(budgetId, month) != null }
+        await {
+            model.state.value.shell!!
+                .headerMinor > 0
+        }
+        val before =
+            model.state.value.shell!!
+                .headerMinor
+        val unassigned =
+            model.state.value.shell!!
+                .let { it.ahead?.freeMinor ?: it.headerMinor }
+
+        model.templates.openDistribute()
+        await { model.state.value.templates.distribute != null }
+        val capped =
+            model.state.value.templates.distribute!!
+                .options
+                .first { it.kind == DistributeKind.UNASSIGNED }
+        assertTrue(capped.reason, capped.enabled)
+        assertTrue(capped.amountMinor in 1..unassigned)
+
+        model.templates.distribute(DistributeKind.UNASSIGNED)
+        await {
+            model.state.value.shell!!
+                .headerMinor == before - capped.amountMinor
+        }
     }
 }

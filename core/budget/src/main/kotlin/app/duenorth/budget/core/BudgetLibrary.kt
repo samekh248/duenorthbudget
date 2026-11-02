@@ -962,9 +962,10 @@ class BudgetLibrary(
         month: YearMonth,
         overwrite: Boolean,
         confirmed: Boolean = false,
+        cap: Long? = null,
     ): TemplateResult {
         if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF)
-        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).run(month, overwrite, confirmed) }
+        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).run(month, overwrite, confirmed, cap) }
             ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
     }
 
@@ -1001,6 +1002,7 @@ class BudgetLibrary(
         month: YearMonth,
         overwrite: Boolean,
         budgeted: Map<String, Long> = emptyMap(),
+        cap: Long? = null,
     ): Pair<TemplateResult, Map<String, Pair<Long, Long>>> {
         if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF) to emptyMap()
         return serial {
@@ -1025,7 +1027,7 @@ class BudgetLibrary(
                             BudgetEdits.assign(session, SyncSchema.clockFor(session), month.toActualMonth(), id, amount)
                         }
                         before = amounts()
-                        result = TemplateEngine(session, clock.today()).run(month, overwrite, confirmed = true)
+                        result = TemplateEngine(session, clock.today()).run(month, overwrite, confirmed = true, cap = cap)
                         after = amounts()
                         throw PreviewRollback()
                     }

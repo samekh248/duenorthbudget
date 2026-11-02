@@ -48,8 +48,43 @@ import kotlin.math.roundToInt
 
 // Tapping a positive unassigned figure: the month's templates, run the way Actual's month menu runs them.
 
-/** Words for the unassigned figure's panel. Apply and overwrite are Actual's two template runs, in plain words. */
+/**
+ * The panel's runs: Actual's apply and overwrite, in plain words, and an app-only apply that spends no more than
+ * what is unassigned.
+ */
+enum class DistributeKind(
+    val overwrite: Boolean,
+    /** Spends no more than the unassigned figure. */
+    val capped: Boolean,
+    val tag: String,
+) {
+    UNASSIGNED(overwrite = false, capped = true, tag = "distribute-unassigned"),
+    APPLY(overwrite = false, capped = false, tag = "distribute-apply"),
+    OVERWRITE(overwrite = true, capped = false, tag = "distribute-overwrite"),
+    ;
+
+    val label: String
+        get() =
+            when (this) {
+                UNASSIGNED -> DistributeCopy.UNASSIGNED
+                APPLY -> DistributeCopy.APPLY
+                OVERWRITE -> DistributeCopy.OVERWRITE
+            }
+
+    val what: String
+        get() =
+            when (this) {
+                UNASSIGNED -> DistributeCopy.UNASSIGNED_WHAT
+                APPLY -> DistributeCopy.APPLY_WHAT
+                OVERWRITE -> DistributeCopy.OVERWRITE_WHAT
+            }
+}
+
+/** Words for the unassigned figure's panel. */
 object DistributeCopy {
+    const val UNASSIGNED = "add unassigned only"
+    const val UNASSIGNED_WHAT = "fills empty targets by priority, only from unassigned"
+
     /** Actual's "Apply budget template". */
     const val APPLY = "fill empty targets"
     const val APPLY_WHAT = "budgets templated categories that have nothing yet"
@@ -74,7 +109,7 @@ object DistributeCopy {
 
 /** One way to share out what is unassigned: what it would budget, or why it cannot. */
 data class DistributeOption(
-    val overwrite: Boolean,
+    val kind: DistributeKind,
     /** Categories whose budget would change. */
     val categories: Int = 0,
     /** What it takes from to budget, after what those categories already hold. */
@@ -91,6 +126,8 @@ data class DistributeOption(
 data class DistributeMenu(
     val month: YearMonth,
     val options: List<DistributeOption>,
+    /** The unassigned figure when it opened: the most "add just the unassigned" spends. */
+    val unassignedMinor: Long = 0,
 )
 
 /** The budget view's hooks for the unassigned figure's panel. */
@@ -98,7 +135,7 @@ data class DistributeActions(
     /** Shows on a positive unassigned figure; null leaves the figure untappable. */
     val menu: DistributeMenu? = null,
     val onOpen: (() -> Unit)? = null,
-    val onPick: (Boolean) -> Unit = {},
+    val onPick: (DistributeKind) -> Unit = {},
     val onDismiss: () -> Unit = {},
 )
 
@@ -112,7 +149,7 @@ fun DistributePopup(
     menu: DistributeMenu,
     currency: CurrencySpec,
     format: FormatOptions,
-    onPick: (Boolean) -> Unit,
+    onPick: (DistributeKind) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -138,7 +175,7 @@ fun DistributePanel(
     menu: DistributeMenu,
     currency: CurrencySpec,
     format: FormatOptions,
-    onPick: (Boolean) -> Unit,
+    onPick: (DistributeKind) -> Unit,
     onDismiss: () -> Unit,
     safeTop: Int = 0,
     safeBottom: Int = 0,
@@ -157,7 +194,7 @@ fun DistributePanel(
                 menu.options.forEach { option ->
                     OptionRow(option, currency, format) {
                         onDismiss()
-                        onPick(option.overwrite)
+                        onPick(option.kind)
                     }
                 }
             }
@@ -198,11 +235,11 @@ private fun OptionRow(
             .heightIn(min = MetroDimens.TouchTarget)
             .then(if (enabled) Modifier.metroPress(onClick = onClick) else Modifier.semantics(mergeDescendants = true) { disabled() })
             .padding(horizontal = INSET, vertical = 10.dp)
-            .testTag(if (option.overwrite) "distribute-overwrite" else "distribute-apply"),
+            .testTag(option.kind.tag),
     ) {
         Row(verticalAlignment = Alignment.Bottom) {
             MetroText(
-                if (option.overwrite) DistributeCopy.OVERWRITE else DistributeCopy.APPLY,
+                option.kind.label,
                 Metro.typography.subheader,
                 Modifier.weight(1f),
                 color = ink,
@@ -220,7 +257,7 @@ private fun OptionRow(
         }
         // Every row keeps the same three single lines, so the options are all one size, on or off.
         MetroText(
-            if (option.overwrite) DistributeCopy.OVERWRITE_WHAT else DistributeCopy.APPLY_WHAT,
+            option.kind.what,
             Metro.typography.caption,
             color = Metro.colors.secondary,
             maxLines = 1,
@@ -239,7 +276,7 @@ private const val SCRIM = 0.85f
 
 /** What one preview run says about an option. */
 internal fun distributeOption(
-    overwrite: Boolean,
+    kind: DistributeKind,
     result: TemplateResult,
     changes: Map<String, Pair<Long, Long>>,
     order: List<Pair<String, String>> = emptyList(),
@@ -247,19 +284,19 @@ internal fun distributeOption(
     when (result) {
         is TemplateResult.Applied ->
             if (changes.isEmpty()) {
-                DistributeOption(overwrite, reason = if (result.categories == 0) DistributeCopy.NO_TEMPLATES else DistributeCopy.NOTHING)
+                DistributeOption(kind, reason = if (result.categories == 0) DistributeCopy.NO_TEMPLATES else DistributeCopy.NOTHING)
             } else {
                 DistributeOption(
-                    overwrite,
+                    kind,
                     changes.size,
                     changes.values.sumOf { (before, after) -> after - before },
                     names = order.filter { it.first in changes }.map { it.second },
                 )
             }
-        is TemplateResult.Invalid -> DistributeOption(overwrite, reason = DistributeCopy.unreadable(result.errors.size))
-        is TemplateResult.Rejected -> DistributeOption(overwrite, reason = result.reason)
-        is TemplateResult.NeedsConfirm -> DistributeOption(overwrite, reason = result.reason)
-        TemplateResult.Valid -> DistributeOption(overwrite, reason = DistributeCopy.NOTHING)
+        is TemplateResult.Invalid -> DistributeOption(kind, reason = DistributeCopy.unreadable(result.errors.size))
+        is TemplateResult.Rejected -> DistributeOption(kind, reason = result.reason)
+        is TemplateResult.NeedsConfirm -> DistributeOption(kind, reason = result.reason)
+        TemplateResult.Valid -> DistributeOption(kind, reason = DistributeCopy.NOTHING)
     }
 
 /** Opens the unassigned figure's menu: works out both template runs for the open month, writing nothing. */
@@ -269,18 +306,21 @@ internal fun ShellHost.openDistribute() {
     val shell = state.shell ?: return
     if (state.budgetEdit != null) return
     val month = state.openMonth
+    // With no later plans to come out, unassigned is all of to budget.
+    val unassigned = (shell.ahead?.freeMinor ?: shell.headerMinor).takeIf { it > 0 } ?: return
     if (!state.formatPrefs.templatesOn) {
-        val off = listOf(false, true).map { DistributeOption(it, reason = TemplateCopy.OFF) }
-        host.mutate { it.copy(templates = it.templates.copy(distribute = DistributeMenu(month, off))) }
+        val off = DistributeKind.entries.map { DistributeOption(it, reason = TemplateCopy.OFF) }
+        host.mutate { it.copy(templates = it.templates.copy(distribute = DistributeMenu(month, off, unassigned))) }
         return
     }
     val order = shell.groups.flatMap { group -> group.categories.map { it.id to it.name } }
     host.scope.launch {
         val options =
             withContext(host.io) {
-                listOf(false, true).map { overwrite ->
-                    val (result, changes) = host.library.previewTemplateChanges(shell.budgetId, month, overwrite)
-                    distributeOption(overwrite, result, changes, order)
+                DistributeKind.entries.map { kind ->
+                    val cap = if (kind.capped) unassigned else null
+                    val (result, changes) = host.library.previewTemplateChanges(shell.budgetId, month, kind.overwrite, cap = cap)
+                    distributeOption(kind, result, changes, order)
                 }
             }
         host.mutate {
@@ -290,7 +330,7 @@ internal fun ShellHost.openDistribute() {
             ) {
                 it
             } else {
-                it.copy(templates = it.templates.copy(distribute = DistributeMenu(month, options)))
+                it.copy(templates = it.templates.copy(distribute = DistributeMenu(month, options, unassigned)))
             }
         }
     }
@@ -301,7 +341,7 @@ internal fun ShellHost.closeDistribute() {
 }
 
 /** A line picked: runs Actual's apply or overwrite on the month as one undo step, then repaints it. */
-internal fun ShellHost.distribute(overwrite: Boolean) {
+internal fun ShellHost.distribute(kind: DistributeKind) {
     val host = this
     val state = host.state.value
     val menu = state.templates.distribute ?: return
@@ -309,7 +349,16 @@ internal fun ShellHost.distribute(overwrite: Boolean) {
     host.mutate { it.copy(templates = it.templates.copy(distribute = null), monthUi = it.monthUi.copy(notice = null)) }
     host.scope.launch {
         // The menu already said what overwrite replaces, so picking it is the confirm.
-        val result = withContext(host.io) { host.library.applyTemplates(budgetId, menu.month, overwrite, confirmed = true) }
+        val result =
+            withContext(host.io) {
+                host.library.applyTemplates(
+                    budgetId,
+                    menu.month,
+                    kind.overwrite,
+                    confirmed = true,
+                    cap = menu.unassignedMinor.takeIf { kind.capped },
+                )
+            }
         when (result) {
             is TemplateResult.Applied -> host.afterMonthWrite(budgetId)
             is TemplateResult.Invalid ->

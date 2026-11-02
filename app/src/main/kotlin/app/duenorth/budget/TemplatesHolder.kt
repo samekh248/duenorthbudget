@@ -468,13 +468,13 @@ class TemplatesHolder internal constructor(
         apply(preview.overwrite, confirmed = true)
     }
 
-    /** The unassigned figure tapped: Actual's apply and overwrite, each with what it would budget. */
+    /** The unassigned figure tapped: its runs, each with what it would budget. */
     fun openDistribute() = host.openDistribute()
 
     fun closeDistribute() = host.closeDistribute()
 
-    /** A line of that menu picked: [overwrite] runs Actual's overwrite, otherwise its apply. */
-    fun distribute(overwrite: Boolean) = host.distribute(overwrite)
+    /** A line of that panel picked: Actual's apply or overwrite, or apply spending only what is unassigned. */
+    fun distribute(kind: DistributeKind) = host.distribute(kind)
 
     fun keepApplyPreview() {
         host.mutate { it.copy(templates = it.templates.copy(applyPreview = null)) }

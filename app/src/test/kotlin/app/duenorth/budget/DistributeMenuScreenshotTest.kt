@@ -59,9 +59,15 @@ class DistributeMenuScreenshotTest {
             DistributeMenu(
                 shell.month,
                 listOf(
-                    DistributeOption(false, 3, 31_000L, names = listOf("Power", "Gas", "Groceries")),
-                    DistributeOption(true, 5, 48_500L, names = listOf("Rent", "Power", "Gas", "Groceries", "Rainy day")),
-                ).let { if (off) listOf(it[0].copy(reason = DistributeCopy.NOTHING, names = emptyList()), it[1]) else it },
+                    DistributeOption(DistributeKind.UNASSIGNED, 2, 15_200L, names = listOf("Power", "Gas")),
+                    DistributeOption(DistributeKind.APPLY, 3, 31_000L, names = listOf("Power", "Gas", "Groceries")),
+                    DistributeOption(
+                        DistributeKind.OVERWRITE,
+                        5,
+                        48_500L,
+                        names = listOf("Rent", "Power", "Gas", "Groceries", "Rainy day"),
+                    ),
+                ).let { if (off) listOf(it[0], it[1].copy(reason = DistributeCopy.NOTHING, names = emptyList()), it[2]) else it },
             )
         var shown by mutableStateOf(false)
         compose.setContent {
