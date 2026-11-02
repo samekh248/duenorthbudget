@@ -92,6 +92,7 @@ internal class TemplateSheet(
                 LEFT JOIN categories c ON c.id = t.category
                 WHERE $filter AND t.date >= ? AND t.date <= ?
                   AND IFNULL(a.offbudget, 1) = 0 AND IFNULL(t.tombstone, 0) = 0 AND IFNULL(t.isParent, 0) = 0
+                  AND NOT ${BankPending.pendingInflowSql("t")}
                 """.trimIndent(),
                 args,
             ).first()

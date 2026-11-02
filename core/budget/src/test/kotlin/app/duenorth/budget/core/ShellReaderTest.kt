@@ -89,6 +89,58 @@ class ShellReaderTest {
         }
     }
 
+    // Money the bank has not posted is not ready to budget: pending income stays out of to budget and pending
+    // refunds out of their category, while pending spending counts at once. Clearing a row by hand counts it.
+    @Test
+    fun pendingIncomeWaitsForTheBankToPostIt() {
+        val file = File.createTempFile("shell", ".sqlite")
+        file.delete()
+        JdbcSessionOpener().use(file) { session ->
+            ActualSchema.create(session)
+            ActualSchema.ensure(session)
+            session.exec("INSERT INTO preferences (id, value) VALUES (?, ?)", listOf("budgetType", "envelope"))
+            session.exec("INSERT INTO category_groups (id, name, is_income, sort_order) VALUES ('g-inc', 'Income', 1, 0)")
+            session.exec("INSERT INTO category_groups (id, name, is_income, sort_order) VALUES ('g-liv', 'Living', 0, 1)")
+            session.exec("INSERT INTO categories (id, name, is_income, cat_group) VALUES ('c-sal', 'Salary', 1, 'g-inc')")
+            session.exec("INSERT INTO categories (id, name, is_income, cat_group) VALUES ('c-food', 'Food', 0, 'g-liv')")
+            session.exec("INSERT INTO accounts (id, name, offbudget, sort_order) VALUES ('checking', 'Checking', 0, 0)")
+            insertTxn(session, "posted-pay", "checking", "c-sal", 500_000, null, 20261001, 1.0)
+            insertTxn(session, "pending-pay", "checking", "c-sal", 200_000, null, 20261014, 2.0)
+            insertTxn(session, "pending-spend", "checking", "c-food", -3_000, null, 20261014, 3.0)
+            insertTxn(session, "pending-refund", "checking", "c-food", 1_000, null, 20261014, 4.0)
+            insertTxn(session, "cleared-pay", "checking", "c-sal", 7_000, null, 20261013, 5.0)
+            insertTxn(session, "pending-split", "checking", null, 50_000, null, 20261014, 6.0, parent = true)
+            insertTxn(session, "pending-part", "checking", "c-sal", 50_000, null, 20261014, 6.0, childOf = "pending-split")
+            val unbooked = """{"booked": false, "transactionId": "x"}"""
+            listOf("pending-pay", "pending-spend", "pending-refund", "pending-split").forEach { id ->
+                session.exec("UPDATE transactions SET cleared = 0, raw_synced_data = ? WHERE id = ?", listOf(unbooked, id))
+            }
+            session.exec("UPDATE transactions SET cleared = 1, raw_synced_data = ? WHERE id = 'cleared-pay'", listOf(unbooked))
+            session.exec("UPDATE transactions SET cleared = 1 WHERE id IN ('posted-pay', 'pending-part')")
+            val shell = ShellReader.read(session, BudgetMetadata("home", "Home"), LocalDate.of(2026, 10, 15))
+            assertEquals(507_000L, shell.headerMinor)
+            assertEquals(
+                -3_000L,
+                shell.groups
+                    .single()
+                    .categories
+                    .single()
+                    .spentMinor,
+            )
+            assertEquals(
+                507_000L,
+                shell.incomeGroups
+                    .single()
+                    .categories
+                    .single()
+                    .receivedMinor,
+            )
+            assertEquals(250_000L, shell.pendingIncomeMinor)
+            // The account still holds every row.
+            assertEquals(755_000L, shell.accounts.single().balanceMinor)
+        }
+    }
+
     @Test
     fun readsTheViewMonthsGoalsForEachCategory() {
         val file = File.createTempFile("shell", ".sqlite")

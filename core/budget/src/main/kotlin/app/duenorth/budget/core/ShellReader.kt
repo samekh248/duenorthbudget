@@ -94,6 +94,26 @@ object ShellReader {
                 ORDER BY t.date DESC, t.sort_order DESC, t.id DESC
                 """.trimIndent(),
             )
+        val pendingIncome =
+            session
+                .query(
+                    """
+                    SELECT COALESCE(SUM(t.amount), 0) AS total
+                    FROM transactions t
+                    JOIN accounts a
+                        ON a.id = t.acct
+                        AND IFNULL(a.tombstone, 0) = 0
+                        AND IFNULL(a.offbudget, 0) = 0
+                    LEFT JOIN categories c ON c.id = t.category
+                    WHERE $alive
+                        AND t.date / 100 = ?
+                        AND t.transferred_id IS NULL
+                        AND (t.category IS NULL OR IFNULL(c.is_income, 0) = 1)
+                        AND ${BankPending.pendingInflowSql("t")}
+                    """.trimIndent(),
+                    listOf(viewMonth.toActualMonth()),
+                ).first()
+                .long("total")
         return MonthShell(
             budgetId = metadata.id,
             budgetName = metadata.budgetName,
@@ -102,6 +122,7 @@ object ShellReader {
             month = month,
             headerLabel = figures.headerLabel,
             headerMinor = figures.headerMinor,
+            pendingIncomeMinor = pendingIncome,
             bufferedMinor = detailed.bufferedMinor,
             ahead = detailed.ahead,
             groups =
@@ -260,6 +281,7 @@ object ShellReader {
                 WHERE $alive
                     AND t.category IS NOT NULL
                     AND t.date IS NOT NULL
+                    AND NOT ${BankPending.pendingInflowSql("t")}
                     AND NOT EXISTS (
                         SELECT 1 FROM accounts off
                         WHERE off.id = t.acct AND IFNULL(off.offbudget, 0) = 1
@@ -407,6 +429,7 @@ object ShellReader {
                     AND IFNULL(payment.is_income, 0) = 0
                 WHERE $alive
                     AND t.date IS NOT NULL
+                    AND NOT ${BankPending.pendingInflowSql("t")}
                     AND t.category != link.value
                     AND t.transferred_id IS NULL
                 GROUP BY t.date / 100, link.value
@@ -435,6 +458,7 @@ object ShellReader {
                     AND IFNULL(partner.offbudget, 0) = 0
                 WHERE $alive
                     AND t.date IS NOT NULL
+                    AND NOT ${BankPending.pendingInflowSql("t")}
                 GROUP BY t.date / 100, link.value
                 """.trimIndent(),
             )

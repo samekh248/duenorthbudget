@@ -540,6 +540,15 @@ fun BudgetSection(
                 Spacer(Modifier.weight(1f))
             }
         }
+        if (shell.pendingIncomeMinor > 0L) {
+            // Pending income stays out of to budget; one quiet line says it is on its way.
+            MetroText(
+                ShellCopy.pendingIncome(MoneyFormat.format(shell.pendingIncomeMinor, shell.currency, formatOptions)),
+                Metro.typography.caption,
+                Modifier.padding(top = 4.dp).testTag("pending-income"),
+                color = Metro.colors.secondary,
+            )
+        }
         if (three) Spacer(Modifier.height(MetroDimens.Grid))
         if (notice != null) MonthNotice(notice, Modifier.padding(top = MetroDimens.Row))
         if (getStarted != null && shell.groups.isEmpty() && shell.incomeGroups.isEmpty()) {
