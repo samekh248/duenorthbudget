@@ -50,8 +50,6 @@ import kotlin.math.roundToInt
 
 /** Words for the unassigned figure's panel. Apply and overwrite are Actual's two template runs, in plain words. */
 object DistributeCopy {
-    fun title(amount: String): String = "put $amount toward this month's targets"
-
     /** Actual's "Apply budget template". */
     const val APPLY = "fill empty targets"
     const val APPLY_WHAT = "budgets templated categories that have nothing yet"
@@ -59,7 +57,6 @@ object DistributeCopy {
     /** Actual's "Overwrite with budget template". */
     const val OVERWRITE = "refill all targets"
     const val OVERWRITE_WHAT = "sets every templated category to its target again"
-    const val PRIORITY = "higher priorities are funded first while money lasts"
     const val NOTHING = "nothing to fill this month"
     const val NO_TEMPLATES = "no category has a template yet"
 
@@ -113,7 +110,6 @@ data class DistributeActions(
 fun DistributePopup(
     anchor: Rect,
     menu: DistributeMenu,
-    unassignedMinor: Long,
     currency: CurrencySpec,
     format: FormatOptions,
     onPick: (Boolean) -> Unit,
@@ -123,7 +119,7 @@ fun DistributePopup(
     val top = WindowInsets.statusBars.getTop(density)
     val bottom = WindowInsets.navigationBars.getBottom(density)
     Popup(popupPositionProvider = WholeWindow, onDismissRequest = onDismiss, properties = PopupProperties(focusable = true)) {
-        DistributePanel(anchor, menu, unassignedMinor, currency, format, onPick, onDismiss, top, bottom)
+        DistributePanel(anchor, menu, currency, format, onPick, onDismiss, top, bottom)
     }
 }
 
@@ -140,7 +136,6 @@ private object WholeWindow : PopupPositionProvider {
 fun DistributePanel(
     anchor: Rect,
     menu: DistributeMenu,
-    unassignedMinor: Long,
     currency: CurrencySpec,
     format: FormatOptions,
     onPick: (Boolean) -> Unit,
@@ -159,18 +154,6 @@ fun DistributePanel(
                     .padding(vertical = MetroDimens.Row)
                     .testTag("distribute-menu"),
             ) {
-                MetroText(
-                    DistributeCopy.title(MoneyFormat.format(unassignedMinor, currency, format)),
-                    Metro.typography.body,
-                    Modifier.padding(horizontal = INSET).padding(top = 4.dp),
-                    color = Metro.colors.foreground,
-                )
-                MetroText(
-                    DistributeCopy.PRIORITY,
-                    Metro.typography.caption,
-                    Modifier.padding(horizontal = INSET).padding(bottom = 8.dp),
-                    color = Metro.colors.secondary,
-                )
                 menu.options.forEach { option ->
                     OptionRow(option, currency, format) {
                         onDismiss()

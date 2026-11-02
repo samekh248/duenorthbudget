@@ -458,7 +458,7 @@ fun BudgetSection(
     var unassignedAnchor by remember { mutableStateOf(Rect.Zero) }
     if (ahead != null) {
         distribute.menu?.let { menu ->
-            DistributePopup(unassignedAnchor, menu, ahead.freeMinor, shell.currency, formatOptions, distribute.onPick, distribute.onDismiss)
+            DistributePopup(unassignedAnchor, menu, shell.currency, formatOptions, distribute.onPick, distribute.onDismiss)
         }
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
