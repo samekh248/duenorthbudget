@@ -962,9 +962,10 @@ class BudgetLibrary(
         month: YearMonth,
         overwrite: Boolean,
         confirmed: Boolean = false,
+        cap: Long? = null,
     ): TemplateResult {
         if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF)
-        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).run(month, overwrite, confirmed) }
+        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).run(month, overwrite, confirmed, cap) }
             ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
     }
 
@@ -988,6 +989,21 @@ class BudgetLibrary(
         overwrite: Boolean,
         budgeted: Map<String, Long>,
     ): Pair<TemplateResult, Map<String, Long>> {
+        val (result, changes) = previewTemplateChanges(budgetId, month, overwrite, budgeted)
+        return result to changes.mapValues { it.value.second }
+    }
+
+    /**
+     * Like [previewTemplates], but each changed category comes back with its amount before and after, so a caller can
+     * tell how much of to budget the run would hand out. Writes nothing.
+     */
+    fun previewTemplateChanges(
+        budgetId: String,
+        month: YearMonth,
+        overwrite: Boolean,
+        budgeted: Map<String, Long> = emptyMap(),
+        cap: Long? = null,
+    ): Pair<TemplateResult, Map<String, Pair<Long, Long>>> {
         if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF) to emptyMap()
         return serial {
             open(budgetId) { session ->
@@ -1011,14 +1027,17 @@ class BudgetLibrary(
                             BudgetEdits.assign(session, SyncSchema.clockFor(session), month.toActualMonth(), id, amount)
                         }
                         before = amounts()
-                        result = TemplateEngine(session, clock.today()).run(month, overwrite, confirmed = true)
+                        result = TemplateEngine(session, clock.today()).run(month, overwrite, confirmed = true, cap = cap)
                         after = amounts()
                         throw PreviewRollback()
                     }
                 } catch (_: PreviewRollback) {
                     // Rolled back: the preview leaves the file as it was.
                 }
-                result to after.filter { (id, amount) -> before[id] != amount }
+                result to
+                    after
+                        .filter { (id, amount) -> (before[id] ?: 0L) != amount }
+                        .mapValues { (id, amount) -> (before[id] ?: 0L) to amount }
             }
         } ?: (TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS) to emptyMap())
     }

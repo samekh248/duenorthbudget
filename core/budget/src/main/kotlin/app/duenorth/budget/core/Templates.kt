@@ -134,13 +134,14 @@ class TemplateEngine(
         month: YearMonth,
         overwrite: Boolean,
         confirmed: Boolean = false,
+        cap: Long? = null,
     ): TemplateResult {
         val categories = categories()
         val errors = categories.flatMap { category -> category.errors.map { TemplateError(category.name, it) } }
         if (errors.isNotEmpty()) return TemplateResult.Invalid(errors)
         if (overwrite && !confirmed) return TemplateResult.NeedsConfirm(TemplateCopy.OVERWRITE_CONFIRM)
         val sheet = TemplateSheet(session, today)
-        val computed = compute(categories, month, sheet, force = overwrite)
+        val computed = compute(categories, month, sheet, force = overwrite, cap = cap)
         if (computed.errors.isNotEmpty()) return TemplateResult.Invalid(computed.errors)
         val table = if (sheet.tracking) "reflect_budgets" else "zero_budgets"
         session.transaction {
@@ -276,9 +277,11 @@ class TemplateEngine(
         keepGoing: Boolean = false,
         only: Boolean = false,
         laneOut: Boolean = false,
+        cap: Long? = null,
     ): Computed {
         val detailed = sheet.month(month)
-        var available = detailed.figures.headerMinor
+        // An app-only cap (the unassigned figure's "just the unassigned" run): to budget, but never more than [cap].
+        var available = detailed.figures.headerMinor.let { header -> cap?.let { minOf(header, it) } ?: header }
         val contexts = mutableListOf<Pair<Category, TemplateContext>>()
         val errors = mutableListOf<TemplateError>()
         for (category in if (only) categories else candidates(categories, sheet)) {
@@ -295,6 +298,7 @@ class TemplateEngine(
                         budgeted,
                         sheet,
                         skipAvailableClamp,
+                        clampAll = cap != null,
                     )
                 } catch (failure: TemplateFailure) {
                     errors += TemplateError(category.name, failure.message.orEmpty())

@@ -40,6 +40,8 @@ data class TemplatesUi(
     val applyPreview: TemplateApplyPreview? = null,
     /** What the last end-of-month cleanup did. */
     val cleanup: CleanupResult? = null,
+    /** The unassigned figure's menu of template runs, while it shows. */
+    val distribute: DistributeMenu? = null,
 )
 
 // Spec 010 US5 (T062): budget templates from category notes. See contracts/templates.md.
@@ -465,6 +467,14 @@ class TemplatesHolder internal constructor(
         host.mutate { it.copy(templates = it.templates.copy(applyPreview = null)) }
         apply(preview.overwrite, confirmed = true)
     }
+
+    /** The unassigned figure tapped: its runs, each with what it would budget. */
+    fun openDistribute() = host.openDistribute()
+
+    fun closeDistribute() = host.closeDistribute()
+
+    /** A line of that panel picked: Actual's apply or overwrite, or apply spending only what is unassigned. */
+    fun distribute(kind: DistributeKind) = host.distribute(kind)
 
     fun keepApplyPreview() {
         host.mutate { it.copy(templates = it.templates.copy(applyPreview = null)) }

@@ -59,6 +59,13 @@ internal fun HomeRoute(
         // Tapping to budget opens edit mode; in edit mode it opens the breakdown.
         onToBudget = if (state.shell == null) null else model.budgetEdit::start,
         showAhead = state.freeAfterPlansOn,
+        distribute =
+            DistributeActions(
+                menu = state.templates.distribute,
+                onOpen = if (state.shell == null) null else model.templates::openDistribute,
+                onPick = model.templates::distribute,
+                onDismiss = model.templates::closeDistribute,
+            ),
         budgetEdit = state.budgetEdit,
         budgetEditActions =
             remember(model) {
