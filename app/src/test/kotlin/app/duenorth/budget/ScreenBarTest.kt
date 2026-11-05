@@ -17,9 +17,43 @@ class ScreenBarTest {
         val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
         assertEquals(listOf("add", "edit-budget"), specs.filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("hold", "categories", "show-hidden", "rules", "settings"),
+            listOf("hold", "show-hidden", "categories", "settings"),
             specs.filter { !it.primary }.map { it.id },
         )
+        // Add names what it adds, on every hub.
+        assertEquals(ScreenBarCopy.ADD_TRANSACTION, specs.first().label)
+    }
+
+    // Every hub's first button is add transaction, and every hub's menu ends with the same tail.
+    @Test
+    fun everyHubStartsWithAddAndEndsWithTheSameTail() {
+        val hubs =
+            listOf(ScreenBar.HOME_INBOX, ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS, ScreenBar.HOME_REPORTS, ScreenBar.HOME_ASSISTANT)
+        hubs.forEach { section ->
+            val specs =
+                ScreenBar.specsFor(
+                    ShellRoute.Home,
+                    hasBudget = true,
+                    mode = BudgetMode.ENVELOPE,
+                    undoLabel = "assign",
+                    homeSection = section,
+                    inboxSync = true,
+                )
+            assertEquals(section.toString(), "add", specs.first().id)
+            val menu = specs.filterNot { it.primary }
+            assertEquals(section.toString(), listOf("sync-all", "undo", "settings"), menu.takeLast(3).map { it.id })
+            assertTrue(section.toString(), menu.takeLast(3).first().rule)
+        }
+    }
+
+    // Reports has its own bar: add and the tail, none of the budget's tools.
+    @Test
+    fun reportsHasItsOwnBar() {
+        val ids =
+            ScreenBar
+                .specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_REPORTS)
+                .map { it.id }
+        assertEquals(listOf("add", "settings"), ids)
     }
 
     // Schedules live on the accounts pivot item: its bar opens them, and the budget's menu no longer adds or lists them.
@@ -30,7 +64,7 @@ class ScreenBarTest {
         assertEquals("schedules", specs.single { it.id == "schedules" }.label)
     }
 
-    // A SimpleFIN-linked budget on a server gets a sync button beside add on the accounts bar.
+    // A SimpleFIN-linked budget on a server syncs from the hub tail, the same sync every hub has.
     @Test
     fun accountsBarSyncsBanksWhenLinked() {
         val specs =
@@ -41,8 +75,8 @@ class ScreenBarTest {
                 homeSection = ScreenBar.HOME_ACCOUNTS,
                 accountsBankSync = true,
             )
-        assertEquals(listOf("add", "bank-sync", "schedules"), specs.filter { it.primary }.map { it.id })
-        assertEquals("sync", specs.single { it.id == "bank-sync" }.label)
+        assertEquals(listOf("add", "schedules"), specs.filter { it.primary }.map { it.id })
+        assertEquals("sync", specs.single { it.id == "sync-all" }.label)
     }
 
     // The failed sync's page retries every linked account, and dismiss clears the tile.
@@ -69,8 +103,9 @@ class ScreenBarTest {
     @Test
     fun schedulesBarSwitchesUpcomingView() {
         val list = ScreenBar.specsFor(ShellRoute.Schedules, hasBudget = true, mode = BudgetMode.ENVELOPE)
-        assertEquals(listOf("add-schedule", "schedules-view"), list.map { it.id })
-        assertEquals("calendar", list.last().label)
+        assertEquals(listOf("add-schedule", "schedules-view", "settings"), list.map { it.id })
+        assertEquals(ScreenBarCopy.ADD_SCHEDULE, list.first().label)
+        assertEquals("calendar", list[1].label)
         val calendar =
             ScreenBar.specsFor(
                 ShellRoute.Schedules,
@@ -78,7 +113,7 @@ class ScreenBarTest {
                 mode = BudgetMode.ENVELOPE,
                 schedules = SchedulesBar(calendar = true),
             )
-        assertEquals("list", calendar.last().label)
+        assertEquals("list", calendar[1].label)
         val all =
             ScreenBar.specsFor(
                 ShellRoute.Schedules,
@@ -86,7 +121,7 @@ class ScreenBarTest {
                 mode = BudgetMode.ENVELOPE,
                 schedules = SchedulesBar(section = SchedulesSection.ALL),
             )
-        assertEquals(listOf("add-schedule"), all.map { it.id })
+        assertEquals(listOf("add-schedule", "settings"), all.map { it.id })
     }
 
     // A schedule's page: post, skip and edit on the bar, delete in the menu; an ended one only edits.
@@ -94,7 +129,9 @@ class ScreenBarTest {
     fun scheduleDetailsBar() {
         val open = ScreenBar.specsFor(ShellRoute.ScheduleDetails("s1"), hasBudget = true, mode = BudgetMode.ENVELOPE)
         assertEquals(listOf("post-schedule", "skip-schedule", "edit-schedule"), open.filter { it.primary }.map { it.id })
-        assertEquals(listOf("delete-schedule", "settings"), open.filter { !it.primary }.map { it.id })
+        // Delete is last, after the tail, and set apart.
+        assertEquals(listOf("settings", "delete-schedule"), open.filter { !it.primary }.map { it.id })
+        assertTrue(open.last().apart)
         val ended =
             ScreenBar.specsFor(
                 ShellRoute.ScheduleDetails("s1"),
@@ -119,10 +156,13 @@ class ScreenBarTest {
             )
         // A sandbox: done and cancel, with the fills and templates in its menu; undo would write straight away.
         assertEquals(listOf("end-budget-edit", "cancel-budget-edit"), specs.filter { it.primary }.map { it.id })
-        assertEquals(listOf("copy-last", "average", "zero", "templates", "settings"), specs.filter { !it.primary }.map { it.id })
-        // The budget's own menu no longer carries them.
+        // A mode: no settings in its menu, and its commit says save.
+        assertEquals(listOf("copy-last", "average", "zero", "templates"), specs.filter { !it.primary }.map { it.id })
+        assertEquals(ScreenBarCopy.SAVE, specs.first().label)
+        // The budget's own menu carries templates too, but not the fills.
         val home = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, templates = true).map { it.id }
-        assertTrue(home.none { it in setOf("copy-last", "average", "zero", "templates") })
+        assertTrue(home.none { it in setOf("copy-last", "average", "zero") })
+        assertTrue(home.contains("templates"))
     }
 
     @Test
@@ -152,8 +192,9 @@ class ScreenBarTest {
     @Test
     fun homeInboxSectionOffersSelectAndSelectModeActsOnTheCheckedRows() {
         val inbox = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX)
-        assertEquals(listOf("select-inbox", "add"), inbox.filter { it.primary }.map { it.id })
-        assertEquals(listOf("settings"), inbox.filter { !it.primary }.map { it.id })
+        assertEquals(listOf("add", "select-inbox"), inbox.filter { it.primary }.map { it.id })
+        // Rules and payees shape what lands in the inbox, so they head its menu.
+        assertEquals(listOf("rules", "payees", "settings"), inbox.filter { !it.primary }.map { it.id })
         val empty =
             ScreenBar.specsFor(
                 ShellRoute.Home,
@@ -188,6 +229,7 @@ class ScreenBarTest {
                 ).map { it.id }
         assertEquals(listOf("end-inbox-selecting"), ids(InboxPick.NONE))
         assertEquals(listOf("categorize-selected", "end-inbox-selecting", "delete-selected"), ids(InboxPick.NEEDS_CATEGORY))
+
         assertEquals(
             listOf("accept-selected", "categorize-selected", "end-inbox-selecting", "delete-selected"),
             ids(InboxPick.READY),
@@ -202,7 +244,8 @@ class ScreenBarTest {
                     inboxSelecting = true,
                     inboxPick = InboxPick.READY,
                 ).single { it.id == "delete-selected" }
-        assertTrue(delete.apart && delete.primary)
+        // Delete is always the menu's last line, set apart, never a button.
+        assertTrue(delete.apart && !delete.primary)
     }
 
     @Test
@@ -217,7 +260,7 @@ class ScreenBarTest {
     @Test
     fun inboxMenuSyncsOnlyABudgetOnTheServerAndKeepsSettingsLast() {
         val local = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX)
-        assertFalse(local.any { it.id == "sync-server" })
+        assertFalse(local.any { it.id == "sync-all" })
         val synced =
             ScreenBar.specsFor(
                 ShellRoute.Home,
@@ -227,8 +270,8 @@ class ScreenBarTest {
                 homeSection = ScreenBar.HOME_INBOX,
                 inboxSync = true,
             )
-        assertEquals(listOf("sync-server", "undo", "settings"), synced.filter { !it.primary }.map { it.id })
-        assertEquals(InboxCopy.SYNC, synced.first { it.id == "sync-server" }.label)
+        assertEquals(listOf("rules", "payees", "sync-all", "undo", "settings"), synced.filter { !it.primary }.map { it.id })
+        assertEquals(ScreenBarCopy.SYNC, synced.first { it.id == "sync-all" }.label)
         val selecting =
             ScreenBar.specsFor(
                 ShellRoute.Home,
@@ -238,7 +281,7 @@ class ScreenBarTest {
                 inboxSelecting = true,
                 inboxSync = true,
             )
-        assertFalse(selecting.any { it.id == "sync-server" })
+        assertFalse(selecting.any { it.id == "sync-all" })
     }
 
     @Test
@@ -271,20 +314,24 @@ class ScreenBarTest {
     @Test
     fun registerActions() {
         val ids = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
-        assertEquals(listOf("search", "add", "reconcile", "import", "edit-account", "bank-link", "close", "settings"), ids)
+        assertEquals(listOf("add", "search", "reconcile", "import", "bank-link", "edit-account", "settings", "close"), ids)
     }
 
     @Test
     fun registerImportIsInTheMenu() {
         val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE)
-        assertEquals(listOf("search", "add", "reconcile"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add", "search", "reconcile"), specs.filter { it.primary }.map { it.id })
+        // Reconcile has its own glyph, so it never reads as save's check.
+        assertEquals(AppGlyph.Reconcile, specs.single { it.id == "reconcile" }.glyph)
+        assertTrue(specs.single { it.id == "close" }.apart)
     }
 
     @Test
     fun bankLinkedRegisterSyncsFromTheBar() {
         val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE, bankLinked = true)
-        assertEquals(listOf("search", "add", "reconcile", "sync"), specs.filter { it.primary }.map { it.id })
-        assertEquals(listOf("import", "edit-account", "bank-link", "close", "settings"), specs.filterNot { it.primary }.map { it.id })
+        assertEquals(listOf("add", "search", "reconcile", "sync"), specs.filter { it.primary }.map { it.id })
+        assertEquals(ScreenBarCopy.SYNC_BANK, specs.single { it.id == "sync" }.label)
+        assertEquals(listOf("import", "bank-link", "edit-account", "settings", "close"), specs.filterNot { it.primary }.map { it.id })
     }
 
     @Test
@@ -319,7 +366,7 @@ class ScreenBarTest {
                     inboxMerge = true,
                 ).map { it.id }
         assertEquals(
-            listOf("accept-selected", "categorize-selected", "merge-inbox-selected", "end-inbox-selecting", "delete-selected", "settings"),
+            listOf("accept-selected", "categorize-selected", "merge-inbox-selected", "end-inbox-selecting", "delete-selected"),
             ids,
         )
         val delete =
@@ -333,17 +380,16 @@ class ScreenBarTest {
                     inboxPick = InboxPick.READY,
                     inboxMerge = true,
                 ).single { it.id == "delete-selected" }
-        // Five buttons do not fit the bar, so delete waits in the menu while merge is on it.
         assertFalse(delete.primary)
     }
 
     @Test
     fun envelopeIncomeCategoryHasNoSave() {
         val income = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, incomeCategory = true)
-        assertEquals(listOf("auto-hold-on", "auto-hold-off-month", "auto-hold-off", "rename-category", "settings"), income.map { it.id })
+        assertEquals(listOf("auto-hold-on", "auto-hold-off-month", "auto-hold-off", "rename-category"), income.map { it.id })
         assertTrue(income.none { it.primary })
         val tracking = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.TRACKING, incomeCategory = true)
-        assertEquals(listOf("save", "cancel", "rename-category", "settings"), tracking.map { it.id })
+        assertEquals(listOf("save", "cancel", "rename-category"), tracking.map { it.id })
     }
 
     @Test
@@ -351,10 +397,10 @@ class ScreenBarTest {
         val specs = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE)
         assertEquals(listOf("save", "cancel", "move"), specs.filter { it.primary }.map { it.id })
         // Rollover is a switch on the page now, not a menu item.
-        assertEquals(listOf("to-budget", "rename-category", "settings"), specs.filterNot { it.primary }.map { it.id })
+        assertEquals(listOf("to-budget", "rename-category"), specs.filterNot { it.primary }.map { it.id })
         // With templates on, add template heads the menu; the page itself has no add button.
         val templates = ScreenBar.specsFor(ShellRoute.CategoryBudget("c"), true, BudgetMode.ENVELOPE, templates = true)
-        assertEquals(listOf("add-template", "to-budget", "rename-category", "settings"), templates.filterNot { it.primary }.map { it.id })
+        assertEquals(listOf("add-template", "to-budget", "rename-category"), templates.filterNot { it.primary }.map { it.id })
     }
 
     @Test
@@ -389,10 +435,10 @@ class ScreenBarTest {
         routes.forEach { route ->
             val ids = ScreenBar.specsFor(route, hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
             assertEquals(route.toString(), listOf("save", "cancel"), ids.take(2))
-            assertTrue(route.toString(), ids.drop(2).all { it in setOf("to-budget", "move", "rename-category", "settings") })
+            assertTrue(route.toString(), ids.drop(2).all { it in setOf("to-budget", "move", "rename-category") })
             assertFalse(ids.contains("hold"))
-            // A form with a menu ends it with settings, like every menu; one without a menu gains none.
-            assertEquals(route.toString(), ids.size > 3, ids.contains("settings"))
+            // Forms never lead off to settings, where a half-filled form would be lost.
+            assertFalse(route.toString(), ids.contains("settings"))
         }
     }
 
@@ -410,7 +456,8 @@ class ScreenBarTest {
                 mode = BudgetMode.ENVELOPE,
                 settings = SettingsBar(page, signedIn, serverActive),
             ).map { it.id }
-        assertEquals(listOf("settings-new", "settings-payees"), ids(SettingsPage.BUDGET))
+        // Payees has its link on the page's manage list, so the bar only adds a budget.
+        assertEquals(listOf("settings-new"), ids(SettingsPage.BUDGET))
         assertEquals(listOf("settings-new"), ids(SettingsPage.BUDGET, hasBudget = false))
         assertEquals(listOf("add-server"), ids(SettingsPage.SERVER))
         assertEquals(listOf("add-server", "server-budgets", "sign-out"), ids(SettingsPage.SERVER, signedIn = true, serverActive = true))
@@ -439,11 +486,11 @@ class ScreenBarTest {
             .specsFor(route, hasBudget = false, mode = null, developerMode = developerMode, passwordSignIn = password)
             .map { it.id }
         assertTrue(ids(ShellRoute.Welcome).isEmpty())
-        assertEquals(listOf("sample-budgets", "settings"), ids(ShellRoute.Welcome, developerMode = true))
         assertEquals(listOf("next"), ids(ShellRoute.OnboardingAddress))
         assertEquals(listOf("sign-in"), ids(ShellRoute.OnboardingSignIn))
         assertTrue(ids(ShellRoute.OnboardingSignIn, password = false).isEmpty())
         assertEquals(listOf("new-budget", "refresh"), ids(ShellRoute.OnboardingFiles))
+        assertEquals(listOf("sample-budgets", "settings"), ids(ShellRoute.Welcome, developerMode = true))
     }
 
     @Test
@@ -456,42 +503,48 @@ class ScreenBarTest {
         assertEquals(listOf("save", "cancel"), menu(TransactionMenu.NEW).filter { it.primary }.map { it.id })
         assertEquals(listOf("save", "cancel"), menu(TransactionMenu.TRANSFER).filter { it.primary }.map { it.id })
         assertEquals(
-            listOf("schedule-transaction", "delete-transaction", "settings"),
+            listOf("schedule-transaction", "delete-transaction"),
             menu(TransactionMenu.ORDINARY).filter { !it.primary }.map { it.id },
         )
-        assertEquals(listOf("delete-transaction", "settings"), menu(TransactionMenu.TRANSFER).filter { !it.primary }.map { it.id })
+        assertEquals(listOf("delete-transaction"), menu(TransactionMenu.TRANSFER).filter { !it.primary }.map { it.id })
+        assertTrue(menu(TransactionMenu.ORDINARY).last().apart)
         assertTrue(menu(TransactionMenu.NEW).none { !it.primary })
     }
 
-    // Every `•••` menu outside settings ends with settings, once, whatever else it carries.
+    // Hubs and object pages end their menu with settings (an object page's destructive line follows it); forms
+    // and modes never offer it; settings' own pages need no way to themselves.
     @Test
-    fun everyMenuEndsWithSettings() {
-        val routes =
+    fun settingsEndsHubAndObjectMenusButNeverForms() {
+        val objects =
+            listOf(ShellRoute.Welcome, ShellRoute.Register("a"), ShellRoute.Rules, ShellRoute.Schedules, ShellRoute.ScheduleDetails("s1"))
+        objects.forEach { route ->
+            val specs =
+                ScreenBar.specsFor(route, hasBudget = true, mode = BudgetMode.ENVELOPE, undoLabel = "assign", developerMode = true)
+            val menu = specs.filterNot { it.primary }
+            assertEquals(route.toString(), "settings", menu.lastOrNull { !it.apart }?.id)
+            assertEquals(route.toString(), 1, specs.count { it.id == "settings" })
+            assertTrue(route.toString(), menu.dropWhile { !it.apart }.all { it.apart })
+        }
+        val forms =
             listOf(
-                ShellRoute.Welcome,
-                ShellRoute.Register("a"),
-                ShellRoute.Rules,
-                ShellRoute.Schedules,
-                ShellRoute.ScheduleDetails("s1"),
                 ShellRoute.ScheduleEditor("s1"),
                 ShellRoute.RuleEditor("r1"),
                 ShellRoute.TemplateEditor("c", 0, TemplateKind.entries.first()),
                 ShellRoute.CategoryBudget("c"),
                 ShellRoute.EditTransaction("a", "t"),
             )
-        routes.forEach { route ->
+        forms.forEach { route ->
             val specs =
                 ScreenBar.specsFor(
                     route,
                     hasBudget = true,
                     mode = BudgetMode.ENVELOPE,
                     undoLabel = "assign",
-                    developerMode = true,
                     transaction = TransactionMenu.ORDINARY,
                 )
-            assertEquals(route.toString(), "settings", specs.last().id)
-            assertFalse(route.toString(), specs.last().primary)
-            assertEquals(route.toString(), 1, specs.count { it.id == "settings" })
+            assertFalse(route.toString(), specs.any { it.id == "settings" })
+            // Destructive lines are always last.
+            assertTrue(route.toString(), specs.dropWhile { !it.apart }.all { it.apart })
         }
         SettingsPage.entries.forEach { page ->
             val specs =
@@ -503,5 +556,28 @@ class ScreenBarTest {
                 )
             assertFalse(page.toString(), specs.any { it.id == "settings" })
         }
+    }
+
+    // + always starts something new and names it; ✓ always commits and never says add.
+    @Test
+    fun addAndSaveGlyphsKeepOneMeaning() {
+        val routes =
+            listOf(
+                ShellRoute.Home,
+                ShellRoute.Register("a"),
+                ShellRoute.Rules,
+                ShellRoute.Schedules,
+                ShellRoute.StarterCategories,
+                ShellRoute.OnboardingFiles,
+                ShellRoute.Settings,
+            )
+        routes.forEach { route ->
+            ScreenBar.specsFor(route, hasBudget = true, mode = BudgetMode.ENVELOPE).filter { it.primary }.forEach { spec ->
+                if (spec.glyph == AppGlyph.Add) assertTrue(spec.label, spec.label.startsWith("add "))
+                if (spec.glyph == AppGlyph.Save) assertFalse(spec.label, spec.label.startsWith("add"))
+            }
+        }
+        val server = ScreenBar.specsFor(ShellRoute.Settings, true, BudgetMode.ENVELOPE, settings = SettingsBar(SettingsPage.SERVER))
+        assertEquals(ScreenBarCopy.ADD_SERVER, server.single { it.id == "add-server" }.label)
     }
 }

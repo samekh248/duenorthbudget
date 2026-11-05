@@ -162,7 +162,7 @@ class TransactionDetailsScreenshotTest {
                         val actions =
                             host.bar ?: ScreenBar
                                 .specsFor(ShellRoute.EditTransaction("visa", row?.id), true, BudgetMode.ENVELOPE, transaction = menu)
-                                .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} }
+                                .map { it.action() }
                         MetroAppBar(actions = actions, expanded = false, onExpandedChange = {})
                     }
                 }

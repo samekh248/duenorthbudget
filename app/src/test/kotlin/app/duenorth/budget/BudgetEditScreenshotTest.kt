@@ -71,7 +71,7 @@ class BudgetEditScreenshotTest {
                     ShellChrome(
                         actions =
                             ScreenBar.specsFor(ShellRoute.MoveCategory("c-gas"), true, BudgetMode.ENVELOPE).map {
-                                ScreenAction(it.id, it.glyph, it.label, it.primary) {}
+                                it.action()
                             },
                         statusBar =
                             androidx.compose.foundation.layout
@@ -108,7 +108,7 @@ class BudgetEditScreenshotTest {
                         actions =
                             ScreenBar
                                 .specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, undoLabel = "assign", budgetEditing = true)
-                                .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                                .map { it.action() },
                         statusBar =
                             androidx.compose.foundation.layout
                                 .WindowInsets(0),

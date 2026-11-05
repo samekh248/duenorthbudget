@@ -79,7 +79,16 @@ object SettingsCopy {
     const val NO_SERVER_HINT = "add the Actual server you run to sync this phone's budgets"
     const val BACKGROUND_SYNC_HINT = "fetches linked banks, then syncs the open budget, while the app is closed"
     const val NO_BUDGET = "no budget open"
-    const val RENAME_PAYEES = "rename and merge payees"
+    const val MANAGE = "manage"
+    const val MANAGE_CATEGORIES = "categories"
+    const val MANAGE_CATEGORIES_HINT = "add, rename, group and hide categories"
+    const val MANAGE_RULES = "rules"
+    const val MANAGE_RULES_HINT = "file new transactions by payee, amount and more"
+    const val MANAGE_SCHEDULES = "schedules"
+    const val MANAGE_SCHEDULES_HINT = "bills and paychecks that repeat"
+    const val MANAGE_TEMPLATES = "templates"
+    const val MANAGE_TEMPLATES_HINT = "fill the month from each category's targets"
+    const val RENAME_PAYEES = "payees"
     const val RENAME_PAYEES_HINT = "tidy names that came in from banks and imports"
     const val LEARN = "learn categories"
     const val LEARN_HINT = "a payee's usual category becomes a rule"
@@ -159,6 +168,7 @@ fun SettingsScreen(
     remoteFiles: List<RemoteFile> = emptyList(),
     onOpenServer: (RemoteFile) -> Unit = {},
     budgetError: String? = null,
+    manage: SettingsManage = SettingsManage(),
 ) {
     val budgetOpen = !openBudgetId.isNullOrBlank()
     val pages = SettingsPage.shown(budgetOpen)
@@ -183,6 +193,7 @@ fun SettingsScreen(
                                 remoteFiles = remoteFiles,
                                 onOpenServer = onOpenServer,
                                 error = budgetError,
+                                manage = manage,
                             )
                         SettingsPage.SERVER ->
                             ServerItem(

@@ -591,7 +591,7 @@ fun CategoryLine(
         modifier
             .fillMaxWidth()
             .ledgerFill(if (banded) ledgerBand else Color.Transparent)
-            .then(if (onOpen != null) Modifier.metroPress { onOpen(category.id) } else Modifier)
+            .then(if (onOpen != null) Modifier.rowPress({ onOpen(category.id) }) { category(category.id) } else Modifier)
             .testTag("category-${category.id}"),
     ) {
         Row(

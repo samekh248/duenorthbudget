@@ -183,7 +183,7 @@ class SettingsScreenshotTest {
             MetroTheme(darkTheme = dark) {
                 Box(Modifier.width(390.dp).height(780.dp)) {
                     ShellChrome(
-                        actions.map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                        actions.map { it.action() },
                         statusBar = WindowInsets(0),
                     ) { modifier -> Box(modifier) { settingsScreen(settingsPage, dark) } }
                 }

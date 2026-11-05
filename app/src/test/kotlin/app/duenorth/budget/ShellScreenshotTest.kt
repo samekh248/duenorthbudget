@@ -288,7 +288,7 @@ class ShellScreenshotTest {
                     MetroAppBar(
                         ScreenBar
                             .specsFor(ShellRoute.BankSyncReport, hasBudget = true, mode = BudgetMode.ENVELOPE)
-                            .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                            .map { it.action() },
                         expanded = false,
                         onExpandedChange = {},
                     )
@@ -512,7 +512,7 @@ class ShellScreenshotTest {
                                                         TransactionMerge.ofInbox(shown.inbox.filter { it.id in selection }),
                                                     ),
                                             ).filter { it.primary }
-                                            .map { ScreenAction(it.id, it.glyph, it.label, it.primary, apart = it.apart) {} }
+                                            .map { it.action() }
                                     } else if (!accounts) {
                                         fake
                                     } else {
@@ -569,7 +569,7 @@ class ShellScreenshotTest {
                         actions =
                             ScreenBar
                                 .specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE)
-                                .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                                .map { it.action() },
                         expanded = expanded,
                         onExpandedChange = {},
                     )

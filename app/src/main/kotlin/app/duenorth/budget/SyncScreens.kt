@@ -125,7 +125,7 @@ fun ServerScreen(
                     ScreenAction("server-upload", AppGlyph.Budgets, "send budget", primary = false, run = onUpload),
                     ScreenAction("server-conflicts", AppGlyph.Reconcile, "conflicts", primary = false, run = onConflicts)
                         .takeIf { conflictCount > 0 },
-                    ScreenAction("server-sign-out", AppGlyph.Cancel, "sign out", primary = false, run = onSignOut),
+                    ScreenAction("server-sign-out", AppGlyph.Cancel, "sign out", primary = false, apart = true, run = onSignOut),
                 ),
             )
         }

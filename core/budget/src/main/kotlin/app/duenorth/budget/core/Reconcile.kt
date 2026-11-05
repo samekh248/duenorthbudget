@@ -28,7 +28,7 @@ object ReconcileCopy {
     const val BEFORE_LAST = "before your last reconcile"
     const val FINISH_LOCKS = "finish locks"
     const val FINISH_ANYWAY = "finish anyway?"
-    const val ADD_AND_FINISH = "add and finish"
+    const val ADD_AND_FINISH = "adjust and finish"
     const val KEEP_LOOKING = "keep looking"
     const val CLEAR_IT = "clear it"
     const val CLEAR_BOTH = "clear both"

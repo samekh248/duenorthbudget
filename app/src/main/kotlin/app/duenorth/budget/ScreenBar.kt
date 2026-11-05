@@ -23,9 +23,30 @@ data class ScreenBarSpec(
     val glyph: AppGlyph,
     val label: String,
     val primary: Boolean = true,
-    /** A destructive button, set apart from the rest of the bar. */
+    /** A destructive command: last in the menu, in the accent, under a rule (or set apart on the bar). */
     val apart: Boolean = false,
+    /** A menu line that starts a new group under a rule: the shared sync, undo, settings tail. */
+    val rule: Boolean = false,
 )
+
+/** The spec as a bar button or menu line that runs [run], keeping its rule and destructive marks. */
+fun ScreenBarSpec.action(run: () -> Unit = {}) = ScreenAction(id, glyph, label, primary, apart = apart, rule = rule, run = run)
+
+/** The bar's words that name what a button does, so a glyph never has to be guessed at (+ adds, ✓ commits). */
+object ScreenBarCopy {
+    const val ADD_TRANSACTION = "add transaction"
+    const val ADD_BUDGET = "add budget"
+    const val ADD_SERVER = "add server"
+    const val ADD_RULE = "add rule"
+    const val ADD_SCHEDULE = "add schedule"
+    const val SAVE = "save"
+    const val USE_THESE = "use these"
+    const val RECONCILE = "reconcile"
+    const val SYNC = "sync"
+    const val SYNC_BANK = "sync bank"
+    const val IMPORT = "import"
+    const val PAYEES = "payees"
+}
 
 /** What the inbox's checked rows allow: nothing, categorize and delete, or accept as well when every one has a category. */
 enum class InboxPick {
@@ -77,6 +98,7 @@ object ScreenBar {
     val HOME_ACCOUNTS = HomeSections.headers.indexOf(HomeSections.ACCOUNTS)
     val HOME_INBOX = HomeSections.headers.indexOf(HomeSections.INBOX)
     val HOME_ASSISTANT = HomeSections.headers.indexOf(HomeSections.ASSISTANT)
+    val HOME_REPORTS = HomeSections.headers.indexOf(HomeSections.REPORTS)
 
     fun specsFor(
         route: ShellRoute,
@@ -119,73 +141,66 @@ object ScreenBar {
         inboxMerge: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
-            // Spec 012: each settings pivot item has its own bar.
+            // Spec 012: each settings pivot item has its own bar. Payees has its link on the budget page's manage list.
             ShellRoute.Settings ->
                 when (settings.page) {
-                    SettingsPage.BUDGET ->
-                        listOf(spec("settings-new", AppGlyph.Add, SettingsCopy.NEW)) +
-                            if (hasBudget) listOf(menu("settings-payees", AppGlyph.Payees, SettingsCopy.PAYEES)) else emptyList()
+                    SettingsPage.BUDGET -> listOf(spec("settings-new", AppGlyph.Add, ScreenBarCopy.ADD_BUDGET))
                     SettingsPage.SERVER ->
                         buildList {
-                            add(spec("add-server", AppGlyph.Add, SettingsCopy.ADD_SERVER))
+                            add(spec("add-server", AppGlyph.Add, ScreenBarCopy.ADD_SERVER))
                             if (settings.signedIn) add(spec("server-budgets", AppGlyph.Budgets, SettingsCopy.SERVER_BUDGETS))
-                            if (settings.serverActive) add(menu("sign-out", AppGlyph.Cancel, SettingsCopy.SIGN_OUT))
+                            if (settings.serverActive) add(destructive("sign-out", AppGlyph.Cancel, SettingsCopy.SIGN_OUT))
                         }
-                    SettingsPage.ADVANCED -> listOf(spec("export", AppGlyph.Save, SettingsCopy.EXPORT))
+                    SettingsPage.ADVANCED -> listOf(spec("export", AppGlyph.Export, SettingsCopy.EXPORT))
                     SettingsPage.FORMAT, SettingsPage.APPEARANCE, SettingsPage.EXPERIMENTAL -> emptyList()
                 }
             is ShellRoute.EncryptionPassword -> saveCancel()
             // Spec 011: one primary action per onboarding page, in the bar where the thumb is.
             ShellRoute.Welcome ->
-                if (developerMode) listOf(menu("sample-budgets", AppGlyph.Budgets, ShellCopy.SAMPLE_BUDGETS)) else emptyList()
+                if (developerMode) listOf(menu("sample-budgets", AppGlyph.Budgets, ShellCopy.SAMPLE_BUDGETS)) + settings() else emptyList()
             ShellRoute.OnboardingAddress -> listOf(spec("next", AppGlyph.ChevronRight, OnboardingScreenCopy.NEXT))
             ShellRoute.OnboardingSignIn ->
                 if (passwordSignIn) listOf(spec("sign-in", AppGlyph.ChevronRight, OnboardingScreenCopy.SIGN_IN)) else emptyList()
             ShellRoute.OnboardingFiles ->
                 listOf(
-                    spec("new-budget", AppGlyph.Add, OnboardingScreenCopy.NEW_BUDGET),
+                    spec("new-budget", AppGlyph.Add, ScreenBarCopy.ADD_BUDGET),
                     spec("refresh", AppGlyph.Sync, OnboardingScreenCopy.REFRESH),
                 )
-            ShellRoute.Home ->
+            // Every home pivot is a hub: add transaction first, then its own buttons; its menu holds its own
+            // tools, then the same sync, undo, settings tail under a rule.
+            ShellRoute.Home -> {
+                val tail = hubTail(inboxSync || accountsBankSync, undoLabel)
                 when {
                     !hasBudget -> settings()
-                    // Edit mode is a sandbox: done saves what changed, cancel drops it. The month fills and
+                    // Edit mode is a sandbox: save keeps what changed, cancel drops it. The month fills and
                     // templates live here and fill its boxes; undo would write straight away, so it waits.
                     homeSection == HOME_BUDGET && budgetEditing ->
                         listOf(
-                            spec("end-budget-edit", AppGlyph.Save, BudgetEditCopy.DONE),
+                            spec("end-budget-edit", AppGlyph.Save, ScreenBarCopy.SAVE),
                             spec("cancel-budget-edit", AppGlyph.Cancel, BudgetEditCopy.CANCEL),
                         ) + fills() + templates(templates)
-                    // The accounts pivot item carries account management in its menu, so the month menu does not.
-                    // Select mode swaps the inbox's bar for what can be done to the checked rows: with none
-                    // checked only cancel, accept only while every checked row has a category, and delete
-                    // set apart at the end.
+                    // Select mode swaps the inbox's bar for what can be done to the checked rows: accept only while
+                    // every checked row has a category, cancel last, and delete always last in the menu.
                     homeSection == HOME_INBOX && inboxSelecting ->
                         buildList {
                             if (inboxPick == InboxPick.READY) add(spec("accept-selected", AppGlyph.Save, InboxCopy.ACCEPT))
                             if (inboxPick != InboxPick.NONE) add(spec("categorize-selected", AppGlyph.Categories, InboxCopy.CATEGORIZE))
                             if (inboxMerge) add(spec("merge-inbox-selected", AppGlyph.Merge, MergeCopy.MERGE))
                             add(spec("end-inbox-selecting", AppGlyph.Cancel, InboxCopy.CANCEL))
-                            // The bar holds four buttons; with merge on it, delete moves into the menu.
-                            if (inboxMerge) {
-                                add(menu("delete-selected", AppGlyph.Delete, InboxCopy.DELETE))
-                            } else if (inboxPick != InboxPick.NONE) {
-                                add(ScreenBarSpec("delete-selected", AppGlyph.Delete, InboxCopy.DELETE, apart = true))
-                            }
+                            if (inboxPick != InboxPick.NONE) add(destructive("delete-selected", AppGlyph.Delete, InboxCopy.DELETE))
                         }
-                    // Add a transaction is always on the inbox bar; select only shows while there is something to check.
+                    // Rules and payees shape what lands in the inbox, so they live in its menu.
                     homeSection == HOME_INBOX ->
                         buildList {
-                            if (!inboxEmpty) add(spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT))
                             add(addTransaction())
-                        } + serverSync(inboxSync) + undo(undoLabel) + settings()
+                            if (!inboxEmpty) add(spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT))
+                        } + rules() + payees() + tail
                     // Reorder happens in place on the accounts list; done is the only way on.
                     homeSection == HOME_ACCOUNTS && accountsReorder ->
                         listOf(spec("reorder", AppGlyph.Save, AccountScreenCopy.DONE))
                     homeSection == HOME_ACCOUNTS ->
-                        listOfNotNull(
+                        listOf(
                             addTransaction(),
-                            spec("bank-sync", AppGlyph.Sync, AccountScreenCopy.SYNC).takeIf { accountsBankSync },
                             spec("schedules", AppGlyph.Calendar, ScheduleScreenCopy.SCHEDULES),
                             menu("add-account", AppGlyph.Add, AccountScreenCopy.ADD),
                             menu("reorder", AppGlyph.Categories, AccountScreenCopy.REORDER),
@@ -194,52 +209,49 @@ object ScreenBar {
                                 AppGlyph.Categories,
                                 if (showClosed) AccountScreenCopy.HIDE_CLOSED else AccountScreenCopy.SHOW_CLOSED,
                             ),
-                        ) + undo(undoLabel) + settings()
-                    // The assistant fixes things from its own panels; its bar refreshes the checks and keeps undo and settings.
+                        ) + tail
+                    // Reports has no tools of its own on the bar; it keeps add and the tail.
+                    homeSection == HOME_REPORTS -> listOf(addTransaction()) + tail
+                    // The assistant fixes things from its own panels; its bar refreshes the checks.
                     homeSection == HOME_ASSISTANT ->
-                        listOf(spec("refresh-assistant", AppGlyph.Sync, AssistantCopy.REFRESH), addTransaction()) +
-                            undo(undoLabel) + settings()
-                    // Add a transaction and edit budget are the budget's buttons; hold and categories head the menu.
-                    mode == BudgetMode.TRACKING ->
-                        listOf(addTransaction()) + editBudget() + categories() + hidden(showHidden) + rules() +
-                            undo(undoLabel) + settings()
+                        listOf(addTransaction(), spec("refresh-assistant", AppGlyph.Sync, AssistantCopy.REFRESH)) + tail
+                    // Add a transaction and edit budget are the budget's buttons; hold heads the menu.
                     else ->
-                        listOf(addTransaction()) + editBudget() + hold() + categories() + hidden(showHidden) + rules() +
-                            undo(undoLabel) + settings()
+                        listOf(addTransaction()) + editBudget() + (if (mode == BudgetMode.TRACKING) emptyList() else hold()) +
+                            hidden(showHidden) + categories() + templates(templates) + tail
                 }
+            }
             // Select mode swaps the register's bar for what can be done to the picked transactions.
             is ShellRoute.Register ->
                 if (selecting) {
                     listOfNotNull(
-                        spec("clear-selected", AppGlyph.Reconcile, RegisterCopy.CLEAR),
+                        spec("clear-selected", AppGlyph.Save, RegisterCopy.CLEAR),
                         spec("unclear-selected", AppGlyph.Undo, RegisterCopy.UNCLEAR),
                         spec("merge-selected", AppGlyph.Merge, MergeCopy.MERGE).takeIf { registerMerge },
-                        spec("end-selecting", AppGlyph.Cancel, RegisterCopy.DONE),
+                        spec("end-selecting", AppGlyph.Cancel, InboxCopy.CANCEL),
                     )
                 } else {
-                    // A bank-linked account syncs from the server; import lives in the menu.
+                    // An object page: its verbs on the bar, the rest in the menu, then undo and settings, close last.
                     buildList {
-                        add(spec("search", AppGlyph.Search, RegisterCopy.SEARCH))
                         add(addTransaction())
-                        add(spec("reconcile", AppGlyph.Reconcile, "reconcile"))
-                        if (bankLinked) add(spec("sync", AppGlyph.Sync, "sync"))
-                        add(menu("import", AppGlyph.Import, "import"))
-                        add(menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT))
+                        add(spec("search", AppGlyph.Search, RegisterCopy.SEARCH))
+                        add(spec("reconcile", AppGlyph.Reconcile, ScreenBarCopy.RECONCILE))
+                        if (bankLinked) add(spec("sync", AppGlyph.Sync, ScreenBarCopy.SYNC_BANK))
+                        add(menu("import", AppGlyph.Import, ScreenBarCopy.IMPORT))
                         add(menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE))
-                        if (accountClosed) {
-                            add(menu("reopen", AppGlyph.Undo, AccountScreenCopy.REOPEN))
-                        } else {
-                            add(menu("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE))
-                        }
-                    } + undo(undoLabel)
+                        add(menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT))
+                        if (accountClosed) add(menu("reopen", AppGlyph.Undo, AccountScreenCopy.REOPEN))
+                        addAll(objectTail(undoLabel))
+                        if (!accountClosed) add(destructive("close", AppGlyph.Cancel, AccountScreenCopy.CLOSE))
+                    }
                 }
             ShellRoute.AddAccount,
             is ShellRoute.EditAccount,
             -> saveCancel()
-            // Add takes the checked groups; making them by hand is the categories page, in the menu.
+            // Use these takes the checked groups; making them by hand is the categories page, in the menu.
             ShellRoute.StarterCategories ->
                 listOf(
-                    spec("save", AppGlyph.Save, StarterCategoriesCopy.ADD),
+                    spec("save", AppGlyph.Save, ScreenBarCopy.USE_THESE),
                     spec("cancel", AppGlyph.Cancel, "cancel"),
                     menu("categories", AppGlyph.Categories, StarterCategoriesCopy.OWN),
                 )
@@ -253,7 +265,7 @@ object ScreenBar {
                         spec("cancel", AppGlyph.Cancel, "cancel"),
                     )
                 }
-            ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, RuleScreenCopy.ADD)) + undo(undoLabel)
+            ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, ScreenBarCopy.ADD_RULE)) + objectTail(undoLabel)
             // The failed sync's page: retry runs every linked account again, dismiss clears the tile.
             ShellRoute.BankSyncReport ->
                 listOf(
@@ -262,27 +274,29 @@ object ScreenBar {
                 )
             // Upcoming switches between its list and its calendar; all has nothing to switch.
             ShellRoute.Schedules ->
-                listOf(spec("add-schedule", AppGlyph.Add, ScheduleScreenCopy.NEW)) +
+                listOf(spec("add-schedule", AppGlyph.Add, ScreenBarCopy.ADD_SCHEDULE)) +
                     if (schedules.section == SchedulesSection.UPCOMING) {
                         listOf(
                             if (schedules.calendar) {
-                                spec("schedules-view", AppGlyph.Categories, ScheduleScreenCopy.LIST)
+                                spec("schedules-view", AppGlyph.Breakdown, ScheduleScreenCopy.LIST)
                             } else {
                                 spec("schedules-view", AppGlyph.Calendar, ScheduleScreenCopy.CALENDAR)
                             },
                         )
                     } else {
                         emptyList()
-                    } + undo(undoLabel)
+                    } + objectTail(undoLabel)
             is ShellRoute.ScheduleDetails ->
                 buildList {
                     if (schedules.open) {
                         add(spec("post-schedule", AppGlyph.Save, ScheduleScreenCopy.POST))
                         add(spec("skip-schedule", AppGlyph.ChevronRight, ScheduleScreenCopy.SKIP))
                     }
-                    add(spec("edit-schedule", AppGlyph.Settings, ScheduleScreenCopy.EDIT_ACTION))
-                    add(menu("delete-schedule", AppGlyph.Cancel, ScheduleScreenCopy.DELETE))
-                } + undo(undoLabel)
+                    add(spec("edit-schedule", AppGlyph.Edit, ScheduleScreenCopy.EDIT_ACTION))
+                    addAll(objectTail(undoLabel))
+                    add(destructive("delete-schedule", AppGlyph.Delete, ScheduleScreenCopy.DELETE))
+                }
+            // Forms: save and cancel on the bar, delete alone in the menu, and no way off to settings.
             is ShellRoute.ScheduleEditor ->
                 saveCancel() +
                     if (route.scheduleId ==
@@ -290,25 +304,27 @@ object ScreenBar {
                     ) {
                         emptyList()
                     } else {
-                        listOf(menu("delete-schedule", AppGlyph.Cancel, ScheduleScreenCopy.DELETE))
+                        listOf(destructive("delete-schedule", AppGlyph.Delete, ScheduleScreenCopy.DELETE))
                     }
             // A template's form saves from the bar; one already in the note can also be removed there.
             is ShellRoute.TemplateEditor ->
                 saveCancel() +
-                    if (route.index == null) emptyList() else listOf(menu("remove-template", AppGlyph.Cancel, TemplateEditorCopy.REMOVE))
+                    if (route.index == null) {
+                        emptyList()
+                    } else {
+                        listOf(destructive("remove-template", AppGlyph.Delete, TemplateEditorCopy.REMOVE))
+                    }
             // Picking a new kind for a line already in the note can also remove that line.
             is ShellRoute.TemplateKinds ->
                 listOf(spec("cancel", AppGlyph.Cancel, "cancel")) +
-                    if (route.index ==
-                        null
-                    ) {
+                    if (route.index == null) {
                         emptyList()
                     } else {
-                        listOf(menu("remove-template", AppGlyph.Cancel, TemplateEditorCopy.REMOVE_LINE))
+                        listOf(destructive("remove-template", AppGlyph.Delete, TemplateEditorCopy.REMOVE_LINE))
                     }
             is ShellRoute.RuleEditor ->
                 saveCancel() +
-                    if (route.ruleId == null) emptyList() else listOf(menu("delete-rule", AppGlyph.Cancel, RuleScreenCopy.DELETE))
+                    if (route.ruleId == null) emptyList() else listOf(destructive("delete-rule", AppGlyph.Delete, RuleScreenCopy.DELETE))
             // Move sits with save, the rest in the menu, add template first; rollover is a switch on the page.
             // Rename is last in the menu on both kinds of category page.
             is ShellRoute.CategoryBudget ->
@@ -343,9 +359,9 @@ object ScreenBar {
                         TransactionMenu.ORDINARY ->
                             listOf(
                                 menu("schedule-transaction", AppGlyph.Calendar, RegisterCopy.SCHEDULE),
-                                menu("delete-transaction", AppGlyph.Cancel, RegisterCopy.DELETE),
+                                destructive("delete-transaction", AppGlyph.Delete, RegisterCopy.DELETE),
                             )
-                        TransactionMenu.TRANSFER -> listOf(menu("delete-transaction", AppGlyph.Cancel, RegisterCopy.DELETE))
+                        TransactionMenu.TRANSFER -> listOf(destructive("delete-transaction", AppGlyph.Delete, RegisterCopy.DELETE))
                     }
             ShellRoute.HoldMonth,
             is ShellRoute.ToBudget,
@@ -355,7 +371,7 @@ object ScreenBar {
             ShellRoute.BudgetPassword,
             -> saveCancel()
             else -> emptyList()
-        }.let { specs -> settingsLast(route, specs) }
+        }
 
     fun forState(
         state: ShellUiState,
@@ -423,6 +439,7 @@ object ScreenBar {
                 label = spec.label,
                 primary = spec.primary,
                 apart = spec.apart,
+                rule = spec.rule,
                 spinning = spec.glyph == AppGlyph.Sync && spec.primary && syncRunning(spec.id, state),
                 run = handlers.bind(spec.id, state),
             )
@@ -471,8 +488,8 @@ object ScreenBar {
         return if (row.transferId != null) TransactionMenu.TRANSFER else TransactionMenu.ORDINARY
     }
 
-    /** Add a transaction: the full form, on the register's account or, from home, the first one. */
-    private fun addTransaction() = spec("add", AppGlyph.Add, "add")
+    /** Add a transaction: the full form, on the register's account or, from home, the first one. First on every hub. */
+    private fun addTransaction() = spec("add", AppGlyph.Add, ScreenBarCopy.ADD_TRANSACTION)
 
     private fun saveCancel() =
         listOf(
@@ -512,28 +529,40 @@ object ScreenBar {
             menu("zero", AppGlyph.Zero, MonthFillCopy.ZERO),
         )
 
-    /** Home `•••` → rules (spec 010 US3); schedules live on the accounts pivot item. */
+    /** Inbox `•••` → rules (spec 010 US3): rules file what lands in the inbox. Schedules live on the accounts pivot item. */
     private fun rules() = listOf(menu("rules", AppGlyph.Categories, RuleScreenCopy.TITLE))
 
     /** Home `•••` → templates, only while experimental features and budget templates are both on (spec 010 US5). */
     private fun templates(on: Boolean) = if (on) listOf(menu("templates", AppGlyph.Average, TemplateCopy.TITLE)) else emptyList()
 
-    /** Inbox `•••` → sync: pulls in what other devices sent without waiting for the background job. */
-    private fun serverSync(on: Boolean) = if (on) listOf(menu("sync-server", AppGlyph.Sync, InboxCopy.SYNC)) else emptyList()
+    /** Inbox `•••` → payees, beside rules: both decide how what lands in the inbox is named and filed. */
+    private fun payees() = listOf(menu("payees", AppGlyph.Payees, ScreenBarCopy.PAYEES))
 
     /** Every home `•••` ends with settings, as WP8.1 apps put it last in the menu. */
     private fun settings() = listOf(menu("settings", AppGlyph.Settings, "settings"))
 
-    /** Every other page with a `•••` menu ends it with settings too; settings' own pages need no way to themselves. */
-    private fun settingsLast(
-        route: ShellRoute,
-        specs: List<ScreenBarSpec>,
-    ): List<ScreenBarSpec> =
-        if (route == ShellRoute.Settings || specs.all { it.primary }) {
-            specs
-        } else {
-            specs.filter { it.id != "settings" } + settings()
-        }
+    /**
+     * The tail every hub's menu ends with, in this order under a rule: sync (the server and every linked bank, when
+     * there is one to sync with), undo while there is a step to undo, settings.
+     */
+    private fun hubTail(
+        sync: Boolean,
+        undoLabel: String?,
+    ): List<ScreenBarSpec> {
+        val lines =
+            (if (sync) listOf(menu("sync-all", AppGlyph.Sync, ScreenBarCopy.SYNC)) else emptyList()) + undo(undoLabel) + settings()
+        return lines.mapIndexed { i, line -> if (i == 0) line.copy(rule = true) else line }
+    }
+
+    /** An object page's menu ends with undo and settings under a rule; its destructive line, if any, follows. */
+    private fun objectTail(undoLabel: String?): List<ScreenBarSpec> = hubTail(sync = false, undoLabel)
+
+    /** A destructive command: always the last line of the menu, in the accent and under a rule. */
+    private fun destructive(
+        id: String,
+        glyph: AppGlyph,
+        label: String,
+    ) = ScreenBarSpec(id, glyph, label, primary = false, apart = true)
 
     /** Present only while there is a step to undo; the label names it. */
     private fun undo(label: String?) =
@@ -607,6 +636,10 @@ class ScreenBarHandlers(
     val onMergeSelected: () -> Unit = {},
     val onMergeInboxSelected: () -> Unit = {},
     val onSyncServer: () -> Unit = {},
+    /** The hubs' one sync: the server and every linked bank. */
+    val onSyncAll: () -> Unit = {},
+    /** Inbox `•••` → payees, pushed over home. */
+    val onPayees: () -> Unit = {},
     val onRefreshAssistant: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
@@ -679,6 +712,8 @@ class ScreenBarHandlers(
             "end-selecting" -> onEndSelecting
             "select-inbox" -> onSelectInbox
             "sync-server" -> onSyncServer
+            "sync-all" -> onSyncAll
+            "payees" -> onPayees
             "refresh-assistant" -> onRefreshAssistant
             "accept-selected" -> onAcceptSelected
             "categorize-selected" -> onCategorizeSelected

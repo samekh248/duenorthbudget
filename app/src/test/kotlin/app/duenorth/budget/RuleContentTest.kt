@@ -45,9 +45,12 @@ class RuleContentTest {
     @Test
     fun barEntries() {
         val home = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE).map { it.id }
-        assertTrue("add-schedule" !in home && "rules" in home)
+        assertTrue("add-schedule" !in home && "rules" !in home)
+        // Rules file what lands in the inbox, so the inbox's menu opens them.
+        val inbox = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX).map { it.id }
+        assertTrue("rules" in inbox)
         assertTrue("add-schedule" in ScreenBar.specsFor(ShellRoute.Schedules, true, BudgetMode.ENVELOPE).map { it.id })
-        assertEquals(listOf("add-rule"), ScreenBar.specsFor(ShellRoute.Rules, true, BudgetMode.ENVELOPE).map { it.id })
+        assertEquals(listOf("add-rule", "settings"), ScreenBar.specsFor(ShellRoute.Rules, true, BudgetMode.ENVELOPE).map { it.id })
         assertEquals(listOf("save", "cancel"), ScreenBar.specsFor(ShellRoute.RuleEditor(null), true, BudgetMode.ENVELOPE).map { it.id })
         assertTrue("delete-rule" in ScreenBar.specsFor(ShellRoute.RuleEditor("r1"), true, BudgetMode.ENVELOPE).map { it.id })
         assertTrue("delete-schedule" in ScreenBar.specsFor(ShellRoute.ScheduleEditor("s1"), true, BudgetMode.ENVELOPE).map { it.id })

@@ -66,6 +66,13 @@ internal fun SettingsRoute(
         remoteFiles = state.remoteFiles,
         onOpenServer = model.budgetFiles::requestRemote,
         budgetError = state.serverError,
+        manage =
+            SettingsManage(
+                onCategories = model.envelopes::showManage,
+                onRules = model.rules::open,
+                onSchedules = model.schedules::open,
+                onTemplates = if (state.formatPrefs.templatesOn) model.templates::open else null,
+            ),
         modifier = modifier,
     )
 }

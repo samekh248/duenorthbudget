@@ -81,6 +81,9 @@ object RuleScreenCopy {
     const val NEW_CONDITION = "new condition"
     const val NEW_ACTION = "new action"
     const val ADD_PART = "add"
+
+    /** The bar's ✓ on a condition or action: it commits the part, so it says done, never add. */
+    const val DONE_PART = "done"
     const val CANCEL = "cancel"
     const val FIELD = "field"
     const val TEST = "test"
@@ -177,7 +180,7 @@ private fun RuleLine(
     Column(
         Modifier
             .fillMaxWidth()
-            .metroPress { onRule(rule.id) }
+            .rowPress({ onRule(rule.id) }) { rule(rule.id) }
             .padding(horizontal = MetroDimens.Gutter, vertical = MetroDimens.Row)
             .testTag("rule-line-${rule.id}"),
     ) {
@@ -475,7 +478,7 @@ internal fun PartPage(
     val bar =
         remember {
             listOf(
-                ScreenAction("rule-part-done", AppGlyph.Save, RuleScreenCopy.ADD_PART) { done() },
+                ScreenAction("rule-part-done", AppGlyph.Save, RuleScreenCopy.DONE_PART) { done() },
                 ScreenAction("rule-part-cancel", AppGlyph.Cancel, RuleScreenCopy.CANCEL) { cancel() },
             )
         }

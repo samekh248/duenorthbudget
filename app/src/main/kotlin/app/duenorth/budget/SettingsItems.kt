@@ -75,6 +75,15 @@ internal fun SettingsItem(
     )
 }
 
+/** The budget's tools, listed together on settings › budget so there is always one place that has them all. */
+data class SettingsManage(
+    val onCategories: () -> Unit = {},
+    val onRules: () -> Unit = {},
+    val onSchedules: () -> Unit = {},
+    /** Null while budget templates are off, so the list leaves them out. */
+    val onTemplates: (() -> Unit)? = null,
+)
+
 @Composable
 internal fun BudgetItem(
     budgets: List<BudgetSummary>,
@@ -90,6 +99,7 @@ internal fun BudgetItem(
     remoteFiles: List<RemoteFile> = emptyList(),
     onOpenServer: (RemoteFile) -> Unit = {},
     error: String? = null,
+    manage: SettingsManage = SettingsManage(),
 ) {
     val open = budgets.find { it.id == openBudgetId }
     // One box is both the open budget and the way to another: the phone's budgets, then the server's.
@@ -130,10 +140,22 @@ internal fun BudgetItem(
         MetroText(error, Metro.typography.body, Modifier.testTag("settings-open-budget-error"), color = Metro.accent.text)
     }
     if (open != null) {
-        SettingsHeading("payees")
+        // Every tool the budget has, in one list; each also has a home next to related work.
+        SettingsHeading(SettingsCopy.MANAGE, tag = "settings-manage")
+        SettingsLinkRow(
+            SettingsCopy.MANAGE_CATEGORIES,
+            SettingsCopy.MANAGE_CATEGORIES_HINT,
+            "settings-manage-categories",
+            manage.onCategories,
+        )
         SettingsLinkRow(SettingsCopy.RENAME_PAYEES, SettingsCopy.RENAME_PAYEES_HINT, "settings-payees", onPayees)
+        SettingsLinkRow(SettingsCopy.MANAGE_RULES, SettingsCopy.MANAGE_RULES_HINT, "settings-manage-rules", manage.onRules)
+        SettingsLinkRow(SettingsCopy.MANAGE_SCHEDULES, SettingsCopy.MANAGE_SCHEDULES_HINT, "settings-manage-schedules", manage.onSchedules)
+        manage.onTemplates?.let { onTemplates ->
+            SettingsLinkRow(SettingsCopy.MANAGE_TEMPLATES, SettingsCopy.MANAGE_TEMPLATES_HINT, "settings-manage-templates", onTemplates)
+        }
         // Actual's "learn categories": a payee's usual category becomes a rule.
-        SettingsHeading("rules", tag = "settings-rules")
+        SettingsHeading("learning", tag = "settings-rules")
         Column(Modifier.padding(top = MetroDimens.Row).testTag("settings-learning")) {
             SwitchRow(SettingsCopy.LEARN, learning, "settings-learning-switch", onLearning)
             MetroText(
@@ -210,13 +232,17 @@ internal fun ServerItem(
                     .fillMaxWidth()
                     .heightIn(min = MetroDimens.TouchTarget)
                     .onGloballyPositioned { bounds = it.boundsInWindow() }
-                    .metroPress {
-                        menu =
-                            bounds to
-                            listOf(
-                                MetroMenuItem("make active", "instance-activate-${instance.id}") { onMakeActive(instance.id) },
-                                removeItem(instance.id, onRemove),
-                            )
+                    .let { row ->
+                        // A saved server has no page of its own, so tap and long-press both show its menu.
+                        val show = {
+                            menu =
+                                bounds to
+                                listOf(
+                                    MetroMenuItem("make active", "instance-activate-${instance.id}") { onMakeActive(instance.id) },
+                                    removeItem(instance.id, onRemove),
+                                )
+                        }
+                        row.metroPress(show, onLongClick = show)
                     }.padding(vertical = MetroDimens.Row)
                     .testTag("instance-${instance.id}"),
             )

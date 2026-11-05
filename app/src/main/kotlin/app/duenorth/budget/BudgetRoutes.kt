@@ -293,6 +293,7 @@ internal fun ManageCategoriesRoute(
             onPlaceGroup = model.envelopes::placeGroup,
             onPlaceCategory = model.envelopes::placeCategory,
             modifier = modifier,
+            onOpenCategory = model.envelopes::openBudget,
         )
     }
 }

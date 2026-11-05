@@ -157,6 +157,18 @@ class RegisterHolder internal constructor(
         }
     }
 
+    /** A row menu's clear or unclear: one transaction, without entering select mode. */
+    fun setCleared(
+        transactionId: String,
+        cleared: Boolean,
+    ) {
+        val accountId = state.openAccountId() ?: return
+        host.launchWrite { id ->
+            val result = withContext(host.io) { host.library.setTransactionsCleared(id, listOf(transactionId), cleared, false) }
+            host.publish(result, accountId, stayOnRegister = true)
+        }
+    }
+
     /** Merges the picked transactions into one, as desktop Actual's merge does, then leaves select mode. */
     fun mergeSelected() {
         val accountId = state.openAccountId() ?: return

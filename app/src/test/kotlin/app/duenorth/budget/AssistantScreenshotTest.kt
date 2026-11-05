@@ -180,7 +180,7 @@ class AssistantScreenshotTest {
                     mode = BudgetMode.ENVELOPE,
                     homeSection = ScreenBar.HOME_ASSISTANT,
                     undoLabel = "merge",
-                ).map { ScreenAction(it.id, it.glyph, it.label, primary = it.primary) {} }
+                ).map { it.action() }
         compose.setContent {
             MetroTheme(darkTheme = dark) {
                 CompositionLocalProvider(LocalWorkingDotsAt provides 1100f) {

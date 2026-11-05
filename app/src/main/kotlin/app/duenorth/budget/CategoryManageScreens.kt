@@ -63,6 +63,7 @@ import app.duenorth.budget.design.theme.MetroDimens
 
 object CategoryManageCopy {
     const val NEW_GROUP = "new group"
+    const val ADD_GROUP = "add group"
     const val NEW_CATEGORY = "new category"
     const val REORDER = "reorder"
     const val REORDER_HINT = "drag a group or category by its handle"
@@ -169,6 +170,8 @@ fun ManageCategoriesScreen(
     onPlaceGroup: (String, String?) -> Unit,
     onPlaceCategory: (String, String?) -> Unit,
     modifier: Modifier = Modifier,
+    /** Tap on a category opens it, as a tap does on every list; long-press keeps its menu. Null: tap opens the menu. */
+    onOpenCategory: ((String) -> Unit)? = null,
 ) {
     var open by rememberSaveable { mutableStateOf(listOf<String>()) }
     var sheet by remember { mutableStateOf<ManageSheet?>(null) }
@@ -212,7 +215,7 @@ fun ManageCategoriesScreen(
             when (mode) {
                 ManageMode.LIST ->
                     listOf(
-                        ScreenAction("manage-new-group", AppGlyph.Add, CategoryManageCopy.NEW_GROUP) { newGroup() },
+                        ScreenAction("manage-new-group", AppGlyph.Add, CategoryManageCopy.ADD_GROUP) { newGroup() },
                         ScreenAction("manage-reorder", AppGlyph.Categories, CategoryManageCopy.REORDER, primary = false) {
                             reorder = true
                         },
@@ -293,6 +296,7 @@ fun ManageCategoriesScreen(
                                         anchor = bounds
                                         sheet = ManageSheet.Category(group, category)
                                     },
+                                    onTap = onOpenCategory?.let { openCategory -> { openCategory(category.id) } },
                                     banded = ledgerBanded(index),
                                     modifier = if (reorder) categoryDrag.follow(category.id, ids) else Modifier,
                                     lifted = categoryDrag.dragging == category.id,
@@ -506,6 +510,7 @@ private fun CategoryLine(
     modifier: Modifier,
     lifted: Boolean,
     handle: Modifier?,
+    onTap: (() -> Unit)? = null,
 ) {
     // Where the row sits, so its menu opens under it.
     var bounds by remember { mutableStateOf(Rect.Zero) }
@@ -520,8 +525,15 @@ private fun CategoryLine(
                     else -> Color.Transparent
                 },
             ).onGloballyPositioned { bounds = it.boundsInWindow() }
-            .then(if (renaming || handle != null) Modifier else Modifier.metroPress({ onOpen(bounds) }, onLongClick = { onOpen(bounds) }))
-            .padding(start = MetroDimens.Gutter)
+            .then(
+                if (renaming ||
+                    handle != null
+                ) {
+                    Modifier
+                } else {
+                    Modifier.metroPress(onTap ?: { onOpen(bounds) }, onLongClick = { onOpen(bounds) })
+                },
+            ).padding(start = MetroDimens.Gutter)
             .testTag("manage-category-${category.id}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {

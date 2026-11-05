@@ -47,6 +47,7 @@ internal fun HomeRoute(
                     onOpenAccount = model.register::openAccount,
                     onMatch = { model.register.match(it, stayOnRegister = false) },
                     onNotAMatch = { model.register.notAMatch(it, stayOnRegister = false) },
+                    onSelect = model.inbox::startSelectingWith,
                 )
             },
         netWorth = state.netWorth,
