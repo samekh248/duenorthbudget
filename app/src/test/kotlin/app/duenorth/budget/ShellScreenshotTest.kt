@@ -97,13 +97,6 @@ class ShellScreenshotTest {
     @Test
     fun homeOverbudgetedDark() = snap("home_overbudgeted_dark", dark = true, shell = sample().copy(headerMinor = -12_550))
 
-    // Income the bank has not posted stays out of to budget; a quiet line under the figures says it is coming.
-    @Test
-    fun homePendingIncomeLight() = snap("home_pending_income_light", dark = false, shell = sample().copy(pendingIncomeMinor = 185_000))
-
-    @Test
-    fun homePendingIncomeDark() = snap("home_pending_income_dark", dark = true, shell = sample().copy(pendingIncomeMinor = 185_000))
-
     // Home with show hidden categories on: hidden groups and categories come back dimmed.
     @Test
     fun homeGoalsLight() = snap("home_goals_light", dark = false, shell = withGoals(), prefs = templatesOn)

@@ -43,11 +43,4 @@ object BankPending {
                 AND REPLACE(REPLACE(src.raw_synced_data, ' ', ''), char(10), '') LIKE '%"booked":false%'
         )
         """.trimIndent()
-
-    /**
-     * SQL that is true when the transaction aliased [t] is pending money coming in. Such a row sits in the account,
-     * but the budget leaves it out (no income for to budget, no refund in a category) until the bank posts it or the
-     * person clears it. Money going out still counts the moment it shows up.
-     */
-    fun pendingInflowSql(t: String): String = "($t.amount > 0 AND ${pendingSql(t)})"
 }

@@ -89,10 +89,10 @@ class ShellReaderTest {
         }
     }
 
-    // Money the bank has not posted is not ready to budget: pending income stays out of to budget and pending
-    // refunds out of their category, while pending spending counts at once. Clearing a row by hand counts it.
+    // Pending rows count in the budget like any other, as in Actual, but an uncategorized one waits outside the
+    // inbox until the bank posts it. A row cleared by hand is no longer pending.
     @Test
-    fun pendingIncomeWaitsForTheBankToPostIt() {
+    fun pendingRowsCountButWaitOutsideTheInbox() {
         val file = File.createTempFile("shell", ".sqlite")
         file.delete()
         JdbcSessionOpener().use(file) { session ->
@@ -120,9 +120,9 @@ class ShellReaderTest {
             session.exec("UPDATE transactions SET cleared = 1, raw_synced_data = ? WHERE id = 'cleared-pay'", listOf(unbooked))
             session.exec("UPDATE transactions SET cleared = 1 WHERE id IN ('posted-pay', 'pending-part')")
             val shell = ShellReader.read(session, BudgetMetadata("home", "Home"), LocalDate.of(2026, 10, 15))
-            assertEquals(507_000L, shell.headerMinor)
+            assertEquals(757_000L, shell.headerMinor)
             assertEquals(
-                -3_000L,
+                -2_000L,
                 shell.groups
                     .single()
                     .categories
@@ -130,15 +130,14 @@ class ShellReaderTest {
                     .spentMinor,
             )
             assertEquals(
-                507_000L,
+                757_000L,
                 shell.incomeGroups
                     .single()
                     .categories
                     .single()
                     .receivedMinor,
             )
-            assertEquals(250_000L, shell.pendingIncomeMinor)
-            // The inbox waits for the bank too: only the posted row is there to categorize.
+            // Only the posted row is in the inbox to categorize.
             assertEquals(listOf("posted-shop"), shell.inbox.map { it.id })
             assertEquals(1, shell.pendingInboxCount)
             // The account still holds every row.

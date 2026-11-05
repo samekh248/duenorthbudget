@@ -234,7 +234,6 @@ class MonthFillBook(
                 LEFT JOIN accounts a ON a.id = t.acct
                 WHERE t.category = ? AND t.date >= ? AND t.date <= ?
                   AND IFNULL(a.offbudget, 1) = 0 AND $ALIVE
-                  AND NOT ${BankPending.pendingInflowSql("t")}
                 """.trimIndent(),
                 listOf(categoryId, actual * 100 + 1, actual * 100 + 31),
             ).first()
