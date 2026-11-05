@@ -46,13 +46,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.metroTilt
@@ -75,6 +78,12 @@ data class ScreenAction(
     val apart: Boolean = false,
     /** A menu line that starts a new group, drawn under a thin rule (the menu's shared sync, undo, settings tail). */
     val rule: Boolean = false,
+    /**
+     * The one line under the button's glyph. The glyph is the verb, so this is only the noun ("transaction" under
+     * +), abbreviated when the word is too long for the slot. The full [label] stays the screen reader's name and the
+     * menu's line.
+     */
+    val caption: String = label,
     val run: () -> Unit,
 )
 
@@ -269,10 +278,11 @@ private fun Mobile10CommandBar(
                     AppGlyphIcon(action.glyph, colors.foreground, Modifier.syncSpin(action.spinning))
                     // Labels always show, so a bare glyph never has to be guessed at.
                     MetroText(
-                        action.label,
+                        fitCaption(action.caption, Mobile10Dimens.CommandSlot),
                         Metro.typography.caption.copy(textAlign = TextAlign.Center),
                         Modifier.fillMaxWidth().padding(top = 4.dp),
-                        maxLines = 2,
+                        maxLines = 1,
+                        softWrap = false,
                     )
                 }
             }
@@ -404,13 +414,14 @@ private fun AppBarIcon(
             AppGlyphIcon(action.glyph, if (filled) accent.onFill else colors.foreground, Modifier.syncSpin(action.spinning))
         }
         if (showLabel) {
-            // A two-word label ("add transaction") wraps under its glyph rather than running into the next one.
+            // One line: the glyph says what it does, the caption says to what.
             MetroText(
-                action.label,
+                fitCaption(action.caption, MetroDimens.AppBarSlot + MetroDimens.AppBarGap - 4.dp),
                 Metro.typography.caption.copy(textAlign = TextAlign.Center),
                 Modifier.requiredWidth(MetroDimens.AppBarSlot + MetroDimens.AppBarGap - 4.dp).padding(top = 4.dp, bottom = 6.dp),
                 color = colors.foreground,
-                maxLines = 2,
+                maxLines = 1,
+                softWrap = false,
             )
         } else {
             Box(Modifier.height(4.dp))
@@ -467,3 +478,29 @@ private const val SPIN_MS = 1200
 
 fun List<AppBarButton>.asScreenActions(): List<ScreenAction> =
     map { ScreenAction(id = it.id, glyph = it.glyph, label = it.label, primary = true, run = it.onClick) }
+
+/**
+ * [caption] as it fits one line of [width]: whole when it fits, otherwise cut to the longest start that fits with a
+ * period, an abbreviation ("transaction" becomes "transac." in a narrow slot) rather than a wrap or an ellipsis.
+ */
+@Composable
+internal fun fitCaption(
+    caption: String,
+    width: Dp,
+): String {
+    val measurer = rememberTextMeasurer()
+    val style = Metro.typography.caption
+    val limit = with(LocalDensity.current) { width.toPx() }
+    val mobile10 = Metro.style.mobile10
+    return remember(caption, limit, style, mobile10) {
+        fun fits(text: String) =
+            measurer.measure(if (mobile10) sentenceCase(text) else text, style, softWrap = false, maxLines = 1).size.width <= limit
+        if (fits(caption)) {
+            caption
+        } else {
+            (caption.length - 1 downTo 2)
+                .map { caption.take(it).trimEnd() + "." }
+                .firstOrNull(::fits) ?: caption
+        }
+    }
+}

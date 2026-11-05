@@ -121,7 +121,7 @@ fun ServerScreen(
             // Sync is the page's button; the rest of the server's commands sit in its menu.
             PageBar(
                 listOfNotNull(
-                    ScreenAction("server-sync", AppGlyph.Sync, "sync now", run = onSync),
+                    ScreenAction("server-sync", AppGlyph.Sync, "sync now", caption = "server", run = onSync),
                     ScreenAction("server-upload", AppGlyph.Budgets, "send budget", primary = false, run = onUpload),
                     ScreenAction("server-conflicts", AppGlyph.Reconcile, "conflicts", primary = false, run = onConflicts)
                         .takeIf { conflictCount > 0 },

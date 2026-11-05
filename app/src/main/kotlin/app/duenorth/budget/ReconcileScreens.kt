@@ -131,8 +131,16 @@ fun ReconcileRegisterScreen(
                     )
                 confirming ->
                     listOf(
-                        ScreenAction("reconcile-adjust", AppGlyph.Save, ReconcileCopy.ADD_AND_FINISH) { adjust() },
-                        ScreenAction("reconcile-keep-looking", AppGlyph.Undo, ReconcileCopy.KEEP_LOOKING) { confirming = false },
+                        ScreenAction(
+                            "reconcile-adjust",
+                            AppGlyph.Save,
+                            ReconcileCopy.ADD_AND_FINISH,
+                            caption = ReconcileCopy.ADJUST,
+                        ) { adjust() },
+                        ScreenAction("reconcile-keep-looking", AppGlyph.Undo, ReconcileCopy.KEEP_LOOKING, caption = ReconcileCopy.BACK) {
+                            confirming =
+                                false
+                        },
                     )
                 else ->
                     listOf(

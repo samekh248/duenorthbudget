@@ -64,6 +64,7 @@ import app.duenorth.budget.design.theme.MetroDimens
 object CategoryManageCopy {
     const val NEW_GROUP = "new group"
     const val ADD_GROUP = "add group"
+    const val GROUP = "group"
     const val NEW_CATEGORY = "new category"
     const val REORDER = "reorder"
     const val REORDER_HINT = "drag a group or category by its handle"
@@ -215,7 +216,12 @@ fun ManageCategoriesScreen(
             when (mode) {
                 ManageMode.LIST ->
                     listOf(
-                        ScreenAction("manage-new-group", AppGlyph.Add, CategoryManageCopy.ADD_GROUP) { newGroup() },
+                        ScreenAction(
+                            "manage-new-group",
+                            AppGlyph.Add,
+                            CategoryManageCopy.ADD_GROUP,
+                            caption = CategoryManageCopy.GROUP,
+                        ) { newGroup() },
                         ScreenAction("manage-reorder", AppGlyph.Categories, CategoryManageCopy.REORDER, primary = false) {
                             reorder = true
                         },

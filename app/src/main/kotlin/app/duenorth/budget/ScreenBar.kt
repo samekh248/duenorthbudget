@@ -27,10 +27,13 @@ data class ScreenBarSpec(
     val apart: Boolean = false,
     /** A menu line that starts a new group under a rule: the shared sync, undo, settings tail. */
     val rule: Boolean = false,
+    /** The one line under a bar button: the noun alone, since the glyph is the verb. The menu shows [label]. */
+    val caption: String = label,
 )
 
 /** The spec as a bar button or menu line that runs [run], keeping its rule and destructive marks. */
-fun ScreenBarSpec.action(run: () -> Unit = {}) = ScreenAction(id, glyph, label, primary, apart = apart, rule = rule, run = run)
+fun ScreenBarSpec.action(run: () -> Unit = {}) =
+    ScreenAction(id, glyph, label, primary, apart = apart, rule = rule, caption = caption, run = run)
 
 /** The bar's words that name what a button does, so a glyph never has to be guessed at (+ adds, ✓ commits). */
 object ScreenBarCopy {
@@ -46,6 +49,19 @@ object ScreenBarCopy {
     const val SYNC_BANK = "sync bank"
     const val IMPORT = "import"
     const val PAYEES = "payees"
+
+    /**
+     * Captions under bar buttons. The glyph is the verb (+ adds, ✓ commits, the pencil edits), so the caption is only
+     * the noun, on one line, abbreviated if the word is too long for its slot.
+     */
+    const val TRANSACTION = "transaction"
+    const val BUDGET = "budget"
+    const val SERVER = "server"
+    const val RULE = "rule"
+    const val SCHEDULE = "schedule"
+    const val BANK = "bank"
+    const val CATEGORIES = "categories"
+    const val CLOSE = "close"
 }
 
 /** What the inbox's checked rows allow: nothing, categorize and delete, or accept as well when every one has a category. */
@@ -144,11 +160,15 @@ object ScreenBar {
             // Spec 012: each settings pivot item has its own bar. Payees has its link on the budget page's manage list.
             ShellRoute.Settings ->
                 when (settings.page) {
-                    SettingsPage.BUDGET -> listOf(spec("settings-new", AppGlyph.Add, ScreenBarCopy.ADD_BUDGET))
+                    SettingsPage.BUDGET -> listOf(spec("settings-new", AppGlyph.Add, ScreenBarCopy.ADD_BUDGET, ScreenBarCopy.BUDGET))
                     SettingsPage.SERVER ->
                         buildList {
-                            add(spec("add-server", AppGlyph.Add, ScreenBarCopy.ADD_SERVER))
-                            if (settings.signedIn) add(spec("server-budgets", AppGlyph.Budgets, SettingsCopy.SERVER_BUDGETS))
+                            add(spec("add-server", AppGlyph.Add, ScreenBarCopy.ADD_SERVER, ScreenBarCopy.SERVER))
+                            if (settings.signedIn) {
+                                add(
+                                    spec("server-budgets", AppGlyph.Budgets, SettingsCopy.SERVER_BUDGETS, SettingsCopy.BUDGETS_CAPTION),
+                                )
+                            }
                             if (settings.serverActive) add(destructive("sign-out", AppGlyph.Cancel, SettingsCopy.SIGN_OUT))
                         }
                     SettingsPage.ADVANCED -> listOf(spec("export", AppGlyph.Export, SettingsCopy.EXPORT))
@@ -163,7 +183,7 @@ object ScreenBar {
                 if (passwordSignIn) listOf(spec("sign-in", AppGlyph.ChevronRight, OnboardingScreenCopy.SIGN_IN)) else emptyList()
             ShellRoute.OnboardingFiles ->
                 listOf(
-                    spec("new-budget", AppGlyph.Add, ScreenBarCopy.ADD_BUDGET),
+                    spec("new-budget", AppGlyph.Add, ScreenBarCopy.ADD_BUDGET, ScreenBarCopy.BUDGET),
                     spec("refresh", AppGlyph.Sync, OnboardingScreenCopy.REFRESH),
                 )
             // Every home pivot is a hub: add transaction first, then its own buttons; its menu holds its own
@@ -176,7 +196,7 @@ object ScreenBar {
                     // templates live here and fill its boxes; undo would write straight away, so it waits.
                     homeSection == HOME_BUDGET && budgetEditing ->
                         listOf(
-                            spec("end-budget-edit", AppGlyph.Save, ScreenBarCopy.SAVE),
+                            spec("end-budget-edit", AppGlyph.Save, ScreenBarCopy.SAVE, ScreenBarCopy.BUDGET),
                             spec("cancel-budget-edit", AppGlyph.Cancel, BudgetEditCopy.CANCEL),
                         ) + fills() + templates(templates)
                     // Select mode swaps the inbox's bar for what can be done to the checked rows: accept only while
@@ -193,7 +213,7 @@ object ScreenBar {
                     homeSection == HOME_INBOX ->
                         buildList {
                             add(addTransaction())
-                            if (!inboxEmpty) add(spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT))
+                            if (!inboxEmpty) add(spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT, InboxCopy.BATCH))
                         } + rules() + payees() + tail
                     // Reorder happens in place on the accounts list; done is the only way on.
                     homeSection == HOME_ACCOUNTS && accountsReorder ->
@@ -236,7 +256,7 @@ object ScreenBar {
                         add(addTransaction())
                         add(spec("search", AppGlyph.Search, RegisterCopy.SEARCH))
                         add(spec("reconcile", AppGlyph.Reconcile, ScreenBarCopy.RECONCILE))
-                        if (bankLinked) add(spec("sync", AppGlyph.Sync, ScreenBarCopy.SYNC_BANK))
+                        if (bankLinked) add(spec("sync", AppGlyph.Sync, ScreenBarCopy.SYNC_BANK, ScreenBarCopy.BANK))
                         add(menu("import", AppGlyph.Import, ScreenBarCopy.IMPORT))
                         add(menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE))
                         add(menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT))
@@ -251,7 +271,7 @@ object ScreenBar {
             // Use these takes the checked groups; making them by hand is the categories page, in the menu.
             ShellRoute.StarterCategories ->
                 listOf(
-                    spec("save", AppGlyph.Save, ScreenBarCopy.USE_THESE),
+                    spec("save", AppGlyph.Save, ScreenBarCopy.USE_THESE, ScreenBarCopy.CATEGORIES),
                     spec("cancel", AppGlyph.Cancel, "cancel"),
                     menu("categories", AppGlyph.Categories, StarterCategoriesCopy.OWN),
                 )
@@ -261,11 +281,11 @@ object ScreenBar {
                     emptyList()
                 } else {
                     listOf(
-                        spec("save", AppGlyph.Save, AccountScreenCopy.CLOSE),
+                        spec("save", AppGlyph.Save, AccountScreenCopy.CLOSE, ScreenBarCopy.CLOSE),
                         spec("cancel", AppGlyph.Cancel, "cancel"),
                     )
                 }
-            ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, ScreenBarCopy.ADD_RULE)) + objectTail(undoLabel)
+            ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, ScreenBarCopy.ADD_RULE, ScreenBarCopy.RULE)) + objectTail(undoLabel)
             // The failed sync's page: retry runs every linked account again, dismiss clears the tile.
             ShellRoute.BankSyncReport ->
                 listOf(
@@ -274,7 +294,7 @@ object ScreenBar {
                 )
             // Upcoming switches between its list and its calendar; all has nothing to switch.
             ShellRoute.Schedules ->
-                listOf(spec("add-schedule", AppGlyph.Add, ScreenBarCopy.ADD_SCHEDULE)) +
+                listOf(spec("add-schedule", AppGlyph.Add, ScreenBarCopy.ADD_SCHEDULE, ScreenBarCopy.SCHEDULE)) +
                     if (schedules.section == SchedulesSection.UPCOMING) {
                         listOf(
                             if (schedules.calendar) {
@@ -440,6 +460,7 @@ object ScreenBar {
                 primary = spec.primary,
                 apart = spec.apart,
                 rule = spec.rule,
+                caption = spec.caption,
                 spinning = spec.glyph == AppGlyph.Sync && spec.primary && syncRunning(spec.id, state),
                 run = handlers.bind(spec.id, state),
             )
@@ -489,7 +510,7 @@ object ScreenBar {
     }
 
     /** Add a transaction: the full form, on the register's account or, from home, the first one. First on every hub. */
-    private fun addTransaction() = spec("add", AppGlyph.Add, ScreenBarCopy.ADD_TRANSACTION)
+    private fun addTransaction() = spec("add", AppGlyph.Add, ScreenBarCopy.ADD_TRANSACTION, ScreenBarCopy.TRANSACTION)
 
     private fun saveCancel() =
         listOf(
@@ -509,7 +530,7 @@ object ScreenBar {
     private fun renameCategory() = listOf(menu("rename-category", AppGlyph.Edit, EnvelopeCopy.RENAME))
 
     /** Edit budget sits on the budget's bar, right of add. */
-    private fun editBudget() = listOf(spec("edit-budget", AppGlyph.Edit, BudgetEditCopy.EDIT))
+    private fun editBudget() = listOf(spec("edit-budget", AppGlyph.Edit, BudgetEditCopy.EDIT, ScreenBarCopy.BUDGET))
 
     /** Home `•••` → hold money for next month, envelope budgets only. */
     private fun hold() = listOf(menu("hold", AppGlyph.Hold, "hold"))
@@ -578,7 +599,8 @@ object ScreenBar {
         id: String,
         glyph: AppGlyph,
         label: String,
-    ) = ScreenBarSpec(id, glyph, label, primary = true)
+        caption: String = label,
+    ) = ScreenBarSpec(id, glyph, label, primary = true, caption = caption)
 }
 
 class ScreenBarHandlers(

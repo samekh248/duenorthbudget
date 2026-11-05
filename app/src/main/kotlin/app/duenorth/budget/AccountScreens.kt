@@ -219,6 +219,7 @@ fun ForceCloseConfirmScreen(
         title = AccountScreenCopy.FORCE_CLOSE,
         body = reason,
         yes = AccountScreenCopy.FORCE_CLOSE,
+        yesCaption = ScreenBarCopy.CLOSE,
         onYes = onConfirm,
         onKeep = onKeep,
         tag = "account-force-close-confirm",

@@ -580,4 +580,29 @@ class ScreenBarTest {
         val server = ScreenBar.specsFor(ShellRoute.Settings, true, BudgetMode.ENVELOPE, settings = SettingsBar(SettingsPage.SERVER))
         assertEquals(ScreenBarCopy.ADD_SERVER, server.single { it.id == "add-server" }.label)
     }
+
+    @Test
+    fun buttonCaptionsAreOneNounUnderTheGlyphsVerb() {
+        val routes =
+            listOf(
+                ShellRoute.Home,
+                ShellRoute.Register("a"),
+                ShellRoute.Rules,
+                ShellRoute.Schedules,
+                ShellRoute.StarterCategories,
+                ShellRoute.OnboardingFiles,
+                ShellRoute.Settings,
+            )
+        val specs =
+            routes.flatMap { ScreenBar.specsFor(it, hasBudget = true, mode = BudgetMode.ENVELOPE) } +
+                ScreenBar.specsFor(ShellRoute.Settings, true, BudgetMode.ENVELOPE, settings = SettingsBar(SettingsPage.SERVER))
+        specs.filter { it.primary }.forEach { spec ->
+            // One word, so the caption never wraps; + is already "add", so the caption never says it again.
+            assertFalse(spec.caption, ' ' in spec.caption)
+            assertFalse(spec.caption, spec.caption.startsWith("add"))
+        }
+        assertEquals(ScreenBarCopy.TRANSACTION, specs.first { it.id == "add" }.caption)
+        // The menu and the screen reader keep the whole command.
+        assertEquals(ScreenBarCopy.ADD_TRANSACTION, specs.first { it.id == "add" }.label)
+    }
 }

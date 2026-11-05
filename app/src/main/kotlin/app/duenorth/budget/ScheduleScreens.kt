@@ -57,6 +57,7 @@ fun ScheduleDuplicateScreen(
         title = ScheduleScreenCopy.DUPLICATE_TITLE,
         body = ScheduleScreenCopy.DUPLICATE_BODY,
         yes = ScheduleScreenCopy.POST_ANYWAY,
+        yesCaption = ScheduleScreenCopy.POST,
         onYes = onPostAnyway,
         onKeep = onCancel,
         tag = "schedule-duplicate",
