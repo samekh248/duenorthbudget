@@ -111,8 +111,10 @@ class ShellReaderTest {
             insertTxn(session, "cleared-pay", "checking", "c-sal", 7_000, null, 20261013, 5.0)
             insertTxn(session, "pending-split", "checking", null, 50_000, null, 20261014, 6.0, parent = true)
             insertTxn(session, "pending-part", "checking", "c-sal", 50_000, null, 20261014, 6.0, childOf = "pending-split")
+            insertTxn(session, "pending-shop", "checking", null, -2_000, null, 20261014, 7.0)
+            insertTxn(session, "posted-shop", "checking", null, -500, null, 20261012, 8.0)
             val unbooked = """{"booked": false, "transactionId": "x"}"""
-            listOf("pending-pay", "pending-spend", "pending-refund", "pending-split").forEach { id ->
+            listOf("pending-pay", "pending-spend", "pending-refund", "pending-split", "pending-shop").forEach { id ->
                 session.exec("UPDATE transactions SET cleared = 0, raw_synced_data = ? WHERE id = ?", listOf(unbooked, id))
             }
             session.exec("UPDATE transactions SET cleared = 1, raw_synced_data = ? WHERE id = 'cleared-pay'", listOf(unbooked))
@@ -136,8 +138,11 @@ class ShellReaderTest {
                     .receivedMinor,
             )
             assertEquals(250_000L, shell.pendingIncomeMinor)
+            // The inbox waits for the bank too: only the posted row is there to categorize.
+            assertEquals(listOf("posted-shop"), shell.inbox.map { it.id })
+            assertEquals(1, shell.pendingInboxCount)
             // The account still holds every row.
-            assertEquals(755_000L, shell.accounts.single().balanceMinor)
+            assertEquals(752_500L, shell.accounts.single().balanceMinor)
         }
     }
 

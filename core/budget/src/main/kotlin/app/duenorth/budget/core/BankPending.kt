@@ -30,19 +30,24 @@ object BankPending {
     }
 
     /**
-     * SQL that is true when the transaction aliased [t] is money coming in that the bank has not posted yet. Such a
-     * row sits in the account, but the budget leaves it out (no income for To Budget, no refund in a category)
-     * until the bank posts it or the person clears it. Money going out still counts the moment it shows up.
-     * A split's parts go by their parent, which holds the bank's copy and the cleared flag.
+     * SQL that is true when the transaction aliased [t] came from the bank and the bank has not posted it yet: the
+     * same rule as [isPending]. A split's parts go by their parent, which holds the bank's copy and the cleared flag.
      */
-    fun pendingInflowSql(t: String): String =
+    fun pendingSql(t: String): String =
         """
-        ($t.amount > 0 AND EXISTS (
+        EXISTS (
             SELECT 1 FROM transactions src
             WHERE src.id = CASE WHEN IFNULL($t.isChild, 0) = 1 THEN $t.parent_id ELSE $t.id END
                 AND IFNULL(src.cleared, 0) = 0
                 AND IFNULL(src.reconciled, 0) = 0
                 AND REPLACE(REPLACE(src.raw_synced_data, ' ', ''), char(10), '') LIKE '%"booked":false%'
-        ))
+        )
         """.trimIndent()
+
+    /**
+     * SQL that is true when the transaction aliased [t] is pending money coming in. Such a row sits in the account,
+     * but the budget leaves it out (no income for to budget, no refund in a category) until the bank posts it or the
+     * person clears it. Money going out still counts the moment it shows up.
+     */
+    fun pendingInflowSql(t: String): String = "($t.amount > 0 AND ${pendingSql(t)})"
 }

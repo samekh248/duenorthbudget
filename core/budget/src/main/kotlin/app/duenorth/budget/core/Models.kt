@@ -487,6 +487,8 @@ data class MonthShell(
      * It stays out of [headerMinor] until it posts; the screen names it so to budget does not look short.
      */
     val pendingIncomeMinor: Long = 0L,
+    /** Uncategorized rows the bank has not posted: kept out of [inbox] until they post, only counted. */
+    val pendingInboxCount: Int = 0,
 )
 
 object ShellCopy {
@@ -498,6 +500,10 @@ object ShellCopy {
 
     /** Under the month's figures while income is pending: it counts toward to budget once the bank posts it. */
     fun pendingIncome(amount: String): String = "$amount pending, counts once the bank posts it"
+
+    /** In the inbox while rows are pending: they wait outside it until the bank posts them. */
+    fun pendingInbox(count: Int): String =
+        if (count == 1) "1 pending, comes in once the bank posts it" else "$count pending, come in once the bank posts them"
 
     /** Takes to budget's place over the figure when more is budgeted than there is. */
     const val OVERBUDGETED = "overbudgeted"

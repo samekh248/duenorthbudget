@@ -91,9 +91,29 @@ object ShellReader {
                 WHERE $alive
                     AND t.category IS NULL
                     AND t.transferred_id IS NULL
+                    AND NOT ${BankPending.pendingSql("t")}
                 ORDER BY t.date DESC, t.sort_order DESC, t.id DESC
                 """.trimIndent(),
             )
+        // Rows the bank has not posted wait outside the inbox; it only says how many.
+        val pendingInbox =
+            session
+                .query(
+                    """
+                    SELECT COUNT(*) AS n
+                    FROM transactions t
+                    JOIN accounts a
+                        ON a.id = t.acct
+                        AND IFNULL(a.tombstone, 0) = 0
+                        AND IFNULL(a.offbudget, 0) = 0
+                    WHERE $alive
+                        AND t.category IS NULL
+                        AND t.transferred_id IS NULL
+                        AND ${BankPending.pendingSql("t")}
+                    """.trimIndent(),
+                ).first()
+                .long("n")
+                .toInt()
         val pendingIncome =
             session
                 .query(
@@ -123,6 +143,7 @@ object ShellReader {
             headerLabel = figures.headerLabel,
             headerMinor = figures.headerMinor,
             pendingIncomeMinor = pendingIncome,
+            pendingInboxCount = pendingInbox,
             bufferedMinor = detailed.bufferedMinor,
             ahead = detailed.ahead,
             groups =

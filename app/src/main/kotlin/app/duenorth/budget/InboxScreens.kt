@@ -75,6 +75,7 @@ import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.RegisterEntry
+import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
@@ -158,6 +159,7 @@ fun InboxSection(
     if (entries.isEmpty() && pair == null) {
         Column(modifier.fillMaxSize()) {
             if (notice != null) MonthNotice(notice, Modifier.padding(horizontal = MetroDimens.Gutter))
+            PendingInboxNote(shell, Modifier.padding(horizontal = MetroDimens.Gutter))
             InboxEmpty(Modifier.weight(1f))
         }
         return
@@ -216,6 +218,7 @@ fun InboxSection(
             }
         }
         if (notice != null) MonthNotice(notice, Modifier.padding(bottom = 4.dp))
+        PendingInboxNote(shell, Modifier.padding(bottom = 4.dp))
         // Select mode fades through: the panel and queue fade out, then the checked list fades in.
         AnimatedContent(
             selection,
@@ -604,6 +607,21 @@ private class EasedHeight {
 /** Clips only what falls below the slot, so the panel's colour still runs past the gutter. */
 private fun Modifier.clipBelow(): Modifier =
     drawWithContent { clipRect(-size.width, 0f, size.width * 2, size.height) { this@drawWithContent.drawContent() } }
+
+/** One quiet line while rows the bank has not posted wait outside the inbox. */
+@Composable
+private fun PendingInboxNote(
+    shell: MonthShell,
+    modifier: Modifier = Modifier,
+) {
+    if (shell.pendingInboxCount <= 0) return
+    MetroText(
+        ShellCopy.pendingInbox(shell.pendingInboxCount),
+        Metro.typography.caption,
+        modifier.testTag("inbox-pending"),
+        color = Metro.colors.secondary,
+    )
+}
 
 /** Select mode's groups, each in inbox order: rows ready to accept, then rows that need a category. Empty groups are left out. */
 internal fun inboxSelectGroups(entries: List<InboxEntry>): List<Pair<String, List<InboxEntry>>> {
