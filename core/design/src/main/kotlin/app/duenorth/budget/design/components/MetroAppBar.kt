@@ -480,8 +480,27 @@ fun List<AppBarButton>.asScreenActions(): List<ScreenAction> =
     map { ScreenAction(id = it.id, glyph = it.glyph, label = it.label, primary = true, run = it.onClick) }
 
 /**
- * [caption] as it fits one line of [width]: whole when it fits, otherwise cut to the longest start that fits with a
- * period, an abbreviation ("transaction" becomes "transac." in a narrow slot) rather than a wrap or an ellipsis.
+ * Hand-picked short forms for captions that can run past a narrow slot, used only when the whole word doesn't fit
+ * ("transaction" stays whole in the Metro bar and reads "txn" in the narrower Windows 10 Mobile one).
+ */
+internal val CaptionAbbreviations =
+    mapOf(
+        "transaction" to "txn",
+        "transactions" to "txns",
+        "account" to "acct",
+        "accounts" to "accts",
+        "schedule" to "sched.",
+        "schedules" to "sched.",
+        "categories" to "categ.",
+        "category" to "categ.",
+        "appearance" to "appear.",
+        "reconcile" to "recon.",
+        "categorize" to "categ.",
+    )
+
+/**
+ * [caption] as it fits one line of [width]: whole when it fits, else its short form from [CaptionAbbreviations], and
+ * only for a word with no short form, the longest start that fits with a period. Never a wrap or an ellipsis.
  */
 @Composable
 internal fun fitCaption(
@@ -495,8 +514,11 @@ internal fun fitCaption(
     return remember(caption, limit, style, mobile10) {
         fun fits(text: String) =
             measurer.measure(if (mobile10) sentenceCase(text) else text, style, softWrap = false, maxLines = 1).size.width <= limit
+        val short = CaptionAbbreviations[caption.lowercase()]
         if (fits(caption)) {
             caption
+        } else if (short != null && fits(short)) {
+            short
         } else {
             (caption.length - 1 downTo 2)
                 .map { caption.take(it).trimEnd() + "." }
