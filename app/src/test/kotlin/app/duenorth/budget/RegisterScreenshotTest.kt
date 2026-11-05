@@ -87,7 +87,7 @@ class RegisterScreenshotTest {
                         actions =
                             ScreenBar
                                 .specsFor(ShellRoute.Register("visa"), true, BudgetMode.ENVELOPE, bankLinked = true)
-                                .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                                .map { it.action() },
                         expanded = expanded,
                         onExpandedChange = {},
                     )
@@ -142,7 +142,7 @@ class RegisterScreenshotTest {
                                     selecting = true,
                                     registerMerge =
                                         TransactionMerge.canMerge(TransactionMerge.ofRegister(shown.rows.filter { it.id in picked })),
-                                ).map { ScreenAction(it.id, it.glyph, it.label, it.primary, apart = it.apart) {} },
+                                ).map { it.action() },
                         expanded = false,
                         onExpandedChange = {},
                     )
@@ -226,7 +226,7 @@ class RegisterScreenshotTest {
                         actions =
                             ScreenBar
                                 .specsFor(ShellRoute.Register("visa"), true, BudgetMode.ENVELOPE)
-                                .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                                .map { it.action() },
                         expanded = false,
                         onExpandedChange = {},
                     )

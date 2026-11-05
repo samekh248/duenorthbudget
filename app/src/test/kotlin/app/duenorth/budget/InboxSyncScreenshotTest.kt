@@ -69,7 +69,7 @@ class InboxSyncScreenshotTest {
                     mode = BudgetMode.ENVELOPE,
                     homeSection = ScreenBar.HOME_INBOX,
                     inboxSync = true,
-                ).map { ScreenAction(it.id, it.glyph, it.label, primary = it.primary) {} }
+                ).map { it.action() }
         compose.setContent {
             MetroTheme(darkTheme = dark) {
                 Column(Modifier.fillMaxSize()) {

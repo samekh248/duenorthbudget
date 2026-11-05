@@ -154,8 +154,12 @@ class SchedulesHolder internal constructor(
     }
 
     fun deleteOpen() {
+        delete(openId() ?: return)
+    }
+
+    /** Deletes [scheduleId]: from its page or editor, or from its row's long-press menu. */
+    fun delete(scheduleId: String) {
         val budgetId = state.settings.openBudgetId ?: return
-        val scheduleId = openId() ?: return
         host.scope.launch {
             withContext(host.io) { host.library.deleteSchedule(budgetId, scheduleId) }
             rules.afterWrite(budgetId, leave = true)

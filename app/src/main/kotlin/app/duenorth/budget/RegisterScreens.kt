@@ -70,6 +70,7 @@ import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.LayerCheckBox
 import app.duenorth.budget.design.components.LocalFieldSubmit
 import app.duenorth.budget.design.components.MetroField
+import app.duenorth.budget.design.components.MetroMenuItem
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.drawRelief
 import app.duenorth.budget.design.components.metroPress
@@ -95,6 +96,8 @@ fun RegisterScreen(
     onSearch: (RegisterSearch) -> Unit = {},
     /** Whether the pending section starts open; a tap on its heading folds it. */
     pendingOpen: Boolean = true,
+    /** A row's long-press menu; select is its first line. Null keeps long-press starting select mode. */
+    rowMenu: ((RegisterRow) -> List<MetroMenuItem>)? = null,
 ) {
     val rows = if (search == null) page.rows else page.searched(search)
     val owed = page.account.type == "credit" && page.balanceMinor < 0
@@ -142,6 +145,7 @@ fun RegisterScreen(
                 onNotAMatch = onNotAMatch,
                 searching = search?.active == true,
                 pendingOpen = pendingOpen,
+                rowMenu = rowMenu.takeIf { selection == null },
             )
         }
     }
@@ -208,7 +212,11 @@ private fun RegisterList(
     onNotAMatch: (MatchPair) -> Unit = {},
     searching: Boolean = false,
     pendingOpen: Boolean = true,
+    /** A row's long-press menu outside select mode; null keeps long-press as select. */
+    rowMenu: ((RegisterRow) -> List<MetroMenuItem>)? = null,
 ) {
+    val menu = rememberRowMenu()
+    RowMenu(menu, tag = "register-menu")
     // A new visit starts at the newest row. Scroll position is not saved.
     val list = rememberLazyListState()
     LaunchedEffect(list) {
@@ -260,6 +268,8 @@ private fun RegisterList(
                         picked = selection?.let { row.id in it },
                         onPress = { onPress(row.id) },
                         onLongPress = { onLongPress(row.id) },
+                        menu = menu.takeIf { rowMenu != null },
+                        menuItems = { rowMenu?.invoke(row).orEmpty() },
                         detail = pendingDetail(row),
                         extraAir = air,
                     )
@@ -296,6 +306,8 @@ private fun RegisterList(
                                 picked = selection?.let { row.id in it },
                                 onPress = { onPress(row.id) },
                                 onLongPress = { onLongPress(row.id) },
+                                menu = menu.takeIf { rowMenu != null },
+                                menuItems = { rowMenu?.invoke(row).orEmpty() },
                                 // The last row holds the panel's bottom air, so a picked one is tinted to the edge.
                                 extraAir = if (row === day.last()) MetroDimens.Row else 0.dp,
                                 showLock = true,
@@ -323,6 +335,8 @@ private fun RegisterList(
                     picked = selection?.let { row.id in it },
                     onPress = { onPress(row.id) },
                     onLongPress = { onLongPress(row.id) },
+                    menu = menu.takeIf { rowMenu != null },
+                    menuItems = { rowMenu?.invoke(row).orEmpty() },
                     showLock = true,
                 )
             }
@@ -459,6 +473,9 @@ internal fun RegisterLine(
     extraAir: Dp = 0.dp,
     /** Shows a reconciled row's mark as a lock, as Actual does, in place of the cleared "c". */
     showLock: Boolean = false,
+    /** When set, long-press opens the row's menu here instead of running [onLongPress]. */
+    menu: RowMenuState? = null,
+    menuItems: () -> List<MetroMenuItem> = { emptyList() },
 ) {
     val accent = Metro.accent.text
     val locked = showLock && row.reconciled
@@ -548,7 +565,7 @@ internal fun RegisterLine(
                 }
                 val c = measurer.measure(RegisterCopy.CLEARED_MARK, mark)
                 drawText(c, topLeft = Offset(left + (CLEARED_BAR.toPx() - c.size.width) / 2, (height - c.size.height) / 2))
-            }.metroPress(onPress, onLongPress)
+            }.then(if (menu != null) Modifier.rowPress(menu, onPress, menuItems) else Modifier.metroPress(onPress, onLongPress))
             .padding(top = REGISTER_ROW_AIR, bottom = REGISTER_ROW_AIR + extraAir)
             .padding(
                 end =

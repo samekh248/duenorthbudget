@@ -206,7 +206,7 @@ class OnboardingScreenshotTest {
                             actions =
                                 host.bar ?: ScreenBar
                                     .specsFor(route, hasBudget = false, mode = null, passwordSignIn = !name.contains("browser"))
-                                    .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} },
+                                    .map { it.action() },
                             expanded = false,
                             onExpandedChange = {},
                             windowInsets = WindowInsets(0),

@@ -288,6 +288,16 @@ fun DueNorthApp(model: ShellViewModel) {
                     onMergeSelected = model.register::mergeSelected,
                     onMergeInboxSelected = model.inbox::mergeSelected,
                     onSyncServer = model.budgetFiles::syncInbox,
+                    // One sync for every hub: a bank sync ends by syncing with the server, so it covers both.
+                    onSyncAll = {
+                        val banks =
+                            state.shell
+                                ?.accounts
+                                .orEmpty()
+                                .any { it.bankSync && !it.closed }
+                        if (banks) model.bankSync.syncAll() else model.budgetFiles.syncInbox()
+                    },
+                    onPayees = model.payees::open,
                     onRefreshAssistant = model.assistant::refresh,
                     onCancel = {
                         when (state.route) {
@@ -361,7 +371,11 @@ fun DueNorthApp(model: ShellViewModel) {
                         }
                     },
         ) { modifier ->
+            val rowMenu = rememberRowMenu()
+            val rowMenus = remember(model) { AppRowMenus(model) }
             CompositionLocalProvider(
+                LocalRowMenu provides rowMenu,
+                LocalRowMenuItems provides rowMenus,
                 LocalFormSaveHost provides formSaveHost,
                 // Enter in a one-line box saves the page, unless a picker drawn over the form owns the bar.
                 LocalFieldSubmit provides { if (formSaveHost.bar == null) formSaveHost.save() },
@@ -472,6 +486,8 @@ fun DueNorthApp(model: ShellViewModel) {
                         )
                     }
                 }
+                // The one long-press menu every list row shares, drawn over the page.
+                RowMenu(rowMenu, tag = "row-menu")
             }
         }
     }

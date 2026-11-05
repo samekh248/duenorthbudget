@@ -111,7 +111,7 @@ class GetStartedScreenshotTest {
     ) {
         val actions =
             ScreenBar.specsFor(ShellRoute.StarterCategories, true, BudgetMode.ENVELOPE).filter { it.primary }.map {
-                ScreenAction(it.id, it.glyph, it.label, primary = it.primary) {}
+                it.action()
             }
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {

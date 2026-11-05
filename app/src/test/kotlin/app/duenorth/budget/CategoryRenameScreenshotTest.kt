@@ -100,7 +100,7 @@ class CategoryRenameScreenshotTest {
         val shell = sample()
         val routeBar =
             ScreenBar.specsFor(ShellRoute.CategoryBudget("c-groceries"), true, BudgetMode.ENVELOPE).map {
-                ScreenAction(it.id, it.glyph, it.label, primary = it.primary) {}
+                it.action()
             }
         compose.setContent {
             val host = rememberFormSaveHost()

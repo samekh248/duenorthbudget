@@ -97,7 +97,7 @@ object StarterCategories {
 object StarterCategoriesCopy {
     const val TITLE = "categories"
     const val LEAD = "start from a set and trim it. you can rename or add more later."
-    const val ADD = "add"
+    const val ADD = "use these"
     const val OWN = "make my own"
     const val PICK_ONE = "check at least one group"
 }

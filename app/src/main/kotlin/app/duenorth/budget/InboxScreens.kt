@@ -126,6 +126,8 @@ class InboxActions(
     val onOpenAccount: (String) -> Unit = {},
     val onMatch: (MatchPair) -> Unit = {},
     val onNotAMatch: (MatchPair) -> Unit = {},
+    /** The row menu's select: select mode with this row already checked. Null leaves select off the menu. */
+    val onSelect: ((String) -> Unit)? = null,
 )
 
 /**
@@ -370,15 +372,17 @@ internal fun inboxMenuItems(
     onCategorize: (String) -> Unit,
     actions: InboxActions,
 ): List<Pair<String, () -> Unit>> =
+    // As every row menu: select first, the row's verbs, delete last (drawn in the accent).
     listOfNotNull(
+        actions.onSelect?.let { select -> RowMenuCopy.SELECT to { select(row.id) } },
         row.suggestionId?.let { InboxCopy.ACCEPT to { onAccept(row.id) } },
         InboxCopy.CATEGORIZE to { onCategorize(row.id) },
         InboxCopy.EDIT to { actions.onDetails(row.id) },
         InboxCopy.SCHEDULE to { actions.onSchedule(row.id) },
-        InboxCopy.DELETE to { actions.onDelete(row.id) },
         row.accountName.ifBlank { null }?.let { account ->
             "${InboxCopy.GO_TO} ${account.lowercase()}" to { actions.onOpenAccount(row.accountId) }
         },
+        InboxCopy.DELETE to { actions.onDelete(row.id) },
     )
 
 /** The inbox's long-press menu: the shared Metro context menu, tagged `inbox-menu`. */
@@ -402,7 +406,8 @@ internal fun InboxMenuPanel(
     MetroContextMenuPanel(anchor, items.menuItems(), onDismiss, INBOX_MENU, safeTop, safeBottom)
 }
 
-private fun List<Pair<String, () -> Unit>>.menuItems() = map { (label, run) -> MetroMenuItem(label, run = run) }
+private fun List<Pair<String, () -> Unit>>.menuItems() =
+    map { (label, run) -> MetroMenuItem(label, run = run, accent = label == InboxCopy.DELETE) }
 
 private const val INBOX_MENU = "inbox-menu"
 

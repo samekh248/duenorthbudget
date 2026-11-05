@@ -981,7 +981,7 @@ private fun AccountLine(
                     banded -> ledgerBand
                     else -> Color.Transparent
                 },
-            ).metroPress { onAccount(account.id) }
+            ).rowPress({ onAccount(account.id) }) { account(account.id) }
             .testTag("account-${account.id}"),
     ) {
         Row(

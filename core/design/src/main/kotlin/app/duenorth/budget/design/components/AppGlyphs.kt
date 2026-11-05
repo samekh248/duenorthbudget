@@ -50,6 +50,7 @@ enum class AppGlyph {
     Delete,
     Edit,
     Merge,
+    Export,
 }
 
 object AppGlyphInk {
@@ -64,7 +65,7 @@ object AppGlyphInk {
             AppGlyph.Add -> 2
             AppGlyph.Settings -> 2
             AppGlyph.Transfer -> 4
-            AppGlyph.Reconcile -> 2
+            AppGlyph.Reconcile -> 5
             AppGlyph.Import -> 3
             AppGlyph.Save -> 2
             AppGlyph.Cancel -> 2
@@ -82,6 +83,7 @@ object AppGlyphInk {
             AppGlyph.Delete -> 4
             AppGlyph.Edit -> 2
             AppGlyph.Merge -> 4
+            AppGlyph.Export -> 4
         }
 
     fun DrawScope.draw(
@@ -181,9 +183,31 @@ object AppGlyphInk {
                 drawLine(color, Offset(18.dp.toPx(), 14.dp.toPx()), Offset(6.dp.toPx(), 14.dp.toPx()), strokeWidth = 1.6.dp.toPx())
                 drawLine(color, Offset(9.dp.toPx(), 17.dp.toPx()), Offset(5.dp.toPx(), 14.dp.toPx()), strokeWidth = 1.6.dp.toPx())
             }
+            // A balance: a post under a beam with a pan hung from each end, so reconcile never reads as save's check.
             AppGlyph.Reconcile -> {
-                drawLine(color, Offset(5.dp.toPx(), 11.dp.toPx()), Offset(9.dp.toPx(), 16.dp.toPx()), strokeWidth = 1.8.dp.toPx())
-                drawLine(color, Offset(9.dp.toPx(), 16.dp.toPx()), Offset(17.dp.toPx(), 6.dp.toPx()), strokeWidth = 1.8.dp.toPx())
+                val sw = 1.6.dp.toPx()
+                drawLine(color, Offset(w / 2, 4.dp.toPx()), Offset(w / 2, 18.dp.toPx()), strokeWidth = sw)
+                drawLine(color, Offset(7.dp.toPx(), 18.dp.toPx()), Offset(15.dp.toPx(), 18.dp.toPx()), strokeWidth = sw)
+                drawLine(color, Offset(4.dp.toPx(), 6.dp.toPx()), Offset(18.dp.toPx(), 6.dp.toPx()), strokeWidth = sw)
+                for (x in listOf(5f, 17f)) {
+                    drawPath(
+                        Path().apply {
+                            moveTo((x - 3f).dp.toPx(), 12.dp.toPx())
+                            lineTo(x.dp.toPx(), 6.dp.toPx())
+                            lineTo((x + 3f).dp.toPx(), 12.dp.toPx())
+                            close()
+                        },
+                        color,
+                        style = stroke,
+                    )
+                }
+            }
+            // Upload: an arrow up off a line, the reverse of import.
+            AppGlyph.Export -> {
+                drawLine(color, Offset(w / 2, 15.dp.toPx()), Offset(w / 2, 4.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(7.dp.toPx(), 8.dp.toPx()), Offset(w / 2, 4.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(15.dp.toPx(), 8.dp.toPx()), Offset(w / 2, 4.dp.toPx()), strokeWidth = 1.6.dp.toPx())
+                drawLine(color, Offset(4.dp.toPx(), 18.dp.toPx()), Offset(18.dp.toPx(), 18.dp.toPx()), strokeWidth = 1.6.dp.toPx())
             }
             AppGlyph.Import -> {
                 drawLine(color, Offset(w / 2, 4.dp.toPx()), Offset(w / 2, 14.dp.toPx()), strokeWidth = 1.6.dp.toPx())
@@ -395,10 +419,12 @@ object Mdl2GlyphInk {
             AppGlyph.Add to "M10 2v16M2 10h16",
             // Switch: one arrow out, one back.
             AppGlyph.Transfer to "M2 7h15M13.5 3.5L17 7l-3.5 3.5M18 13H3M6.5 9.5L3 13l3.5 3.5",
-            // CheckMark.
-            AppGlyph.Reconcile to "M2.5 10.5l5 5L17.5 5",
+            // Balance: a post and its foot under a beam, a pan hung from each end.
+            AppGlyph.Reconcile to "M10 3v14.5M6 17.5h8M3 5h14M3 5l-2 5h4zM17 5l-2 5h4z",
             // Download: an arrow onto a line.
             AppGlyph.Import to "M10 2v11.5M5.5 9l4.5 4.5L14.5 9M2.5 17.5h15",
+            // Upload: an arrow up off a line.
+            AppGlyph.Export to "M10 14V2.5M5.5 7L10 2.5L14.5 7M2.5 17.5h15",
             // Accept.
             AppGlyph.Save to "M2.5 10.5l5 5L17.5 5",
             AppGlyph.Cancel to "M3.5 3.5l13 13M16.5 3.5l-13 13",

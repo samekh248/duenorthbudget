@@ -86,7 +86,8 @@ class ScreenBarContentTest {
         compose.onAllNodesWithText("add").assertCountEquals(1)
         compose.onNodeWithTag("app-bar-add").performClick()
         assertFalse(expanded)
-        compose.onAllNodesWithText("add").assertCountEquals(0)
+        // Labels show on a closed bar too, so a glyph never has to be guessed at.
+        compose.onAllNodesWithText("add").assertCountEquals(1)
     }
 
     @Test

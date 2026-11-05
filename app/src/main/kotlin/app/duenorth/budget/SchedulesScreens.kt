@@ -256,6 +256,7 @@ private fun LazyListScope.occurrenceDays(
                     income = row.schedule.amountMinor > 0,
                     tag = "schedule-row-${row.schedule.id}-$date",
                     onClick = { onOpen(row.schedule.id) },
+                    scheduleId = row.schedule.id,
                 )
             }
         }
@@ -280,7 +281,7 @@ private fun DuePanel(
             .padding(vertical = 14.dp)
             .testTag("schedule-due-${schedule.id}"),
     ) {
-        Column(Modifier.fillMaxWidth().metroPress { onOpen(schedule.id) }) {
+        Column(Modifier.fillMaxWidth().rowPress({ onOpen(schedule.id) }) { schedule(schedule.id) }) {
             MetroText(
                 if (row.date == today) {
                     ScheduleScreenCopy.DUE_TODAY
@@ -392,6 +393,7 @@ private fun ScheduleCalendar(
                         income = row.schedule.amountMinor > 0,
                         tag = "calendar-row-${row.schedule.id}",
                         onClick = { onOpen(row.schedule.id) },
+                        scheduleId = row.schedule.id,
                     )
                     // Post and skip act on a schedule's next date only.
                     if (row.isNext) {
@@ -493,6 +495,7 @@ private fun AllSchedules(
                     tag = "schedule-${schedule.id}",
                     banded = ledgerBanded(position.getValue(schedule.id)),
                     onClick = { onOpen(schedule.id) },
+                    scheduleId = schedule.id,
                 )
             }
             item(key = "gap-$account") { GroupGap() }
@@ -521,6 +524,7 @@ private fun AllSchedules(
                         banded = ledgerBanded(position.getValue(schedule.id)),
                         dim = true,
                         onClick = { onOpen(schedule.id) },
+                        scheduleId = schedule.id,
                     )
                 }
             }
@@ -651,14 +655,21 @@ private fun ScheduleLine(
     dim: Boolean = false,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    /** The schedule this line stands for, so long-press opens its menu. */
+    scheduleId: String? = null,
 ) {
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .ledgerFill(if (banded) ledgerBand else Color.Transparent)
-            .then(if (onClick != null) Modifier.metroPress(onClick) else Modifier)
-            .padding(vertical = 6.dp)
+            .then(
+                when {
+                    onClick == null -> Modifier
+                    scheduleId != null -> Modifier.rowPress(onClick) { schedule(scheduleId) }
+                    else -> Modifier.metroPress(onClick)
+                },
+            ).padding(vertical = 6.dp)
             .testTag(tag),
         verticalAlignment = Alignment.CenterVertically,
     ) {

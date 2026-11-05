@@ -56,11 +56,16 @@ class RulesHolder internal constructor(
     }
 
     fun deleteOpen() {
+        delete((state.route as? ShellRoute.RuleEditor)?.ruleId ?: return)
+    }
+
+    /** Deletes [ruleId]: from its editor, which then closes, or from its row's long-press menu on the list. */
+    fun delete(ruleId: String) {
         val budgetId = state.settings.openBudgetId ?: return
-        val ruleId = (state.route as? ShellRoute.RuleEditor)?.ruleId ?: return
+        val fromEditor = (state.route as? ShellRoute.RuleEditor)?.ruleId == ruleId
         host.scope.launch {
             withContext(host.io) { host.library.deleteRule(budgetId, ruleId) }
-            afterWrite(budgetId, leave = true)
+            afterWrite(budgetId, leave = fromEditor)
         }
     }
 

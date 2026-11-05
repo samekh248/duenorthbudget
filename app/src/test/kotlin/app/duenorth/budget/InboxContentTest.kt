@@ -157,7 +157,10 @@ class InboxContentTest {
         assertEquals(listOf("schedule shell", "account visa"), ran)
         // No suggestion, no accept.
         val atm = inboxMenuItems(sampleInbox().last(), {}, {}, InboxActions()).map { it.first }
-        assertEquals(listOf("categorize", "edit", "schedule", "delete", "go to checking"), atm)
+        assertEquals(listOf("categorize", "edit", "schedule", "go to checking", "delete"), atm)
+        // With select wired, select heads the menu, as on every row menu.
+        val selectable = inboxMenuItems(sampleInbox().last(), {}, {}, InboxActions(onSelect = {})).map { it.first }
+        assertEquals(RowMenuCopy.SELECT, selectable.first())
     }
 
     @Test

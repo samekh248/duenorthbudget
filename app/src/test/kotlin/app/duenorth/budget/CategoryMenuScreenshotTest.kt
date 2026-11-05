@@ -35,7 +35,7 @@ class CategoryMenuScreenshotTest {
     ) {
         val actions =
             ScreenBar.specsFor(ShellRoute.CategoryBudget("c-food"), true, BudgetMode.ENVELOPE, templates = true).map {
-                ScreenAction(it.id, it.glyph, it.label, primary = it.primary) {}
+                it.action()
             }
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {

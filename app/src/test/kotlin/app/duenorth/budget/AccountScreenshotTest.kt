@@ -68,7 +68,7 @@ class AccountScreenshotTest {
     ) {
         val actions =
             ScreenBar.specsFor(ShellRoute.CloseAccount("a2"), true, BudgetMode.ENVELOPE).map {
-                ScreenAction(it.id, it.glyph, it.label, primary = it.primary) {}
+                it.action()
             }
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {

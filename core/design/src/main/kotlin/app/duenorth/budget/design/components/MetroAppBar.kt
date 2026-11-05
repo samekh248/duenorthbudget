@@ -23,11 +23,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -52,6 +52,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.metroTilt
@@ -67,8 +68,13 @@ data class ScreenAction(
     val primary: Boolean = true,
     /** A sync button whose sync is running: its glyph turns until it ends. */
     val spinning: Boolean = false,
-    /** A destructive button, set apart from the rest of the bar by a rule and extra air. */
+    /**
+     * A destructive command. In the menu it is the last line, in the accent and under a rule; on the bar it is set
+     * apart by a rule and extra air.
+     */
     val apart: Boolean = false,
+    /** A menu line that starts a new group, drawn under a thin rule (the menu's shared sync, undo, settings tail). */
+    val rule: Boolean = false,
     val run: () -> Unit,
 )
 
@@ -147,7 +153,7 @@ fun MetroAppBar(
                 horizontalArrangement = Arrangement.spacedBy(MetroDimens.AppBarGap),
             ) {
                 primary.forEach { action ->
-                    AppBarIcon(action, expanded, rule = action.apart && action != primary.first()) {
+                    AppBarIcon(action, showLabel = true, rule = action.apart && action != primary.first()) {
                         onExpandedChange(false)
                         action.run()
                     }
@@ -173,19 +179,22 @@ fun MetroAppBar(
         }
         if (expanded && secondary.isNotEmpty()) {
             Column(Modifier.padding(start = MetroDimens.Gutter * 2, bottom = MetroDimens.Gutter)) {
-                secondary.forEach { action ->
+                secondary.forEachIndexed { index, action ->
+                    if (index > 0 && (action.rule || action.apart)) MenuRule(action.id, end = MetroDimens.Gutter * 2)
                     MetroText(
                         action.label,
                         Metro.typography.subheader,
-                        Modifier
-                            .fillMaxWidth()
-                            .metroTilt()
-                            .testTag("app-bar-menu-${action.id}")
-                            .clickable(interactionSource = null, indication = null, role = Role.Button) {
-                                onExpandedChange(false)
-                                action.run()
-                            }.heightIn(min = MetroDimens.TouchTarget)
-                            .padding(vertical = 10.dp),
+                        color = if (action.apart) Metro.accent.text else colors.foreground,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .metroTilt()
+                                .testTag("app-bar-menu-${action.id}")
+                                .clickable(interactionSource = null, indication = null, role = Role.Button) {
+                                    onExpandedChange(false)
+                                    action.run()
+                                }.heightIn(min = MetroDimens.TouchTarget)
+                                .padding(vertical = 10.dp),
                     )
                 }
             }
@@ -254,19 +263,17 @@ private fun Mobile10CommandBar(
                         }.semantics {
                             contentDescription = action.label
                             if (action.spinning) stateDescription = "syncing"
-                        }.padding(top = 14.dp, bottom = if (expanded) 8.dp else 14.dp),
+                        }.padding(top = 14.dp, bottom = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     AppGlyphIcon(action.glyph, colors.foreground, Modifier.syncSpin(action.spinning))
-                    if (expanded) {
-                        MetroText(
-                            action.label,
-                            Metro.typography.caption,
-                            Modifier.wrapContentWidth(unbounded = true).padding(top = 4.dp),
-                            maxLines = 1,
-                            softWrap = false,
-                        )
-                    }
+                    // Labels always show, so a bare glyph never has to be guessed at.
+                    MetroText(
+                        action.label,
+                        Metro.typography.caption.copy(textAlign = TextAlign.Center),
+                        Modifier.fillMaxWidth().padding(top = 4.dp),
+                        maxLines = 2,
+                    )
                 }
             }
             Box(
@@ -287,23 +294,45 @@ private fun Mobile10CommandBar(
         }
         if (expanded && secondary.isNotEmpty()) {
             Column(Modifier.padding(bottom = 8.dp)) {
-                secondary.forEach { action ->
+                secondary.forEachIndexed { index, action ->
+                    if (index > 0 && (action.rule || action.apart)) {
+                        MenuRule(action.id, start = MetroDimens.Gutter, end = MetroDimens.Gutter)
+                    }
                     MetroText(
                         action.label,
                         Metro.typography.body,
-                        Modifier
-                            .fillMaxWidth()
-                            .testTag("app-bar-menu-${action.id}")
-                            .clickable(interactionSource = null, indication = null, role = Role.Button) {
-                                onExpandedChange(false)
-                                action.run()
-                            }.heightIn(min = MetroDimens.TouchTarget)
-                            .padding(horizontal = MetroDimens.Gutter, vertical = 13.dp),
+                        color = if (action.apart) Metro.accent.text else colors.foreground,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .testTag("app-bar-menu-${action.id}")
+                                .clickable(interactionSource = null, indication = null, role = Role.Button) {
+                                    onExpandedChange(false)
+                                    action.run()
+                                }.heightIn(min = MetroDimens.TouchTarget)
+                                .padding(horizontal = MetroDimens.Gutter, vertical = 13.dp),
                     )
                 }
             }
         }
     }
+}
+
+/** The thin rule that starts a new group of menu lines. */
+@Composable
+private fun MenuRule(
+    id: String,
+    start: androidx.compose.ui.unit.Dp = 0.dp,
+    end: androidx.compose.ui.unit.Dp = 0.dp,
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = start, end = end, top = 4.dp, bottom = 4.dp)
+            .height(1.dp)
+            .background(Metro.colors.secondary.copy(alpha = 0.5f))
+            .testTag("app-bar-menu-rule-$id"),
+    )
 }
 
 /** The three small dots of the WP8.1 ellipsis. */
@@ -375,14 +404,13 @@ private fun AppBarIcon(
             AppGlyphIcon(action.glyph, if (filled) accent.onFill else colors.foreground, Modifier.syncSpin(action.spinning))
         }
         if (showLabel) {
+            // A two-word label ("add transaction") wraps under its glyph rather than running into the next one.
             MetroText(
                 action.label,
-                Metro.typography.caption,
-                // Longer labels ("categories") may run a little past the slot, never wrap.
-                Modifier.wrapContentWidth(unbounded = true).padding(top = 4.dp, bottom = 6.dp),
+                Metro.typography.caption.copy(textAlign = TextAlign.Center),
+                Modifier.requiredWidth(MetroDimens.AppBarSlot + MetroDimens.AppBarGap - 4.dp).padding(top = 4.dp, bottom = 6.dp),
                 color = colors.foreground,
-                maxLines = 1,
-                softWrap = false,
+                maxLines = 2,
             )
         } else {
             Box(Modifier.height(4.dp))

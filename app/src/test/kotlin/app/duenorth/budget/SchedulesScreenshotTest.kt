@@ -151,7 +151,7 @@ class SchedulesScreenshotTest {
         val actions =
             ScreenBar
                 .specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_ACCOUNTS)
-                .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} }
+                .map { it.action() }
         captureRoboImage("src/test/snapshots/app_bar_accounts_expanded_light.png") {
             MetroTheme(darkTheme = false) {
                 Column(Modifier.width(390.dp)) {
@@ -197,7 +197,7 @@ class SchedulesScreenshotTest {
         val actions =
             ScreenBar
                 .specsFor(route, hasBudget = true, mode = BudgetMode.ENVELOPE, schedules = bar)
-                .map { ScreenAction(it.id, it.glyph, it.label, it.primary) {} }
+                .map { it.action() }
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
                 Column(Modifier.width(390.dp).height(780.dp)) {

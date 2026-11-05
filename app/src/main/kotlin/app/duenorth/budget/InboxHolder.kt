@@ -103,6 +103,11 @@ class InboxHolder internal constructor(
         update { it.copy(selection = emptySet()) }
     }
 
+    /** A row menu's select: select mode with that row already checked. */
+    fun startSelectingWith(transactionId: String) {
+        update { it.copy(selection = setOf(transactionId)) }
+    }
+
     fun toggleSelected(transactionId: String) {
         update {
             val picked = it.selection ?: return@update it

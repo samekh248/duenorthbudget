@@ -3,8 +3,10 @@ package app.duenorth.budget
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.SimpleFinError
+import app.duenorth.budget.design.components.MetroMenuItem
 
 // The pages of accounts, their registers and transactions, import and bank links, each wired to the view model. DueNorthApp picks one per route.
 
@@ -59,6 +61,24 @@ internal fun RegisterRoute(
             onNotAMatch = { model.register.notAMatch(it, stayOnRegister = true) },
             search = state.registerUi.search,
             onSearch = model.register::setSearch,
+            // Long-press shows the row's menu, select first, as the inbox's does.
+            rowMenu = { row ->
+                listOfNotNull(
+                    MetroMenuItem(RowMenuCopy.SELECT, "register-menu-select") { model.register.startSelecting(row.id) },
+                    MetroMenuItem(RowMenuCopy.EDIT, "register-menu-edit") { model.register.openEdit(row.id) },
+                    if (row.reconciled) {
+                        null
+                    } else if (row.cleared) {
+                        MetroMenuItem(RegisterCopy.UNCLEAR, "register-menu-unclear") { model.register.setCleared(row.id, false) }
+                    } else {
+                        MetroMenuItem(RegisterCopy.CLEAR, "register-menu-clear") { model.register.setCleared(row.id, true) }
+                    },
+                    MetroMenuItem(RegisterCopy.SCHEDULE, "register-menu-schedule") {
+                        model.schedules.createFromTransaction(row.id)
+                    }.takeIf { row.transferId == null },
+                    destructiveItem(RegisterCopy.DELETE, "register-menu-delete") { model.register.delete(row.id) },
+                )
+            },
         )
     }
 }

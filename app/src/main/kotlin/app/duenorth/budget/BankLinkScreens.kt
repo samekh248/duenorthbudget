@@ -135,7 +135,10 @@ fun BankLinkScreen(
                 ScreenAction("bank-token-new", AppGlyph.Sync, BankLinkCopy.NEW_TOKEN, primary = false, run = onNewToken)
                     .takeIf { ui.provider == BankProvider.SIMPLEFIN && !ui.askingToken && !ui.loading },
                 ui.linked?.let {
-                    ScreenAction("bank-link-remove-ask", AppGlyph.Cancel, BankLinkCopy.REMOVE, primary = false) { askingRemove = true }
+                    ScreenAction("bank-link-remove-ask", AppGlyph.Delete, BankLinkCopy.REMOVE, primary = false, apart = true) {
+                        askingRemove =
+                            true
+                    }
                 },
             ),
         )
