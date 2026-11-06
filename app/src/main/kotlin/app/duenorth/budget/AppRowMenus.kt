@@ -14,7 +14,7 @@ internal class AppRowMenus(
 ) : RowMenuItems {
     private val state get() = model.state.value
 
-    /** A month's category: move money, rename it on its page, hide it from the month. */
+    /** A month's category: move money, cover it while it is overspent, rename it on its page, hide it from the month. */
     override fun category(categoryId: String): List<MetroMenuItem> {
         val shell = state.shell ?: return emptyList()
         val category = shell.groups.flatMap { it.categories }.firstOrNull { it.id == categoryId } ?: return emptyList()
@@ -22,6 +22,8 @@ internal class AppRowMenus(
             MetroMenuItem(RowMenuCopy.OPEN, "category-menu-open") { model.envelopes.openBudget(categoryId) },
             MetroMenuItem(EnvelopeCopy.MOVE, "category-menu-move") { model.envelopes.openMoveFrom(categoryId) }
                 .takeIf { shell.mode != BudgetMode.TRACKING },
+            MetroMenuItem(EnvelopeCopy.COVER, "category-menu-cover") { model.envelopes.openCover(categoryId) }
+                .takeIf { shell.mode != BudgetMode.TRACKING && category.availableMinor < 0 && state.budgetEdit == null },
             MetroMenuItem(EnvelopeCopy.RENAME, "category-menu-rename") {
                 model.envelopes.openBudget(categoryId)
                 model.envelopes.startRenameCategory()

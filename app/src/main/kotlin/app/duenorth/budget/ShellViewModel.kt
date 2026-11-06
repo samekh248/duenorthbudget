@@ -948,6 +948,7 @@ class ShellViewModel(
     private fun ShellRoute.pinsMonth(): Boolean =
         this is ShellRoute.CategoryBudget ||
             this is ShellRoute.MoveCategory ||
+            this is ShellRoute.CoverCategory ||
             this is ShellRoute.HoldMonth ||
             this is ShellRoute.ToBudget
 

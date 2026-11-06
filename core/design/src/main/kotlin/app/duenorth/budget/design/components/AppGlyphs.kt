@@ -51,6 +51,7 @@ enum class AppGlyph {
     Edit,
     Merge,
     Export,
+    Cover,
 }
 
 object AppGlyphInk {
@@ -84,6 +85,7 @@ object AppGlyphInk {
             AppGlyph.Edit -> 2
             AppGlyph.Merge -> 4
             AppGlyph.Export -> 4
+            AppGlyph.Cover -> 4
         }
 
     fun DrawScope.draw(
@@ -357,6 +359,30 @@ object AppGlyphInk {
                     style = stroke,
                 )
             }
+            // An umbrella: its canopy over the shaft and the hooked handle, so cover never reads as move's arrows.
+            AppGlyph.Cover -> {
+                val sw = 1.6.dp.toPx()
+                drawArc(
+                    color,
+                    startAngle = 180f,
+                    sweepAngle = 180f,
+                    useCenter = false,
+                    topLeft = Offset(3.dp.toPx(), 4.dp.toPx()),
+                    size = Size(16.dp.toPx(), 14.dp.toPx()),
+                    style = stroke,
+                )
+                drawLine(color, Offset(3.dp.toPx(), 11.dp.toPx()), Offset(19.dp.toPx(), 11.dp.toPx()), strokeWidth = sw)
+                drawLine(color, Offset(11.dp.toPx(), 11.dp.toPx()), Offset(11.dp.toPx(), 17.dp.toPx()), strokeWidth = sw)
+                drawArc(
+                    color,
+                    startAngle = 0f,
+                    sweepAngle = 180f,
+                    useCenter = false,
+                    topLeft = Offset(7.dp.toPx(), 15.dp.toPx()),
+                    size = Size(4.dp.toPx(), 4.dp.toPx()),
+                    style = Stroke(width = sw),
+                )
+            }
             AppGlyph.Undo -> {
                 drawLine(color, Offset(5.dp.toPx(), 9.dp.toPx()), Offset(15.dp.toPx(), 9.dp.toPx()), strokeWidth = 1.6.dp.toPx())
                 drawLine(color, Offset(5.dp.toPx(), 9.dp.toPx()), Offset(9.dp.toPx(), 5.dp.toPx()), strokeWidth = 1.6.dp.toPx())
@@ -449,6 +475,8 @@ object Mdl2GlyphInk {
             AppGlyph.Delete to "M2 4.5h16M7.5 4.5V2h5v2.5M4 4.5l1 13.5h10l1-13.5M8.5 7.5v7.5M11.5 7.5v7.5",
             // Edit: a pencil down to the left, its tip and the band behind it.
             AppGlyph.Edit to "M2.5 17.5l1-4.5L14 2.5L17.5 6L7 16.5zM12 4.5L15.5 8M3.5 13L7 16.5",
+            // Umbrella: a canopy over its shaft and hooked handle.
+            AppGlyph.Cover to "M2 10a8 7 0 0 1 16 0zM10 10v6a1.75 1.75 0 0 1-3.5 0",
             // Merge: two lines running together into one arrow.
             AppGlyph.Merge to "M2 3.5l7 6.5M2 16.5l7-6.5M9 10h9M14.5 6.5L18 10l-3.5 3.5",
         )

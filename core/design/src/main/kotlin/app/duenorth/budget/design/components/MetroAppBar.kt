@@ -496,6 +496,7 @@ internal val CaptionAbbreviations =
         "appearance" to "appear.",
         "reconcile" to "recon.",
         "categorize" to "categ.",
+        "overspending" to "oversp.",
     )
 
 /**

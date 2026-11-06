@@ -528,6 +528,133 @@ private fun MoveTarget(
     }
 }
 
+/**
+ * Covers an overspent category: where the money comes from, picked from to budget and every other category with
+ * money available, and how much, which starts at what the category is short by. A source with less than that
+ * offers all it has. The overspent category and the picked source show what they will have after the cover.
+ */
+@Composable
+fun CoverCategoryScreen(
+    shell: MonthShell,
+    categoryId: String,
+    error: String?,
+    onSave: (String, String) -> Unit,
+    modifier: Modifier = Modifier,
+    initialFrom: String = "",
+) {
+    val categories = shell.groups.flatMap { it.categories }
+    val to = categories.first { it.id == categoryId }
+    val prefs = LocalFormatPrefs.current
+    val options = formatOptions()
+    val money = shell.currency
+    val envelope = shell.mode == BudgetMode.ENVELOPE
+    val short = (-to.availableMinor).coerceAtLeast(0L)
+
+    fun available(id: String): Long =
+        if (id == MOVE_TO_BUDGET) shell.headerMinor else categories.firstOrNull { it.id == id }?.availableMinor ?: 0L
+
+    // What a pick puts in the amount box: all that is short, or all the source has when that is less.
+    fun suggested(id: String): Long = if (id == MOVE_TO_BUDGET || available(id) >= short) short else available(id).coerceAtLeast(0L)
+    var fromId by remember { mutableStateOf(initialFrom) }
+    var amount by remember {
+        mutableStateOf(
+            prefs.editAmount(if (initialFrom.isBlank()) short else suggested(initialFrom), money.decimals),
+        )
+    }
+    // Until the person types an amount, picking a source fits the amount to it.
+    var typed by remember { mutableStateOf(false) }
+    val moved = MoneyMath.evaluate(amount, prefs.numberFormat, money.decimals)?.takeIf { it > 0 } ?: 0L
+
+    fun pick(id: String) {
+        fromId = id
+        if (!typed) amount = prefs.editAmount(suggested(id), money.decimals)
+    }
+    Column(
+        modifier
+            .fillMaxSize()
+            .background(Metro.colors.background)
+            .padding(MetroDimens.Gutter)
+            .testTag("cover-screen"),
+    ) {
+        MetroText(EnvelopeCopy.coverTitle(to.name), Metro.typography.subheader, maxLines = 2)
+        MetroText(
+            "${EnvelopeCopy.AVAILABLE} ${MoneyFormat.format(to.availableMinor + moved, money, options)}",
+            Metro.typography.caption,
+            Modifier.padding(top = 4.dp).testTag("cover-available"),
+            color = if (to.availableMinor + moved < 0) Metro.colors.error else Metro.colors.secondary,
+        )
+        MetroField(
+            amount,
+            {
+                amount = it
+                typed = true
+            },
+            "amount",
+            Modifier.padding(top = MetroDimens.Gutter).testTag("cover-amount"),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Grid)) {
+            if (short > 0) {
+                QuickAmount("cover ${MoneyFormat.format(short, money, options)}", "cover-short") {
+                    amount = prefs.editAmount(short, money.decimals)
+                    typed = false
+                }
+            }
+            val has = if (fromId.isBlank() || fromId == MOVE_TO_BUDGET) 0L else available(fromId)
+            if (has in 1 until short) {
+                QuickAmount("all ${MoneyFormat.format(has, money, options)}", "cover-all") {
+                    amount = prefs.editAmount(has, money.decimals)
+                    typed = false
+                }
+            }
+        }
+        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+        MetroText(EnvelopeCopy.COVER_FROM, Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
+        LazyColumn(Modifier.weight(1f).testTag("cover-sources")) {
+            if (envelope) {
+                item(key = MOVE_TO_BUDGET) {
+                    MoveTarget(
+                        name = shell.headerLabel,
+                        available = MoneyFormat.format(shell.headerMinor - if (fromId == MOVE_TO_BUDGET) moved else 0L, money, options),
+                        picked = fromId == MOVE_TO_BUDGET,
+                        banded = false,
+                        tag = "cover-from-$MOVE_TO_BUDGET",
+                    ) { pick(MOVE_TO_BUDGET) }
+                }
+            }
+            var band = 0
+            shell.groups.forEach { group ->
+                // Only categories with money to give, and never the one being covered.
+                val sources = group.categories.filter { it.id != categoryId && it.availableMinor > 0 }
+                if (sources.isEmpty()) return@forEach
+                item(key = "group-${group.id}") {
+                    MetroText(
+                        group.name,
+                        Metro.typography.groupHeader,
+                        Modifier.padding(top = MetroDimens.Row, bottom = 4.dp),
+                        color = Metro.colors.secondary,
+                    )
+                }
+                sources.forEach { source ->
+                    val banded = ledgerBanded(band++)
+                    item(key = source.id) {
+                        MoveTarget(
+                            name = source.name,
+                            available = MoneyFormat.format(source.availableMinor - if (fromId == source.id) moved else 0L, money, options),
+                            picked = fromId == source.id,
+                            banded = banded,
+                            tag = "cover-from-${source.id}",
+                        ) { pick(source.id) }
+                    }
+                }
+            }
+        }
+        RememberFormSave { onSave(fromId, prefs.readAmount(amount, money.decimals)) }
+        if (!formSaveOnBar()) {
+            MetroButton("cover") { onSave(fromId, prefs.readAmount(amount, money.decimals)) }
+        }
+    }
+}
+
 @Composable
 fun HoldMonthScreen(
     shell: MonthShell,

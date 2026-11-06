@@ -65,6 +65,11 @@ sealed interface ShellRoute {
         val fromCategoryId: String,
     ) : ShellRoute
 
+    /** Covers [categoryId]'s overspending with money from another category or from to budget. */
+    data class CoverCategory(
+        val categoryId: String,
+    ) : ShellRoute
+
     data object HoldMonth : ShellRoute
 
     data class ToBudget(

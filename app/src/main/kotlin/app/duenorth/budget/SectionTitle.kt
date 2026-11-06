@@ -59,6 +59,7 @@ object SectionTitle {
                 is ShellRoute.TemplateKinds,
                 is ShellRoute.TemplateEditor,
                 is ShellRoute.MoveCategory,
+                is ShellRoute.CoverCategory,
                 is ShellRoute.ToBudget,
                 ShellRoute.HoldMonth,
                 ShellRoute.StarterCategories,

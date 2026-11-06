@@ -9,6 +9,17 @@ object EnvelopeCopy {
     const val STILL_USED = "category still has money or transactions"
     const val GROUP_STILL_USED = "group still has categories in use"
     const val MOVE = "move"
+
+    // Cover overspending: money moved into an overspent category from another one or from to budget. The bar's
+    // umbrella is the verb, so its caption is the noun alone.
+    const val COVER = "cover overspending"
+    const val COVER_CAPTION = "overspending"
+    const val COVER_FROM = "from"
+    const val PICK_SOURCE = "pick where the money comes from"
+
+    /** The cover screen's heading: what [name] is short by. */
+    fun coverTitle(name: String): String = "cover $name"
+
     const val HOLD = "hold"
     const val RELEASE = "release hold"
     const val ROLLOVER = "rollover overspending"

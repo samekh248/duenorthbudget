@@ -119,6 +119,34 @@ internal fun MoveCategoryRoute(
 }
 
 @Composable
+internal fun CoverCategoryRoute(
+    route: ShellRoute.CoverCategory,
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val shell = state.editingShell()
+    if (shell == null || shell.groups.none { group -> group.categories.any { it.id == route.categoryId } }) {
+        Placeholder()
+    } else {
+        EditorWithMonth(
+            openMonth = state.openMonth,
+            monthWindow = model.monthWindow(),
+            onSelectMonth = model::selectOpenMonth,
+            modifier = modifier,
+        ) { inner ->
+            CoverCategoryScreen(
+                shell = shell,
+                categoryId = route.categoryId,
+                error = state.editError,
+                onSave = model.envelopes::submitCover,
+                modifier = inner,
+            )
+        }
+    }
+}
+
+@Composable
 internal fun HoldMonthRoute(
     state: ShellUiState,
     model: ShellViewModel,
