@@ -142,3 +142,24 @@ data class NewTransactionPrefill(
     val amountMinor: Long,
     val dateIso: String,
 )
+
+/**
+ * Whether the app takes system back itself rather than leaving it to the system (which closes the app from home).
+ * On home that is only while a mode is open there: the budget's edit mode, inbox select or accounts reorder,
+ * so back ends the mode and the next back, in read mode, leaves as before. Dialogs and the keyboard handle
+ * their own back first, so this only sees back when neither is open.
+ */
+fun ShellUiState.takesBack(): Boolean =
+    confirm != null ||
+        monthUi.fillConfirm != null ||
+        settingsUi.confirmAdvanced != null ||
+        (
+            route == ShellRoute.Home &&
+                (budgetEdit != null || inbox.selection != null || accounts.reorder)
+        ) ||
+        (
+            route != ShellRoute.Home &&
+                route != ShellRoute.Welcome &&
+                !(route == ShellRoute.Create && shell == null && onboarding == null && !settingsReturn) &&
+                !(route == ShellRoute.BudgetPassword && locked)
+        )

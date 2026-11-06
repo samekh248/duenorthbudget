@@ -19,6 +19,7 @@ import app.duenorth.budget.core.UndoCopy
 import app.duenorth.budget.core.createFromMock
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -59,6 +60,22 @@ class BudgetEditTest {
     }
 
     @Test
+    fun systemBackReturnsEditModeToReadModeAndOnlyThenLeavesTheApp() {
+        val model = household("system-back")
+        // Read mode on home: back is left to the system, which leaves the app as before.
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        assertFalse(model.state.value.takesBack())
+        model.budgetEdit.start()
+        // Edit mode: the app takes back, and it returns the budget to read mode on home.
+        assertTrue(model.state.value.takesBack())
+        assertTrue(model.back())
+        assertNull(model.state.value.budgetEdit)
+        assertEquals(ShellRoute.Home, model.state.value.route)
+        assertEquals(ScreenBar.HOME_BUDGET, model.state.value.homeSection)
+        assertFalse(model.state.value.takesBack())
+    }
+
+    @Test
     fun equalsWorksTheSumOutInTheBox() {
         val model = household("equals")
         model.budgetEdit.start()
@@ -89,6 +106,10 @@ class BudgetEditTest {
         listOf("9", "9").forEach(model.budgetEdit::typeKey)
         model.budgetEdit.focusBox("c-rent")
         listOf("+", "5").forEach(model.budgetEdit::typeKey)
+        // The first back only closes the keypad; edit mode stays open with what was done before it.
+        assertTrue(model.back())
+        assertNull(model.edit().categoryId)
+        assertTrue(model.state.value.takesBack())
         assertTrue(model.back())
         assertNull(model.state.value.budgetEdit)
         assertEquals(ShellRoute.Home, model.state.value.route)

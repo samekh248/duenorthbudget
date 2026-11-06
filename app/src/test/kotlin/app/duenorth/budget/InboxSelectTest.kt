@@ -5,6 +5,7 @@ import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.UndoCopy
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -103,7 +104,9 @@ class InboxSelectTest {
     fun backLeavesSelectMode() {
         val (model, _) = household("inbox-select-back")
         model.inbox.startSelecting()
+        assertTrue(model.state.value.takesBack())
         assertTrue(model.back())
+        assertFalse(model.state.value.takesBack())
         assertEquals(null, model.state.value.inbox.selection)
     }
 }

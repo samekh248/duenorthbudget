@@ -229,16 +229,7 @@ fun DueNorthApp(model: ShellViewModel) {
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    val canBack =
-        state.confirm != null ||
-            state.monthUi.fillConfirm != null ||
-            state.settingsUi.confirmAdvanced != null ||
-            (
-                state.route != ShellRoute.Home &&
-                    state.route != ShellRoute.Welcome &&
-                    !(state.route == ShellRoute.Create && state.shell == null && state.onboarding == null && !state.settingsReturn) &&
-                    !(state.route == ShellRoute.BudgetPassword && state.locked)
-            )
+    val canBack = state.takesBack()
     BackHandler(enabled = canBack) {
         if (state.settingsUi.confirmAdvanced != null) {
             model.settingsUi.cancelAdvanced()
