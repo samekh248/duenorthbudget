@@ -1,7 +1,10 @@
 package app.duenorth.budget
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -115,6 +118,9 @@ fun PullSyncPanel(
     onDetails: () -> Unit = {},
     /** Clears the failed bank sync, and the strip with it. */
     onDismissFailure: () -> Unit = {},
+    /** Bounce the panel down and back up once, so someone new sees it is there; [onPeeked] says it played. */
+    peek: Boolean = false,
+    onPeeked: () -> Unit = {},
     content: @Composable (Modifier) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -132,6 +138,23 @@ fun PullSyncPanel(
     fun settle(toOpen: Boolean) {
         open = toOpen
         scope.launch { revealed.animateTo(if (toOpen) height() else 0f) }
+    }
+
+    // The first-run hint: a moment after the page settles, the panel drops partway, holds, and tucks back up.
+    LaunchedEffect(peek && ui.enabled) {
+        if (!peek || !ui.enabled) return@LaunchedEffect
+        delay(PEEK_DELAY_MS)
+        if (open || revealed.value > 0f) return@LaunchedEffect
+        // In the panel's own scope: recording the peek turns [peek] off, which must not cut the bounce short.
+        scope.launch {
+            revealed.animateTo(
+                height() * PEEK_SHARE,
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+            )
+            delay(PEEK_HOLD_MS)
+            if (!open) revealed.animateTo(0f, spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow))
+        }
+        onPeeked()
     }
 
     // Turned off mid-pull (a mode opened, the budget closed): the panel goes away with it.
@@ -253,6 +276,45 @@ fun PullSyncPanel(
                 )
             }
         }
+    }
+}
+
+/** The first-run peek waits this long after the budget shows, so the bounce isn't lost in the page loading. */
+private const val PEEK_DELAY_MS = 900L
+
+/** How much of the panel the peek shows: enough to read its status and see the buttons start. */
+private const val PEEK_SHARE = 0.6f
+
+/** How long the peek holds before it tucks back up. */
+private const val PEEK_HOLD_MS = 900L
+
+/**
+ * Whether the pull-down sync panel still owes its one-time peek. Only a fresh install owes it: the
+ * first look after an update from an older version records it as already seen, so people who have
+ * used the app before never get the bounce.
+ */
+object PullSyncPeek {
+    private const val PREFS = "pull_sync_peek"
+    private const val DONE = "done"
+
+    /** Decides once per install; after that the stored answer stands. */
+    fun pending(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(DONE)) {
+            val info = runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull()
+            // A fresh install was never updated: its install and last update times are the same moment.
+            val fresh = info != null && info.firstInstallTime == info.lastUpdateTime
+            prefs.edit().putBoolean(DONE, !fresh).apply()
+        }
+        return !prefs.getBoolean(DONE, true)
+    }
+
+    fun markDone(context: Context) {
+        context
+            .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(DONE, true)
+            .apply()
     }
 }
 

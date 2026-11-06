@@ -148,6 +148,7 @@ fun DueNorthApp(model: ShellViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var importAccountId by remember { mutableStateOf<String?>(null) }
+    var peekPending by remember { mutableStateOf(PullSyncPeek.pending(context)) }
     val importLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
             val accountId = importAccountId ?: return@rememberLauncherForActivityResult
@@ -376,6 +377,12 @@ fun DueNorthApp(model: ShellViewModel) {
                                 modifier = fill,
                                 onDetails = model.bankSync::openReport,
                                 onDismissFailure = model.bankSync::dismiss,
+                                // A fresh install's first look at the budget bounces the panel once, so it is found.
+                                peek = peekPending && state.homeSection == ScreenBar.HOME_BUDGET,
+                                onPeeked = {
+                                    peekPending = false
+                                    PullSyncPeek.markDone(context)
+                                },
                             ) { HomeRoute(state, model, it) }
                         ShellRoute.Settings -> SettingsRoute(state, model, fill)
                         is ShellRoute.ExperimentalOffer -> ExperimentalOfferRoute(route, state, model, fill)

@@ -28,6 +28,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 /** The pull-down sync panel: a pull opens it without syncing, its buttons sync, and pushing back up shuts it. */
@@ -179,6 +181,49 @@ class PullSyncContentTest {
         assertEquals(1, dismissed)
         compose.onNodeWithTag("pull-sync-failure").assertDoesNotExist()
         compose.onNodeWithTag("pull-sync-strip").assertDoesNotExist()
+    }
+
+    // The first-run peek drops the panel into view, then tucks it back, and says once that it played.
+    @Test
+    fun thePeekBouncesOnceAndTucksBack() {
+        var peeked = 0
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            MetroTheme {
+                PullSyncPanel(ui, onSync = {}, onBankSync = {}, peek = peeked == 0, onPeeked = { peeked++ }) { modifier ->
+                    LazyColumn(modifier.testTag("page")) {
+                        items(40) { MetroText("row $it", Metro.typography.body, Modifier.fillMaxWidth().padding(12.dp)) }
+                    }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(1_600)
+        compose.onNodeWithTag("pull-sync-now").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(4_000)
+        compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
+        assertEquals(1, peeked)
+        assertEquals(0, synced)
+    }
+
+    // Only a fresh install owes the peek; once played it is never owed again.
+    @Test
+    fun aFreshInstallOwesThePeekOnce() {
+        val context = RuntimeEnvironment.getApplication()
+        assertTrue(PullSyncPeek.pending(context))
+        assertTrue(PullSyncPeek.pending(context))
+        PullSyncPeek.markDone(context)
+        assertFalse(PullSyncPeek.pending(context))
+    }
+
+    // Someone updating from an older version has used the app before, so the peek is recorded as seen.
+    @Test
+    fun anUpdateNeverPeeks() {
+        val context = RuntimeEnvironment.getApplication()
+        Shadows.shadowOf(context.packageManager).getInternalMutablePackageInfo(context.packageName).apply {
+            firstInstallTime = 1_000L
+            lastUpdateTime = 2_000L
+        }
+        assertFalse(PullSyncPeek.pending(context))
     }
 
     @Test
