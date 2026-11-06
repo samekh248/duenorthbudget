@@ -406,6 +406,41 @@ class AssistantTest {
     }
 
     @Test
+    fun postingAMissedScheduleEntersItAndClearsTheFinding() {
+        db { session ->
+            insert(session, "rent", 20260920, -150000, "checking", "p-gas", null, null, "f-rent", "RENT")
+            val book = SchedulesBook(session, { TODAY })
+            assertEquals(ScheduleWriteResult.Posted, book.createFromTransaction("rent", "monthly", "2026-10-20"))
+            val scheduleId = book.listAll().single().id
+            assertTrue(readAll(session).findings.any { it.kind == FindingKind.MISSED_SCHEDULE })
+            assertEquals(ScheduleWriteResult.Posted, book.post(scheduleId))
+            assertTrue(readAll(session).findings.none { it.kind == FindingKind.MISSED_SCHEDULE })
+            val posted = session.query("SELECT schedule FROM transactions WHERE date = 20261020").single()
+            assertEquals(scheduleId, posted.str("schedule"))
+        }
+    }
+
+    @Test
+    fun postingAMissedCardPaymentEntersATransfer() {
+        db { session ->
+            // Actual's transfer payees have no name: the account they pay into names them.
+            session.exec("INSERT INTO payees (id, name, transfer_acct) VALUES ('p-to-visa', '', 'visa')")
+            insert(session, "pay", 20260920, -40000, "checking", "p-to-visa", null, null, null, null)
+            val book = SchedulesBook(session, { TODAY })
+            assertEquals(ScheduleWriteResult.Posted, book.createFromTransaction("pay", "monthly", "2026-10-20"))
+            val scheduleId = book.listAll().single().id
+            assertTrue(readAll(session).findings.any { it.kind == FindingKind.MISSED_SCHEDULE })
+            assertEquals(ScheduleWriteResult.Posted, book.post(scheduleId))
+            assertTrue(readAll(session).findings.none { it.kind == FindingKind.MISSED_SCHEDULE })
+            val rows =
+                session
+                    .query("SELECT acct, amount, schedule, transferred_id FROM transactions WHERE date = 20261020 ORDER BY amount")
+                    .map { Triple(it.str("acct"), it.long("amount"), it.str("transferred_id") != null) }
+            assertEquals(listOf(Triple("checking", -40000L, true), Triple("visa", 40000L, true)), rows)
+        }
+    }
+
+    @Test
     fun aPayeeAlwaysInOneCategoryGetsARuleIdea() {
         db { session ->
             (1..4).forEach { insert(session, "gas-$it", 20261000 + it, -3000, "checking", "p-gas", "c-dining", null, "f-$it", "SHELL") }

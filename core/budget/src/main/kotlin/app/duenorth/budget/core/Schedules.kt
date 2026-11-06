@@ -324,6 +324,8 @@ class SchedulesBook(
         categoryId = ruled.category
         amount = ruled.amount
         val payeeId = ruled.payee ?: schedule.payeeId
+        // A payment to another account (a card or a loan) has a transfer payee, which has no name of its own.
+        val transferAccountId = payeeId?.let(::transferAccountOf)?.takeIf { it != schedule.accountId }
         val draft =
             TransactionDraft(
                 id = ids(),
@@ -334,11 +336,12 @@ class SchedulesBook(
                 categoryId = categoryId,
                 note = ruled.notes,
                 force = false,
+                transferAccountId = transferAccountId,
                 scheduleId = schedule.id,
             )
-        when (book.save(draft)) {
+        when (val saved = book.save(draft)) {
             is WriteResult.Saved -> Unit
-            is WriteResult.Rejected -> return ScheduleWriteResult.Rejected(RegisterCopy.ENTER_PAYEE)
+            is WriteResult.Rejected -> return ScheduleWriteResult.Rejected(saved.reason)
             is WriteResult.Confirm -> return ScheduleWriteResult.Rejected(RegisterCopy.RECONCILE_WARN)
         }
         advanceNextDate(schedule)
@@ -795,6 +798,14 @@ class SchedulesBook(
             ?.jsonPrimitive
             ?.contentOrNull
     }
+
+    /** The account a transfer payee pays into, or null for an ordinary payee. */
+    private fun transferAccountOf(payeeId: String): String? =
+        session
+            .query("SELECT transfer_acct FROM payees WHERE id = ? AND IFNULL(tombstone, 0) = 0", listOf(payeeId))
+            .firstOrNull()
+            ?.str("transfer_acct")
+            ?.ifBlank { null }
 
     private fun hasMatchingTransaction(
         schedule: LoadedSchedule,
