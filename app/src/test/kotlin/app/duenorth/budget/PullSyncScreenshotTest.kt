@@ -3,8 +3,12 @@ package app.duenorth.budget
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import app.duenorth.budget.core.BankSyncFailure
@@ -60,6 +64,13 @@ class PullSyncScreenshotTest {
     @Test
     fun banksDark() = snap("pull_sync_banks_dark", dark = true, synced.copy(bankSync = true))
 
+    // After sync now: the panel has folded to its grip, which says syncing until the sync is done.
+    @Test
+    fun syncingLight() = snap("pull_sync_syncing_light", dark = false, synced, tapSync = true)
+
+    @Test
+    fun syncingDark() = snap("pull_sync_syncing_dark", dark = true, synced, tapSync = true)
+
     @Test
     fun closedLight() = snap("pull_sync_closed_light", dark = false, synced, pull = false)
 
@@ -88,7 +99,9 @@ class PullSyncScreenshotTest {
         dark: Boolean,
         ui: PullSyncUi,
         pull: Boolean = true,
+        tapSync: Boolean = false,
     ) {
+        var shown by mutableStateOf(ui)
         val shell = sample()
         val actions =
             ScreenBar
@@ -97,7 +110,12 @@ class PullSyncScreenshotTest {
         compose.setContent {
             MetroTheme(darkTheme = dark) {
                 Column(Modifier.fillMaxSize()) {
-                    PullSyncPanel(ui, onSync = {}, onBankSync = {}, modifier = Modifier.weight(1f)) { inner ->
+                    PullSyncPanel(
+                        shown,
+                        onSync = { shown = shown.copy(syncing = true) },
+                        onBankSync = {},
+                        modifier = Modifier.weight(1f),
+                    ) { inner ->
                         HomePivot(
                             shell = shell,
                             loading = false,
@@ -117,6 +135,10 @@ class PullSyncScreenshotTest {
             compose.onNodeWithTag("budget-list").performTouchInput {
                 swipeDown(startY = top + 10f, endY = bottom - 10f, durationMillis = 400)
             }
+            compose.waitForIdle()
+        }
+        if (tapSync) {
+            compose.onNodeWithTag("pull-sync-now").performClick()
             compose.waitForIdle()
         }
         captureScreenRoboImage("src/test/snapshots/$name.png")

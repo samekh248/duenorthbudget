@@ -73,8 +73,6 @@ data class PullSyncUi(
     val status: String = "",
     /** A server or bank sync is running, whoever started it. */
     val syncing: Boolean = false,
-    /** How far the server sync has got, when it knows; null for a bank sync or none. */
-    val progress: Float? = null,
     /** The budget has bank-linked accounts, so the panel offers bank sync beside sync now. */
     val bankSync: Boolean = false,
     /** The budget is on a server this phone is signed in to, so the panel can sync it. */
@@ -97,9 +95,6 @@ private const val OVERSTRETCH = 1.25f
 
 /** A sync asked for that never starts (one was already running) gives up waiting after this long. */
 private const val START_WAIT_MS = 1_500L
-
-/** The finished sync's status stays on screen this long before the panel closes. */
-private const val DONE_PAUSE_MS = 700L
 
 /**
  * The home pivot's pull-down sync panel. With a page's list at its top, pulling further down
@@ -160,22 +155,15 @@ fun PullSyncPanel(
     // Turned off mid-pull (a mode opened, the budget closed): the panel goes away with it.
     LaunchedEffect(ui.enabled) { if (!ui.enabled && (open || revealed.value > 0f)) settle(false) }
 
-    // After a tap, the panel shows the sync running, then the new status a moment, then closes.
+    // After a tap the panel has folded away; the syncing strip stays until the sync it started is done.
     LaunchedEffect(ui.syncing, requested) {
         when {
             requested == Requested.ASKED && ui.syncing -> requested = Requested.RUNNING
             requested == Requested.ASKED -> {
                 delay(START_WAIT_MS)
-                if (!current.syncing) {
-                    requested = Requested.NONE
-                    settle(false)
-                }
+                if (!current.syncing) requested = Requested.NONE
             }
-            requested == Requested.RUNNING && !ui.syncing -> {
-                delay(DONE_PAUSE_MS)
-                requested = Requested.NONE
-                settle(false)
-            }
+            requested == Requested.RUNNING && !ui.syncing -> requested = Requested.NONE
         }
     }
 
@@ -226,9 +214,14 @@ fun PullSyncPanel(
         }
 
     Column(modifier.nestedScroll(connection)) {
-        // A failed sync waits as a quiet strip at the top of the page; a tap (or a pull) opens the panel that explains it.
+        // A sync started from the panel shows as the panel's folded grip saying syncing, while the app's own sync
+        // animation runs along the top; it goes once the sync is done. A failed sync then waits as a quiet strip,
+        // and a tap (or a pull) opens the panel that explains it.
         val failure = ui.failure
-        if (failure != null && !open && revealed.value <= 0f) {
+        val folded = !open && revealed.value <= 0f
+        if (folded && requested != Requested.NONE) {
+            PullSyncSyncing()
+        } else if (folded && failure != null) {
             PullSyncStrip(failure, onOpen = { settle(true) })
         }
         val shownDp = with(density) { revealed.value.toDp() }
@@ -239,22 +232,27 @@ fun PullSyncPanel(
                 .clipToBounds(),
         ) {
             // Measured at its full height and pinned to the bottom, so it slides out from above the page.
+            // Whichever button is pressed, the panel folds back up.
             PullSyncSheet(
                 ui = ui,
-                running = requested != Requested.NONE || ui.syncing,
                 onSync = {
                     requested = Requested.ASKED
+                    settle(false)
                     onSync()
                 },
                 onBankSync = {
                     requested = Requested.ASKED
+                    settle(false)
                     onBankSync()
                 },
                 onDetails = {
                     settle(false)
                     onDetails()
                 },
-                onDismissFailure = onDismissFailure,
+                onDismissFailure = {
+                    settle(false)
+                    onDismissFailure()
+                },
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -325,7 +323,6 @@ private const val FLICK_SHUT = 1_200f
 @Composable
 internal fun PullSyncSheet(
     ui: PullSyncUi,
-    running: Boolean,
     onSync: () -> Unit,
     onBankSync: () -> Unit,
     modifier: Modifier = Modifier,
@@ -339,10 +336,9 @@ internal fun PullSyncSheet(
             .testTag("pull-sync-panel")
             .padding(top = MetroDimens.Row),
     ) {
-        val syncing = running && ui.syncing
         val status =
             when {
-                syncing -> PullSyncCopy.SYNCING
+                ui.syncing -> PullSyncCopy.SYNCING
                 ui.status.isBlank() -> PullSyncCopy.NOT_YET
                 else -> ui.status
             }
@@ -353,23 +349,10 @@ internal fun PullSyncSheet(
                 .padding(horizontal = MetroDimens.Gutter)
                 .semantics { liveRegion = LiveRegionMode.Polite }
                 .testTag("pull-sync-status"),
-            color = if (syncing) Metro.accent.text else Metro.colors.foreground,
             maxLines = 2,
         )
-        Box(
-            Modifier
-                .padding(top = MetroDimens.Row)
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(if (syncing) Metro.colors.outline else Metro.colors.chrome),
-        ) {
-            val fraction = ui.progress?.takeIf { syncing }
-            if (fraction != null) {
-                Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(3.dp).background(Metro.accent.fill))
-            }
-        }
         val failure = ui.failure
-        if (failure != null && !syncing) PullSyncFailure(failure, onDetails, onDismissFailure)
+        if (failure != null && !ui.syncing) PullSyncFailure(failure, onDetails, onDismissFailure)
         if (ui.canSync) {
             MetroButtonGrid(Modifier.padding(horizontal = MetroDimens.Gutter).padding(top = MetroDimens.Row)) {
                 MetroButton(PullSyncCopy.SYNC_NOW, Modifier.testTag("pull-sync-now")) { if (!ui.syncing) onSync() }
@@ -409,7 +392,6 @@ internal fun ShellUiState.pullSync(): PullSyncUi {
         failure = failure,
         status = syncStatus,
         syncing = syncing || bankSync.syncing,
-        progress = syncProgress,
         bankSync =
             server &&
                 shell
@@ -513,5 +495,27 @@ private fun QuietAction(
         contentAlignment = Alignment.Center,
     ) {
         MetroText(label, Metro.typography.body, color = Metro.accent.text)
+    }
+}
+
+/** The panel folded back to its grip, saying syncing until the sync a button started is done. */
+@Composable
+private fun PullSyncSyncing() {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Metro.colors.chrome)
+            .padding(top = 8.dp, bottom = 6.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .testTag("pull-sync-syncing"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .width(36.dp)
+                .height(4.dp)
+                .background(Metro.colors.secondary, RoundedCornerShape(2.dp)),
+        )
+        MetroText(PullSyncCopy.SYNCING, Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
     }
 }

@@ -54,7 +54,7 @@ class PullSyncContentTest {
             MetroTheme {
                 PullSyncPanel(ui, onSync = {
                     synced++
-                    if (startsSyncing) ui = ui.copy(syncing = true, progress = 0.4f)
+                    if (startsSyncing) ui = ui.copy(syncing = true)
                 }, onBankSync = { bankSynced++ }, onDetails = { details++ }, onDismissFailure = {
                     dismissed++
                     ui = ui.copy(failure = null)
@@ -139,20 +139,37 @@ class PullSyncContentTest {
         compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
     }
 
+    // A tap folds the panel straight back up; its grip says syncing until the sync is done, then goes.
     @Test
-    fun itShowsTheSyncRunningThenShutsWhenItEnds() {
+    fun aTapFoldsThePanelIntoASyncingStripUntilItsDone() {
         startsSyncing = true
         show()
         pull()
         compose.onNodeWithTag("pull-sync-now").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("pull-sync-now").assertIsDisplayed()
-        compose.onNodeWithTag("pull-sync-status", useUnmergedTree = true).assertTextEquals(PullSyncCopy.SYNCING)
-        ui = ui.copy(syncing = false, progress = null, status = "synced 3:50 pm")
-        compose.waitForIdle()
-        compose.mainClock.advanceTimeBy(2_000)
-        compose.waitForIdle()
         compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
+        compose.onNodeWithTag("pull-sync-syncing").assertIsDisplayed()
+        ui = ui.copy(syncing = false, status = "synced 3:50 pm")
+        compose.waitForIdle()
+        compose.onNodeWithTag("pull-sync-syncing").assertDoesNotExist()
+        compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
+    }
+
+    // Bank sync folds the panel too, and a failure it ends in takes the strip's place.
+    @Test
+    fun aFailedSyncFromThePanelLeavesItsStrip() {
+        show()
+        pull()
+        ui = ui.copy(bankSync = true)
+        compose.waitForIdle()
+        compose.onNodeWithTag("pull-sync-banks").performClick()
+        ui = ui.copy(syncing = true)
+        compose.waitForIdle()
+        compose.onNodeWithTag("pull-sync-syncing").assertIsDisplayed()
+        ui = ui.copy(syncing = false, failure = failed)
+        compose.waitForIdle()
+        compose.onNodeWithTag("pull-sync-syncing").assertDoesNotExist()
+        compose.onNodeWithTag("pull-sync-strip").assertIsDisplayed()
     }
 
     // A failed bank sync waits as a quiet strip; a tap opens the panel with what failed, details and dismiss.
