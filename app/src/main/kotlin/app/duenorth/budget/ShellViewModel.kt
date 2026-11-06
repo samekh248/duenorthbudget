@@ -435,6 +435,11 @@ class ShellViewModel(
             _state.update { it.copy(accounts = it.accounts.copy(reorder = false)) }
             return true
         }
+        // Back with the keypad open closes it and stays in edit mode, the way back closes a keyboard.
+        if (current.budgetEdit?.categoryId != null && current.route == ShellRoute.Home && current.confirm == null) {
+            budgetEdit.closeKeypad()
+            return true
+        }
         // Back is edit mode's cancel: it leaves without saving anything changed there.
         if (current.budgetEdit != null && current.route == ShellRoute.Home && current.confirm == null) {
             budgetEdit.cancel()
