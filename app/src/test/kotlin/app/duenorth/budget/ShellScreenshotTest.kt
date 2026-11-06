@@ -245,15 +245,6 @@ class ShellScreenshotTest {
     @Test
     fun accountsBankSyncingDark() = bankSyncSnap("accounts_bank_syncing_dark", dark = true, BankSyncUi(accountName = "Joint checking"))
 
-    // Done with an error: the red tile above the bar names the failed account and offers retry.
-    @Test
-    fun accountsBankSyncRetryLight() =
-        bankSyncSnap("accounts_bank_sync_retry_light", dark = false, BankSyncUi(running = false, failures = listOf(cardFailure)))
-
-    @Test
-    fun accountsBankSyncRetryDark() =
-        bankSyncSnap("accounts_bank_sync_retry_dark", dark = true, BankSyncUi(running = false, failures = listOf(cardFailure)))
-
     // The dots run over every page while banks fetch: here over the budget.
     @Test
     fun budgetBankSyncingDark() =
@@ -296,8 +287,6 @@ class ShellScreenshotTest {
             }
         }
     }
-
-    private val cardFailure = BankSyncFailure("Credit card", ImportCopy.FETCH_FAILED)
 
     private fun bankSyncSnap(
         name: String,
@@ -474,7 +463,6 @@ class ShellScreenshotTest {
                                 showAhead = showAhead,
                                 accountsReorder = accountsReorder,
                             )
-                            bankSync?.takeUnless { it.running }?.let { BankSyncPanel(it, {}, Modifier.align(Alignment.BottomCenter)) }
                         }
                         MetroAppBar(
                             actions =

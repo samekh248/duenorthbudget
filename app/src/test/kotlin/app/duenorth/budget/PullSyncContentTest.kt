@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.BankSyncFailure
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroTheme
@@ -27,6 +28,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 /** The pull-down sync panel: a pull opens it without syncing, its buttons sync, and pushing back up shuts it. */
@@ -42,14 +45,20 @@ class PullSyncContentTest {
 
     // As in the app, a tap on sync now marks the shell as syncing straight away.
     private var startsSyncing = false
+    private var details = 0
+    private var dismissed = 0
+    private val failed = BankSyncUi(running = false, failures = listOf(BankSyncFailure("Card", "fetch did not finish")))
 
     private fun show() {
         compose.setContent {
             MetroTheme {
                 PullSyncPanel(ui, onSync = {
                     synced++
-                    if (startsSyncing) ui = ui.copy(syncing = true, progress = 0.4f)
-                }, onBankSync = { bankSynced++ }) { modifier ->
+                    if (startsSyncing) ui = ui.copy(syncing = true)
+                }, onBankSync = { bankSynced++ }, onDetails = { details++ }, onDismissFailure = {
+                    dismissed++
+                    ui = ui.copy(failure = null)
+                }) { modifier ->
                     LazyColumn(modifier.testTag("page")) {
                         items(40) { MetroText("row $it", Metro.typography.body, Modifier.fillMaxWidth().padding(12.dp)) }
                     }
@@ -70,8 +79,14 @@ class PullSyncContentTest {
         compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
         pull()
         compose.onNodeWithTag("pull-sync-now").assertIsDisplayed()
-        compose.onNodeWithTag("pull-sync-status", useUnmergedTree = true).assertTextEquals("synced 3:42 pm")
+        compose.onNodeWithTag("pull-sync-status", useUnmergedTree = true).assertTextEquals("last synced 3:42 pm")
         assertEquals(0, synced)
+    }
+
+    @Test
+    fun aFailedServerSyncKeepsItsOwnWords() {
+        assertEquals("last synced 3:42 pm", PullSyncCopy.lastSynced("synced 3:42 pm"))
+        assertEquals("the last try failed", PullSyncCopy.lastSynced("the last try failed"))
     }
 
     @Test
@@ -130,20 +145,128 @@ class PullSyncContentTest {
         compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
     }
 
+    // A tap folds the panel straight back up; its grip says syncing until the sync is done, then goes.
     @Test
-    fun itShowsTheSyncRunningThenShutsWhenItEnds() {
+    fun aTapFoldsThePanelIntoASyncingStripUntilItsDone() {
         startsSyncing = true
         show()
         pull()
         compose.onNodeWithTag("pull-sync-now").performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("pull-sync-now").assertIsDisplayed()
-        compose.onNodeWithTag("pull-sync-status", useUnmergedTree = true).assertTextEquals(PullSyncCopy.SYNCING)
-        ui = ui.copy(syncing = false, progress = null, status = "synced 3:50 pm")
-        compose.waitForIdle()
-        compose.mainClock.advanceTimeBy(2_000)
-        compose.waitForIdle()
         compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
+        compose.onNodeWithTag("pull-sync-syncing").assertIsDisplayed()
+        ui = ui.copy(syncing = false, status = "synced 3:50 pm")
+        compose.waitForIdle()
+        compose.onNodeWithTag("pull-sync-syncing").assertDoesNotExist()
+        compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
+    }
+
+    // Bank sync folds the panel too, and a failure it ends in takes the strip's place.
+    @Test
+    fun aFailedSyncFromThePanelLeavesItsStrip() {
+        show()
+        pull()
+        ui = ui.copy(bankSync = true)
+        compose.waitForIdle()
+        compose.onNodeWithTag("pull-sync-banks").performClick()
+        ui = ui.copy(syncing = true)
+        compose.waitForIdle()
+        compose.onNodeWithTag("pull-sync-syncing").assertIsDisplayed()
+        ui = ui.copy(syncing = false, failure = failed)
+        compose.waitForIdle()
+        compose.onNodeWithTag("pull-sync-syncing").assertDoesNotExist()
+        compose.onNodeWithTag("pull-sync-strip").assertIsDisplayed()
+    }
+
+    // A failed bank sync waits as a quiet strip naming what failed; a tap on it opens the details, with no button for them.
+    @Test
+    fun aFailedSyncsStripOpensItsDetails() {
+        ui = ui.copy(failure = failed)
+        show()
+        compose.onNodeWithTag("pull-sync-strip").assertIsDisplayed()
+        compose.onNodeWithTag("pull-sync-strip-title", useUnmergedTree = true).assertTextEquals(BankSyncCopy.FINISHED_WITH_ERRORS)
+        compose.onNodeWithTag("pull-sync-strip-line", useUnmergedTree = true).assertTextEquals("Card: fetch did not finish")
+        compose.onNodeWithTag("pull-sync-details").assertDoesNotExist()
+        compose.onNodeWithTag("pull-sync-strip").performClick()
+        assertEquals(1, details)
+        assertEquals(0, dismissed)
+    }
+
+    // The strip's × dismisses it.
+    @Test
+    fun theStripsCrossDismissesIt() {
+        ui = ui.copy(failure = failed)
+        show()
+        compose.onNodeWithTag("pull-sync-strip-dismiss").performClick()
+        compose.waitForIdle()
+        assertEquals(1, dismissed)
+        assertEquals(0, details)
+        compose.onNodeWithTag("pull-sync-strip").assertDoesNotExist()
+    }
+
+    // In the open panel the failure's row opens the details on a tap too.
+    @Test
+    fun thePanelsFailureOpensItsDetails() {
+        ui = ui.copy(failure = failed)
+        show()
+        pull()
+        compose.onNodeWithTag("pull-sync-failure").performClick()
+        assertEquals(1, details)
+    }
+
+    @Test
+    fun dismissClearsTheFailure() {
+        ui = ui.copy(failure = failed)
+        show()
+        pull()
+        compose.onNodeWithTag("pull-sync-failure-dismiss").performClick()
+        compose.waitForIdle()
+        assertEquals(1, dismissed)
+        compose.onNodeWithTag("pull-sync-failure").assertDoesNotExist()
+        compose.onNodeWithTag("pull-sync-strip").assertDoesNotExist()
+    }
+
+    // The first-run peek drops the panel into view, then tucks it back, and says once that it played.
+    @Test
+    fun thePeekBouncesOnceAndTucksBack() {
+        var peeked = 0
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            MetroTheme {
+                PullSyncPanel(ui, onSync = {}, onBankSync = {}, peek = peeked == 0, onPeeked = { peeked++ }) { modifier ->
+                    LazyColumn(modifier.testTag("page")) {
+                        items(40) { MetroText("row $it", Metro.typography.body, Modifier.fillMaxWidth().padding(12.dp)) }
+                    }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(1_600)
+        compose.onNodeWithTag("pull-sync-now").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(4_000)
+        compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
+        assertEquals(1, peeked)
+        assertEquals(0, synced)
+    }
+
+    // Only a fresh install owes the peek; once played it is never owed again.
+    @Test
+    fun aFreshInstallOwesThePeekOnce() {
+        val context = RuntimeEnvironment.getApplication()
+        assertTrue(PullSyncPeek.pending(context))
+        assertTrue(PullSyncPeek.pending(context))
+        PullSyncPeek.markDone(context)
+        assertFalse(PullSyncPeek.pending(context))
+    }
+
+    // Someone updating from an older version has used the app before, so the peek is recorded as seen.
+    @Test
+    fun anUpdateNeverPeeks() {
+        val context = RuntimeEnvironment.getApplication()
+        Shadows.shadowOf(context.packageManager).getInternalMutablePackageInfo(context.packageName).apply {
+            firstInstallTime = 1_000L
+            lastUpdateTime = 2_000L
+        }
+        assertFalse(PullSyncPeek.pending(context))
     }
 
     @Test
@@ -158,5 +281,8 @@ class PullSyncContentTest {
         assertFalse(server.copy(route = ShellRoute.Settings).pullSync().enabled)
         assertFalse(server.copy(accounts = server.accounts.copy(reorder = true)).pullSync().enabled)
         assertFalse(server.copy(locked = true).pullSync().enabled)
+        // A finished sync that failed shows; one still running does not.
+        assertEquals(failed, server.copy(bankSync = BankSyncState(panel = failed)).pullSync().failure)
+        assertEquals(null, server.copy(bankSync = BankSyncState(panel = BankSyncUi())).pullSync().failure)
     }
 }

@@ -25,29 +25,6 @@ class BankSyncPanelContentTest {
     @get:Rule
     val compose = createHostComposeRule()
 
-    // Done with an error: each failed account shows with its reason, and dismiss answers; there is no retry here.
-    @Test
-    fun finishedWithErrorsOffersDismissOnly() {
-        var dismissed = 0
-        val ui = BankSyncUi(running = false, failures = listOf(BankSyncFailure("Card", "fetch did not finish")))
-        compose.setContent { MetroTheme { BankSyncPanel(ui, { dismissed++ }) } }
-        compose.onNodeWithTag("bank-sync-title", useUnmergedTree = true).assertTextEquals(BankSyncCopy.FINISHED_WITH_ERRORS)
-        compose.onNodeWithTag("bank-sync-error", useUnmergedTree = true).assertTextEquals("Card: fetch did not finish")
-        compose.onNodeWithTag("bank-sync-retry").assertDoesNotExist()
-        compose.onNodeWithTag("bank-sync-dismiss").performClick()
-        assertEquals(1, dismissed)
-    }
-
-    // A failed sync's tile opens its page on a tap.
-    @Test
-    fun failedTileOpensItsPage() {
-        var opened = 0
-        val ui = BankSyncUi(running = false, failures = listOf(BankSyncFailure("Card", "fetch did not finish")))
-        compose.setContent { MetroTheme { BankSyncPanel(ui, {}, onOpen = { opened++ }) } }
-        compose.onNodeWithTag("bank-sync-panel").performClick()
-        assertEquals(1, opened)
-    }
-
     // The page lists each account the sync reached: synced, or failed with its reason.
     @Test
     fun reportListsEachAccount() {
