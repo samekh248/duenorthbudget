@@ -86,6 +86,7 @@ fun BankLinkScreen(
             title = "${BankLinkCopy.REMOVE} to ${ui.linked.second}",
             body = BankLinkCopy.REMOVE_BODY,
             yes = BankLinkCopy.REMOVE,
+            yesCaption = BankLinkCopy.REMOVE_CAPTION,
             onYes = {
                 askingRemove = false
                 onRemove()
@@ -101,15 +102,26 @@ fun BankLinkScreen(
         when {
             ui.loading -> null
             ui.askingToken ->
-                ScreenAction("bank-token-send", AppGlyph.Save, BankLinkCopy.SEND_TOKEN) {
+                ScreenAction("bank-token-send", AppGlyph.Save, BankLinkCopy.SEND_TOKEN, caption = BankLinkCopy.TOKEN_CAPTION) {
                     val sent = token
                     token = ""
                     if (sent.isNotBlank()) onToken(sent)
                 }
             ui.provider == BankProvider.GOCARDLESS && ui.goCardless != null ->
-                ScreenAction("bank-signed-in", AppGlyph.Save, BankLinkCopy.SIGNED_IN, run = onSignedIn)
+                ScreenAction(
+                    "bank-signed-in",
+                    AppGlyph.Save,
+                    BankLinkCopy.SIGNED_IN,
+                    caption = BankLinkCopy.SIGNED_IN_CAPTION,
+                    run = onSignedIn,
+                )
             ui.provider == BankProvider.GOCARDLESS ->
-                ScreenAction("bank-country-find", AppGlyph.Search, BankLinkCopy.FIND_BANKS) { onCountry(country) }
+                ScreenAction(
+                    "bank-country-find",
+                    AppGlyph.Search,
+                    BankLinkCopy.FIND_BANKS,
+                    caption = BankLinkCopy.BANKS,
+                ) { onCountry(country) }
             else -> null
         }
     Column(

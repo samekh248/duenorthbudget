@@ -46,6 +46,8 @@ fun ConfirmPage(
     onKeep: () -> Unit,
     tag: String,
     modifier: Modifier = Modifier,
+    /** The one word under the bar's ✓ when [yes] is longer ("close" for "force close"). */
+    yesCaption: String = yes,
     caption: String? = null,
     body: String? = null,
     note: String? = null,
@@ -71,7 +73,7 @@ fun ConfirmPage(
         if (body != null) MetroText(body, Metro.typography.subheader, Modifier.testTag("$tag-body"))
         if (note != null) MetroText(note, Metro.typography.body, color = Metro.colors.secondary)
         content()
-        ConfirmAnswers(yes, onYes, onKeep, yesTag, keepTag)
+        ConfirmAnswers(yes, onYes, onKeep, yesTag, keepTag, yesCaption)
     }
 }
 
@@ -86,14 +88,15 @@ fun ConfirmAnswers(
     onKeep: () -> Unit,
     yesTag: String,
     keepTag: String,
+    yesCaption: String? = yes,
 ) {
     if (formSaveOnBar()) {
         val yesNow = rememberUpdatedState(onYes)
         val keepNow = rememberUpdatedState(onKeep)
         val bar =
-            remember(yes) {
+            remember(yes, yesCaption) {
                 listOfNotNull(
-                    yes?.let { ScreenAction(CONFIRM_YES, AppGlyph.Save, it) { yesNow.value() } },
+                    yes?.let { ScreenAction(CONFIRM_YES, AppGlyph.Save, it, caption = yesCaption ?: it) { yesNow.value() } },
                     ScreenAction(CONFIRM_KEEP, AppGlyph.Cancel, ConfirmCopy.KEEP) { keepNow.value() },
                 )
             }

@@ -71,6 +71,9 @@ object SettingsCopy {
     const val PAYEES = "payees"
     const val ADD_SERVER = "add"
     const val SERVER_BUDGETS = "server budgets"
+
+    /** The server budgets button's caption: the glyph and the page already say whose. */
+    const val BUDGETS_CAPTION = "budgets"
     const val SIGN_OUT = "sign out"
     const val EXPORT = "export"
     const val NOT_CONNECTED = "not connected"

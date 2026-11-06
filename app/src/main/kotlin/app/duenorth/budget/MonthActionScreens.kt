@@ -41,6 +41,7 @@ object MonthActionCopy {
     const val TOTAL = "to budget"
     const val REPLACE = "replace"
     const val ZERO = "set to zero"
+    const val ZERO_CAPTION = "zero"
     const val KEEP = "keep"
     const val TRANSFER = "move to to-budget"
     const val UNDO = "undo"
@@ -75,6 +76,7 @@ fun FillConfirmScreen(
         caption = monthLabel(month),
         body = confirm.reason,
         yes = if (confirm.kind == MonthFillKind.ZERO) MonthActionCopy.ZERO else MonthActionCopy.REPLACE,
+        yesCaption = if (confirm.kind == MonthFillKind.ZERO) MonthActionCopy.ZERO_CAPTION else MonthActionCopy.REPLACE,
         onYes = onConfirm,
         onKeep = onKeep,
         tag = "fill-confirm",
