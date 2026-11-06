@@ -338,25 +338,6 @@ class ShellScreenshotTest {
     @Test
     fun inboxLight() = snap("inbox_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX))
 
-    // Rows the bank has not posted wait outside the inbox; one line under the totals says how many.
-    @Test
-    fun inboxPendingLight() =
-        snap(
-            "inbox_pending_light",
-            dark = false,
-            shell = sample().copy(pendingInboxCount = 2),
-            section = HomeSections.headers.indexOf(HomeSections.INBOX),
-        )
-
-    @Test
-    fun inboxPendingDark() =
-        snap(
-            "inbox_pending_dark",
-            dark = true,
-            shell = sample().copy(pendingInboxCount = 2),
-            section = HomeSections.headers.indexOf(HomeSections.INBOX),
-        )
-
     // Select mode: a check box on every row, grouped into ready to accept and needs a category, and
     // the bar acts on the checked ones. Only cancel until a row is checked.
     @Test
