@@ -21,13 +21,6 @@ class PayeesHolder internal constructor(
 
     private fun update(transform: (PayeesState) -> PayeesState) = host.mutate { it.copy(payees = transform(it.payees)) }
 
-    /** Inbox `•••` → payees: the same page, pushed over home so back returns to the inbox. */
-    fun open() {
-        host.push(ShellRoute.Payees)
-        host.mutate { it.copy(writeError = null, payees = it.payees.copy(mergeTarget = null)) }
-        load()
-    }
-
     fun show() {
         host.clearHistory()
         host.mutate { it.copy(route = ShellRoute.Payees, writeError = null, payees = it.payees.copy(mergeTarget = null)) }

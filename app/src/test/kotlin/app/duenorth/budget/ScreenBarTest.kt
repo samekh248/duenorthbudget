@@ -193,8 +193,8 @@ class ScreenBarTest {
     fun homeInboxSectionOffersSelectAndSelectModeActsOnTheCheckedRows() {
         val inbox = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX)
         assertEquals(listOf("add", "select-inbox"), inbox.filter { it.primary }.map { it.id })
-        // Rules and payees shape what lands in the inbox, so they head its menu.
-        assertEquals(listOf("rules", "payees", "settings"), inbox.filter { !it.primary }.map { it.id })
+        // Rules and payees live in settings, so the inbox menu is just the hub tail.
+        assertEquals(listOf("settings"), inbox.filter { !it.primary }.map { it.id })
         val empty =
             ScreenBar.specsFor(
                 ShellRoute.Home,
@@ -270,7 +270,7 @@ class ScreenBarTest {
                 homeSection = ScreenBar.HOME_INBOX,
                 inboxSync = true,
             )
-        assertEquals(listOf("rules", "payees", "sync-all", "undo", "settings"), synced.filter { !it.primary }.map { it.id })
+        assertEquals(listOf("sync-all", "undo", "settings"), synced.filter { !it.primary }.map { it.id })
         assertEquals(ScreenBarCopy.SYNC, synced.first { it.id == "sync-all" }.label)
         val selecting =
             ScreenBar.specsFor(

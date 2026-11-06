@@ -48,7 +48,6 @@ object ScreenBarCopy {
     const val SYNC = "sync"
     const val SYNC_BANK = "sync bank"
     const val IMPORT = "import"
-    const val PAYEES = "payees"
 
     /**
      * Captions under bar buttons. The glyph is the verb (+ adds, ✓ commits, the pencil edits), so the caption is only
@@ -209,12 +208,12 @@ object ScreenBar {
                             add(spec("end-inbox-selecting", AppGlyph.Cancel, InboxCopy.CANCEL))
                             if (inboxPick != InboxPick.NONE) add(destructive("delete-selected", AppGlyph.Delete, InboxCopy.DELETE))
                         }
-                    // Rules and payees shape what lands in the inbox, so they live in its menu.
+                    // Rules and payees live in settings › budget › manage, with the budget's other lists.
                     homeSection == HOME_INBOX ->
                         buildList {
                             add(addTransaction())
                             if (!inboxEmpty) add(spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT, InboxCopy.BATCH))
-                        } + rules() + payees() + tail
+                        } + tail
                     // Reorder happens in place on the accounts list; done is the only way on.
                     homeSection == HOME_ACCOUNTS && accountsReorder ->
                         listOf(spec("reorder", AppGlyph.Save, AccountScreenCopy.DONE))
@@ -550,14 +549,8 @@ object ScreenBar {
             menu("zero", AppGlyph.Zero, MonthFillCopy.ZERO),
         )
 
-    /** Inbox `•••` → rules (spec 010 US3): rules file what lands in the inbox. Schedules live on the accounts pivot item. */
-    private fun rules() = listOf(menu("rules", AppGlyph.Categories, RuleScreenCopy.TITLE))
-
     /** Home `•••` → templates, only while experimental features and budget templates are both on (spec 010 US5). */
     private fun templates(on: Boolean) = if (on) listOf(menu("templates", AppGlyph.Average, TemplateCopy.TITLE)) else emptyList()
-
-    /** Inbox `•••` → payees, beside rules: both decide how what lands in the inbox is named and filed. */
-    private fun payees() = listOf(menu("payees", AppGlyph.Payees, ScreenBarCopy.PAYEES))
 
     /** Every home `•••` ends with settings, as WP8.1 apps put it last in the menu. */
     private fun settings() = listOf(menu("settings", AppGlyph.Settings, "settings"))
@@ -626,7 +619,6 @@ class ScreenBarHandlers(
     val onCloseAccount: () -> Unit = {},
     val onReopenAccount: () -> Unit = {},
     val onAddSchedule: () -> Unit = {},
-    val onRules: () -> Unit = {},
     val onAddRule: () -> Unit = {},
     val onDeleteSchedule: () -> Unit = {},
     val onDeleteRule: () -> Unit = {},
@@ -660,8 +652,6 @@ class ScreenBarHandlers(
     val onSyncServer: () -> Unit = {},
     /** The hubs' one sync: the server and every linked bank. */
     val onSyncAll: () -> Unit = {},
-    /** Inbox `•••` → payees, pushed over home. */
-    val onPayees: () -> Unit = {},
     val onRefreshAssistant: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
@@ -707,7 +697,6 @@ class ScreenBarHandlers(
             "close" -> onCloseAccount
             "reopen" -> onReopenAccount
             "add-schedule" -> onAddSchedule
-            "rules" -> onRules
             "add-rule" -> onAddRule
             "delete-schedule" -> onDeleteSchedule
             "delete-rule" -> onDeleteRule
@@ -735,7 +724,6 @@ class ScreenBarHandlers(
             "select-inbox" -> onSelectInbox
             "sync-server" -> onSyncServer
             "sync-all" -> onSyncAll
-            "payees" -> onPayees
             "refresh-assistant" -> onRefreshAssistant
             "accept-selected" -> onAcceptSelected
             "categorize-selected" -> onCategorizeSelected
