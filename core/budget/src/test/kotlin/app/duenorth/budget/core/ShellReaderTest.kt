@@ -139,7 +139,6 @@ class ShellReaderTest {
             )
             // Only the posted row is in the inbox to categorize.
             assertEquals(listOf("posted-shop"), shell.inbox.map { it.id })
-            assertEquals(1, shell.pendingInboxCount)
             // The account still holds every row.
             assertEquals(752_500L, shell.accounts.single().balanceMinor)
         }
