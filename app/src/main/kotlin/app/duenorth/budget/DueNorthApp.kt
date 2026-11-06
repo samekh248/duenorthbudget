@@ -297,7 +297,6 @@ fun DueNorthApp(model: ShellViewModel) {
                                 .any { it.bankSync && !it.closed }
                         if (banks) model.bankSync.syncAll() else model.budgetFiles.syncInbox()
                     },
-                    onPayees = model.payees::open,
                     onRefreshAssistant = model.assistant::refresh,
                     onCancel = {
                         when (state.route) {
@@ -317,7 +316,6 @@ fun DueNorthApp(model: ShellViewModel) {
                     onCloseAccount = model.accounts::openClose,
                     onReopenAccount = model.accounts::reopenOpen,
                     onAddSchedule = model.schedules::openNew,
-                    onRules = model.rules::open,
                     onAddRule = model.rules::openNew,
                     onDeleteSchedule = model.schedules::deleteOpen,
                     onDeleteRule = model.rules::deleteOpen,
