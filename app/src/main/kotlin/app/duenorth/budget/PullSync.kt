@@ -325,7 +325,7 @@ object PullSyncPeek {
 /** An upward flick faster than this, in pixels a second, shuts the panel however far it was pulled. */
 private const val FLICK_SHUT = 1_200f
 
-/** The panel itself: the status line, its buttons, and the grip that says it pushes back up. */
+/** The panel itself: a failed sync's row, its buttons, the last sync under them, and the grip that says it pushes back up. */
 @Composable
 internal fun PullSyncSheet(
     ui: PullSyncUi,
@@ -340,8 +340,19 @@ internal fun PullSyncSheet(
             .fillMaxWidth()
             .background(Metro.colors.chrome)
             .testTag("pull-sync-panel")
-            .padding(top = MetroDimens.Row),
+            .padding(top = 4.dp),
     ) {
+        val failure = ui.failure
+        if (failure != null && !ui.syncing) PullSyncFailure(failure, onDetails, onDismissFailure)
+        if (ui.canSync) {
+            MetroButtonGrid(Modifier.padding(horizontal = MetroDimens.Gutter).padding(top = MetroDimens.Row)) {
+                MetroButton(PullSyncCopy.SYNC_NOW, Modifier.testTag("pull-sync-now")) { if (!ui.syncing) onSync() }
+                if (ui.bankSync) {
+                    MetroButton(PullSyncCopy.BANK_SYNC, Modifier.testTag("pull-sync-banks")) { if (!ui.syncing) onBankSync() }
+                }
+            }
+        }
+        // The last sync sits under the buttons, centred over the grip.
         val status =
             when {
                 ui.syncing -> PullSyncCopy.SYNCING
@@ -354,20 +365,11 @@ internal fun PullSyncSheet(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = MetroDimens.Gutter)
+                .padding(top = MetroDimens.Row)
                 .semantics { liveRegion = LiveRegionMode.Polite }
                 .testTag("pull-sync-status"),
             maxLines = 2,
         )
-        val failure = ui.failure
-        if (failure != null && !ui.syncing) PullSyncFailure(failure, onDetails, onDismissFailure)
-        if (ui.canSync) {
-            MetroButtonGrid(Modifier.padding(horizontal = MetroDimens.Gutter).padding(top = MetroDimens.Row)) {
-                MetroButton(PullSyncCopy.SYNC_NOW, Modifier.testTag("pull-sync-now")) { if (!ui.syncing) onSync() }
-                if (ui.bankSync) {
-                    MetroButton(PullSyncCopy.BANK_SYNC, Modifier.testTag("pull-sync-banks")) { if (!ui.syncing) onBankSync() }
-                }
-            }
-        }
         Column(
             Modifier.fillMaxWidth().padding(top = MetroDimens.Row, bottom = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
