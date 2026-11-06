@@ -79,8 +79,14 @@ class PullSyncContentTest {
         compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
         pull()
         compose.onNodeWithTag("pull-sync-now").assertIsDisplayed()
-        compose.onNodeWithTag("pull-sync-status", useUnmergedTree = true).assertTextEquals("synced 3:42 pm")
+        compose.onNodeWithTag("pull-sync-status", useUnmergedTree = true).assertTextEquals("last synced 3:42 pm")
         assertEquals(0, synced)
+    }
+
+    @Test
+    fun aFailedServerSyncKeepsItsOwnWords() {
+        assertEquals("last synced 3:42 pm", PullSyncCopy.lastSynced("synced 3:42 pm"))
+        assertEquals("the last try failed", PullSyncCopy.lastSynced("the last try failed"))
     }
 
     @Test

@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.design.components.AppGlyph
@@ -63,6 +64,11 @@ object PullSyncCopy {
     const val SYNC_NOW = "sync now"
     const val BANK_SYNC = "bank sync"
     const val CLOSE_HINT = "swipe up to close"
+
+    /** The server sync's "synced 3:42 pm" reads "last synced 3:42 pm" here; a failure's own words stay as they are. */
+    fun lastSynced(status: String) = if (status.startsWith(SYNCED)) "last $status" else status
+
+    private const val SYNCED = "synced "
 }
 
 /** What the pull-down sync panel shows, and whether a pull opens it at all. */
@@ -340,12 +346,13 @@ internal fun PullSyncSheet(
             when {
                 ui.syncing -> PullSyncCopy.SYNCING
                 ui.status.isBlank() -> PullSyncCopy.NOT_YET
-                else -> ui.status
+                else -> PullSyncCopy.lastSynced(ui.status)
             }
         MetroText(
             status,
-            Metro.typography.body,
+            Metro.typography.body.copy(textAlign = TextAlign.Center),
             Modifier
+                .fillMaxWidth()
                 .padding(horizontal = MetroDimens.Gutter)
                 .semantics { liveRegion = LiveRegionMode.Polite }
                 .testTag("pull-sync-status"),
