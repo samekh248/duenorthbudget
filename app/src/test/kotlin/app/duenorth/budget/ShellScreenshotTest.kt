@@ -474,7 +474,7 @@ class ShellScreenshotTest {
                                 showAhead = showAhead,
                                 accountsReorder = accountsReorder,
                             )
-                            bankSync?.takeUnless { it.running }?.let { BankSyncPanel(it, {}, {}, Modifier.align(Alignment.BottomCenter)) }
+                            bankSync?.takeUnless { it.running }?.let { BankSyncPanel(it, {}, Modifier.align(Alignment.BottomCenter)) }
                         }
                         MetroAppBar(
                             actions =

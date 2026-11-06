@@ -134,7 +134,6 @@ object ScreenBar {
         inboxPick: InboxPick = InboxPick.NONE,
         /** The inbox holds no transactions, so there is nothing to select. */
         inboxEmpty: Boolean = false,
-        bankLinked: Boolean = false,
         transaction: TransactionMenu = TransactionMenu.NEW,
         budgetEditing: Boolean = false,
         schedules: SchedulesBar = SchedulesBar(),
@@ -253,7 +252,6 @@ object ScreenBar {
                         add(addTransaction())
                         add(spec("search", AppGlyph.Search, RegisterCopy.SEARCH))
                         add(spec("reconcile", AppGlyph.Reconcile, ScreenBarCopy.RECONCILE))
-                        if (bankLinked) add(spec("sync", AppGlyph.Sync, ScreenBarCopy.SYNC_BANK, ScreenBarCopy.BANK))
                         add(menu("import", AppGlyph.Import, ScreenBarCopy.IMPORT))
                         add(menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE))
                         add(menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT))
@@ -283,12 +281,8 @@ object ScreenBar {
                     )
                 }
             ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, ScreenBarCopy.ADD_RULE, ScreenBarCopy.RULE)) + objectTail(undoLabel)
-            // The failed sync's page: retry runs every linked account again, dismiss clears the tile.
-            ShellRoute.BankSyncReport ->
-                listOf(
-                    spec("bank-sync", AppGlyph.Sync, BankSyncCopy.RETRY),
-                    spec("bank-sync-dismiss", AppGlyph.Cancel, BankSyncCopy.DISMISS),
-                )
+            // The failed sync's page: dismiss clears the tile. Syncing again is the home pull-down panel's job.
+            ShellRoute.BankSyncReport -> listOf(spec("bank-sync-dismiss", AppGlyph.Cancel, BankSyncCopy.DISMISS))
             // Upcoming switches between its list and its calendar; all has nothing to switch.
             ShellRoute.Schedules ->
                 listOf(spec("add-schedule", AppGlyph.Add, ScreenBarCopy.ADD_SCHEDULE, ScreenBarCopy.SCHEDULE)) +
@@ -427,7 +421,6 @@ object ScreenBar {
             state.inbox.selection != null,
             state.inbox.selection?.let { InboxPick.of(it, state.shell?.inbox.orEmpty()) } ?: InboxPick.NONE,
             state.shell?.inbox.isNullOrEmpty(),
-            state.registerBankLinked,
             transactionMenu(state),
             state.budgetEdit != null,
             SchedulesBar(
@@ -503,8 +496,6 @@ object ScreenBar {
         state: ShellUiState,
     ): Boolean =
         when (id) {
-            "sync" -> state.import.fetchPending || state.bankSync.syncing
-            "bank-sync" -> state.bankSync.syncing
             "refresh" -> state.remoteRefreshing
             "refresh-assistant" -> state.assistant.refreshing || state.syncing
             else -> false
@@ -608,8 +599,6 @@ class ScreenBarHandlers(
     val onSettings: () -> Unit,
     val onReconcile: () -> Unit,
     val onImport: () -> Unit,
-    val onBankSync: () -> Unit = {},
-    val onBankSyncAll: () -> Unit = {},
     val onDismissBankSync: () -> Unit = {},
     val onSave: () -> Unit,
     val onCancel: () -> Unit,
@@ -683,8 +672,6 @@ class ScreenBarHandlers(
             "reconcile" -> onReconcile
             "search" -> onSearch
             "import" -> onImport
-            "sync" -> onBankSync
-            "bank-sync" -> onBankSyncAll
             "bank-sync-dismiss" -> onDismissBankSync
             "save" -> onSave
             "cancel" -> onCancel

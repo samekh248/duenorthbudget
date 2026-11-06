@@ -74,22 +74,20 @@ class ScreenBarTest {
         }
     }
 
-    // The failed sync's page retries every linked account, and dismiss clears the tile.
+    // The failed sync's page only dismisses: syncing again is the home pull-down panel's job.
     @Test
-    fun bankSyncReportBarRetriesAndDismisses() {
+    fun bankSyncReportBarOnlyDismisses() {
         val specs = ScreenBar.specsFor(ShellRoute.BankSyncReport, hasBudget = true, mode = BudgetMode.ENVELOPE)
-        assertEquals(listOf("bank-sync", "bank-sync-dismiss"), specs.map { it.id })
-        assertEquals(listOf("retry", "dismiss"), specs.map { it.label })
+        assertEquals(listOf("bank-sync-dismiss"), specs.map { it.id })
+        assertEquals(listOf("dismiss"), specs.map { it.label })
     }
 
     // A sync button turns only while its own sync is running.
     @Test
     fun syncButtonsSpinOnlyWhileSyncing() {
         val idle = ShellUiState()
-        listOf("sync", "bank-sync", "refresh").forEach { assertFalse(ScreenBar.syncRunning(it, idle)) }
-        assertTrue(ScreenBar.syncRunning("sync", idle.copy(import = ImportState(fetchPending = true))))
-        assertTrue(ScreenBar.syncRunning("bank-sync", idle.copy(bankSync = BankSyncState(syncing = true))))
-        assertFalse(ScreenBar.syncRunning("bank-sync", idle.copy(import = ImportState(fetchPending = true))))
+        listOf("refresh", "refresh-assistant").forEach { assertFalse(ScreenBar.syncRunning(it, idle)) }
+        assertTrue(ScreenBar.syncRunning("refresh-assistant", idle.copy(syncing = true)))
         assertTrue(ScreenBar.syncRunning("refresh", idle.copy(remoteRefreshing = true)))
         assertFalse(ScreenBar.syncRunning("add", idle.copy(bankSync = BankSyncState(syncing = true))))
     }
@@ -307,11 +305,11 @@ class ScreenBarTest {
         assertTrue(specs.single { it.id == "close" }.apart)
     }
 
+    // A linked account's page has no bank sync of its own: that is the home pull-down panel's.
     @Test
-    fun bankLinkedRegisterSyncsFromTheBar() {
-        val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE, bankLinked = true)
-        assertEquals(listOf("add", "search", "reconcile", "sync"), specs.filter { it.primary }.map { it.id })
-        assertEquals(ScreenBarCopy.SYNC_BANK, specs.single { it.id == "sync" }.label)
+    fun registerHasNoBankSync() {
+        val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE)
+        assertEquals(listOf("add", "search", "reconcile"), specs.filter { it.primary }.map { it.id })
         assertEquals(listOf("import", "bank-link", "edit-account", "settings", "close"), specs.filterNot { it.primary }.map { it.id })
     }
 

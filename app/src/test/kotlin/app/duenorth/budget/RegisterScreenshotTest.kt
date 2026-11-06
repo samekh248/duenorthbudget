@@ -86,7 +86,7 @@ class RegisterScreenshotTest {
                     MetroAppBar(
                         actions =
                             ScreenBar
-                                .specsFor(ShellRoute.Register("visa"), true, BudgetMode.ENVELOPE, bankLinked = true)
+                                .specsFor(ShellRoute.Register("visa"), true, BudgetMode.ENVELOPE)
                                 .map { it.action() },
                         expanded = expanded,
                         onExpandedChange = {},

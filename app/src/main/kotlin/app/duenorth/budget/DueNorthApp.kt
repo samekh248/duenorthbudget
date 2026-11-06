@@ -263,12 +263,6 @@ fun DueNorthApp(model: ShellViewModel) {
                         importAccountId = accountId
                         importLauncher.launch("*/*")
                     },
-                    onBankSync = {
-                        val accountId =
-                            (state.route as? ShellRoute.Register)?.accountId ?: return@ScreenBarHandlers
-                        model.import.fetchBank(accountId)
-                    },
-                    onBankSyncAll = model.bankSync::syncAll,
                     onDismissBankSync = model.bankSync::dismiss,
                     onSave = {
                         when (state.route) {
@@ -361,7 +355,6 @@ fun DueNorthApp(model: ShellViewModel) {
                         { modifier ->
                             BankSyncPanel(
                                 ui,
-                                model.bankSync::syncAll,
                                 model.bankSync::dismiss,
                                 modifier,
                                 onOpen = model.bankSync::openReport,
