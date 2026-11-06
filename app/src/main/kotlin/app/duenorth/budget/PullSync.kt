@@ -344,7 +344,7 @@ internal fun PullSyncSheet(
             }
         MetroText(
             status,
-            Metro.typography.subheader,
+            Metro.typography.body,
             Modifier
                 .padding(horizontal = MetroDimens.Gutter)
                 .semantics { liveRegion = LiveRegionMode.Polite }
