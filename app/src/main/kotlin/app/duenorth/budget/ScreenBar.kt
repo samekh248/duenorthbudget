@@ -154,6 +154,8 @@ object ScreenBar {
         registerMerge: Boolean = false,
         /** The checked inbox rows can be merged: two or more of one account and amount. */
         inboxMerge: Boolean = false,
+        /** The open category's available is below zero, so its page offers to cover it. */
+        overspent: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar. Payees has its link on the budget page's manage list.
@@ -344,7 +346,8 @@ object ScreenBar {
             is ShellRoute.RuleEditor ->
                 saveCancel() +
                     if (route.ruleId == null) emptyList() else listOf(destructive("delete-rule", AppGlyph.Delete, RuleScreenCopy.DELETE))
-            // Move sits with save, the rest in the menu, add template first; rollover is a switch on the page.
+            // Move sits with save, and cover beside it while the category is overspent; the rest in the menu, add
+            // template first; rollover is a switch on the page.
             // Rename is last in the menu on both kinds of category page.
             is ShellRoute.CategoryBudget ->
                 if (incomeCategory) {
@@ -353,6 +356,9 @@ object ScreenBar {
                     buildList {
                         addAll(saveCancel())
                         add(spec("move", AppGlyph.Transfer, EnvelopeCopy.MOVE))
+                        if (overspent && mode != BudgetMode.TRACKING) {
+                            add(spec("cover", AppGlyph.Cover, EnvelopeCopy.COVER, EnvelopeCopy.COVER_CAPTION))
+                        }
                         if (templates &&
                             (!categoryAutomations || automationsOn)
                         ) {
@@ -385,6 +391,7 @@ object ScreenBar {
             ShellRoute.HoldMonth,
             is ShellRoute.ToBudget,
             is ShellRoute.MoveCategory,
+            is ShellRoute.CoverCategory,
             is ShellRoute.ImportPreviewRoute,
             is ShellRoute.Reconcile,
             ShellRoute.BudgetPassword,
@@ -451,6 +458,7 @@ object ScreenBar {
             automationsOn = state.formatPrefs.automationsOn,
             registerMerge = registerMerge(state),
             inboxMerge = inboxMerge(state),
+            overspent = overspent(state),
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -464,6 +472,18 @@ object ScreenBar {
                 run = handlers.bind(spec.id, state),
             )
         }
+    }
+
+    /** Whether the open category page's category has spent more than it has, so cover belongs on its bar. */
+    internal fun overspent(state: ShellUiState): Boolean {
+        val route = state.route as? ShellRoute.CategoryBudget ?: return false
+        val category =
+            state
+                .editingShell()
+                ?.groups
+                ?.flatMap { it.categories }
+                ?.firstOrNull { it.id == route.categoryId }
+        return (category?.availableMinor ?: 0L) < 0L
     }
 
     /** Whether the register's picked transactions can be merged, by desktop Actual's rule. */
@@ -664,6 +684,7 @@ class ScreenBarHandlers(
     val onToAutomations: () -> Unit = {},
     val onToNotes: () -> Unit = {},
     val onMoveCategory: () -> Unit = {},
+    val onCoverCategory: () -> Unit = {},
     val onRenameCategory: () -> Unit = {},
     val onAutoHold: (AutoHoldChoice) -> Unit = {},
 ) {
@@ -741,6 +762,7 @@ class ScreenBarHandlers(
             "to-automations" -> onToAutomations
             "to-notes" -> onToNotes
             "move" -> onMoveCategory
+            "cover" -> onCoverCategory
             "rename-category" -> onRenameCategory
             "auto-hold-on" -> ({ onAutoHold(AutoHoldChoice.ON) })
             "auto-hold-off-month" -> ({ onAutoHold(AutoHoldChoice.OFF_THIS_MONTH) })

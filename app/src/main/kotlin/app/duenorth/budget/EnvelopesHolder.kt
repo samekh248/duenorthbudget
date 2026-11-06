@@ -2,8 +2,10 @@ package app.duenorth.budget
 
 import app.duenorth.budget.core.CategoryManagePage
 import app.duenorth.budget.core.EditResult
+import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.ManageGroupRow
 import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.core.MoneyParse
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.withBudgetedAssignment
@@ -52,6 +54,61 @@ class EnvelopesHolder internal constructor(
     fun openMoveFrom(categoryId: String) {
         host.push(ShellRoute.MoveCategory(categoryId))
         host.mutate { it.copy(editError = null) }
+    }
+
+    /** Opens cover for [categoryId], from its row's long-press menu on the budget or from its own page's bar. */
+    fun openCover(categoryId: String) {
+        host.push(ShellRoute.CoverCategory(categoryId))
+        host.mutate { it.copy(editError = null) }
+    }
+
+    /** The category page's cover: covers the category the page is about. */
+    fun openCover() {
+        val categoryId = (state.route as? ShellRoute.CategoryBudget)?.categoryId ?: return
+        openCover(categoryId)
+    }
+
+    /**
+     * Cover's save: moves [amountText] into the overspent category from [fromId], another category or to budget
+     * ([MOVE_TO_BUDGET], which budgets that much more in the category), then goes back to the page that opened it.
+     */
+    fun submitCover(
+        fromId: String,
+        amountText: String,
+    ) {
+        val shell = state.shell ?: return
+        val toId = (state.route as? ShellRoute.CoverCategory)?.categoryId ?: return
+        if (fromId.isBlank()) {
+            host.mutate { it.copy(editError = EnvelopeCopy.PICK_SOURCE) }
+            return
+        }
+        val amount = MoneyFormat.parse(amountText, shell.currency.decimals)
+        if (amount == null || amount <= 0L) {
+            host.mutate { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
+            return
+        }
+        if (state.budgetEdit != null) {
+            if (fromId != MOVE_TO_BUDGET) host.moveInBudgetEdit(fromId, toId, amountText)
+            return
+        }
+        if (fromId == MOVE_TO_BUDGET) {
+            val to = shell.groups.flatMap { it.categories }.firstOrNull { it.id == toId } ?: return
+            val budgeted = to.budgetedMinor + amount
+            val text = (if (budgeted < 0) "-" else "") + MoneyParse.formatMagnitude(budgeted, shell.currency.decimals)
+            assign(toId, text, stayOnRoute = false)
+            return
+        }
+        val from = shell.groups.flatMap { it.categories }.firstOrNull { it.id == fromId }
+        if (from == null || amount > from.availableMinor) {
+            host.mutate { it.copy(editError = EnvelopeCopy.NOT_ENOUGH) }
+            return
+        }
+        applyEdit(
+            stayOnRoute = false,
+            optimistic = { it.withMoveAvailable(fromId, toId, amount) },
+        ) {
+            host.sync.moveCategory(shell.budgetId, fromId, toId, host.editorMonth(), amountText)
+        }
     }
 
     fun showHold() {

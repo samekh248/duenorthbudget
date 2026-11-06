@@ -295,6 +295,7 @@ fun DueNorthApp(model: ShellViewModel) {
                     onToAutomations = model.templates::switchToAutomations,
                     onToNotes = model.templates::switchToNotes,
                     onMoveCategory = model.envelopes::openMove,
+                    onCoverCategory = model.envelopes::openCover,
                     onRenameCategory = model.envelopes::startRenameCategory,
                     onAutoHold = model.month::chooseAutoHold,
                     onSelectInbox = model.inbox::startSelecting,
@@ -433,6 +434,7 @@ fun DueNorthApp(model: ShellViewModel) {
                         is ShellRoute.ReviewCategory -> ReviewCategoryRoute(state, model, fill)
                         is ShellRoute.CategoryBudget -> CategoryBudgetRoute(route, state, model, fill)
                         is ShellRoute.MoveCategory -> MoveCategoryRoute(route, state, model, fill)
+                        is ShellRoute.CoverCategory -> CoverCategoryRoute(route, state, model, fill)
                         ShellRoute.HoldMonth -> HoldMonthRoute(state, model, fill)
                         ShellRoute.StarterCategories ->
                             StarterCategoriesScreen(
