@@ -37,6 +37,8 @@ class BackgroundSyncWorker(
                     app.sync.syncUnattended()
                 }
             }
+            // What the banks brought in shows on the app icon before the app is opened.
+            runCatching { InboxBadge.count(app.library)?.let { InboxBadge.show(app, it) } }
         }
         // A failed sync is recorded on the budget; the next run tries again, so the job never retries early.
         return Result.success()

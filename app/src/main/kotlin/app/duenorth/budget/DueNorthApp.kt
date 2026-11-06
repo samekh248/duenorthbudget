@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import android.Manifest
 import android.app.Application
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -178,6 +179,22 @@ fun DueNorthApp(model: ShellViewModel) {
             }
         context.startActivity(Intent.createChooser(share, export.fileName))
         model.settingsUi.clearPendingExport()
+    }
+    // The app icon's badge follows the inbox header's count; it is cleared when no budget is open.
+    val badge =
+        state.shell?.let { InboxBadge.count(it) } ?: if (state.settings.openBudgetId == null) 0 else null
+    val notificationAsk =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) InboxBadge.show(context, badge ?: 0)
+        }
+    LaunchedEffect(badge) {
+        val count = badge ?: return@LaunchedEffect
+        // Asked once, the first time there is something to count, so the ask comes with a reason on screen.
+        if (count > 0 && InboxBadge.shouldAsk(context)) {
+            InboxBadge.markAsked(context)
+            notificationAsk.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        InboxBadge.show(context, count)
     }
     val systemDark = isSystemInDarkTheme()
     val dark =

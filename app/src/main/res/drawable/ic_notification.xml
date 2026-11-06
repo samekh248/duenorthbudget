@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The launcher mark's bars and north arrow, cropped to its safe zone, for the status bar. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="54"
+    android:viewportHeight="54">
+    <path
+        android:pathData="M10,52 L10,40 M21,52 L21,30 M32,52 L32,6"
+        android:strokeWidth="5.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="butt" />
+    <path
+        android:pathData="M20,18 L32,6 L44,18"
+        android:strokeWidth="5.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="square"
+        android:strokeLineJoin="miter" />
+</vector>
