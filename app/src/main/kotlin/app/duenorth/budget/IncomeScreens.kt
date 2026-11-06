@@ -78,7 +78,7 @@ fun IncomeGroupLine(
             maxLines = 2,
         )
         Column(horizontalAlignment = Alignment.End) {
-            MetroText(
+            FigureText(
                 MoneyFormat.format(group.receivedMinor, shell.currency, formatOptions),
                 Metro.typography.subheader.copy(textAlign = TextAlign.End),
                 Modifier.testTag("income-group-received-${group.id}"),
@@ -126,7 +126,7 @@ fun IncomeCategoryLine(
             maxLines = 2,
         )
         if (shell.mode == BudgetMode.TRACKING) {
-            LedgerCell(
+            LedgerFigure(
                 MoneyFormat.format(category.budgetedMinor, money, formatOptions),
                 Metro.typography.body,
                 Metro.colors.foreground,
@@ -136,7 +136,7 @@ fun IncomeCategoryLine(
             Spacer(Modifier.weight(LEDGER_FIGURE))
         }
         Spacer(Modifier.weight(LEDGER_FIGURE))
-        LedgerCell(
+        LedgerFigure(
             MoneyFormat.format(category.receivedMinor, money, formatOptions),
             Metro.typography.body,
             Metro.accent.text,

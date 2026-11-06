@@ -201,20 +201,25 @@ fun HomePivot(
                                         bottom = MetroDimens.Row,
                                     ),
                             )
-                            BudgetSection(
-                                shell,
-                                onListGesture = { listGesture = it },
-                                modifier = Modifier.weight(1f),
-                                onCategory = onBudgetCategory,
-                                formatOptions = formatOptions,
-                                onToBudget = onToBudget,
-                                notice = notice,
-                                showAhead = showAhead,
-                                getStarted = getStarted,
-                                onGetStarted = onGetStarted,
-                                onHideGetStarted = onHideGetStarted,
-                                distribute = distribute,
-                            )
+                            // Until the picked month's figures arrive, the shell still holds the last month's: keep
+                            // its names and rows, draw its figures as placeholders, and hold taps until they land.
+                            val stale = shell.month != openMonth
+                            FiguresLoading(stale) {
+                                BudgetSection(
+                                    shell,
+                                    onListGesture = { listGesture = it },
+                                    modifier = Modifier.weight(1f).testTag(if (stale) "budget-month-loading" else "budget-month"),
+                                    onCategory = onBudgetCategory.takeUnless { stale },
+                                    formatOptions = formatOptions,
+                                    onToBudget = onToBudget.takeUnless { stale },
+                                    notice = notice,
+                                    showAhead = showAhead,
+                                    getStarted = getStarted,
+                                    onGetStarted = onGetStarted,
+                                    onHideGetStarted = onHideGetStarted,
+                                    distribute = if (stale) distribute.copy(onOpen = null) else distribute,
+                                )
+                            }
                         }
                     }
                 },
@@ -446,7 +451,8 @@ fun BudgetSection(
         snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) }
     }
     val style = Metro.style
-    val error = shell.headerMinor < 0
+    // While a month loads, the last month's overbudgeted red would say something about this one.
+    val error = shell.headerMinor < 0 && !figuresLoading()
     // Tile relief sets to budget on a flat accent tile (red while overbudgeted) and held on a raised neutral one.
     val tiles = style.heroTiles
     val onTile = if (tiles) (if (error) Metro.colors.onErrorFill else Metro.accent.onFill) else null
@@ -758,7 +764,7 @@ internal fun BudgetTotal(
                         .testTag(amountTag),
             )
         } else {
-            MetroText(
+            FigureText(
                 amount,
                 amountStyle,
                 color = amountColor,
@@ -785,10 +791,11 @@ private fun GroupLine(
         modifier = modifier,
         dim = group.hidden,
     ) {
-        MetroText(
+        FigureText(
             MoneyFormat.format(group.availableMinor, shell.currency, formatOptions),
             Metro.typography.groupHeader,
             it,
+            color = Metro.colors.foreground,
         )
     }
 }
