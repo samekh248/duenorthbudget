@@ -278,6 +278,8 @@ class ShellViewModel(
             onboarding.resume()
             val id = _state.value.settings.openBudgetId ?: return@launch
             if (_state.value.locked) return@launch
+            // A sync that finished in the last half hour is fresh enough; the accounts bar still syncs on a tap.
+            if (withContext(io) { runCatching { sync.syncedRecently(id) }.getOrDefault(false) }) return@launch
             // Launch fetches the banks first, so the sync after sends what they brought to the server.
             // The panel only shows once a linked account starts, so a budget with none never sees it.
             bankSync.run(id, quiet = true)
