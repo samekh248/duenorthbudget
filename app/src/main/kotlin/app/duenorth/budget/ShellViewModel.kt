@@ -56,6 +56,9 @@ class ShellViewModel(
     internal val shellGate = RefreshGate<MonthShell>()
     private val registerGate = RefreshGate<RegisterPage>()
     internal val months = OpenMonthStore()
+
+    /** The budget whose months [months] holds, so a reload of the same budget stays on the month showing. */
+    private var monthsBudgetId: String? = null
     internal val history = ArrayDeque<ShellRoute>()
 
     /** Category note saves, written in the order they were made. */
@@ -255,7 +258,7 @@ class ShellViewModel(
     val onboarding: OnboardingHolder = OnboardingHolder(host, settingsUi, servers, budgetFiles)
 
     /** When the last sync the screen started without being asked began, in epoch millis; launch syncs at start. */
-    private var lastScreenSync = System.currentTimeMillis()
+    internal var lastScreenSync = System.currentTimeMillis()
 
     /** Counts returns to the screen, so a send started on leaving can tell the person came back. */
     private var screenVisits = 0
@@ -642,10 +645,21 @@ class ShellViewModel(
         _state.update { it.copy(confirm = null) }
     }
 
+    /**
+     * Reads the whole shell again. A sync, a return to the app or a settings change keeps the month the person is on;
+     * only a budget opened, switched or closed starts again on the calendar month.
+     */
     internal suspend fun reload() {
-        val calendar = YearMonth.now()
-        months.reset(calendar)
-        _state.update { it.copy(openMonth = calendar, pinnedMonth = null) }
+        val openId = withContext(io) { library.settings().openBudgetId }
+        if (openId == null || openId != monthsBudgetId) {
+            monthsBudgetId = openId
+            val calendar = YearMonth.now()
+            months.reset(calendar)
+            _state.update { it.copy(openMonth = calendar, pinnedMonth = null) }
+        } else {
+            // What came in can change any month, so every cached one reads again; the open one does just below.
+            months.invalidate()
+        }
         val accountId = (_state.value.route as? ShellRoute.Register)?.accountId
         apply(load(accountId), accountId)
     }
