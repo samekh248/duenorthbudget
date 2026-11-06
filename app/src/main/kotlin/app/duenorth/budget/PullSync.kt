@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,10 +38,13 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.design.components.AppGlyph
+import app.duenorth.budget.design.components.AppGlyphIcon
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroText
@@ -54,6 +59,7 @@ object PullSyncCopy {
     const val SYNC_NOW = "sync now"
     const val BANK_SYNC = "bank sync"
     const val CLOSE_HINT = "swipe up to close"
+    const val OPEN_HINT = "pull down or tap for details"
 }
 
 /** What the pull-down sync panel shows, and whether a pull opens it at all. */
@@ -68,6 +74,10 @@ data class PullSyncUi(
     val progress: Float? = null,
     /** The budget has bank-linked accounts, so the panel offers bank sync beside sync now. */
     val bankSync: Boolean = false,
+    /** The budget is on a server this phone is signed in to, so the panel can sync it. */
+    val canSync: Boolean = true,
+    /** The last bank sync's failure, kept until dismissed: a quiet strip over the page, and its lines in the panel. */
+    val failure: BankSyncUi? = null,
 )
 
 /** Where the panel is after a tap on one of its syncs: waiting for it to start, then for it to end. */
@@ -101,6 +111,10 @@ fun PullSyncPanel(
     onSync: () -> Unit,
     onBankSync: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Opens the failed bank sync's page, with every account and why each failed. */
+    onDetails: () -> Unit = {},
+    /** Clears the failed bank sync, and the strip with it. */
+    onDismissFailure: () -> Unit = {},
     content: @Composable (Modifier) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -189,6 +203,11 @@ fun PullSyncPanel(
         }
 
     Column(modifier.nestedScroll(connection)) {
+        // A failed sync waits as a quiet strip at the top of the page; a tap (or a pull) opens the panel that explains it.
+        val failure = ui.failure
+        if (failure != null && !open && revealed.value <= 0f) {
+            PullSyncStrip(failure, onOpen = { settle(true) })
+        }
         val shownDp = with(density) { revealed.value.toDp() }
         Box(
             Modifier
@@ -208,6 +227,11 @@ fun PullSyncPanel(
                     requested = Requested.ASKED
                     onBankSync()
                 },
+                onDetails = {
+                    settle(false)
+                    onDetails()
+                },
+                onDismissFailure = onDismissFailure,
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
@@ -243,6 +267,8 @@ internal fun PullSyncSheet(
     onSync: () -> Unit,
     onBankSync: () -> Unit,
     modifier: Modifier = Modifier,
+    onDetails: () -> Unit = {},
+    onDismissFailure: () -> Unit = {},
 ) {
     Column(
         modifier
@@ -280,10 +306,14 @@ internal fun PullSyncSheet(
                 Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(3.dp).background(Metro.accent.fill))
             }
         }
-        MetroButtonGrid(Modifier.padding(horizontal = MetroDimens.Gutter).padding(top = MetroDimens.Row)) {
-            MetroButton(PullSyncCopy.SYNC_NOW, Modifier.testTag("pull-sync-now")) { if (!ui.syncing) onSync() }
-            if (ui.bankSync) {
-                MetroButton(PullSyncCopy.BANK_SYNC, Modifier.testTag("pull-sync-banks")) { if (!ui.syncing) onBankSync() }
+        val failure = ui.failure
+        if (failure != null && !syncing) PullSyncFailure(failure, onDetails, onDismissFailure)
+        if (ui.canSync) {
+            MetroButtonGrid(Modifier.padding(horizontal = MetroDimens.Gutter).padding(top = MetroDimens.Row)) {
+                MetroButton(PullSyncCopy.SYNC_NOW, Modifier.testTag("pull-sync-now")) { if (!ui.syncing) onSync() }
+                if (ui.bankSync) {
+                    MetroButton(PullSyncCopy.BANK_SYNC, Modifier.testTag("pull-sync-banks")) { if (!ui.syncing) onBankSync() }
+                }
             }
         }
         Column(
@@ -310,8 +340,11 @@ internal fun PullSyncSheet(
 internal fun ShellUiState.pullSync(): PullSyncUi {
     val server = shell != null && !locked && signedIn && !cloudFileId.isNullOrBlank()
     val modeOpen = budgetEdit != null || inbox.selection != null || accounts.reorder
+    val failure = bankSync.panel?.takeIf { !it.running }
     return PullSyncUi(
-        enabled = server && route == ShellRoute.Home && !modeOpen,
+        enabled = (server || failure != null) && shell != null && !locked && route == ShellRoute.Home && !modeOpen,
+        canSync = server,
+        failure = failure,
         status = syncStatus,
         syncing = syncing || bankSync.syncing,
         progress = syncProgress,
@@ -322,4 +355,101 @@ internal fun ShellUiState.pullSync(): PullSyncUi {
                     .orEmpty()
                     .any { it.bankSync && !it.closed },
     )
+}
+
+/** At most this many failed accounts are named in the panel; the rest are counted. */
+private const val SHOWN_FAILURES = 2
+
+/** The failed sync's headline: what went wrong as a whole, or that some accounts did not sync. */
+private fun BankSyncUi.headline() = error ?: BankSyncCopy.FINISHED_WITH_ERRORS
+
+/**
+ * A failed bank sync, waiting at the top of the page in the panel's own grey: a sync glyph and
+ * its headline in the error colour, and a hint that it opens. No red fill, so it reads as part of
+ * the page rather than over it.
+ */
+@Composable
+private fun PullSyncStrip(
+    failure: BankSyncUi,
+    onOpen: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Metro.colors.chrome)
+            .clickable(onClickLabel = BankSyncCopy.DETAILS, onClick = onOpen)
+            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite }
+            .testTag("pull-sync-strip"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppGlyphIcon(AppGlyph.Sync, Metro.colors.error, size = 16.dp)
+        Column(Modifier.padding(start = 10.dp).weight(1f)) {
+            MetroText(failure.headline(), Metro.typography.body, color = Metro.colors.error, maxLines = 1)
+            MetroText(PullSyncCopy.OPEN_HINT, Metro.typography.caption, color = Metro.colors.secondary, maxLines = 1)
+        }
+        AppGlyphIcon(AppGlyph.ChevronDown, Metro.colors.secondary, size = 16.dp)
+    }
+}
+
+/** The failed sync inside the panel: its headline, the accounts that failed, and details and dismiss as quiet text. */
+@Composable
+private fun PullSyncFailure(
+    failure: BankSyncUi,
+    onDetails: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val lines =
+        failure.failures.take(SHOWN_FAILURES).map(BankSyncCopy::failure) +
+            listOfNotNull((failure.failures.size - SHOWN_FAILURES).takeIf { it > 0 }?.let(BankSyncCopy::more))
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = MetroDimens.Gutter)
+            .padding(top = MetroDimens.Row)
+            .testTag("pull-sync-failure"),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AppGlyphIcon(AppGlyph.Sync, Metro.colors.error, size = 16.dp)
+            MetroText(
+                failure.headline(),
+                Metro.typography.body,
+                Modifier.padding(start = 8.dp).testTag("pull-sync-failure-title"),
+                color = Metro.colors.error,
+                maxLines = 1,
+            )
+        }
+        lines.forEach { line ->
+            MetroText(
+                line,
+                Metro.typography.caption,
+                Modifier.padding(start = 24.dp, top = 2.dp).testTag("pull-sync-failure-line"),
+                color = Metro.colors.secondary,
+                maxLines = 1,
+            )
+        }
+        Row(Modifier.padding(start = 12.dp)) {
+            QuietAction(BankSyncCopy.DETAILS, "pull-sync-details", onDetails)
+            QuietAction(BankSyncCopy.DISMISS, "pull-sync-dismiss", onDismiss)
+        }
+    }
+}
+
+/** A text-only action in the accent, at full touch height, so the failure's controls don't shout. */
+@Composable
+private fun QuietAction(
+    label: String,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .defaultMinSize(minWidth = MetroDimens.TouchTarget, minHeight = MetroDimens.TouchTarget)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 12.dp)
+            .testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) {
+        MetroText(label, Metro.typography.body, color = Metro.accent.text)
+    }
 }

@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.BankSyncFailure
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroTheme
@@ -42,6 +43,9 @@ class PullSyncContentTest {
 
     // As in the app, a tap on sync now marks the shell as syncing straight away.
     private var startsSyncing = false
+    private var details = 0
+    private var dismissed = 0
+    private val failed = BankSyncUi(running = false, failures = listOf(BankSyncFailure("Card", "fetch did not finish")))
 
     private fun show() {
         compose.setContent {
@@ -49,7 +53,10 @@ class PullSyncContentTest {
                 PullSyncPanel(ui, onSync = {
                     synced++
                     if (startsSyncing) ui = ui.copy(syncing = true, progress = 0.4f)
-                }, onBankSync = { bankSynced++ }) { modifier ->
+                }, onBankSync = { bankSynced++ }, onDetails = { details++ }, onDismissFailure = {
+                    dismissed++
+                    ui = ui.copy(failure = null)
+                }) { modifier ->
                     LazyColumn(modifier.testTag("page")) {
                         items(40) { MetroText("row $it", Metro.typography.body, Modifier.fillMaxWidth().padding(12.dp)) }
                     }
@@ -146,6 +153,34 @@ class PullSyncContentTest {
         compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
     }
 
+    // A failed bank sync waits as a quiet strip; a tap opens the panel with what failed, details and dismiss.
+    @Test
+    fun aFailedSyncWaitsInAStripThatOpensThePanel() {
+        ui = ui.copy(failure = failed)
+        show()
+        compose.onNodeWithTag("pull-sync-strip").assertIsDisplayed()
+        compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
+        compose.onNodeWithTag("pull-sync-strip").performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("pull-sync-strip").assertDoesNotExist()
+        compose.onNodeWithTag("pull-sync-failure-title", useUnmergedTree = true).assertTextEquals(BankSyncCopy.FINISHED_WITH_ERRORS)
+        compose.onNodeWithTag("pull-sync-failure-line", useUnmergedTree = true).assertTextEquals("Card: fetch did not finish")
+        compose.onNodeWithTag("pull-sync-details").performClick()
+        assertEquals(1, details)
+    }
+
+    @Test
+    fun dismissClearsTheFailure() {
+        ui = ui.copy(failure = failed)
+        show()
+        pull()
+        compose.onNodeWithTag("pull-sync-dismiss").performClick()
+        compose.waitForIdle()
+        assertEquals(1, dismissed)
+        compose.onNodeWithTag("pull-sync-failure").assertDoesNotExist()
+        compose.onNodeWithTag("pull-sync-strip").assertDoesNotExist()
+    }
+
     @Test
     fun theShellTurnsItOnOnlyForAServerBudgetOnHome() {
         val shell =
@@ -158,5 +193,8 @@ class PullSyncContentTest {
         assertFalse(server.copy(route = ShellRoute.Settings).pullSync().enabled)
         assertFalse(server.copy(accounts = server.accounts.copy(reorder = true)).pullSync().enabled)
         assertFalse(server.copy(locked = true).pullSync().enabled)
+        // A finished sync that failed shows; one still running does not.
+        assertEquals(failed, server.copy(bankSync = BankSyncState(panel = failed)).pullSync().failure)
+        assertEquals(null, server.copy(bankSync = BankSyncState(panel = BankSyncUi())).pullSync().failure)
     }
 }

@@ -340,7 +340,7 @@ fun DueNorthApp(model: ShellViewModel) {
                 )
             }
         val actions = formSaveHost.bar ?: ScreenBar.forState(state, handlers)
-        // While banks fetch the working dots run along the top; a failed sync's tile stays over every page until closed.
+        // While banks fetch the working dots run along the top; a failed sync waits in home's pull-down sync panel.
         ShellChrome(
             actions,
             syncing = state.syncing || state.import.fetchPending,
@@ -348,19 +348,6 @@ fun DueNorthApp(model: ShellViewModel) {
             working = state.writing || state.assistant.working != null || state.bankSync.syncing,
             workingLabel = if (state.bankSync.syncing) BankSyncCopy.SYNCING_BANKS else WorkingCopy.WORKING,
             bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
-            overBar =
-                state.bankSync.panel
-                    ?.takeIf { !it.running && state.route != ShellRoute.BankSyncReport }
-                    ?.let { ui ->
-                        { modifier ->
-                            BankSyncPanel(
-                                ui,
-                                model.bankSync::dismiss,
-                                modifier,
-                                onOpen = model.bankSync::openReport,
-                            )
-                        }
-                    },
         ) { modifier ->
             val rowMenu = rememberRowMenu()
             val rowMenus = remember(model) { AppRowMenus(model) }
@@ -387,6 +374,8 @@ fun DueNorthApp(model: ShellViewModel) {
                                 onSync = model.budgetFiles::syncInbox,
                                 onBankSync = model.bankSync::syncAll,
                                 modifier = fill,
+                                onDetails = model.bankSync::openReport,
+                                onDismissFailure = model.bankSync::dismiss,
                             ) { HomeRoute(state, model, it) }
                         ShellRoute.Settings -> SettingsRoute(state, model, fill)
                         is ShellRoute.ExperimentalOffer -> ExperimentalOfferRoute(route, state, model, fill)

@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
+import app.duenorth.budget.core.BankSyncFailure
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.Currencies
@@ -61,6 +62,25 @@ class PullSyncScreenshotTest {
 
     @Test
     fun closedLight() = snap("pull_sync_closed_light", dark = false, synced, pull = false)
+
+    private val failed =
+        synced.copy(
+            bankSync = true,
+            failure = BankSyncUi(running = false, failures = listOf(BankSyncFailure("Credit card", "fetch did not finish"))),
+        )
+
+    // A failed bank sync: the quiet strip at the top of the page, then the panel it opens.
+    @Test
+    fun failedStripLight() = snap("pull_sync_failed_strip_light", dark = false, failed, pull = false)
+
+    @Test
+    fun failedStripDark() = snap("pull_sync_failed_strip_dark", dark = true, failed, pull = false)
+
+    @Test
+    fun failedOpenLight() = snap("pull_sync_failed_open_light", dark = false, failed)
+
+    @Test
+    fun failedOpenDark() = snap("pull_sync_failed_open_dark", dark = true, failed)
 
     @OptIn(ExperimentalRoborazziApi::class)
     private fun snap(
