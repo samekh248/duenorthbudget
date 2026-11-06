@@ -28,4 +28,19 @@ object BankPending {
         val row = runCatching { json.parseToJsonElement(rawSyncedData) as? JsonObject }.getOrNull() ?: return false
         return row["booked"]?.jsonPrimitive?.booleanOrNull == false
     }
+
+    /**
+     * SQL that is true when the transaction aliased [t] came from the bank and the bank has not posted it yet: the
+     * same rule as [isPending]. A split's parts go by their parent, which holds the bank's copy and the cleared flag.
+     */
+    fun pendingSql(t: String): String =
+        """
+        EXISTS (
+            SELECT 1 FROM transactions src
+            WHERE src.id = CASE WHEN IFNULL($t.isChild, 0) = 1 THEN $t.parent_id ELSE $t.id END
+                AND IFNULL(src.cleared, 0) = 0
+                AND IFNULL(src.reconciled, 0) = 0
+                AND REPLACE(REPLACE(src.raw_synced_data, ' ', ''), char(10), '') LIKE '%"booked":false%'
+        )
+        """.trimIndent()
 }

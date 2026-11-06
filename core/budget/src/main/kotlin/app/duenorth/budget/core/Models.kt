@@ -482,6 +482,8 @@ data class MonthShell(
     val incomeGroups: List<IncomeGroupRow> = emptyList(),
     /** Possible matches in on-budget accounts, waiting in the inbox for match or not a match. */
     val matches: List<MatchPair> = emptyList(),
+    /** Uncategorized rows the bank has not posted: kept out of [inbox] until they post, only counted. */
+    val pendingInboxCount: Int = 0,
 )
 
 object ShellCopy {
@@ -490,6 +492,10 @@ object ShellCopy {
     const val CHOOSE_CURRENCY = "choose a currency"
     const val UNKNOWN_SAMPLE = "unknown sample"
     const val TO_BUDGET = "to budget"
+
+    /** In the inbox while rows are pending: they wait outside it until the bank posts them. */
+    fun pendingInbox(count: Int): String =
+        if (count == 1) "1 pending, comes in once the bank posts it" else "$count pending, come in once the bank posts them"
 
     /** Takes to budget's place over the figure when more is budgeted than there is. */
     const val OVERBUDGETED = "overbudgeted"
