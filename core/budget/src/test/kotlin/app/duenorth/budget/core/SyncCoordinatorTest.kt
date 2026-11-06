@@ -238,6 +238,32 @@ class SyncCoordinatorTest {
     }
 
     @Test
+    fun launchSkipsItsSyncOnlyWithinHalfAnHourOfTheLastSuccessfulOne() {
+        scenario {
+            val kept = (library.create("Trip", "JPY") as CreateResult.Created).id
+            // Never synced: launch syncs as before.
+            assertFalse(sync.syncedRecently(kept))
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            assertEquals("synced 3:04 pm", sync.sync(remote.fileId).status)
+            val synced = opened.now
+            assertTrue(sync.syncedRecently(remote.fileId))
+            opened.now = synced + SyncCoordinator.STARTUP_SYNC_SKIP_MS - 1
+            assertTrue(sync.syncedRecently(remote.fileId))
+            opened.now = synced + SyncCoordinator.STARTUP_SYNC_SKIP_MS
+            assertFalse(sync.syncedRecently(remote.fileId))
+            // A failed sync keeps the last successful time, so it does not count as fresh.
+            server.online = false
+            sync.sync(remote.fileId)
+            assertFalse(sync.syncedRecently(remote.fileId))
+            // The phone's clock went back: the stored time is in the future, so launch syncs.
+            opened.now = synced - 1
+            assertFalse(sync.syncedRecently(remote.fileId))
+            assertEquals(30 * 60 * 1_000L, SyncCoordinator.STARTUP_SYNC_SKIP_MS)
+        }
+    }
+
+    @Test
     fun backgroundSyncLeavesAPhoneOnlyBudgetAlone() {
         scenario {
             val kept = (library.create("Trip", "JPY") as CreateResult.Created).id
@@ -842,7 +868,7 @@ class SyncCoordinatorTest {
         /** Each wait before a retried sync, instead of sleeping. */
         val pauses: MutableList<Long> = java.util.Collections.synchronizedList(mutableListOf())
         private val today = LocalDate.of(2026, 10, 7)
-        private val now = Instant.parse("2026-10-07T15:04:00Z").toEpochMilli()
+        var now = Instant.parse("2026-10-07T15:04:00Z").toEpochMilli()
 
         fun library(): BudgetLibrary = BudgetLibrary(root, JdbcSessionOpener(), BudgetClock { today })
 
