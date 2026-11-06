@@ -172,19 +172,39 @@ class PullSyncContentTest {
         compose.onNodeWithTag("pull-sync-strip").assertIsDisplayed()
     }
 
-    // A failed bank sync waits as a quiet strip; a tap opens the panel with what failed, details and dismiss.
+    // A failed bank sync waits as a quiet strip naming what failed; a tap on it opens the details, with no button for them.
     @Test
-    fun aFailedSyncWaitsInAStripThatOpensThePanel() {
+    fun aFailedSyncsStripOpensItsDetails() {
         ui = ui.copy(failure = failed)
         show()
         compose.onNodeWithTag("pull-sync-strip").assertIsDisplayed()
-        compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
+        compose.onNodeWithTag("pull-sync-strip-title", useUnmergedTree = true).assertTextEquals(BankSyncCopy.FINISHED_WITH_ERRORS)
+        compose.onNodeWithTag("pull-sync-strip-line", useUnmergedTree = true).assertTextEquals("Card: fetch did not finish")
+        compose.onNodeWithTag("pull-sync-details").assertDoesNotExist()
         compose.onNodeWithTag("pull-sync-strip").performClick()
+        assertEquals(1, details)
+        assertEquals(0, dismissed)
+    }
+
+    // The strip's × dismisses it.
+    @Test
+    fun theStripsCrossDismissesIt() {
+        ui = ui.copy(failure = failed)
+        show()
+        compose.onNodeWithTag("pull-sync-strip-dismiss").performClick()
         compose.waitForIdle()
+        assertEquals(1, dismissed)
+        assertEquals(0, details)
         compose.onNodeWithTag("pull-sync-strip").assertDoesNotExist()
-        compose.onNodeWithTag("pull-sync-failure-title", useUnmergedTree = true).assertTextEquals(BankSyncCopy.FINISHED_WITH_ERRORS)
-        compose.onNodeWithTag("pull-sync-failure-line", useUnmergedTree = true).assertTextEquals("Card: fetch did not finish")
-        compose.onNodeWithTag("pull-sync-details").performClick()
+    }
+
+    // In the open panel the failure's row opens the details on a tap too.
+    @Test
+    fun thePanelsFailureOpensItsDetails() {
+        ui = ui.copy(failure = failed)
+        show()
+        pull()
+        compose.onNodeWithTag("pull-sync-failure").performClick()
         assertEquals(1, details)
     }
 
@@ -193,7 +213,7 @@ class PullSyncContentTest {
         ui = ui.copy(failure = failed)
         show()
         pull()
-        compose.onNodeWithTag("pull-sync-dismiss").performClick()
+        compose.onNodeWithTag("pull-sync-failure-dismiss").performClick()
         compose.waitForIdle()
         assertEquals(1, dismissed)
         compose.onNodeWithTag("pull-sync-failure").assertDoesNotExist()

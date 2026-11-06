@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Velocity
@@ -62,7 +63,6 @@ object PullSyncCopy {
     const val SYNC_NOW = "sync now"
     const val BANK_SYNC = "bank sync"
     const val CLOSE_HINT = "swipe up to close"
-    const val OPEN_HINT = "pull down or tap for details"
 }
 
 /** What the pull-down sync panel shows, and whether a pull opens it at all. */
@@ -215,14 +215,14 @@ fun PullSyncPanel(
 
     Column(modifier.nestedScroll(connection)) {
         // A sync started from the panel shows as the panel's folded grip saying syncing, while the app's own sync
-        // animation runs along the top; it goes once the sync is done. A failed sync then waits as a quiet strip,
-        // and a tap (or a pull) opens the panel that explains it.
+        // animation runs along the top; it goes once the sync is done. A failed sync then waits as a quiet strip:
+        // a tap opens its page, its × dismisses it, and a pull still opens the panel.
         val failure = ui.failure
         val folded = !open && revealed.value <= 0f
         if (folded && requested != Requested.NONE) {
             PullSyncSyncing()
         } else if (folded && failure != null) {
-            PullSyncStrip(failure, onOpen = { settle(true) })
+            PullSyncStrip(failure, onDetails = onDetails, onDismiss = onDismissFailure)
         }
         val shownDp = with(density) { revealed.value.toDp() }
         Box(
@@ -408,93 +408,99 @@ private const val SHOWN_FAILURES = 2
 private fun BankSyncUi.headline() = error ?: BankSyncCopy.FINISHED_WITH_ERRORS
 
 /**
- * A failed bank sync, waiting at the top of the page in the panel's own grey: a sync glyph and
- * its headline in the error colour, and a hint that it opens. No red fill, so it reads as part of
- * the page rather than over it.
+ * A failed bank sync, waiting at the top of the page in the panel's own grey: the same row the
+ * panel shows, with no red fill, so it reads as part of the page rather than over it.
  */
 @Composable
 private fun PullSyncStrip(
     failure: BankSyncUi,
-    onOpen: () -> Unit,
+    onDetails: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(Metro.colors.chrome)
-            .clickable(onClickLabel = BankSyncCopy.DETAILS, onClick = onOpen)
-            .padding(horizontal = MetroDimens.Gutter, vertical = 8.dp)
-            .semantics { liveRegion = LiveRegionMode.Polite }
-            .testTag("pull-sync-strip"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AppGlyphIcon(AppGlyph.Sync, Metro.colors.error, size = 16.dp)
-        Column(Modifier.padding(start = 10.dp).weight(1f)) {
-            MetroText(failure.headline(), Metro.typography.body, color = Metro.colors.error, maxLines = 1)
-            MetroText(PullSyncCopy.OPEN_HINT, Metro.typography.caption, color = Metro.colors.secondary, maxLines = 1)
-        }
-        AppGlyphIcon(AppGlyph.ChevronDown, Metro.colors.secondary, size = 16.dp)
-    }
+    PullSyncFailureRow(
+        failure,
+        shown = 1,
+        onDetails = onDetails,
+        onDismiss = onDismiss,
+        tag = "pull-sync-strip",
+        modifier =
+            Modifier
+                .background(Metro.colors.chrome)
+                .semantics { liveRegion = LiveRegionMode.Polite }
+                .testTag("pull-sync-strip"),
+    )
 }
 
-/** The failed sync inside the panel: its headline, the accounts that failed, and details and dismiss as quiet text. */
+/** The failed sync inside the panel: the same row, naming up to [SHOWN_FAILURES] accounts. */
 @Composable
 private fun PullSyncFailure(
     failure: BankSyncUi,
     onDetails: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    PullSyncFailureRow(
+        failure,
+        shown = SHOWN_FAILURES,
+        onDetails = onDetails,
+        onDismiss = onDismiss,
+        tag = "pull-sync-failure",
+        modifier = Modifier.padding(top = 4.dp).testTag("pull-sync-failure"),
+    )
+}
+
+/**
+ * A failed sync's row: its headline in the error colour, the accounts that failed, and an × on
+ * the right that dismisses it. A tap anywhere else on the row opens the full page.
+ */
+@Composable
+private fun PullSyncFailureRow(
+    failure: BankSyncUi,
+    shown: Int,
+    onDetails: () -> Unit,
+    onDismiss: () -> Unit,
+    /** Tags the row's parts, so the strip's and the panel's can be told apart. */
+    tag: String,
+    modifier: Modifier = Modifier,
+) {
     val lines =
-        failure.failures.take(SHOWN_FAILURES).map(BankSyncCopy::failure) +
-            listOfNotNull((failure.failures.size - SHOWN_FAILURES).takeIf { it > 0 }?.let(BankSyncCopy::more))
-    Column(
-        Modifier
+        failure.failures.take(shown).map(BankSyncCopy::failure) +
+            listOfNotNull((failure.failures.size - shown).takeIf { it > 0 }?.let(BankSyncCopy::more))
+    Row(
+        modifier
             .fillMaxWidth()
-            .padding(horizontal = MetroDimens.Gutter)
-            .padding(top = MetroDimens.Row)
-            .testTag("pull-sync-failure"),
+            .clickable(onClickLabel = BankSyncCopy.DETAILS, onClick = onDetails)
+            .padding(start = MetroDimens.Gutter, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AppGlyphIcon(AppGlyph.Sync, Metro.colors.error, size = 16.dp)
+        AppGlyphIcon(AppGlyph.Sync, Metro.colors.error, size = 16.dp)
+        Column(Modifier.padding(start = 10.dp).weight(1f)) {
             MetroText(
                 failure.headline(),
                 Metro.typography.body,
-                Modifier.padding(start = 8.dp).testTag("pull-sync-failure-title"),
+                Modifier.testTag("$tag-title"),
                 color = Metro.colors.error,
                 maxLines = 1,
             )
+            lines.forEach { line ->
+                MetroText(
+                    line,
+                    Metro.typography.caption,
+                    Modifier.testTag("$tag-line"),
+                    color = Metro.colors.secondary,
+                    maxLines = 1,
+                )
+            }
         }
-        lines.forEach { line ->
-            MetroText(
-                line,
-                Metro.typography.caption,
-                Modifier.padding(start = 24.dp, top = 2.dp).testTag("pull-sync-failure-line"),
-                color = Metro.colors.secondary,
-                maxLines = 1,
-            )
+        Box(
+            Modifier
+                .defaultMinSize(minWidth = MetroDimens.TouchTarget, minHeight = MetroDimens.TouchTarget)
+                .clickable(role = Role.Button, onClickLabel = BankSyncCopy.DISMISS, onClick = onDismiss)
+                .semantics { contentDescription = BankSyncCopy.DISMISS }
+                .testTag("$tag-dismiss"),
+            contentAlignment = Alignment.Center,
+        ) {
+            MetroText(BankSyncCopy.CLOSE, Metro.typography.subheader, color = Metro.colors.secondary)
         }
-        Row(Modifier.padding(start = 12.dp)) {
-            QuietAction(BankSyncCopy.DETAILS, "pull-sync-details", onDetails)
-            QuietAction(BankSyncCopy.DISMISS, "pull-sync-dismiss", onDismiss)
-        }
-    }
-}
-
-/** A text-only action in the accent, at full touch height, so the failure's controls don't shout. */
-@Composable
-private fun QuietAction(
-    label: String,
-    tag: String,
-    onClick: () -> Unit,
-) {
-    Box(
-        Modifier
-            .defaultMinSize(minWidth = MetroDimens.TouchTarget, minHeight = MetroDimens.TouchTarget)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp)
-            .testTag(tag),
-        contentAlignment = Alignment.Center,
-    ) {
-        MetroText(label, Metro.typography.body, color = Metro.accent.text)
     }
 }
 
