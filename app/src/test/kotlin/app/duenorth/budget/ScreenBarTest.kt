@@ -41,7 +41,7 @@ class ScreenBarTest {
                 )
             assertEquals(section.toString(), "add", specs.first().id)
             val menu = specs.filterNot { it.primary }
-            assertEquals(section.toString(), listOf("sync-all", "undo", "settings"), menu.takeLast(3).map { it.id })
+            assertEquals(section.toString(), listOf("undo", "sync-all", "settings"), menu.takeLast(3).map { it.id })
             assertTrue(section.toString(), menu.takeLast(3).first().rule)
         }
     }
@@ -270,7 +270,7 @@ class ScreenBarTest {
                 homeSection = ScreenBar.HOME_INBOX,
                 inboxSync = true,
             )
-        assertEquals(listOf("sync-all", "undo", "settings"), synced.filter { !it.primary }.map { it.id })
+        assertEquals(listOf("undo", "sync-all", "settings"), synced.filter { !it.primary }.map { it.id })
         assertEquals(ScreenBarCopy.SYNC, synced.first { it.id == "sync-all" }.label)
         val selecting =
             ScreenBar.specsFor(

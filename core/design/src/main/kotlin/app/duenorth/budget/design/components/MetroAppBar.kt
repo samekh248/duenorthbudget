@@ -76,7 +76,7 @@ data class ScreenAction(
      * apart by a rule and extra air.
      */
     val apart: Boolean = false,
-    /** A menu line that starts a new group, drawn under a thin rule (the menu's shared sync, undo, settings tail). */
+    /** A menu line that starts a new group, drawn under a thin rule (the menu's shared undo, sync, settings tail). */
     val rule: Boolean = false,
     /**
      * The one line under the button's glyph. The glyph is the verb, so this is only the noun ("transaction" under

@@ -25,7 +25,7 @@ data class ScreenBarSpec(
     val primary: Boolean = true,
     /** A destructive command: last in the menu, in the accent, under a rule (or set apart on the bar). */
     val apart: Boolean = false,
-    /** A menu line that starts a new group under a rule: the shared sync, undo, settings tail. */
+    /** A menu line that starts a new group under a rule: the shared undo, sync, settings tail. */
     val rule: Boolean = false,
     /** The one line under a bar button: the noun alone, since the glyph is the verb. The menu shows [label]. */
     val caption: String = label,
@@ -188,7 +188,7 @@ object ScreenBar {
                     spec("refresh", AppGlyph.Sync, OnboardingScreenCopy.REFRESH),
                 )
             // Every home pivot is a hub: add transaction first, then its own buttons; its menu holds its own
-            // tools, then the same sync, undo, settings tail under a rule.
+            // tools, then the same undo, sync, settings tail under a rule.
             ShellRoute.Home -> {
                 val tail = hubTail(inboxSync || accountsBankSync, undoLabel)
                 when {
@@ -576,15 +576,15 @@ object ScreenBar {
     private fun settings() = listOf(menu("settings", AppGlyph.Settings, "settings"))
 
     /**
-     * The tail every hub's menu ends with, in this order under a rule: sync (the server and every linked bank, when
-     * there is one to sync with), undo while there is a step to undo, settings.
+     * The tail every hub's menu ends with, in this order under a rule: undo while there is a step to undo, sync (the
+     * server and every linked bank, when there is one to sync with), settings.
      */
     private fun hubTail(
         sync: Boolean,
         undoLabel: String?,
     ): List<ScreenBarSpec> {
         val lines =
-            (if (sync) listOf(menu("sync-all", AppGlyph.Sync, ScreenBarCopy.SYNC)) else emptyList()) + undo(undoLabel) + settings()
+            undo(undoLabel) + (if (sync) listOf(menu("sync-all", AppGlyph.Sync, ScreenBarCopy.SYNC)) else emptyList()) + settings()
         return lines.mapIndexed { i, line -> if (i == 0) line.copy(rule = true) else line }
     }
 
