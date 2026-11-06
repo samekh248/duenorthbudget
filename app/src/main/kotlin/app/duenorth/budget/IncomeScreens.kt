@@ -105,6 +105,7 @@ fun IncomeCategoryLine(
     banded: Boolean = false,
 ) {
     val money = shell.currency
+    val nameAir = ledgerNameAir(Metro.typography.body)
     Row(
         modifier
             .fillMaxWidth()
@@ -117,7 +118,10 @@ fun IncomeCategoryLine(
         MetroText(
             category.name,
             Metro.typography.body,
-            Modifier.weight(LEDGER_NAME).padding(end = MetroDimens.Gutter),
+            Modifier
+                .weight(LEDGER_NAME)
+                .padding(end = MetroDimens.Gutter, top = nameAir, bottom = nameAir)
+                .testTag("income-category-name-${category.id}"),
             color = if (category.hidden) Metro.colors.secondary else Metro.colors.foreground,
             maxLines = 2,
         )

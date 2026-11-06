@@ -27,12 +27,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryAutomations
@@ -58,6 +61,7 @@ import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.mobile10Fill
 import java.time.YearMonth
+import kotlin.math.floor
 
 @Composable
 fun CategoryBudgetScreen(
@@ -714,6 +718,7 @@ fun CategoryLine(
 ) {
     val money = shell.currency
     val progress = if (showGoal) category.goalProgress ?: 0f else null
+    val nameAir = ledgerNameAir(Metro.typography.body)
     Column(
         modifier
             .fillMaxWidth()
@@ -722,13 +727,16 @@ fun CategoryLine(
             .testTag("category-${category.id}"),
     ) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = MetroDimens.TouchTarget),
+            Modifier.fillMaxWidth().heightIn(min = MetroDimens.TouchTarget).testTag("category-line-${category.id}"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             MetroText(
                 category.name,
                 Metro.typography.body,
-                Modifier.weight(LEDGER_NAME).padding(end = MetroDimens.Gutter),
+                Modifier
+                    .weight(LEDGER_NAME)
+                    .padding(end = MetroDimens.Gutter, top = nameAir, bottom = nameAir)
+                    .testTag("category-name-${category.id}"),
                 color = if (category.hidden) Metro.colors.secondary else Metro.colors.foreground,
                 maxLines = 2,
             )
@@ -803,6 +811,22 @@ internal fun RowScope.LedgerCell(
         maxLines = 1,
         softWrap = false,
     )
+}
+
+/**
+ * Air above and below a ledger row's name: what centering one line in a touch-target row leaves each side.
+ * Padding the name by it keeps that air when the name wraps, where centering alone would squeeze it to nothing.
+ */
+@Composable
+internal fun ledgerNameAir(style: TextStyle): Dp {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    return remember(style, density) {
+        val line = measurer.measure("Ag", style, maxLines = 1).size.height
+        // Whole pixels, so the padded line never comes out a pixel taller than the touch target it fills.
+        val air = floor((with(density) { MetroDimens.TouchTarget.toPx() } - line) / 2f).coerceAtLeast(0f)
+        with(density) { air.toDp() }
+    }
 }
 
 internal const val LEDGER_NAME = 1.8f
