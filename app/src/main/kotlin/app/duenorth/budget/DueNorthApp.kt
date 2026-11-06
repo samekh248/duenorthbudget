@@ -297,15 +297,6 @@ fun DueNorthApp(model: ShellViewModel) {
                     onMergeSelected = model.register::mergeSelected,
                     onMergeInboxSelected = model.inbox::mergeSelected,
                     onSyncServer = model.budgetFiles::syncInbox,
-                    // One sync for every hub: a bank sync ends by syncing with the server, so it covers both.
-                    onSyncAll = {
-                        val banks =
-                            state.shell
-                                ?.accounts
-                                .orEmpty()
-                                .any { it.bankSync && !it.closed }
-                        if (banks) model.bankSync.syncAll() else model.budgetFiles.syncInbox()
-                    },
                     onRefreshAssistant = model.assistant::refresh,
                     onCancel = {
                         when (state.route) {
@@ -396,7 +387,14 @@ fun DueNorthApp(model: ShellViewModel) {
                         importLauncher.launch("*/*")
                     }
                     when (val route = state.route) {
-                        ShellRoute.Home -> HomeRoute(state, model, fill)
+                        // A pull down past the top of a home page opens the sync panel; it is the only sync on home.
+                        ShellRoute.Home ->
+                            PullSyncPanel(
+                                ui = state.pullSync(),
+                                onSync = model.budgetFiles::syncInbox,
+                                onBankSync = model.bankSync::syncAll,
+                                modifier = fill,
+                            ) { HomeRoute(state, model, it) }
                         ShellRoute.Settings -> SettingsRoute(state, model, fill)
                         is ShellRoute.ExperimentalOffer -> ExperimentalOfferRoute(route, state, model, fill)
                         is ShellRoute.EncryptionPassword -> EncryptionPasswordRoute(route, state, model, fill)

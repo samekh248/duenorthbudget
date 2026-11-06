@@ -523,7 +523,6 @@ class ShellScreenshotTest {
                                                 mode = BudgetMode.ENVELOPE,
                                                 homeSection = ScreenBar.HOME_ACCOUNTS,
                                                 accountsReorder = accountsReorder,
-                                                accountsBankSync = bankSync != null,
                                             ).map {
                                                 ScreenAction(
                                                     it.id,

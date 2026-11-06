@@ -37,12 +37,11 @@ class ScreenBarTest {
                     mode = BudgetMode.ENVELOPE,
                     undoLabel = "assign",
                     homeSection = section,
-                    inboxSync = true,
                 )
             assertEquals(section.toString(), "add", specs.first().id)
             val menu = specs.filterNot { it.primary }
-            assertEquals(section.toString(), listOf("sync-all", "undo", "settings"), menu.takeLast(3).map { it.id })
-            assertTrue(section.toString(), menu.takeLast(3).first().rule)
+            assertEquals(section.toString(), listOf("undo", "settings"), menu.takeLast(2).map { it.id })
+            assertTrue(section.toString(), menu.takeLast(2).first().rule)
         }
     }
 
@@ -64,19 +63,15 @@ class ScreenBarTest {
         assertEquals("schedules", specs.single { it.id == "schedules" }.label)
     }
 
-    // A SimpleFIN-linked budget on a server syncs from the hub tail, the same sync every hub has.
+    // No hub offers sync or bank sync on its bar or in its menu: a pull down opens the sync panel instead.
     @Test
-    fun accountsBarSyncsBanksWhenLinked() {
-        val specs =
-            ScreenBar.specsFor(
-                ShellRoute.Home,
-                hasBudget = true,
-                mode = BudgetMode.ENVELOPE,
-                homeSection = ScreenBar.HOME_ACCOUNTS,
-                accountsBankSync = true,
-            )
-        assertEquals(listOf("add", "schedules"), specs.filter { it.primary }.map { it.id })
-        assertEquals("sync", specs.single { it.id == "sync-all" }.label)
+    fun noHubOffersSync() {
+        val hubs =
+            listOf(ScreenBar.HOME_INBOX, ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS, ScreenBar.HOME_REPORTS, ScreenBar.HOME_ASSISTANT)
+        hubs.forEach { section ->
+            val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = section)
+            assertFalse(section.toString(), specs.any { it.id in setOf("sync-all", "sync", "bank-sync", "sync-server") })
+        }
     }
 
     // The failed sync's page retries every linked account, and dismiss clears the tile.
@@ -258,30 +253,16 @@ class ScreenBarTest {
     }
 
     @Test
-    fun inboxMenuSyncsOnlyABudgetOnTheServerAndKeepsSettingsLast() {
-        val local = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX)
-        assertFalse(local.any { it.id == "sync-all" })
-        val synced =
+    fun inboxMenuKeepsSettingsLast() {
+        val specs =
             ScreenBar.specsFor(
                 ShellRoute.Home,
                 hasBudget = true,
                 mode = BudgetMode.ENVELOPE,
                 undoLabel = "accept",
                 homeSection = ScreenBar.HOME_INBOX,
-                inboxSync = true,
             )
-        assertEquals(listOf("sync-all", "undo", "settings"), synced.filter { !it.primary }.map { it.id })
-        assertEquals(ScreenBarCopy.SYNC, synced.first { it.id == "sync-all" }.label)
-        val selecting =
-            ScreenBar.specsFor(
-                ShellRoute.Home,
-                hasBudget = true,
-                mode = BudgetMode.ENVELOPE,
-                homeSection = ScreenBar.HOME_INBOX,
-                inboxSelecting = true,
-                inboxSync = true,
-            )
-        assertFalse(selecting.any { it.id == "sync-all" })
+        assertEquals(listOf("undo", "settings"), specs.filter { !it.primary }.map { it.id }.takeLast(2))
     }
 
     @Test

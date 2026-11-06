@@ -25,7 +25,7 @@ data class ScreenBarSpec(
     val primary: Boolean = true,
     /** A destructive command: last in the menu, in the accent, under a rule (or set apart on the bar). */
     val apart: Boolean = false,
-    /** A menu line that starts a new group under a rule: the shared sync, undo, settings tail. */
+    /** A menu line that starts a new group under a rule: the shared undo, settings tail. */
     val rule: Boolean = false,
     /** The one line under a bar button: the noun alone, since the glyph is the verb. The menu shows [label]. */
     val caption: String = label,
@@ -134,8 +134,6 @@ object ScreenBar {
         inboxPick: InboxPick = InboxPick.NONE,
         /** The inbox holds no transactions, so there is nothing to select. */
         inboxEmpty: Boolean = false,
-        /** The open budget lives on a server this phone is signed in to, so the inbox menu can sync it. */
-        inboxSync: Boolean = false,
         bankLinked: Boolean = false,
         transaction: TransactionMenu = TransactionMenu.NEW,
         budgetEditing: Boolean = false,
@@ -144,8 +142,6 @@ object ScreenBar {
         accountClosed: Boolean = false,
         /** The close page is asking again before a force close; the question puts its own answers on the bar. */
         accountForceConfirm: Boolean = false,
-        /** An open account is linked through SimpleFIN and the budget lives on a server, so the accounts bar can bank sync. */
-        accountsBankSync: Boolean = false,
         /** The open category's templates are its budget automations (`goal_def`), not lines in its note. */
         categoryAutomations: Boolean = false,
         /** Budget automations are on for the budget, so a category can be switched to them and back, and edited. */
@@ -188,9 +184,9 @@ object ScreenBar {
                     spec("refresh", AppGlyph.Sync, OnboardingScreenCopy.REFRESH),
                 )
             // Every home pivot is a hub: add transaction first, then its own buttons; its menu holds its own
-            // tools, then the same sync, undo, settings tail under a rule.
+            // tools, then the same undo, settings tail under a rule. Syncing lives in the panel a pull down opens.
             ShellRoute.Home -> {
-                val tail = hubTail(inboxSync || accountsBankSync, undoLabel)
+                val tail = hubTail(undoLabel)
                 when {
                     !hasBudget -> settings()
                     // Edit mode is a sandbox: save keeps what changed, cancel drops it. The month fills and
@@ -431,7 +427,6 @@ object ScreenBar {
             state.inbox.selection != null,
             state.inbox.selection?.let { InboxPick.of(it, state.shell?.inbox.orEmpty()) } ?: InboxPick.NONE,
             state.shell?.inbox.isNullOrEmpty(),
-            state.signedIn && !state.cloudFileId.isNullOrBlank(),
             state.registerBankLinked,
             transactionMenu(state),
             state.budgetEdit != null,
@@ -448,12 +443,6 @@ object ScreenBar {
                 ?.account
                 ?.closed == true,
             state.accounts.forceConfirm != null,
-            state.signedIn &&
-                !state.cloudFileId.isNullOrBlank() &&
-                state.shell
-                    ?.accounts
-                    .orEmpty()
-                    .any { it.bankSync && !it.closed },
             categoryAutomations = state.templates.automations != null,
             automationsOn = state.formatPrefs.automationsOn,
             registerMerge = registerMerge(state),
@@ -576,20 +565,16 @@ object ScreenBar {
     private fun settings() = listOf(menu("settings", AppGlyph.Settings, "settings"))
 
     /**
-     * The tail every hub's menu ends with, in this order under a rule: sync (the server and every linked bank, when
-     * there is one to sync with), undo while there is a step to undo, settings.
+     * The tail every hub's menu ends with, in this order under a rule: undo while there is a step to undo, settings.
+     * Sync is not here: on home a pull down opens the sync panel, with sync now and bank sync.
      */
-    private fun hubTail(
-        sync: Boolean,
-        undoLabel: String?,
-    ): List<ScreenBarSpec> {
-        val lines =
-            (if (sync) listOf(menu("sync-all", AppGlyph.Sync, ScreenBarCopy.SYNC)) else emptyList()) + undo(undoLabel) + settings()
+    private fun hubTail(undoLabel: String?): List<ScreenBarSpec> {
+        val lines = undo(undoLabel) + settings()
         return lines.mapIndexed { i, line -> if (i == 0) line.copy(rule = true) else line }
     }
 
     /** An object page's menu ends with undo and settings under a rule; its destructive line, if any, follows. */
-    private fun objectTail(undoLabel: String?): List<ScreenBarSpec> = hubTail(sync = false, undoLabel)
+    private fun objectTail(undoLabel: String?): List<ScreenBarSpec> = hubTail(undoLabel)
 
     /** A destructive command: always the last line of the menu, in the accent and under a rule. */
     private fun destructive(
@@ -670,8 +655,6 @@ class ScreenBarHandlers(
     val onMergeSelected: () -> Unit = {},
     val onMergeInboxSelected: () -> Unit = {},
     val onSyncServer: () -> Unit = {},
-    /** The hubs' one sync: the server and every linked bank. */
-    val onSyncAll: () -> Unit = {},
     val onRefreshAssistant: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
@@ -744,7 +727,6 @@ class ScreenBarHandlers(
             "end-selecting" -> onEndSelecting
             "select-inbox" -> onSelectInbox
             "sync-server" -> onSyncServer
-            "sync-all" -> onSyncAll
             "refresh-assistant" -> onRefreshAssistant
             "accept-selected" -> onAcceptSelected
             "categorize-selected" -> onCategorizeSelected
