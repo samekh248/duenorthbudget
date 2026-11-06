@@ -423,13 +423,14 @@ class SyncCoordinator(
     }
 
     /**
-     * Whether [budgetId]'s last successful sync finished less than [STARTUP_SYNC_SKIP_MS] ago, so the
-     * sync at launch can be left out. False when it has never synced, or the stored time is in the future.
+     * Whether [budgetId]'s last successful sync finished less than [AUTO_SYNC_SKIP_MS] ago, so the sync the
+     * app starts on its own (at launch, on coming back) can be left out. False when it has never synced, or
+     * the stored time is in the future.
      */
     fun syncedRecently(budgetId: String): Boolean {
         val last = state(budgetId, "lastSuccessEpoch")?.toLongOrNull() ?: return false
         val since = now() - last
-        return since in 0 until STARTUP_SYNC_SKIP_MS
+        return since in 0 until AUTO_SYNC_SKIP_MS
     }
 
     /** Fetches every bank-linked account of [budgetId] into the budget; null when it was left alone. */
@@ -1301,8 +1302,8 @@ class SyncCoordinator(
     )
 
     companion object {
-        /** How long after a successful sync the app's launch skips its own automatic sync: 30 minutes. */
-        const val STARTUP_SYNC_SKIP_MS = 30 * 60 * 1_000L
+        /** How long after a successful sync the app skips the sync it starts on its own (launch, return): 30 minutes. */
+        const val AUTO_SYNC_SKIP_MS = 30 * 60 * 1_000L
 
         private const val LEGACY_TOKEN = "actual.token"
         private const val MAX_SYNC_ROUNDS = 5
