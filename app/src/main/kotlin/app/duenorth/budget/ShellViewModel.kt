@@ -342,16 +342,19 @@ class ShellViewModel(
         // Edit mode's changes belong to the month it opened on.
         if (_state.value.budgetEdit != null) return
         val gesture = shellGate.gestureActive
-        val pinned = _state.value.pinnedMonth
         val hit = months.select(month, gesture)
+        // A month picked on a one-month page (a category, a move, a hold) is that page's month from now on: its
+        // control is the only month control showing, so the page, its figures and its saves follow it. Keeping the
+        // old pin here showed this month's spending under a later month's name, and saved to the month not shown.
         _state.update {
             it.copy(
                 openMonth = months.openMonth,
-                shell = if (hit && pinned == null) months.shell else it.shell,
-                monthReview = if (hit && pinned == null) months.review else it.monthReview,
+                pinnedMonth = if (it.pinnedMonth != null) months.openMonth else null,
+                shell = if (hit) months.shell else it.shell,
+                monthReview = if (hit) months.review else it.monthReview,
             )
         }
-        if (!hit && !gesture && pinned == null) {
+        if (!hit && !gesture) {
             loadOpenMonth(month)
         }
     }
