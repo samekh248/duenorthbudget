@@ -640,6 +640,7 @@ class RegisterBook(
                     date = draft.date,
                     transferId = partnerId,
                     sort = nextSort(),
+                    scheduleId = draft.scheduleId,
                 )
             } else {
                 updateFields(draft.id, side.id, placed.first, draft.amountMinor, sidePayee, note, draft.date)

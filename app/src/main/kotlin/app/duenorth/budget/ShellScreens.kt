@@ -258,6 +258,7 @@ fun HomePivot(
                             onToggleExpanded = onAssistantMore,
                             settling = assistant.settling,
                             working = assistant.working,
+                            failed = assistant.failed,
                             formatOptions = formatOptions,
                         )
                     }

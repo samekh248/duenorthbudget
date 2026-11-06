@@ -66,6 +66,7 @@ fun AssistantSection(
     onToggleExpanded: (FindingKind) -> Unit = {},
     settling: Set<String> = emptySet(),
     working: AssistantUi.Working? = null,
+    failed: AssistantUi.Failed? = null,
     formatOptions: FormatOptions = formatOptions(),
 ) {
     if (report == null) {
@@ -111,7 +112,13 @@ fun AssistantSection(
                                 .height(2.dp)
                                 .background(Metro.colors.background),
                         )
-                        FindingPanel(finding, money, onAct, working = working?.takeIf { it.key == finding.key }?.label)
+                        FindingPanel(
+                            finding,
+                            money,
+                            onAct,
+                            working = working?.takeIf { it.key == finding.key }?.label,
+                            failed = failed?.takeIf { it.key == finding.key }?.reason,
+                        )
                     }
                 }
             }
@@ -192,6 +199,8 @@ internal fun FindingPanel(
     modifier: Modifier = Modifier,
     /** What its fix is doing while it saves, such as "merging payees…"; the buttons give way to it and the dots. */
     working: String? = null,
+    /** Why its last fix did not save, such as a bill with no payee; shown under the buttons until the next tap. */
+    failed: String? = null,
 ) {
     Column(
         modifier
@@ -220,6 +229,14 @@ internal fun FindingPanel(
                     MetroButton(action.label, Modifier.testTag(tag)) { onAct(finding, action) }
                 }
             }
+        }
+        if (failed != null) {
+            MetroText(
+                failed,
+                Metro.typography.body,
+                Modifier.padding(top = 10.dp).testTag("finding-failed-${finding.key}"),
+                color = Metro.colors.error,
+            )
         }
     }
 }

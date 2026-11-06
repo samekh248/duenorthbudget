@@ -23,10 +23,17 @@ data class AssistantUi(
     val working: Working? = null,
     /** A refresh the person asked for is still reading the checks again. */
     val refreshing: Boolean = false,
+    /** The finding whose last fix was turned down, and why, so the tap does not look like it did nothing. */
+    val failed: Failed? = null,
 ) {
     data class Working(
         val key: String,
         val label: String,
+    )
+
+    data class Failed(
+        val key: String,
+        val reason: String,
     )
 }
 
@@ -109,8 +116,16 @@ class AssistantHolder internal constructor(
             else -> Unit
         }
         if (host.writing) return
-        update { it.copy(settling = it.settling + finding.key, working = AssistantUi.Working(finding.key, AssistantCopy.working(action))) }
+        update {
+            it.copy(
+                settling = it.settling + finding.key,
+                working = AssistantUi.Working(finding.key, AssistantCopy.working(action)),
+                failed = null,
+            )
+        }
         host.launchWrite { id ->
+            // A bill that looks entered already asks first, on the same page the schedule's own post uses.
+            var duplicate = false
             val result =
                 try {
                     withContext(host.io) {
@@ -131,7 +146,12 @@ class AssistantHolder internal constructor(
                                         "monthly",
                                         action.nextDateIso,
                                     ).asWrite()
-                            is FindingAction.PostSchedule -> host.library.postSchedule(id, action.scheduleId).asWrite()
+                            is FindingAction.PostSchedule ->
+                                host.library
+                                    .postSchedule(id, action.scheduleId)
+                                    .also {
+                                        duplicate = it is ScheduleWriteResult.ConfirmDuplicate
+                                    }.asWrite()
                             is FindingAction.SkipSchedule -> host.library.skipSchedule(id, action.scheduleId).asWrite()
                             is FindingAction.UpdateScheduleAmount ->
                                 host.library.updateScheduleAmount(id, action.scheduleId, action.amountMinor).asWrite()
@@ -161,6 +181,15 @@ class AssistantHolder internal constructor(
                 }
             // A saved fix keeps its working line until the next read of the checks takes the finding away.
             if (result !is WriteResult.Saved) update { it.copy(settling = it.settling - finding.key, working = null) }
+            if (duplicate && action is FindingAction.PostSchedule) {
+                host.mutate { it.copy(schedulesUi = it.schedulesUi.copy(duplicateId = action.scheduleId)) }
+                return@launchWrite
+            }
+            // A fix turned down says why on its own card; the shell's write error shows only on forms.
+            if (result is WriteResult.Rejected) {
+                update { it.copy(failed = AssistantUi.Failed(finding.key, result.reason)) }
+                return@launchWrite
+            }
             // A budget finding belongs to no account: a save just reads the budget again.
             if (finding.accountId.isBlank() && result is WriteResult.Saved) {
                 host.reload()
