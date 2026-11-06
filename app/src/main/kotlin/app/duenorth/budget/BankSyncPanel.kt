@@ -107,13 +107,12 @@ private const val SHOWN_FAILURES = 1
 /**
  * A failed bank sync, as a WP toast: a solid red tile floating a gutter in from the edges just above
  * the app bar, over whatever page is showing. It names what went wrong and the first failed account,
- * and offers retry and close; a tap on it opens the full page. While banks fetch there is no tile:
+ * and offers close; a tap on it opens the full page. Syncing again is the home pull-down panel's job. While banks fetch there is no tile:
  * the working dots run along the top of the page instead, and a clean sync shows nothing.
  */
 @Composable
 fun BankSyncPanel(
     ui: BankSyncUi,
-    onRetry: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     /** A tap on the tile opens the failed sync's full page. */
@@ -149,7 +148,6 @@ fun BankSyncPanel(
                 MetroText(line, Metro.typography.caption, Modifier.testTag("bank-sync-error"), color = on, maxLines = 1)
             }
         }
-        TileAction(BankSyncCopy.RETRY, BankSyncCopy.RETRY, "bank-sync-retry", Metro.typography.body, on, onRetry)
         TileAction(BankSyncCopy.CLOSE, BankSyncCopy.DISMISS, "bank-sync-dismiss", Metro.typography.subheader, on, onDismiss)
     }
 }

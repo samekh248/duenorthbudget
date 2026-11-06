@@ -568,7 +568,8 @@ fun BudgetSection(
                     .fillMaxWidth()
                     .weight(1f)
                     .padding(top = if (cards) 0.dp else MetroDimens.Grid)
-                    .bleedGutter(cards),
+                    .bleedGutter(cards)
+                    .testTag("budget-list"),
                 state = list,
                 contentPadding = cardListPadding(cards, top = MetroDimens.Grid),
             ) {

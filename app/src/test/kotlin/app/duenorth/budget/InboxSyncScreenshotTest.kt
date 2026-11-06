@@ -21,7 +21,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.time.YearMonth
 
-/** The inbox with its `•••` menu open: sync above settings, and the line it leaves under the totals. */
+/** The inbox with its `•••` menu open (no sync: that is the pull-down panel now), and the line a sync leaves under the totals. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [33], qualifiers = "w390dp-h780dp-xxhdpi")
@@ -68,7 +68,6 @@ class InboxSyncScreenshotTest {
                     hasBudget = true,
                     mode = BudgetMode.ENVELOPE,
                     homeSection = ScreenBar.HOME_INBOX,
-                    inboxSync = true,
                 ).map { it.action() }
         compose.setContent {
             MetroTheme(darkTheme = dark) {
