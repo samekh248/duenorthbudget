@@ -257,7 +257,7 @@ class ShellViewModel(
     /** First run, and settings' add server path through the same pages. */
     val onboarding: OnboardingHolder = OnboardingHolder(host, settingsUi, servers, budgetFiles)
 
-    /** When the last sync the screen started without being asked began, in epoch millis; launch syncs at start. */
+    /** When a return to the screen last checked whether to sync, in epoch millis; launch counts as the first. */
     internal var lastScreenSync = System.currentTimeMillis()
 
     /** Counts returns to the screen, so a send started on leaving can tell the person came back. */
@@ -281,30 +281,36 @@ class ShellViewModel(
             onboarding.resume()
             val id = _state.value.settings.openBudgetId ?: return@launch
             if (_state.value.locked) return@launch
-            // A sync that finished in the last half hour is fresh enough; the accounts bar still syncs on a tap.
-            if (withContext(io) { runCatching { sync.syncedRecently(id) }.getOrDefault(false) }) return@launch
-            // Launch fetches the banks first, so the sync after sends what they brought to the server.
-            // The panel only shows once a linked account starts, so a budget with none never sees it.
-            bankSync.run(id, quiet = true)
+            autoSync(id)
         }
     }
 
     /**
-     * The app came back on screen: pick up what other devices sent while it was away, quietly, at
-     * most once a minute. Edit mode and a locked budget wait, since a sync would change what they show.
+     * The sync the app starts on its own, at launch and on coming back on screen: the banks, then the budget, so
+     * the budget sync sends what they brought to the server. Left out while the last successful sync is under
+     * [SyncCoordinator.AUTO_SYNC_SKIP_MS] (30 minutes) old; the accounts bar still syncs on a tap. The panel only
+     * shows once a linked account starts, so a budget with none never sees it. True when it ran.
+     */
+    internal suspend fun autoSync(id: String): Boolean {
+        if (withContext(io) { runCatching { sync.syncedRecently(id) }.getOrDefault(false) }) return false
+        bankSync.run(id, quiet = true)
+        return true
+    }
+
+    /**
+     * The app came back on screen: sync as launch does, quietly, when the last successful sync is 30 minutes old
+     * or more, checking at most once a minute. Edit mode and a locked budget wait, since a sync would change what
+     * they show.
      */
     fun onScreenReturned() {
         screenVisits++
         val current = _state.value
         val id = current.settings.openBudgetId ?: return
-        if (current.locked || current.syncing || current.budgetEdit != null) return
+        if (current.locked || current.syncing || current.bankSync.syncing || current.budgetEdit != null) return
         val now = System.currentTimeMillis()
         if (now - lastScreenSync < RETURN_SYNC_GAP_MS) return
         lastScreenSync = now
-        viewModelScope.launch {
-            withContext(io) { runCatching { sync.sync(id) } }
-            if (_state.value.settings.openBudgetId == id) reload()
-        }
+        viewModelScope.launch { autoSync(id) }
     }
 
     fun refresh() {
