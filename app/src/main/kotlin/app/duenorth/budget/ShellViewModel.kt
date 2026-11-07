@@ -325,9 +325,13 @@ class ShellViewModel(
         if (!shellGate.gestureActive) return
         shellGate.endGesture()
         val hit = months.flushPending(gestureActive = false)
+        if (hit) months.shell?.let(shellGate::offer)
+        // A repaint held back by the gesture lands now, but only one for the month on screen: the gate can still hold
+        // a month left since, and putting that back emptied the budget on the first scroll after coming back.
+        val held = shellGate.visible?.takeIf { shell -> shell.month == months.openMonth }
         _state.update {
             it.copy(
-                shell = if (hit) months.shell ?: shellGate.visible ?: it.shell else shellGate.visible ?: it.shell,
+                shell = if (hit) months.shell ?: held ?: it.shell else held ?: it.shell,
                 monthReview = if (hit) months.review ?: it.monthReview else it.monthReview,
                 openMonth = months.openMonth,
             )
@@ -352,6 +356,8 @@ class ShellViewModel(
         if (_state.value.budgetEdit != null) return
         val gesture = shellGate.gestureActive
         val hit = months.select(month, gesture)
+        // The month shown from the cache is the gate's month from now on, so a scroll's end keeps it on screen.
+        if (hit) months.shell?.let(shellGate::offer)
         // A month picked on a one-month page (a category, a move, a hold) is that page's month from now on: its
         // control is the only month control showing, so the page, its figures and its saves follow it. Keeping the
         // old pin here showed this month's spending under a later month's name, and saved to the month not shown.
