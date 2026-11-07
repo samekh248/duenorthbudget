@@ -211,7 +211,13 @@ internal fun EditAccountRoute(
     if (detail == null || detail.id != route.accountId) {
         Placeholder()
     } else {
-        EditAccountScreen(detail, state.editError, model.accounts::submitEdit, modifier)
+        EditAccountScreen(
+            detail,
+            state.editError,
+            model.accounts::submitEdit,
+            modifier,
+            decimals = state.shell?.currency?.decimals ?: 2,
+        )
     }
 }
 

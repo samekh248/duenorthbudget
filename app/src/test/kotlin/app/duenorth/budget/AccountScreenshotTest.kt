@@ -46,7 +46,23 @@ class AccountScreenshotTest {
     fun closeDark() = snapWithBar("account_close_dark", dark = true)
 
     @Test
+    fun editLight() = snap("account_edit_light", dark = false) { Edit() }
+
+    @Test
+    fun editDark() = snap("account_edit_dark", dark = true) { Edit() }
+
+    @Test
     fun forceCloseDark() = snap("account_force_close_dark", dark = true) { ForceCloseConfirmScreen(AccountsCopy.FORCE_CONFIRM, {}, {}) }
+
+    /** A linked credit union share account. */
+    @Composable
+    private fun Edit() {
+        EditAccountScreen(
+            account = AccountDetail("a6", "Credit union share", false, false, 2_500, 4, "", true, bankMinimumMinor = 500),
+            error = null,
+            onSave = { _, _, _ -> },
+        )
+    }
 
     @Composable
     private fun Close() {

@@ -336,6 +336,37 @@ class AssistantTest {
     }
 
     @Test
+    fun aGapTheSizeOfTheBankMinimumIsNotAMismatch() {
+        db { session ->
+            val now = TODAY.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            session.exec(
+                """
+                UPDATE accounts SET account_sync_source = 'simpleFin', account_id = 'b-1', last_sync = ?, balance_current = 3500
+                WHERE id = 'checking'
+                """.trimIndent(),
+                listOf(now.toString()),
+            )
+            bank(session, "pay", date = 20261020, account = "checking", amount = 4000, financialId = "f-pay")
+            // The bank leaves its $5 out of the balance it reports.
+            assertEquals(500L, read(session).findings.single().let { -it.difference!! })
+            val book = AccountsBook(session, TODAY)
+            assertEquals(AccountWriteResult.Saved("checking"), book.setBankMinimum("checking", 500))
+            assertEquals(500L, book.detail("checking")!!.bankMinimumMinor)
+            assertTrue(read(session).findings.isEmpty())
+            // The register never heard of the $5 the bank holds.
+            session.exec("UPDATE accounts SET balance_current = 4500 WHERE id = 'checking'")
+            assertTrue(read(session).findings.isEmpty())
+            // Any other gap is still a mismatch.
+            session.exec("UPDATE accounts SET balance_current = 4600 WHERE id = 'checking'")
+            assertEquals(FindingKind.BANK_BALANCE, read(session).findings.single().kind)
+            assertEquals(AccountWriteResult.Rejected(AccountsCopy.NOT_NEGATIVE), book.setBankMinimum("checking", -1))
+            book.setBankMinimum("checking", 0)
+            session.exec("UPDATE accounts SET balance_current = 4500 WHERE id = 'checking'")
+            assertEquals(FindingKind.BANK_BALANCE, read(session).findings.single().kind)
+        }
+    }
+
+    @Test
     fun bankSyncKeepsTheBanksBalance() {
         db { session ->
             session.exec("UPDATE accounts SET account_sync_source = 'simpleFin', account_id = 'b-1' WHERE id = 'checking'")

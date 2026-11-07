@@ -57,7 +57,8 @@ internal object AccountChecks {
 
     /**
      * A linked account that synced lately whose bank balance is neither its register's balance nor its cleared
-     * balance: something is missing, doubled, or entered wrong.
+     * balance: something is missing, doubled, or entered wrong. A gap the size of the account's [BankMinimum] is the
+     * bank holding money back, not a mistake.
      */
     private fun balance(
         session: SqlSession,
@@ -82,7 +83,8 @@ internal object AccountChecks {
                         ).firstOrNull() ?: return@mapNotNull null
                 val total = row.long("total")
                 val cleared = row.long("cleared")
-                if (bank == total || bank == cleared) return@mapNotNull null
+                val minimum = BankMinimum.read(session, account.id)
+                if (BankMinimum.explains(bank, total, minimum) || BankMinimum.explains(bank, cleared, minimum)) return@mapNotNull null
                 Finding(
                     key = AssistantBook.key("balance", account.id, "$bank", "$total"),
                     kind = FindingKind.BANK_BALANCE,

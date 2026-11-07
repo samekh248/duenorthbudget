@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -16,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountDetail
 import app.duenorth.budget.core.CategoryChoice
@@ -49,6 +51,9 @@ object AccountScreenCopy {
     const val KEEP = "keep"
     const val NAME = "name"
     const val NOTE = "note"
+    const val BANK_MINIMUM = "bank minimum, like 5.00"
+    const val BANK_MINIMUM_HINT =
+        "bank minimum: money the bank keeps in the account. when the bank's balance is off by this much, it isn't flagged as a mismatch."
     const val BALANCE = "starting balance"
     const val BALANCE_LEFT = "balance"
     const val DESTINATION = "move the balance to"
@@ -96,16 +101,25 @@ fun AddAccountScreen(
     }
 }
 
-/** Rename and note. Tag `account-edit`. */
+/**
+ * Rename and note, and for a bank-linked account the minimum the bank holds back. Tag `account-edit`.
+ * [onSave] gets the minimum as typed, rewritten as "1234.56", or blank for none.
+ */
 @Composable
 fun EditAccountScreen(
     account: AccountDetail,
     error: String?,
-    onSave: (name: String, note: String) -> Unit,
+    onSave: (name: String, note: String, bankMinimum: String) -> Unit,
     modifier: Modifier = Modifier,
+    decimals: Int = 2,
 ) {
+    val prefs = LocalFormatPrefs.current
     var name by remember(account.id) { mutableStateOf(account.name) }
     var note by remember(account.id) { mutableStateOf(account.note) }
+    var minimum by remember(account.id) {
+        mutableStateOf(if (account.bankMinimumMinor == 0L) "" else prefs.editAmount(account.bankMinimumMinor, decimals))
+    }
+    val save = { onSave(name, note, if (minimum.isBlank()) "" else prefs.readAmount(minimum)) }
     Column(
         modifier
             .fillMaxSize()
@@ -117,10 +131,27 @@ fun EditAccountScreen(
         MetroText(AccountScreenCopy.EDIT, Metro.typography.header)
         MetroField(name, { name = it }, AccountScreenCopy.NAME, Modifier.testTag("account-edit-name"))
         MetroField(note, { note = it }, AccountScreenCopy.NOTE, Modifier.testTag("account-edit-note"), lines = 2..6)
+        if (account.linked) {
+            Column {
+                MetroField(
+                    minimum,
+                    { minimum = it },
+                    AccountScreenCopy.BANK_MINIMUM,
+                    Modifier.testTag("account-edit-bank-minimum"),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                )
+                MetroText(
+                    AccountScreenCopy.BANK_MINIMUM_HINT,
+                    Metro.typography.caption,
+                    Modifier.padding(top = 8.dp),
+                    color = Metro.colors.secondary,
+                )
+            }
+        }
         if (error != null) MetroText(error, Metro.typography.body, Modifier.testTag("account-error"), color = Metro.accent.text)
-        RememberFormSave { onSave(name, note) }
+        RememberFormSave { save() }
         if (!formSaveOnBar()) {
-            MetroButton("save", Modifier.testTag("account-edit-save")) { onSave(name, note) }
+            MetroButton("save", Modifier.testTag("account-edit-save")) { save() }
         }
     }
 }
