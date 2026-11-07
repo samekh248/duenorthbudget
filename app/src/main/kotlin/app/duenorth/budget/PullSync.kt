@@ -7,6 +7,9 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,7 +106,8 @@ private const val OVERSTRETCH = 1.25f
 private const val START_WAIT_MS = 1_500L
 
 /**
- * The home pivot's pull-down sync panel. With a page's list at its top, pulling further down
+ * The home pivot's pull-down sync panel, on every section. With a page's list at its top (or on a page with
+ * no list at all), pulling further down
  * draws a panel out from above the page: the last sync's time, and sync now (and bank sync when
  * accounts are linked). Pulling never syncs by itself, so a stray swipe costs nothing: a short
  * pull springs back, a longer one leaves the panel open, and only a tap on its buttons syncs.
@@ -266,7 +270,10 @@ fun PullSyncPanel(
                         .onSizeChanged { panelHeight = it.height.toFloat() },
             )
         }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+        // A page with no list to scroll (an empty inbox, the assistant with nothing found, a featured row) still
+        // opens the panel: a drag no list took scrolls nothing here, so all of it passes to the pull above.
+        val still = rememberScrollableState { 0f }
+        Box(Modifier.weight(1f).fillMaxWidth().scrollable(still, Orientation.Vertical)) {
             content(Modifier.fillMaxSize())
             // While it is open a tap on the page shuts the panel rather than opening a row.
             if (open && revealed.value > 0f) {
