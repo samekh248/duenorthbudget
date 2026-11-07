@@ -59,6 +59,8 @@ data class ShellUiState(
     val today: String = RegisterEntry.todayIso(),
     val openMonth: YearMonth = YearMonth.now(),
     val pinnedMonth: YearMonth? = null,
+    /** The month whose figures are being read for Home right now; null when no month read is under way. */
+    val monthLoading: YearMonth? = null,
     val monthReview: MonthReviewPage? = null,
     val netWorth: NetWorthPage? = null,
     val categoryMonth: CategoryMonthPage? = null,

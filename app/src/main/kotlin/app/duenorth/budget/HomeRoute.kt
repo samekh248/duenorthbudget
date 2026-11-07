@@ -17,6 +17,7 @@ internal fun HomeRoute(
         shell = state.editingShell(),
         loading = state.loading,
         openMonth = state.openMonth,
+        monthLoading = state.monthLoading == state.openMonth,
         monthWindow = model.monthWindow(),
         initialSection = state.homeSection,
         onGesture = model::setGesture,

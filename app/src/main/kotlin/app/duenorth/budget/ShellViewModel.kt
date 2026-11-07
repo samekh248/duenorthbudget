@@ -388,24 +388,34 @@ class ShellViewModel(
     private fun loadOpenMonth(month: YearMonth) {
         val budgetId = _state.value.settings.openBudgetId ?: return
         if (_state.value.locked) return
+        _state.update { it.copy(monthLoading = month) }
         viewModelScope.launch {
-            val snapshot =
-                withContext(io) {
-                    val shell = library.readShell(budgetId, month) ?: return@withContext null
-                    val review = library.readMonthReview(budgetId, month)
-                    MonthSnapshot(month, shell, review)
-                } ?: return@launch
-            if (month != months.openMonth) return@launch
-            months.applyLoaded(snapshot, shellGate.gestureActive)
-            if (!shellGate.gestureActive && months.openMonth == month) {
-                shellGate.offer(snapshot.shell)
-                _state.update {
-                    it.copy(
-                        shell = months.shell,
-                        monthReview = months.review,
-                        openMonth = months.openMonth,
-                    )
+            var shown = false
+            try {
+                val snapshot =
+                    withContext(io) {
+                        val shell = library.readShell(budgetId, month) ?: return@withContext null
+                        val review = library.readMonthReview(budgetId, month)
+                        MonthSnapshot(month, shell, review)
+                    } ?: return@launch
+                if (month != months.openMonth) return@launch
+                months.applyLoaded(snapshot, shellGate.gestureActive)
+                if (!shellGate.gestureActive && months.openMonth == month) {
+                    shellGate.offer(snapshot.shell)
+                    // The figures and the end of loading land in one update, so no frame shows the old month bare.
+                    _state.update {
+                        it.copy(
+                            shell = months.shell,
+                            monthReview = months.review,
+                            openMonth = months.openMonth,
+                            monthLoading = it.monthLoading.takeUnless { loading -> loading == month },
+                        )
+                    }
+                    shown = true
                 }
+            } finally {
+                // Only a read under way counts as loading, so the budget never sits in placeholders with nothing coming.
+                if (!shown) _state.update { if (it.monthLoading == month) it.copy(monthLoading = null) else it }
             }
         }
     }
