@@ -96,6 +96,8 @@ fun HomePivot(
     loading: Boolean,
     openMonth: YearMonth,
     monthWindow: MonthWindow,
+    /** True while the open month's figures are being read; only then do stale figures turn to placeholders. */
+    monthLoading: Boolean = false,
     initialSection: Int = 0,
     onGesture: (Boolean) -> Unit,
     onSection: (Int) -> Unit = {},
@@ -201,9 +203,9 @@ fun HomePivot(
                                         bottom = MetroDimens.Row,
                                     ),
                             )
-                            // Until the picked month's figures arrive, the shell still holds the last month's: keep
-                            // its names and rows, draw its figures as placeholders, and hold taps until they land.
-                            val stale = shell.month != openMonth
+                            // While the picked month's figures are being read, the shell still holds the last month's:
+                            // keep its names and rows, draw its figures as placeholders, and hold taps until they land.
+                            val stale = monthLoading && shell.month != openMonth
                             FiguresLoading(stale) {
                                 BudgetSection(
                                     shell,

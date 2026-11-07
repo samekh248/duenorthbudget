@@ -68,6 +68,7 @@ class BudgetMonthLoadingScreenshotTest {
                             shell = shell,
                             loading = false,
                             openMonth = open,
+                            monthLoading = true,
                             monthWindow = MonthWindow.around(OCTOBER),
                             onGesture = {},
                             initialSection = HomeSections.headers.indexOf(HomeSections.BUDGET),
