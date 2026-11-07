@@ -717,7 +717,8 @@ fun CategoryLine(
     showGoal: Boolean = LocalFormatPrefs.current.templatesOn,
 ) {
     val money = shell.currency
-    val progress = if (showGoal) category.goalProgress ?: 0f else null
+    // While a month loads, the bar keeps its place as an empty track.
+    val progress = if (showGoal) (if (figuresLoading()) 0f else category.goalProgress ?: 0f) else null
     val nameAir = ledgerNameAir(Metro.typography.body)
     Column(
         modifier
@@ -740,19 +741,19 @@ fun CategoryLine(
                 color = if (category.hidden) Metro.colors.secondary else Metro.colors.foreground,
                 maxLines = 2,
             )
-            LedgerCell(
+            LedgerFigure(
                 MoneyFormat.format(category.budgetedMinor, money, formatOptions),
                 Metro.typography.body,
                 Metro.colors.foreground,
                 "category-budgeted-${category.id}",
             )
-            LedgerCell(
+            LedgerFigure(
                 MoneyFormat.format(category.spentMinor, money, formatOptions),
                 Metro.typography.body,
                 Metro.colors.foreground,
                 "category-spent-${category.id}",
             )
-            LedgerCell(
+            LedgerFigure(
                 MoneyFormat.format(category.availableMinor, money, formatOptions),
                 Metro.typography.body,
                 Metro.accent.text,
@@ -804,6 +805,24 @@ internal fun RowScope.LedgerCell(
     tag: String,
 ) {
     MetroText(
+        text,
+        style.copy(textAlign = TextAlign.End),
+        Modifier.weight(LEDGER_FIGURE).testTag(tag),
+        color = color,
+        maxLines = 1,
+        softWrap = false,
+    )
+}
+
+/** A money figure in a ledger column: a [LedgerCell] that turns placeholder while a month loads. */
+@Composable
+internal fun RowScope.LedgerFigure(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    tag: String,
+) {
+    FigureText(
         text,
         style.copy(textAlign = TextAlign.End),
         Modifier.weight(LEDGER_FIGURE).testTag(tag),
