@@ -24,6 +24,7 @@ import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.MetroAppBar
 import app.duenorth.budget.design.components.ScreenAction
+import app.duenorth.budget.design.theme.MetroStyle
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureScreenRoboImage
@@ -89,6 +90,29 @@ class AssistantScreenshotTest {
             dark = false,
             report = sampleAssistantBudget(),
             expanded = setOf(FindingKind.OVERSPENT),
+        )
+
+    @Test
+    fun budgetDark() = snap("assistant_budget_dark", dark = true, report = sampleAssistantBudget(), expanded = setOf(FindingKind.OVERSPENT))
+
+    @Test
+    fun budgetMobile10Light() =
+        snap(
+            "assistant_budget_mobile10_light",
+            dark = false,
+            report = sampleAssistantBudget(),
+            expanded = setOf(FindingKind.OVERSPENT),
+            style = MetroStyle.Mobile10,
+        )
+
+    @Test
+    fun budgetMobile10Dark() =
+        snap(
+            "assistant_budget_mobile10_dark",
+            dark = true,
+            report = sampleAssistantBudget(),
+            expanded = setOf(FindingKind.OVERSPENT),
+            style = MetroStyle.Mobile10,
         )
 
     @Test
@@ -158,6 +182,7 @@ class AssistantScreenshotTest {
         report: AssistantReport,
         expanded: Set<FindingKind> = emptySet(),
         working: AssistantUi.Working? = null,
+        style: MetroStyle = MetroStyle.Default,
     ) {
         val shell =
             MonthShell(
@@ -182,7 +207,7 @@ class AssistantScreenshotTest {
                     undoLabel = "merge",
                 ).map { it.action() }
         compose.setContent {
-            MetroTheme(darkTheme = dark) {
+            MetroTheme(darkTheme = dark, style = style) {
                 CompositionLocalProvider(LocalWorkingDotsAt provides 1100f) {
                     Column(Modifier.fillMaxSize()) {
                         if (working != null) WorkingDots()

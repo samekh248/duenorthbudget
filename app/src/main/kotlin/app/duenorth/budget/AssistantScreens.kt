@@ -35,8 +35,10 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import app.duenorth.budget.core.AssistantCopy
 import app.duenorth.budget.core.AssistantReport
 import app.duenorth.budget.core.CurrencySpec
@@ -334,7 +336,9 @@ private fun FindingBody(
     finding.sides.forEachIndexed { index, side ->
         FindingSideLine(side, money, showAccount = finding.kind == FindingKind.WRONG_ACCOUNT || index == 0)
     }
-    if (finding.figures.isNotEmpty()) FindingFigures(finding.figures, money)
+    if (finding.figures.isNotEmpty()) {
+        FindingFigures(finding.figures, money, emphasized = AssistantCopy.AVAILABLE.takeIf { finding.kind == FindingKind.OVERSPENT })
+    }
     FindingReasons(finding.reasons + listOfNotNull(finding.difference?.let { AssistantCopy.offBy(money(abs(it))) }))
 }
 
@@ -363,25 +367,31 @@ private fun FindingSideLine(
     }
 }
 
-/** The amounts behind a finding, a label on the left and its amount on the right; a negative one in red. */
+/**
+ * The amounts behind a finding, a label on the left and its amount on the right; a negative one in red. The figure
+ * labelled [emphasized], if any, is the one the finding is about (an overspent envelope's available), so it is set
+ * semibold and a touch larger than the rest.
+ */
 @Composable
 private fun FindingFigures(
     figures: List<FindingFigure>,
     money: (Long) -> String,
+    emphasized: String? = null,
 ) {
     Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         figures.forEach { figure ->
-            Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.Bottom) {
+            val emphasize = figure.label == emphasized
+            Row(Modifier.fillMaxWidth().padding(top = if (emphasize) 8.dp else 2.dp), verticalAlignment = Alignment.Bottom) {
                 MetroText(
                     figure.label,
-                    Metro.typography.caption,
+                    Metro.typography.caption.emphasizedIf(emphasize),
                     Modifier.weight(1f).padding(end = 12.dp),
                     color = Metro.colors.secondary,
                     maxLines = 1,
                 )
                 MetroText(
                     money(figure.amountMinor),
-                    Metro.typography.body,
+                    Metro.typography.body.emphasizedIf(emphasize),
                     color = if (figure.amountMinor < 0) Metro.colors.error else Metro.colors.foreground,
                     maxLines = 1,
                     softWrap = false,
@@ -390,6 +400,21 @@ private fun FindingFigures(
         }
     }
 }
+
+/** How much larger an emphasized figure is than its theme's own size: a touch, about 2sp on body text. */
+private const val FIGURE_EMPHASIS_SCALE = 1.125f
+
+/** This style set semibold and [FIGURE_EMPHASIS_SCALE] larger when [emphasize], so it follows each theme's sizes. */
+private fun TextStyle.emphasizedIf(emphasize: Boolean): TextStyle =
+    if (!emphasize) {
+        this
+    } else {
+        copy(
+            fontWeight = MetroWeights.Semibold,
+            fontSize = fontSize * FIGURE_EMPHASIS_SCALE,
+            lineHeight = if (lineHeight.isSpecified) lineHeight * FIGURE_EMPHASIS_SCALE else lineHeight,
+        )
+    }
 
 /** The accent rule with why the assistant thinks so. */
 @Composable
