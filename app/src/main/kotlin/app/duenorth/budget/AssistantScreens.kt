@@ -1,5 +1,7 @@
 package app.duenorth.budget
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,16 +15,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -41,6 +50,7 @@ import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.MatchCopy
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.RegisterEntry
+import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroText
@@ -48,7 +58,9 @@ import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.MetroWeights
+import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * The assistant pivot item: a count of what needs a look, then a card for each kind of finding with its count in a
@@ -98,27 +110,32 @@ fun AssistantSection(
         val alone = byKind.size == 1
         byKind.forEach { (kind, all) ->
             val open = (kind in expanded) != alone
+            // The card and its findings are one row, so opening it grows that row and the cards below ease down with it.
             item(key = "kind-${kind.name}") {
-                KindCard(kind, all.size, open, Modifier.padding(top = 12.dp)) { onToggleExpanded(kind) }
-            }
-            if (open) {
-                // An open card grows downward: its findings carry on in the card itself, each under a thin rule of the page's own colour.
-                items(all, key = { it.key }) { finding ->
-                    Column(Modifier.fillMaxWidth().background(Metro.colors.chrome)) {
-                        Box(
-                            Modifier
-                                .padding(horizontal = CARD_PADDING)
-                                .fillMaxWidth()
-                                .height(2.dp)
-                                .background(Metro.colors.background),
-                        )
-                        FindingPanel(
-                            finding,
-                            money,
-                            onAct,
-                            working = working?.takeIf { it.key == finding.key }?.label,
-                            failed = failed?.takeIf { it.key == finding.key }?.reason,
-                        )
+                Column(Modifier.padding(top = 12.dp)) {
+                    KindCard(kind, all.size, open) { onToggleExpanded(kind) }
+                    CardFold(open, Modifier.testTag("assistant-fold-${kind.name}")) {
+                        // An open card grows downward: its findings carry on in the card itself, each under a thin rule of the page's own colour.
+                        all.forEach { finding ->
+                            key(finding.key) {
+                                Column(Modifier.fillMaxWidth().background(Metro.colors.chrome)) {
+                                    Box(
+                                        Modifier
+                                            .padding(horizontal = CARD_PADDING)
+                                            .fillMaxWidth()
+                                            .height(2.dp)
+                                            .background(Metro.colors.background),
+                                    )
+                                    FindingPanel(
+                                        finding,
+                                        money,
+                                        onAct,
+                                        working = working?.takeIf { it.key == finding.key }?.label,
+                                        failed = failed?.takeIf { it.key == finding.key }?.reason,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -167,6 +184,67 @@ private fun KindCard(
             )
         }
     }
+}
+
+/**
+ * A card's findings, folding open under its header and closed back into it. The slot's height eases with the
+ * resize curve while the findings fade: in a moment behind the slot as it opens, so they never show in a gap too thin
+ * to read, and out quickly as it closes, so they are gone before the slot shuts on them. A tap mid-way turns the
+ * motion around from wherever it is. With animations off the card simply opens and closes.
+ */
+@Composable
+private fun CardFold(
+    open: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val animate = Metro.animations
+    val target = if (open) 1f else 0f
+    val height = remember { Animatable(target) }
+    val fade = remember { Animatable(target) }
+    LaunchedEffect(open, animate) {
+        if (!animate) {
+            height.snapTo(target)
+            fade.snapTo(target)
+            return@LaunchedEffect
+        }
+        launch { height.animateTo(target, tween(FoldMotion.HEIGHT_MS, easing = MetroMotion.Standard)) }
+        if (open) {
+            fade.animateTo(1f, tween(FoldMotion.FADE_IN_MS, delayMillis = FoldMotion.FADE_IN_DELAY_MS, easing = MetroMotion.EaseOut))
+        } else {
+            fade.animateTo(0f, tween(FoldMotion.FADE_OUT_MS, easing = MetroMotion.Standard))
+        }
+    }
+    // Kept while it closes, so the findings fold away instead of vanishing; read in a derived state, so the run's
+    // frames only touch layout and drawing.
+    val showing by remember { derivedStateOf { height.value > 0f } }
+    if (!open && (!showing || !animate)) return
+    Column(
+        modifier
+            .clipBelow()
+            .layout { measurable, constraints ->
+                val p = measurable.measure(constraints)
+                val fraction = if (animate) height.value else target
+                layout(p.width, (p.height * fraction).roundToInt()) { p.place(0, 0) }
+            }.graphicsLayer { alpha = if (animate) fade.value else 1f },
+    ) { content() }
+}
+
+/** Clips only what falls below the slot, so a card's colour still runs to its edges while it folds. */
+private fun Modifier.clipBelow(): Modifier =
+    drawWithContent { clipRect(-size.width, 0f, size.width * 2, size.height) { this@drawWithContent.drawContent() } }
+
+/** A card's fold, at the pace the inbox's rows resize and arrive. */
+internal object FoldMotion {
+    /** The slot opens and shuts at the pace a row resizes. */
+    const val HEIGHT_MS = MetroMotion.SHORT_MS
+
+    /** The findings start in once the slot has begun to open, then land softly over a page turn's length. */
+    const val FADE_IN_DELAY_MS = 50
+    const val FADE_IN_MS = MetroMotion.PAGE_MS - FADE_IN_DELAY_MS
+
+    /** On the way closed they fade quickly, ahead of the slot. */
+    const val FADE_OUT_MS = MetroMotion.QUICK_MS
 }
 
 /** A card's side padding, shared by its header and the findings an open card holds. */
