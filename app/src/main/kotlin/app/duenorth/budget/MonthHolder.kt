@@ -166,6 +166,13 @@ class MonthHolder internal constructor(
                     if (register != null) host.mutate { it.copy(register = register) }
                 }
                 host.afterMonthWrite(budgetId)
+                // Schedules, a schedule's page, the assistant and reports keep their own copies, and so does
+                // the rules list: read them again so the page undo was picked on shows what it put back.
+                host.reload()
+                if (state.route == ShellRoute.Rules) {
+                    val rules = withContext(host.io) { host.library.listRules(budgetId) }
+                    host.mutate { it.copy(rules = it.rules.copy(list = rules)) }
+                }
             } else {
                 host.mutate { it.copy(undoLabel = host.library.undoLabel(budgetId)) }
             }
