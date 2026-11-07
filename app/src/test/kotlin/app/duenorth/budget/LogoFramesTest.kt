@@ -64,6 +64,6 @@ class LogoFramesTest {
     }
 
     private companion object {
-        val FRAMES_MS = listOf(0, 80, 160, 240, 320, 400, 480, 560, 640, 700)
+        val FRAMES_MS = listOf(0, 100, 200, 300, 400, 500, 600, 680, 760, 900)
     }
 }
