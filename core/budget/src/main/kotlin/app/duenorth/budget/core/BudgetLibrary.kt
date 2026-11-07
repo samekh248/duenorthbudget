@@ -676,6 +676,16 @@ class BudgetLibrary(
         edit(budgetId, UndoCopy.LINK_TRANSFER) { AssistantBook(it, clock.today(), ids).linkTransfer(fromId, toId) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    /** The inbox's transfer guess: the transaction becomes a transfer to or from [accountId], as one undo step. */
+    fun makeTransfer(
+        budgetId: String,
+        transactionId: String,
+        accountId: String,
+        partnerId: String?,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.MAKE_TRANSFER) { TransferBook(it, clock.today(), ids).make(transactionId, accountId, partnerId) }
+            ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     /** The assistant's price change: the schedule's amount becomes what it has cost lately. */
     fun updateScheduleAmount(
         budgetId: String,

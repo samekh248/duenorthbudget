@@ -49,6 +49,7 @@ internal fun HomeRoute(
                     onMatch = { model.register.match(it, stayOnRegister = false) },
                     onNotAMatch = { model.register.notAMatch(it, stayOnRegister = false) },
                     onSelect = model.inbox::startSelectingWith,
+                    onTransfer = model.inbox::makeTransfer,
                 )
             },
         netWorth = state.netWorth,
