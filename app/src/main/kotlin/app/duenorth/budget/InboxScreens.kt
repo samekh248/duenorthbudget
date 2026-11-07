@@ -161,6 +161,8 @@ fun InboxSection(
     val pair = shell.matches.firstOrNull()?.takeIf { selection == null }
     val inbox = inboxQueue(shell, lead)
     val entries = inboxEntries(inbox, filed)
+    // Noted even while the inbox is empty, so its first transaction arrives into the panel.
+    val arrivals = rememberArrivals(inbox.map { it.id })
     var menu by remember { mutableStateOf<Pair<InboxRow, Rect>?>(null) }
     if (entries.isEmpty() && pair == null) {
         Column(modifier.fillMaxSize()) {
@@ -232,12 +234,15 @@ fun InboxSection(
             contentKey = { it != null },
         ) { picked ->
             if (picked != null) {
+                // Its own record, begun as select mode opens, so only rows that turn up during it arrive.
+                val listed = rememberArrivals(entries.map { it.row.id })
+                selectList.keepTopFor(listed)
                 LazyColumn(Modifier.fillMaxSize(), state = selectList) {
                     // Two groups: rows with a category to accept, then rows that still need one.
                     // Rows just filed stay in the list until their confirmation has played.
                     inboxSelectGroups(entries).forEach { (title, group) ->
                         item(key = "group-$title") { InboxGroupHeading(title, group.size) }
-                        inboxDayItems(group) { i, entry ->
+                        inboxDayItems(group, arrivals = listed) { i, entry ->
                             InboxLine(
                                 entry = entry,
                                 amount = money(entry.row.amountMinor),
@@ -246,6 +251,7 @@ fun InboxSection(
                                 onTap = { onToggle(entry.row.id) },
                                 onMenu = null,
                                 checked = entry.row.id in picked,
+                                modifier = Modifier.arriving(listed, entry.row.id),
                             )
                         }
                     }
@@ -261,6 +267,7 @@ fun InboxSection(
                     onFiledShown = onFiledShown,
                     actions = actions,
                     onMenu = { row, bounds -> menu = row to bounds },
+                    arrivals = arrivals,
                 )
             }
         }
@@ -282,9 +289,13 @@ private fun InboxQueue(
     onFiledShown: (String) -> Unit,
     actions: InboxActions,
     onMenu: (InboxRow, Rect) -> Unit,
+    arrivals: Arrivals? = null,
 ) {
     // A possible match leads the inbox: it takes the panel and every waiting row stays in the queue.
     if (pair != null) {
+        // The queue's own record, so a row that moves down out of the panel arrives in the queue as well.
+        val listed = rememberArrivals(entries.map { it.row.id }, key = "match")
+        list.keepTopFor(listed)
         Column(Modifier.fillMaxSize()) {
             MatchPanel(
                 pair = pair,
@@ -294,7 +305,7 @@ private fun InboxQueue(
                 modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
             )
             LazyColumn(Modifier.weight(1f), state = list) {
-                inboxDayItems(entries) { i, entry ->
+                inboxDayItems(entries, arrivals = listed) { i, entry ->
                     InboxLine(
                         entry = entry,
                         amount = money(entry.row.amountMinor),
@@ -304,6 +315,7 @@ private fun InboxQueue(
                         onMenu = { bounds -> onMenu(entry.row, bounds) },
                         onAccept = onAccept,
                         onCategorize = onInbox,
+                        modifier = Modifier.arriving(listed, entry.row.id),
                     )
                 }
             }
@@ -327,15 +339,34 @@ private fun InboxQueue(
         }
         shown(head.row.id)
     }
+    // A transaction that has just arrived at the top rises into the panel the way the next one does after a filing.
+    val arrive =
+        remember(head.row.id) {
+            Animatable(
+                if (animations && head.filedTo == null &&
+                    arrivals?.isNew(head.row.id) == true
+                ) {
+                    0f
+                } else {
+                    1f
+                },
+            )
+        }
+    LaunchedEffect(arrive) {
+        if (arrive.value < 1f) arrive.animateTo(1f, tween(MetroMotion.PAGE_MS, easing = MetroMotion.EaseOut))
+    }
     // Read only in layout and drawing, so the rise never recomposes the panel or the list.
     val risen = { rise.value }
+    val arrived = { arrive.value }
     val featured = if (head.filedTo == null) head.row else next?.row
+    val listed = rememberArrivals(entries.drop(1).map { it.row.id }, key = "queue")
+    list.keepTopFor(listed)
     Column(Modifier.fillMaxSize()) {
         FeaturedPanel(
             row = featured,
             amount = featured?.let { money(it.amountMinor) }.orEmpty(),
             filed = head.takeIf { it.filedTo != null },
-            rise = risen,
+            rise = if (head.filedTo != null) risen else arrived,
             onAccept = onAccept,
             onCategorize = onInbox,
             onDetails = actions.onDetails,
@@ -344,7 +375,7 @@ private fun InboxQueue(
             modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
         )
         LazyColumn(Modifier.weight(1f), state = list) {
-            inboxDayItems(entries.drop(1), leaving = next?.let { it to risen }) { i, entry ->
+            inboxDayItems(entries.drop(1), leaving = next?.let { it to risen }, arrivals = listed) { i, entry ->
                 InboxLine(
                     entry = entry,
                     amount = money(entry.row.amountMinor),
@@ -356,6 +387,7 @@ private fun InboxQueue(
                     onCategorize = onInbox,
                     // The row rising into the panel leaves the queue as it goes.
                     leaving = if (entry == next) risen else NOT_LEAVING,
+                    modifier = Modifier.arriving(listed, entry.row.id),
                 )
             }
         }
@@ -497,7 +529,8 @@ private fun FeaturedPanel(
                 Modifier
                     .fillMaxWidth()
                     .clipBelow()
-                    .then(if (filed != null) Modifier.rising(rise) else Modifier)
+                    // After a filing the next row rises in; a newly arrived one rises in the same way.
+                    .rising(rise)
                     // The press band covers the whole panel, past the gutter like its fill, not just the text column.
                     .metroPress(onClick = { onDetails(row.id) }, onLongClick = { onMenu(row, bounds) }, bleed = MetroDimens.Gutter)
                     .padding(vertical = FEATURED_PAD)
@@ -716,6 +749,8 @@ internal fun inboxDays(entries: List<InboxEntry>): List<List<InboxEntry>> =
 private fun LazyListScope.inboxDayItems(
     entries: List<InboxEntry>,
     leaving: Pair<InboxEntry, () -> Float>? = null,
+    /** A date that is new as a whole arrives with its rows. */
+    arrivals: Arrivals? = null,
     line: @Composable (Int, InboxEntry) -> Unit,
 ) {
     var start = 0
@@ -724,10 +759,12 @@ private fun LazyListScope.inboxDayItems(
         val first = day.first()
         // Each date sticks to the top of the list until the next date pushes it off.
         stickyHeader(key = "day-${first.row.date}-${first.row.id}") {
+            val dayIds = day.map { it.row.id }
             InboxDayHeading(
                 first.row.date,
                 filed = waiting.isEmpty(),
                 leaving = leaving?.takeIf { (entry, _) -> waiting == listOf(entry) }?.second ?: NOT_LEAVING,
+                modifier = Modifier.arriving(arrivals, "day-${first.row.date}") { it.allNew(dayIds) },
             )
         }
         val offset = start
@@ -742,6 +779,7 @@ private fun InboxDayHeading(
     date: Int,
     filed: Boolean,
     leaving: () -> Float,
+    modifier: Modifier = Modifier,
 ) {
     val height = remember { Animatable(1f) }
     val animations = Metro.animations
@@ -756,7 +794,7 @@ private fun InboxDayHeading(
     MetroText(
         RegisterEntry.registerDateLabel(date),
         Metro.typography.caption,
-        Modifier
+        modifier
             .collapse { height.value * (1f - leaving()) }
             .graphicsLayer { alpha = 1f - leaving() }
             .fillMaxWidth()
@@ -792,6 +830,7 @@ private fun InboxLine(
     onCategorize: (String) -> Unit = {},
     checked: Boolean? = null,
     leaving: () -> Float = NOT_LEAVING,
+    modifier: Modifier = Modifier,
 ) {
     val row = entry.row
     var bounds by remember { mutableStateOf(Rect.Zero) }
@@ -813,7 +852,7 @@ private fun InboxLine(
     }
     val acceptsHere = row.suggestionId != null
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
             .collapse { height.value * (1f - leaving()) }
             .graphicsLayer { alpha = 1f - leaving() }

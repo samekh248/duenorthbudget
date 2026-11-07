@@ -100,6 +100,8 @@ fun RegisterScreen(
     rowMenu: ((RegisterRow) -> List<MetroMenuItem>)? = null,
 ) {
     val rows = if (search == null) page.rows else page.searched(search)
+    // Every row the account holds, not just the ones a search keeps, so closing a search brings nothing "new".
+    val arrivals = rememberArrivals(page.rows.map { it.id }, key = page.account.id)
     val owed = page.account.type == "credit" && page.balanceMinor < 0
     Column(
         modifier
@@ -146,6 +148,7 @@ fun RegisterScreen(
                 searching = search?.active == true,
                 pendingOpen = pendingOpen,
                 rowMenu = rowMenu.takeIf { selection == null },
+                arrivals = arrivals,
             )
         }
     }
@@ -214,11 +217,14 @@ private fun RegisterList(
     pendingOpen: Boolean = true,
     /** A row's long-press menu outside select mode; null keeps long-press as select. */
     rowMenu: ((RegisterRow) -> List<MetroMenuItem>)? = null,
+    /** Rows that have just arrived (a sync, an import, a new entry) ease into place instead of popping in. */
+    arrivals: Arrivals? = null,
 ) {
     val menu = rememberRowMenu()
     RowMenu(menu, tag = "register-menu")
     // A new visit starts at the newest row. Scroll position is not saved.
     val list = rememberLazyListState()
+    arrivals?.let { list.keepTopFor(it) }
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onGesture(it) }
     }
@@ -272,6 +278,7 @@ private fun RegisterList(
                         menuItems = { rowMenu?.invoke(row).orEmpty() },
                         detail = pendingDetail(row),
                         extraAir = air,
+                        modifier = Modifier.arriving(arrivals, row.id),
                     )
                 }
                 if (cards) {
@@ -291,27 +298,33 @@ private fun RegisterList(
             // Each day is one block (panel or channel) under its date, so the rows of a day travel together.
             days.forEach { day ->
                 item(key = "day-${day.first().id}") {
-                    MetroText(
-                        RegisterEntry.registerDateLabel(day.first().date),
-                        Metro.typography.caption,
-                        Modifier.padding(top = 16.dp, bottom = 8.dp).testTag("register-day-${day.first().date}"),
-                        color = Metro.accent.text,
-                    )
-                    LedgerGroup(Modifier.padding(bottom = 4.dp), bottomAir = false, heading = {}) {
-                        day.forEach { row ->
-                            RegisterLine(
-                                row,
-                                page,
-                                banded = false,
-                                picked = selection?.let { row.id in it },
-                                onPress = { onPress(row.id) },
-                                onLongPress = { onLongPress(row.id) },
-                                menu = menu.takeIf { rowMenu != null },
-                                menuItems = { rowMenu?.invoke(row).orEmpty() },
-                                // The last row holds the panel's bottom air, so a picked one is tinted to the edge.
-                                extraAir = if (row === day.last()) MetroDimens.Row else 0.dp,
-                                showLock = true,
-                            )
+                    // A day that is new as a whole arrives as one block; otherwise its new rows arrive inside it.
+                    val dayIds = day.map { it.id }
+                    val dayNew = remember(dayIds) { arrivals?.allNew(dayIds) == true }
+                    Column(Modifier.arriving(arrivals, "day-${day.first().date}") { dayNew }) {
+                        MetroText(
+                            RegisterEntry.registerDateLabel(day.first().date),
+                            Metro.typography.caption,
+                            Modifier.padding(top = 16.dp, bottom = 8.dp).testTag("register-day-${day.first().date}"),
+                            color = Metro.accent.text,
+                        )
+                        LedgerGroup(Modifier.padding(bottom = 4.dp), bottomAir = false, heading = {}) {
+                            day.forEach { row ->
+                                RegisterLine(
+                                    row,
+                                    page,
+                                    banded = false,
+                                    picked = selection?.let { row.id in it },
+                                    onPress = { onPress(row.id) },
+                                    onLongPress = { onLongPress(row.id) },
+                                    menu = menu.takeIf { rowMenu != null },
+                                    menuItems = { rowMenu?.invoke(row).orEmpty() },
+                                    // The last row holds the panel's bottom air, so a picked one is tinted to the edge.
+                                    extraAir = if (row === day.last()) MetroDimens.Row else 0.dp,
+                                    showLock = true,
+                                    modifier = Modifier.arriving(arrivals.takeUnless { dayNew }, row.id),
+                                )
+                            }
                         }
                     }
                 }
@@ -320,10 +333,14 @@ private fun RegisterList(
         }
         days.forEach { day ->
             item(key = "day-${day.first().id}") {
+                val dayIds = day.map { it.id }
                 MetroText(
                     RegisterEntry.registerDateLabel(day.first().date),
                     Metro.typography.caption,
-                    Modifier.padding(top = 16.dp, bottom = 4.dp).testTag("register-day-${day.first().date}"),
+                    Modifier
+                        .arriving(arrivals, "day-${day.first().date}") { it.allNew(dayIds) }
+                        .padding(top = 16.dp, bottom = 4.dp)
+                        .testTag("register-day-${day.first().date}"),
                     color = Metro.accent.text,
                 )
             }
@@ -338,6 +355,7 @@ private fun RegisterList(
                     menu = menu.takeIf { rowMenu != null },
                     menuItems = { rowMenu?.invoke(row).orEmpty() },
                     showLock = true,
+                    modifier = Modifier.arriving(arrivals, row.id),
                 )
             }
         }
