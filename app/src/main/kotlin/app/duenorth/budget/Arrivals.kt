@@ -12,11 +12,13 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.theme.Metro
+import app.duenorth.budget.design.theme.MetroDimens
 import kotlin.math.roundToInt
 
 /**
@@ -115,12 +117,46 @@ internal fun Modifier.arriving(
         }.layout { measurable, constraints ->
             val p = measurable.measure(constraints)
             layout(p.width, (p.height * ArrivalMotion.open(t())).roundToInt()) { p.place(0, 0) }
-        }.graphicsLayer {
+        }.bleedLayer {
             val rise = ArrivalMotion.rise(t())
             alpha = rise
             translationY = size.height * ArrivalMotion.TRAVEL * (1f - rise)
         }
 }
+
+/**
+ * A graphics layer one gutter wider on each side than the content. A layer that fades draws offscreen and is cut to
+ * its own bounds, which would trim a ledger fill or band that runs into the gutter while it fades, then let it snap
+ * back to full width at the end. The wider layer keeps the fill whole the whole way.
+ */
+internal fun Modifier.bleedLayer(block: GraphicsLayerScope.() -> Unit): Modifier =
+    layout { measurable, constraints ->
+        if (!constraints.hasBoundedWidth) {
+            val p = measurable.measure(constraints)
+            return@layout layout(p.width, p.height) { p.place(0, 0) }
+        }
+        val gutter = MetroDimens.Gutter.roundToPx()
+        val p =
+            measurable.measure(
+                constraints.copy(minWidth = constraints.minWidth + 2 * gutter, maxWidth = constraints.maxWidth + 2 * gutter),
+            )
+        layout(p.width - 2 * gutter, p.height) { p.place(-gutter, 0) }
+    }.graphicsLayer(block)
+        .layout { measurable, constraints ->
+            if (!constraints.hasBoundedWidth) {
+                val p = measurable.measure(constraints)
+                return@layout layout(p.width, p.height) { p.place(0, 0) }
+            }
+            val gutter = MetroDimens.Gutter.roundToPx()
+            val p =
+                measurable.measure(
+                    constraints.copy(
+                        minWidth = (constraints.minWidth - 2 * gutter).coerceAtLeast(0),
+                        maxWidth = constraints.maxWidth - 2 * gutter,
+                    ),
+                )
+            layout(p.width + 2 * gutter, p.height) { p.place(gutter, 0) }
+        }
 
 /** The entrance's timing, as fractions of one linear run from 0 to 1. */
 internal object ArrivalMotion {

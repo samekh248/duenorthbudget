@@ -6,6 +6,7 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,6 +32,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -323,7 +325,8 @@ private fun InboxQueue(
         return
     }
     if (entries.isEmpty()) return
-    // The top entry is featured. When it has just been filed, the next waiting one rises into the panel.
+    // The top entry is featured. When it has just been filed, its confirmation holds, then the panel leaves and comes
+    // back with the next waiting one.
     val head = entries.first()
     val next = if (head.filedTo != null) entries.drop(1).firstOrNull { it.filedTo == null } else null
     val rise = remember(head.row.id, head.filedTo) { Animatable(if (head.filedTo == null) 1f else 0f) }
@@ -332,8 +335,8 @@ private fun InboxQueue(
     LaunchedEffect(head.row.id, head.filedTo) {
         if (head.filedTo == null) return@LaunchedEffect
         delay(FILED_HOLD_MS)
-        if (animations && next != null) {
-            rise.animateTo(1f, tween(MetroMotion.PAGE_MS, easing = MetroMotion.EaseOut))
+        if (animations) {
+            rise.animateTo(1f, tween(FeaturedMotion.SWAP_MS, easing = LinearEasing))
         } else {
             rise.snapTo(1f)
         }
@@ -356,10 +359,14 @@ private fun InboxQueue(
     LaunchedEffect(arrive) {
         if (arrive.value < 1f) arrive.animateTo(1f, tween(FEATURED_ARRIVE_MS, easing = MetroMotion.EaseOut))
     }
-    // Read only in layout and drawing, so the rise never recomposes the panel or the list.
-    val risen = { rise.value }
-    val arrived = { arrive.value }
-    val featured = if (head.filedTo == null) head.row else next?.row
+    // Read only in layout and drawing, so the swap never recomposes the panel or the list.
+    val leaves = { FeaturedMotion.out(rise.value) }
+    val arrived = { if (head.filedTo != null) FeaturedMotion.inn(rise.value) else arrive.value }
+    // The next row leaves the queue as its panel comes in.
+    val risen = { FeaturedMotion.queue(rise.value) }
+    // The filed transaction keeps its panel, and its size, until the panel has left; then the next one takes it.
+    val swappedIn by remember(rise) { derivedStateOf { FeaturedMotion.inn(rise.value) > 0f } }
+    val featured = if (head.filedTo == null || !swappedIn) head.row else next?.row
     val listed = rememberArrivals(entries.drop(1).map { it.row.id }, key = "queue")
     list.keepTopFor(listed)
     Column(Modifier.fillMaxSize()) {
@@ -367,7 +374,7 @@ private fun InboxQueue(
             row = featured,
             amount = featured?.let { money(it.amountMinor) }.orEmpty(),
             filed = head.takeIf { it.filedTo != null },
-            rise = risen,
+            leave = leaves,
             arrive = arrived,
             onAccept = onAccept,
             onCategorize = onInbox,
@@ -507,23 +514,35 @@ private fun FeaturedPanel(
     row: InboxRow?,
     amount: String,
     filed: InboxEntry?,
-    rise: () -> Float,
+    /** After a filing, the panel with its confirmation fades and lifts away as this goes from 0 to 1. */
+    leave: () -> Float,
     onAccept: (String) -> Unit,
     onCategorize: (String) -> Unit,
     onDetails: (String) -> Unit,
     onMenu: (InboxRow, Rect) -> Unit,
     onTransfer: (String) -> Unit = {},
     modifier: Modifier = Modifier,
-    /** A newly arrived transaction: the whole panel, fill and all, fades and rises in as this goes from 0 to 1. */
+    /**
+     * The transaction coming in, a new arrival or the next after a filing: the whole panel, fill and all, fades and
+     * rises into place as this goes from 0 to 1.
+     */
     arrive: () -> Float = { 1f },
 ) {
     var bounds by remember { mutableStateOf(Rect.Zero) }
+    // Until the next transaction starts in, a filed panel shows its confirmation; after that, the transaction.
+    val swapped = { filed == null || arrive() > 0f }
     Box(
         modifier
-            .graphicsLayer {
-                val t = arrive()
-                alpha = t
-                translationY = size.height * FEATURED_ARRIVE_TRAVEL * (1f - t)
+            .bleedLayer {
+                val coming = arrive()
+                if (filed != null && coming <= 0f) {
+                    val going = leave()
+                    alpha = 1f - going
+                    translationY = -size.height * FeaturedMotion.TRAVEL * going
+                } else {
+                    alpha = coming
+                    translationY = size.height * FeaturedMotion.TRAVEL * (1f - coming)
+                }
             }.fillMaxWidth()
             .clipBelow()
             .ledgerFill(Metro.colors.chrome)
@@ -537,7 +556,7 @@ private fun FeaturedPanel(
                 Modifier
                     .fillMaxWidth()
                     .clipBelow()
-                    .then(if (filed != null) Modifier.rising(rise) else Modifier)
+                    .graphicsLayer { alpha = if (swapped()) 1f else 0f }
                     // The press band covers the whole panel, past the gutter like its fill, not just the text column.
                     .metroPress(onClick = { onDetails(row.id) }, onLongClick = { onMenu(row, bounds) }, bleed = MetroDimens.Gutter)
                     .padding(vertical = FEATURED_PAD)
@@ -591,7 +610,7 @@ private fun FeaturedPanel(
             Row(
                 Modifier
                     .then(if (row != null) Modifier.matchParentSize() else Modifier.heightIn(min = FEATURED_EMPTY))
-                    .graphicsLayer { alpha = 1f - window(rise(), 0f, RISE_FADE_TO) }
+                    .graphicsLayer { alpha = if (swapped()) 0f else 1f }
                     .testTag("inbox-filed-${filed.row.id}"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -671,14 +690,6 @@ private fun window(
     from: Float,
     to: Float,
 ) = ((t - from) / (to - from)).coerceIn(0f, 1f)
-
-/** Rises content into its slot from below as [rise] goes from 0 to 1, fading it in on the way. */
-private fun Modifier.rising(rise: () -> Float): Modifier =
-    graphicsLayer {
-        val t = rise()
-        translationY = size.height * (1f - t)
-        alpha = window(t, RISE_FADE_FROM, 1f)
-    }
 
 /** Eases the slot's height to its content's whenever the content changes size, without clipping its sides. */
 @Composable
@@ -1013,10 +1024,25 @@ private val GROUP_AIR_ABOVE = 24.dp
 private const val MODE_OUT_MS = 90
 private const val MODE_IN_MS = 180
 
-/** The confirmation is gone by this share of the rise; the next transaction starts showing at the other. */
-private const val RISE_FADE_TO = 0.4f
-private const val RISE_FADE_FROM = 0.3f
-
-/** A new top transaction's panel entrance: a little slower than a page turn, rising through a third of its height. */
+/** A new top transaction's panel entrance: a little slower than a page turn. */
 internal const val FEATURED_ARRIVE_MS = 480
-private const val FEATURED_ARRIVE_TRAVEL = 0.33f
+
+/**
+ * The featured panel's swap after a filing, as one linear run: the panel with its confirmation fades and lifts away,
+ * then the panel comes back with the next transaction the way a new arrival does, while that row leaves the queue.
+ */
+internal object FeaturedMotion {
+    private const val OUT_MS = MetroMotion.SHORT_MS
+    const val SWAP_MS = OUT_MS + FEATURED_ARRIVE_MS
+
+    /** The share of its height the panel travels on the way out and on the way in. */
+    const val TRAVEL = 0.33f
+
+    private const val SWAP = OUT_MS.toFloat() / SWAP_MS
+
+    fun out(t: Float): Float = MetroMotion.Standard.transform(window(t, 0f, SWAP))
+
+    fun inn(t: Float): Float = MetroMotion.EaseOut.transform(window(t, SWAP, 1f))
+
+    fun queue(t: Float): Float = MetroMotion.Standard.transform(window(t, SWAP, SWAP + (1f - SWAP) * 0.6f))
+}
