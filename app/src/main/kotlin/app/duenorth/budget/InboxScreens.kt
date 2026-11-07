@@ -339,7 +339,8 @@ private fun InboxQueue(
         }
         shown(head.row.id)
     }
-    // A transaction that has just arrived at the top rises into the panel the way the next one does after a filing.
+    // A transaction that has just arrived at the top brings the whole panel in with it: the box fades and rises
+    // into place, a touch slower than a row so the lead transaction reads as arriving first.
     val arrive =
         remember(head.row.id) {
             Animatable(
@@ -353,7 +354,7 @@ private fun InboxQueue(
             )
         }
     LaunchedEffect(arrive) {
-        if (arrive.value < 1f) arrive.animateTo(1f, tween(MetroMotion.PAGE_MS, easing = MetroMotion.EaseOut))
+        if (arrive.value < 1f) arrive.animateTo(1f, tween(FEATURED_ARRIVE_MS, easing = MetroMotion.EaseOut))
     }
     // Read only in layout and drawing, so the rise never recomposes the panel or the list.
     val risen = { rise.value }
@@ -366,7 +367,8 @@ private fun InboxQueue(
             row = featured,
             amount = featured?.let { money(it.amountMinor) }.orEmpty(),
             filed = head.takeIf { it.filedTo != null },
-            rise = if (head.filedTo != null) risen else arrived,
+            rise = risen,
+            arrive = arrived,
             onAccept = onAccept,
             onCategorize = onInbox,
             onDetails = actions.onDetails,
@@ -512,11 +514,17 @@ private fun FeaturedPanel(
     onMenu: (InboxRow, Rect) -> Unit,
     onTransfer: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    /** A newly arrived transaction: the whole panel, fill and all, fades and rises in as this goes from 0 to 1. */
+    arrive: () -> Float = { 1f },
 ) {
     var bounds by remember { mutableStateOf(Rect.Zero) }
     Box(
         modifier
-            .fillMaxWidth()
+            .graphicsLayer {
+                val t = arrive()
+                alpha = t
+                translationY = size.height * FEATURED_ARRIVE_TRAVEL * (1f - t)
+            }.fillMaxWidth()
             .clipBelow()
             .ledgerFill(Metro.colors.chrome)
             // The next transaction can be taller or shorter: the panel eases to its size instead of jumping.
@@ -529,8 +537,7 @@ private fun FeaturedPanel(
                 Modifier
                     .fillMaxWidth()
                     .clipBelow()
-                    // After a filing the next row rises in; a newly arrived one rises in the same way.
-                    .rising(rise)
+                    .then(if (filed != null) Modifier.rising(rise) else Modifier)
                     // The press band covers the whole panel, past the gutter like its fill, not just the text column.
                     .metroPress(onClick = { onDetails(row.id) }, onLongClick = { onMenu(row, bounds) }, bleed = MetroDimens.Gutter)
                     .padding(vertical = FEATURED_PAD)
@@ -1009,3 +1016,7 @@ private const val MODE_IN_MS = 180
 /** The confirmation is gone by this share of the rise; the next transaction starts showing at the other. */
 private const val RISE_FADE_TO = 0.4f
 private const val RISE_FADE_FROM = 0.3f
+
+/** A new top transaction's panel entrance: a little slower than a page turn, rising through a third of its height. */
+internal const val FEATURED_ARRIVE_MS = 480
+private const val FEATURED_ARRIVE_TRAVEL = 0.33f

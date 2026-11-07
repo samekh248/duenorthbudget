@@ -150,8 +150,12 @@ class ArrivalsContentTest {
         compose.onNodeWithTag("inbox-featured-rent").assertExists()
         compose.onNodeWithTag("inbox-row-coffee").assertExists()
         val partway = top("inbox-row-atm")
-        compose.mainClock.advanceTimeBy(ArrivalMotion.DURATION_MS + 200L)
+        // The whole panel, fill and all, is still rising.
+        val panelPartway = top("inbox-featured")
+        compose.mainClock.advanceTimeBy(FEATURED_ARRIVE_MS + 200L)
         val settled = top("inbox-row-atm")
+        val panelSettled = top("inbox-featured")
+        assertTrue("the panel rises into place: $panelSettled < $panelPartway", panelSettled < panelPartway)
         assertTrue("coffee's slot opens in the queue: $before < $partway < $settled", before < partway && partway < settled)
     }
 
