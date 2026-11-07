@@ -93,8 +93,7 @@ class AssistantScreenshotTest {
         )
 
     @Test
-    fun budgetDark() =
-        snap("assistant_budget_dark", dark = true, report = sampleAssistantBudget(), expanded = setOf(FindingKind.OVERSPENT))
+    fun budgetDark() = snap("assistant_budget_dark", dark = true, report = sampleAssistantBudget(), expanded = setOf(FindingKind.OVERSPENT))
 
     @Test
     fun budgetMobile10Light() =
