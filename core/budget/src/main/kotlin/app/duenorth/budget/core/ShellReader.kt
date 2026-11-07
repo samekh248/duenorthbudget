@@ -165,21 +165,25 @@ object ShellReader {
                     )
                 },
             inbox =
-                inbox.map { row ->
-                    val payee = row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE }
-                    val suggestion = row.str("suggestion_id")
-                    InboxRow(
-                        id = row.str("id").orEmpty(),
-                        payee = payee,
-                        amountMinor = row.long("amount"),
-                        date = row.long("date").toInt(),
-                        accountId = row.str("account_id").orEmpty(),
-                        accountName = row.str("account_name").orEmpty(),
-                        note = row.str("notes").orEmpty().trim(),
-                        suggestionId = suggestion,
-                        suggestionName = suggestion?.let { categoryNames[it] }.orEmpty(),
-                    )
-                },
+                inbox
+                    .map { row ->
+                        val payee = row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE }
+                        val suggestion = row.str("suggestion_id")
+                        InboxRow(
+                            id = row.str("id").orEmpty(),
+                            payee = payee,
+                            amountMinor = row.long("amount"),
+                            date = row.long("date").toInt(),
+                            accountId = row.str("account_id").orEmpty(),
+                            accountName = row.str("account_name").orEmpty(),
+                            note = row.str("notes").orEmpty().trim(),
+                            suggestionId = suggestion,
+                            suggestionName = suggestion?.let { categoryNames[it] }.orEmpty(),
+                        )
+                    }.let { rows ->
+                        val guesses = TransferGuesser.guess(session, rows, today)
+                        rows.map { row -> guesses[row.id]?.let { row.copy(transfer = it) } ?: row }
+                    },
             matches = MatchFinder.find(session).filter { it.bank.accountId in onBudget },
         )
     }

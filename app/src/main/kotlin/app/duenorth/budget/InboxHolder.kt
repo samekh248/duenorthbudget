@@ -55,6 +55,20 @@ class InboxHolder internal constructor(
         file(row, index, categoryId, row.suggestionName, fromPicker = false)
     }
 
+    /**
+     * Makes the row the transfer it was guessed to be: linked with the other side already there, or with one added.
+     * The row plays its confirmation in place, as filing it does.
+     */
+    fun makeTransfer(transactionId: String) {
+        val inbox = shown() ?: return
+        val index = inbox.indexOfFirst { it.id == transactionId }
+        val row = inbox.getOrNull(index) ?: return
+        val guess = row.transfer ?: return
+        write(listOf(InboxFiled(row, index, guess.label(row.amountMinor), transfer = true)), fromPicker = false) { id ->
+            host.library.makeTransfer(id, row.id, guess.accountId, guess.partnerId)
+        }
+    }
+
     /** A tap on an inbox row opens its transaction, as the register does. */
     fun openDetails(transactionId: String) {
         openFromInbox(transactionId) { accountId -> ShellRoute.EditTransaction(accountId, transactionId) }
@@ -200,6 +214,21 @@ class InboxHolder internal constructor(
         assignments: Map<String, String?>,
         filed: List<InboxFiled>,
         fromPicker: Boolean,
+    ) = write(filed, fromPicker, assignments.keys) { id ->
+        if (assignments.size == 1) {
+            val (txn, category) = assignments.entries.single()
+            host.library.setTransactionCategory(id, txn, category, false)
+        } else {
+            host.library.setTransactionsCategory(id, assignments, false)
+        }
+    }
+
+    /** Runs [change] on the open budget as one undo step while [filed] play their confirmations. */
+    private fun write(
+        filed: List<InboxFiled>,
+        fromPicker: Boolean,
+        unselect: Set<String> = filed.mapTo(mutableSetOf()) { it.row.id },
+        change: (String) -> WriteResult,
     ) {
         if (host.writing || filed.isEmpty() || state.settings.openBudgetId == null) return
         val ids = filed.map { it.row.id }
@@ -209,14 +238,7 @@ class InboxHolder internal constructor(
         host.launchWrite { id ->
             val result =
                 try {
-                    withContext(host.io) {
-                        if (assignments.size == 1) {
-                            val (txn, category) = assignments.entries.single()
-                            host.library.setTransactionCategory(id, txn, category, false)
-                        } else {
-                            host.library.setTransactionsCategory(id, assignments, false)
-                        }
-                    }
+                    withContext(host.io) { change(id) }
                 } catch (e: Throwable) {
                     settle(ids)
                     throw e
@@ -228,7 +250,7 @@ class InboxHolder internal constructor(
             if (result is WriteResult.Saved) {
                 update {
                     it.copy(
-                        selection = it.selection?.minus(assignments.keys)?.ifEmpty { null },
+                        selection = it.selection?.minus(unselect)?.ifEmpty { null },
                     )
                 }
             }

@@ -75,6 +75,8 @@ import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.RegisterEntry
+import app.duenorth.budget.core.TransferCopy
+import app.duenorth.budget.core.TransferGuess
 import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.components.AppGlyph
 import app.duenorth.budget.design.components.AppGlyphIcon
@@ -127,6 +129,8 @@ class InboxActions(
     val onOpenAccount: (String) -> Unit = {},
     val onMatch: (MatchPair) -> Unit = {},
     val onNotAMatch: (MatchPair) -> Unit = {},
+    /** Makes the row the transfer it was guessed to be. */
+    val onTransfer: (String) -> Unit = {},
     /** The row menu's select: select mode with this row already checked. Null leaves select off the menu. */
     val onSelect: ((String) -> Unit)? = null,
 )
@@ -336,6 +340,7 @@ private fun InboxQueue(
             onCategorize = onInbox,
             onDetails = actions.onDetails,
             onMenu = onMenu,
+            onTransfer = actions.onTransfer,
             modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
         )
         LazyColumn(Modifier.weight(1f), state = list) {
@@ -376,6 +381,7 @@ internal fun inboxMenuItems(
     // As every row menu: select first, the row's verbs, delete last (drawn in the accent).
     listOfNotNull(
         actions.onSelect?.let { select -> RowMenuCopy.SELECT to { select(row.id) } },
+        row.transfer?.let { it.label(row.amountMinor).lowercase() to { actions.onTransfer(row.id) } },
         row.suggestionId?.let { InboxCopy.ACCEPT to { onAccept(row.id) } },
         InboxCopy.CATEGORIZE to { onCategorize(row.id) },
         InboxCopy.EDIT to { actions.onDetails(row.id) },
@@ -416,7 +422,17 @@ private const val INBOX_MENU = "inbox-menu"
 internal data class InboxEntry(
     val row: InboxRow,
     val filedTo: String? = null,
+    /** Made a transfer: [filedTo] is "transfer to" the account, and the confirmation says "filed as" it. */
+    val transfer: Boolean = false,
 )
+
+/** "filed to groceries", or "filed as transfer to ally savings" for a row made a transfer. */
+internal fun filedLine(entry: InboxEntry): String =
+    if (entry.transfer) {
+        "${TransferCopy.FILED_AS} ${entry.filedTo.orEmpty().lowercase()}"
+    } else {
+        "${InboxCopy.FILED_TO} ${entry.filedTo.orEmpty().lowercase()}"
+    }
 
 /**
  * The inbox rows in the order the inbox shows them: the row a match just left leads, and both
@@ -439,11 +455,11 @@ internal fun inboxEntries(
     filed: List<InboxFiled>,
 ): List<InboxEntry> {
     val byId = filed.associateBy { it.row.id }
-    val out = inbox.map { InboxEntry(it, byId[it.id]?.categoryName) }.toMutableList()
+    val out = inbox.map { InboxEntry(it, byId[it.id]?.categoryName, byId[it.id]?.transfer == true) }.toMutableList()
     filed
         .filter { f -> inbox.none { it.id == f.row.id } }
         .sortedBy { it.index }
-        .forEach { f -> out.add(f.index.coerceIn(0, out.size), InboxEntry(f.row, f.categoryName)) }
+        .forEach { f -> out.add(f.index.coerceIn(0, out.size), InboxEntry(f.row, f.categoryName, f.transfer)) }
     return out
 }
 
@@ -462,6 +478,7 @@ private fun FeaturedPanel(
     onCategorize: (String) -> Unit,
     onDetails: (String) -> Unit,
     onMenu: (InboxRow, Rect) -> Unit,
+    onTransfer: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var bounds by remember { mutableStateOf(Rect.Zero) }
@@ -506,16 +523,26 @@ private fun FeaturedPanel(
                         softWrap = false,
                     )
                 }
-                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (row.suggestionId != null) {
-                        MetroText("${InboxCopy.SUGGESTED} ", Metro.typography.caption, color = Metro.colors.secondary)
-                        MetroText(row.suggestionName, Metro.typography.body.copy(fontWeight = MetroWeights.Semibold))
-                    } else {
-                        MetroText(InboxCopy.NO_SUGGESTION, Metro.typography.caption, color = Metro.colors.secondary)
+                val transfer = row.transfer
+                if (transfer != null) {
+                    TransferGuessLines(row, transfer)
+                } else {
+                    Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (row.suggestionId != null) {
+                            MetroText("${InboxCopy.SUGGESTED} ", Metro.typography.caption, color = Metro.colors.secondary)
+                            MetroText(row.suggestionName, Metro.typography.body.copy(fontWeight = MetroWeights.Semibold))
+                        } else {
+                            MetroText(InboxCopy.NO_SUGGESTION, Metro.typography.caption, color = Metro.colors.secondary)
+                        }
                     }
                 }
                 MetroButtonGrid(Modifier.padding(top = 12.dp)) {
-                    if (row.suggestionId != null) AcceptButton { onAccept(row.id) }
+                    // A guessed transfer leads; the category suggestion stays in the row's menu.
+                    if (transfer != null) {
+                        AccentButton(TransferCopy.MAKE_TRANSFER, Modifier.testTag("inbox-featured-transfer")) { onTransfer(row.id) }
+                    } else if (row.suggestionId != null) {
+                        AcceptButton { onAccept(row.id) }
+                    }
                     MetroButton(InboxCopy.CATEGORIZE, Modifier.testTag("inbox-featured-categorize")) { onCategorize(row.id) }
                 }
             }
@@ -530,10 +557,39 @@ private fun FeaturedPanel(
             ) {
                 AppGlyphIcon(AppGlyph.Save, Metro.accent.text)
                 Column(Modifier.padding(start = MetroDimens.Gutter)) {
-                    MetroText("${InboxCopy.FILED_TO} ${filed.filedTo.orEmpty().lowercase()}", Metro.typography.groupHeader, maxLines = 1)
+                    MetroText(filedLine(filed), Metro.typography.groupHeader, maxLines = 1)
                     MetroText(filed.row.payee, Metro.typography.caption, color = Metro.colors.secondary, maxLines = 1)
                 }
             }
+        }
+    }
+}
+
+/** The guessed transfer in the featured panel: the transfer glyph and where it went, then why it looks like one. */
+@Composable
+private fun TransferGuessLines(
+    row: InboxRow,
+    guess: TransferGuess,
+) {
+    Column(Modifier.padding(top = 10.dp).testTag("inbox-featured-guess")) {
+        MetroText(TransferCopy.LOOKS_LIKE, Metro.typography.caption, color = Metro.colors.secondary)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AppGlyphIcon(AppGlyph.Transfer, Metro.accent.text)
+            MetroText(
+                guess.label(row.amountMinor),
+                Metro.typography.body.copy(fontWeight = MetroWeights.Semibold),
+                Modifier.padding(start = 6.dp),
+                maxLines = 1,
+            )
+        }
+        if (guess.reasons.isNotEmpty()) {
+            MetroText(
+                guess.reasons.joinToString(" \u00b7 "),
+                Metro.typography.caption,
+                Modifier.testTag("inbox-featured-reasons"),
+                color = Metro.colors.secondary,
+                maxLines = 2,
+            )
         }
     }
 }
@@ -714,7 +770,7 @@ private fun InboxDayHeading(
 /** The quieter line under a payee: the suggested category, the account, then the note. The date is the row's heading. */
 internal fun inboxDetail(row: InboxRow): String =
     listOfNotNull(
-        row.suggestionName.ifBlank { InboxCopy.NO_CATEGORY },
+        row.transfer?.let { "${it.label(row.amountMinor).lowercase()}?" } ?: row.suggestionName.ifBlank { InboxCopy.NO_CATEGORY },
         row.accountName.ifBlank { null },
         row.note.ifBlank { null },
     ).joinToString(" · ")
@@ -822,7 +878,7 @@ private fun InboxLine(
                 AppGlyphIcon(AppGlyph.Save, Metro.accent.onFill)
                 Column(Modifier.padding(start = MetroDimens.Gutter)) {
                     MetroText(
-                        "${InboxCopy.FILED_TO} ${filedTo.lowercase()}",
+                        filedLine(entry),
                         Metro.typography.body,
                         color = Metro.accent.onFill,
                         maxLines = 1,

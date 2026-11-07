@@ -462,6 +462,8 @@ data class InboxRow(
     /** The category this payee last went to, offered as the swipe-right accept. */
     val suggestionId: String? = null,
     val suggestionName: String = "",
+    /** The account this looks like a transfer to or from, offered ahead of the category; null when it doesn't. */
+    val transfer: TransferGuess? = null,
 )
 
 data class MonthShell(

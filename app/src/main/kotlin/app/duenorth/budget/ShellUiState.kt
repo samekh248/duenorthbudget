@@ -38,6 +38,8 @@ data class InboxFiled(
     val row: InboxRow,
     val index: Int,
     val categoryName: String,
+    /** Made a transfer: [categoryName] is "transfer to" the other account. */
+    val transfer: Boolean = false,
 )
 
 data class ShellUiState(
