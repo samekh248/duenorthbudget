@@ -535,6 +535,14 @@ class BudgetLibrary(
         edit(budgetId, AccountsCopy.NOTE) { AccountsBook(it, clock.today(), ids).setNote(accountId, note) }
             ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    fun setAccountBankMinimum(
+        budgetId: String,
+        accountId: String,
+        minimumMinor: Long,
+    ): AccountWriteResult =
+        edit(budgetId, AccountsCopy.BANK_MINIMUM) { AccountsBook(it, clock.today(), ids).setBankMinimum(accountId, minimumMinor) }
+            ?: AccountWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     /** Places [accountId] before [targetId], or last when null. */
     fun moveAccount(
         budgetId: String,

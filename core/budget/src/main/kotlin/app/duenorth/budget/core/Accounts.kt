@@ -7,6 +7,8 @@ object AccountsCopy {
     const val ADD = "add account"
     const val EDIT = "account change"
     const val NOTE = "account note"
+    const val BANK_MINIMUM = "bank minimum"
+    const val NOT_NEGATIVE = "enter zero or more"
     const val REORDER = "reorder accounts"
     const val CLOSE = "close account"
     const val FORCE_CLOSE = "force close"
@@ -47,6 +49,8 @@ data class AccountDetail(
     val transactionCount: Int,
     val note: String,
     val linked: Boolean,
+    /** Money the bank holds back, like a $5 membership share: a bank balance off by this much is not a mismatch. */
+    val bankMinimumMinor: Long = 0,
 )
 
 /**
@@ -79,6 +83,7 @@ class AccountsBook(
             transactionCount = count,
             note = note(accountId),
             linked = !row.str("account_id").isNullOrBlank() && !row.str("account_sync_source").isNullOrBlank(),
+            bankMinimumMinor = BankMinimum.read(session, accountId),
         )
     }
 
@@ -150,6 +155,17 @@ class AccountsBook(
     ): AccountWriteResult {
         if (!exists(accountId)) return AccountWriteResult.Rejected(AccountsCopy.NOT_FOUND)
         SyncSchema.writeRow(session, "notes", "account-$accountId", "note" to note)
+        return AccountWriteResult.Saved(accountId)
+    }
+
+    /** Sets the money the bank holds back in [accountId]; zero clears it. Kept in a synced preference. */
+    fun setBankMinimum(
+        accountId: String,
+        minimumMinor: Long,
+    ): AccountWriteResult {
+        if (minimumMinor < 0) return AccountWriteResult.Rejected(AccountsCopy.NOT_NEGATIVE)
+        if (!exists(accountId)) return AccountWriteResult.Rejected(AccountsCopy.NOT_FOUND)
+        SyncSchema.writeRow(session, "preferences", BankMinimum.key(accountId), "value" to minimumMinor.toString())
         return AccountWriteResult.Saved(accountId)
     }
 
@@ -469,4 +485,36 @@ class AccountsBook(
             )
             """.trimIndent()
     }
+}
+
+/**
+ * The money a bank keeps in an account and may leave out of the balance it reports, such as a credit union's $5
+ * membership share. Actual's file has no column for it, so it lives in a synced preference per account, which
+ * Actual keeps and ignores.
+ */
+object BankMinimum {
+    private const val PREFIX = "duenorth.bankMinimum."
+
+    fun key(accountId: String) = PREFIX + accountId
+
+    fun read(
+        session: SqlSession,
+        accountId: String,
+    ): Long =
+        session
+            .query("SELECT value FROM preferences WHERE id = ?", listOf(key(accountId)))
+            .firstOrNull()
+            ?.str("value")
+            ?.toLongOrNull()
+            ?.coerceAtLeast(0) ?: 0
+
+    /**
+     * True when [bank] is [register] exactly, or off by [minimum] either way: the bank leaving the held money out of
+     * its balance, or the register never having been told about it.
+     */
+    fun explains(
+        bank: Long,
+        register: Long,
+        minimum: Long,
+    ): Boolean = bank == register || (minimum > 0 && (bank == register - minimum || bank == register + minimum))
 }

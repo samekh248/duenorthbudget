@@ -86,28 +86,43 @@ class AccountsHolder internal constructor(
     fun submitEdit(
         name: String,
         note: String,
+        bankMinimumText: String = "",
     ) {
         val budgetId = state.settings.openBudgetId ?: return
         val accountId = (state.route as? ShellRoute.EditAccount)?.accountId ?: return
+        val decimals =
+            state.shell
+                ?.currency
+                ?.decimals ?: 2
+        val minimum =
+            if (bankMinimumText.isBlank()) {
+                0L
+            } else {
+                MoneyFormat.parse(bankMinimumText, decimals) ?: run {
+                    host.mutate { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
+                    return
+                }
+            }
         host.scope.launch {
             val result =
                 withContext(host.io) {
                     val detail = host.library.readAccount(budgetId, accountId)
-                    val renamed =
-                        if (detail?.name ==
-                            name.trim()
-                        ) {
-                            AccountWriteResult.Saved(accountId)
-                        } else {
-                            host.library.renameAccount(budgetId, accountId, name)
-                        }
-                    if (renamed !is AccountWriteResult.Saved ||
-                        detail?.note == note
-                    ) {
-                        renamed
-                    } else {
-                        host.library.setAccountNote(budgetId, accountId, note)
-                    }
+                    val steps =
+                        listOf(
+                            {
+                                if (detail?.name == name.trim()) null else host.library.renameAccount(budgetId, accountId, name)
+                            },
+                            { if (detail?.note == note) null else host.library.setAccountNote(budgetId, accountId, note) },
+                            {
+                                if ((detail?.bankMinimumMinor ?: 0L) == minimum) {
+                                    null
+                                } else {
+                                    host.library.setAccountBankMinimum(budgetId, accountId, minimum)
+                                }
+                            },
+                        )
+                    steps.firstNotNullOfOrNull { step -> step()?.takeIf { it !is AccountWriteResult.Saved } }
+                        ?: AccountWriteResult.Saved(accountId)
                 }
             when (result) {
                 is AccountWriteResult.Saved -> afterWrite(budgetId, leave = true)
