@@ -303,7 +303,7 @@ private fun FindingFigures(
     Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         figures.forEach { figure ->
             val emphasize = figure.label == emphasized
-            Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.fillMaxWidth().padding(top = if (emphasize) 8.dp else 2.dp), verticalAlignment = Alignment.Bottom) {
                 MetroText(
                     figure.label,
                     Metro.typography.caption.emphasizedIf(emphasize),
