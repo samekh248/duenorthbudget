@@ -79,7 +79,7 @@ data class ScreenAction(
     /** A menu line that starts a new group, drawn under a thin rule (the menu's shared sync, undo, settings tail). */
     val rule: Boolean = false,
     /**
-     * The one line under the button's glyph. The glyph is the verb, so this is only the noun ("transaction" under
+     * The one line under the button's glyph. The glyph is the verb, so this is only the noun ("rule" under
      * +), abbreviated when the word is too long for the slot. The full [label] stays the screen reader's name and the
      * menu's line.
      */
@@ -481,12 +481,10 @@ fun List<AppBarButton>.asScreenActions(): List<ScreenAction> =
 
 /**
  * Hand-picked short forms for captions that can run past a narrow slot, used only when the whole word doesn't fit
- * ("transaction" stays whole in the Metro bar and reads "txn" in the narrower Windows 10 Mobile one).
+ * ("account" stays whole in the Metro bar and reads "acct" in the narrower Windows 10 Mobile one).
  */
 internal val CaptionAbbreviations =
     mapOf(
-        "transaction" to "txn",
-        "transactions" to "txns",
         "account" to "acct",
         "accounts" to "accts",
         "schedule" to "sched.",

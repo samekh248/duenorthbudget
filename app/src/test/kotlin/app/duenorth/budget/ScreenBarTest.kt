@@ -576,11 +576,12 @@ class ScreenBarTest {
             routes.flatMap { ScreenBar.specsFor(it, hasBudget = true, mode = BudgetMode.ENVELOPE) } +
                 ScreenBar.specsFor(ShellRoute.Settings, true, BudgetMode.ENVELOPE, settings = SettingsBar(SettingsPage.SERVER))
         specs.filter { it.primary }.forEach { spec ->
-            // One word, so the caption never wraps; + is already "add", so the caption never says it again.
+            // One word, so the caption never wraps; + is already "add", so a noun caption never says it again.
             assertFalse(spec.caption, ' ' in spec.caption)
-            assertFalse(spec.caption, spec.caption.startsWith("add"))
+            assertFalse(spec.caption, spec.caption.startsWith("add") && spec.caption != ScreenBarCopy.ADD)
         }
-        assertEquals(ScreenBarCopy.TRANSACTION, specs.first { it.id == "add" }.caption)
+        // Adding a transaction reads plainly "add", never a clipped "txn".
+        assertEquals(ScreenBarCopy.ADD, specs.first { it.id == "add" }.caption)
         // The menu and the screen reader keep the whole command.
         assertEquals(ScreenBarCopy.ADD_TRANSACTION, specs.first { it.id == "add" }.label)
     }
