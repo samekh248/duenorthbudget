@@ -37,6 +37,14 @@ object EnvelopeCopy {
     const val SPENT = "spent"
     const val LEFT = "left"
     const val OVER = "over"
+
+    // The budget list: an overspent category's line under its name, and the count under its group and the month.
+    fun overBy(amount: String) = "over by $amount"
+
+    fun overByCover(amount: String) = "over by $amount \u00b7 tap to cover"
+
+    fun overspentCount(count: Int) = "$count overspent"
+
     const val TEMPLATE = "template"
     const val BUDGETED = "budgeted this month"
     const val CARRIED_IN = "carried in"
