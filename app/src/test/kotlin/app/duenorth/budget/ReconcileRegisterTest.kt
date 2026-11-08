@@ -61,6 +61,19 @@ class ReconcileRegisterTest {
         assertEquals(listOf("shell"), toggled)
     }
 
+    // Pending rows start folded under their own heading, as on the register; a tap opens them.
+    @Test
+    fun pendingRowsStartFolded() {
+        val base = register()
+        val withPending = base.copy(rows = base.rows.map { if (it.id == "parking") it.copy(pending = true) else it })
+        show(page = null, register = withPending)
+        compose.onNodeWithTag("reconcile-pending-heading").assertIsDisplayed()
+        compose.onNodeWithTag("register-row-parking").assertDoesNotExist()
+        compose.onNodeWithTag("register-row-shell").assertIsDisplayed()
+        compose.onNodeWithTag("reconcile-pending-heading").performClick()
+        compose.onNodeWithTag("register-row-parking").assertIsDisplayed()
+    }
+
     @Test
     fun anExactMatchIsOutlinedAndClearedFromTheHint() {
         val cleared = mutableListOf<List<String>>()

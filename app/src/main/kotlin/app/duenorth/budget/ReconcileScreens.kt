@@ -390,29 +390,54 @@ private fun ReconcileList(
         snapshotFlow { list.isScrollInProgress }.collect { onGesture(it) }
     }
     var showLocked by rememberSaveable { mutableStateOf(true) }
-    val open = rows.filter { !it.reconciled }
+    // Rows the bank has not posted yet fold away under their own heading, as on the register; a lead that
+    // points at one opens them, so the row it names is on screen.
+    val outlined = ReconcileHelp.rowsOf(hints)
+    val pending = rows.filter { it.pending && !it.reconciled }
+    var showPending by rememberSaveable { mutableStateOf(false) }
+    val pendingHinted = pending.any { it.id in outlined }
+    LaunchedEffect(pendingHinted) { if (pendingHinted) showPending = true }
+    val open = rows.filter { !it.reconciled && !it.pending }
     val done = rows.filter { it.reconciled }
     val lockedThrough = done.maxOfOrNull { it.date }
-    val outlined = ReconcileHelp.rowsOf(hints)
     val statementDate = page?.statementDate
+    val openLabel: (Int) -> String = { date ->
+        val day = RegisterEntry.registerDateLabel(date)
+        when {
+            statementDate != null && date > statementDate -> "$day · ${ReconcileCopy.AFTER_STATEMENT}"
+            lockedThrough != null && date <= lockedThrough -> "$day · ${ReconcileCopy.BEFORE_LAST}"
+            else -> day
+        }
+    }
+    val dimAfter: (RegisterRow) -> Boolean = { row -> statementDate != null && row.date > statementDate && row.id !in outlined }
     LazyColumn(modifier.testTag("reconcile-list"), state = list) {
         if (page != null && confirming) {
             item(key = "adjust") { AdjustPanel(register.account.name, page) }
         } else if (page != null && hints.isNotEmpty()) {
             item(key = "hints") { LeadsCard(page, hints, onSetCleared, onFlip, onOpen, onAddMissing) }
         }
+        if (pending.isNotEmpty()) {
+            item(key = "pending") {
+                PendingHeading(pending, register, showPending, tag = "reconcile-pending-heading") { showPending = !showPending }
+            }
+            if (showPending) {
+                ledgerDays(
+                    rows = pending,
+                    page = register,
+                    label = openLabel,
+                    dim = dimAfter,
+                    outlined = outlined,
+                    onPress = { id -> if (page != null) onToggle(id) },
+                    onLongPress = onOpen,
+                    keyPrefix = "pending-",
+                )
+            }
+        }
         ledgerDays(
             rows = open,
             page = register,
-            label = { date ->
-                val day = RegisterEntry.registerDateLabel(date)
-                when {
-                    statementDate != null && date > statementDate -> "$day · ${ReconcileCopy.AFTER_STATEMENT}"
-                    lockedThrough != null && date <= lockedThrough -> "$day · ${ReconcileCopy.BEFORE_LAST}"
-                    else -> day
-                }
-            },
-            dim = { row -> statementDate != null && row.date > statementDate && row.id !in outlined },
+            label = openLabel,
+            dim = dimAfter,
             outlined = outlined,
             onPress = { id -> if (page != null) onToggle(id) },
             onLongPress = onOpen,

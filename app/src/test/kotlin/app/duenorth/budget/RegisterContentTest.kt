@@ -92,7 +92,7 @@ class RegisterContentTest {
         compose.onNodeWithText("balance ${RegisterCopy.OWED}").assertIsDisplayed()
     }
 
-    // Pending rows sit under their own heading, which folds them away; locked rows read as locked.
+    // Pending rows start folded under their own heading, which opens and folds them; locked rows read as locked.
     @Test
     fun pendingFoldsAndLockedReadsLocked() {
         compose.setContent {
@@ -117,6 +117,12 @@ class RegisterContentTest {
             }
         }
         compose.onNodeWithTag("register-pending-total", useUnmergedTree = true).assertTextEquals("1 · -\$12.40")
+        compose
+            .onNodeWithTag("register-pending-heading")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, RegisterCopy.PENDING_FOLDED))
+        compose.onNodeWithTag("register-row-stream").assertDoesNotExist()
+        compose.onNodeWithTag("register-row-cafe").assertIsDisplayed()
+        compose.onNodeWithTag("register-pending-heading").performClick()
         compose
             .onNodeWithTag("register-row-stream")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, RegisterCopy.PENDING))
