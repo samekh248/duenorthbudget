@@ -50,10 +50,11 @@ object ScreenBarCopy {
     const val IMPORT = "import"
 
     /**
-     * Captions under bar buttons. The glyph is the verb (+ adds, ✓ commits, the pencil edits), so the caption is only
-     * the noun, on one line, abbreviated if the word is too long for its slot.
+     * Captions under bar buttons. The glyph is the verb (+ adds, ✓ commits, the pencil edits), so the caption is
+     * usually only the noun, on one line, abbreviated if the word is too long for its slot. Adding a transaction, the
+     * bar's most used button, reads plainly "add" rather than a clipped "txn".
      */
-    const val TRANSACTION = "transaction"
+    const val ADD = "add"
     const val BUDGET = "budget"
     const val SERVER = "server"
     const val RULE = "rule"
@@ -509,7 +510,7 @@ object ScreenBar {
     }
 
     /** Add a transaction: the full form, on the register's account or, from home, the first one. First on every hub. */
-    private fun addTransaction() = spec("add", AppGlyph.Add, ScreenBarCopy.ADD_TRANSACTION, ScreenBarCopy.TRANSACTION)
+    private fun addTransaction() = spec("add", AppGlyph.Add, ScreenBarCopy.ADD_TRANSACTION, ScreenBarCopy.ADD)
 
     private fun saveCancel() =
         listOf(
