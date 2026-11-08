@@ -55,6 +55,7 @@ import app.duenorth.budget.core.AccountRow
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.Finding
 import app.duenorth.budget.core.FindingAction
 import app.duenorth.budget.core.FindingKind
@@ -463,6 +464,10 @@ fun BudgetSection(
     // With unassigned on, the three figures split the row evenly in smaller type: to budget, unassigned centered, held.
     val three = ahead != null
     val raised = if (tiles) Modifier.relief(Relief.Raised, small = true).then(tile) else Modifier
+    // The month's overspent categories, summed: on the right of the row when it is free, else on a line under it.
+    val overspent = if (figuresLoading()) emptyList() else shell.groups.flatMap { it.categories }.filter { it.availableMinor < 0 }
+    val overspentMinor = overspent.sumOf { it.availableMinor }
+    val overspentSlot = overspent.isNotEmpty() && !three && !tiles && shell.bufferedMinor == 0L
     // Where the unassigned figure sits, so its menu opens under it with the figure left bright.
     var unassignedAnchor by remember { mutableStateOf(Rect.Zero) }
     if (ahead != null) {
@@ -534,7 +539,17 @@ fun BudgetSection(
                             .testTag("free-after-plans-figure"),
                 )
             }
-            if (shell.bufferedMinor != 0L) {
+            if (overspentSlot) {
+                BudgetTotal(
+                    label = EnvelopeCopy.overspentCount(overspent.size),
+                    amount = MoneyFormat.format(overspentMinor, shell.currency, formatOptions),
+                    amountColor = Metro.colors.error,
+                    amountTag = "overspent-total",
+                    alignEnd = true,
+                    labelColor = Metro.colors.error,
+                    modifier = slot.testTag("overspent-figure"),
+                )
+            } else if (shell.bufferedMinor != 0L) {
                 BudgetTotal(
                     label = "held",
                     amount = MoneyFormat.format(shell.bufferedMinor, shell.currency, formatOptions),
@@ -550,6 +565,17 @@ fun BudgetSection(
             }
         }
         if (three) Spacer(Modifier.height(MetroDimens.Grid))
+        if (overspent.isNotEmpty() && !overspentSlot) {
+            // The right of the row is taken (held, unassigned or tiles), so the month's overspending sits under it.
+            MetroText(
+                "${EnvelopeCopy.overspentCount(
+                    overspent.size,
+                )} \u00b7 ${MoneyFormat.format(overspentMinor, shell.currency, formatOptions)}",
+                Metro.typography.caption,
+                Modifier.padding(top = MetroDimens.Row / 2).testTag("overspent-line"),
+                color = Metro.colors.error,
+            )
+        }
         if (notice != null) MonthNotice(notice, Modifier.padding(top = MetroDimens.Row))
         if (getStarted != null && shell.groups.isEmpty() && shell.incomeGroups.isEmpty()) {
             GetStartedList(
@@ -786,19 +812,30 @@ private fun GroupLine(
     modifier: Modifier = Modifier,
     formatOptions: FormatOptions = formatOptions(),
 ) {
-    GroupHeading(
-        name = group.name,
-        tag = "group",
-        id = group.id,
-        modifier = modifier,
-        dim = group.hidden,
-    ) {
-        FigureText(
-            MoneyFormat.format(group.availableMinor, shell.currency, formatOptions),
-            Metro.typography.groupHeader,
-            it,
-            color = Metro.colors.foreground,
-        )
+    val overspent = if (figuresLoading()) 0 else group.categories.count { it.availableMinor < 0 }
+    Column(modifier) {
+        GroupHeading(
+            name = group.name,
+            tag = "group",
+            id = group.id,
+            dim = group.hidden,
+        ) {
+            FigureText(
+                MoneyFormat.format(group.availableMinor, shell.currency, formatOptions),
+                Metro.typography.groupHeader,
+                it,
+                color = Metro.colors.foreground,
+            )
+        }
+        // How many of the group's categories are flagged, so a folded-away or scrolled-past one still shows.
+        if (overspent > 0) {
+            MetroText(
+                EnvelopeCopy.overspentCount(overspent),
+                Metro.typography.caption,
+                Modifier.padding(bottom = MetroDimens.Row / 2).testTag("group-overspent-${group.id}"),
+                color = Metro.colors.error,
+            )
+        }
     }
 }
 
