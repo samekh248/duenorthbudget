@@ -300,6 +300,56 @@ class ShellContentTest {
     }
 
     @Test
+    fun overspentCategoriesAreFlagged() {
+        val food = CategoryRow("c-food", "Groceries", 20_000L, 28_000L, -8_000L, false)
+        val fuel = CategoryRow("c-fuel", "Fuel", 10_000L, 10_550L, -550L, false)
+        val rent = CategoryRow("c-rent", "Rent", 50_000L, 50_000L, 0L, false)
+        val group = GroupRow("g", "Food", -8_550L, listOf(food, fuel, rent))
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    BudgetSection(sample().copy(groups = listOf(group), bufferedMinor = 0L), onListGesture = {}, onCategory = {})
+                }
+            }
+        }
+        compose.onNodeWithTag("category-over-c-food", useUnmergedTree = true).assertTextEquals("over by $80.00 \u00b7 tap to cover")
+        compose.onNodeWithTag("category-over-c-fuel", useUnmergedTree = true).assertTextEquals("over by $5.50 \u00b7 tap to cover")
+        compose.onNodeWithTag("category-over-c-rent", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("group-overspent-g", useUnmergedTree = true).assertTextEquals("2 overspent")
+        compose.onNodeWithTag("overspent-total", useUnmergedTree = true).assertTextEquals("-$85.50")
+    }
+
+    @Test
+    fun overspentTotalMovesUnderTheRowWhileHeldTakesTheRight() {
+        val food = CategoryRow("c-food", "Groceries", 20_000L, 28_000L, -8_000L, false)
+        val group = GroupRow("g", "Food", -8_000L, listOf(food))
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    BudgetSection(sample().copy(groups = listOf(group), bufferedMinor = 5_000L), onListGesture = {}, onCategory = {})
+                }
+            }
+        }
+        compose.onNodeWithTag("held-amount", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("overspent-total", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("overspent-line", useUnmergedTree = true).assertTextEquals("1 overspent \u00b7 -$80.00")
+    }
+
+    @Test
+    fun trackingBudgetsFlagWithoutCover() {
+        val food = CategoryRow("c-food", "Groceries", 20_000L, 28_000L, -8_000L, false)
+        val group = GroupRow("g", "Food", -8_000L, listOf(food))
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    BudgetSection(sample().copy(groups = listOf(group), mode = BudgetMode.TRACKING), onListGesture = {}, onCategory = {})
+                }
+            }
+        }
+        compose.onNodeWithTag("category-over-c-food", useUnmergedTree = true).assertTextEquals("over by $80.00")
+    }
+
+    @Test
     fun threeHundredCategoriesStayLazyWhileEditable() {
         val categories = (0 until 300).map { CategoryRow("c$it", "category $it", 0L, 0L, 0L, false) }
         val group = GroupRow("g", "one group", 0L, categories)

@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,6 +34,7 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -720,11 +722,19 @@ fun CategoryLine(
     // While a month loads, the bar keeps its place as an empty track.
     val progress = if (showGoal) (if (figuresLoading()) 0f else category.goalProgress ?: 0f) else null
     val nameAir = ledgerNameAir(Metro.typography.body)
+    // Overspent, the row is flagged: a red tint and stripe, the figure in red, and how far over under the name.
+    // While a month loads, last month's figures would flag the wrong rows.
+    val over = category.availableMinor < 0 && !figuresLoading()
     Column(
         modifier
             .fillMaxWidth()
-            .ledgerFill(if (banded) ledgerBand else Color.Transparent)
-            .then(if (onOpen != null) Modifier.rowPress({ onOpen(category.id) }) { category(category.id) } else Modifier)
+            .then(
+                if (over) {
+                    Modifier.ledgerFlag(overspentTint, Metro.colors.errorFill)
+                } else {
+                    Modifier.ledgerFill(if (banded) ledgerBand else Color.Transparent)
+                },
+            ).then(if (onOpen != null) Modifier.rowPress({ onOpen(category.id) }) { category(category.id) } else Modifier)
             .testTag("category-${category.id}"),
     ) {
         Row(
@@ -755,14 +765,32 @@ fun CategoryLine(
             )
             LedgerFigure(
                 MoneyFormat.format(category.availableMinor, money, formatOptions),
-                Metro.typography.body,
-                Metro.accent.text,
+                if (over) Metro.typography.body.copy(fontWeight = FontWeight.SemiBold) else Metro.typography.body,
+                if (over) Metro.colors.error else Metro.accent.text,
                 "category-available-${category.id}",
+            )
+        }
+        if (over) {
+            val by = MoneyFormat.format(-category.availableMinor, money, formatOptions)
+            MetroText(
+                // A tap opens the category's page, whose bar offers cover; tracking budgets have nothing to cover from.
+                if (shell.mode == BudgetMode.TRACKING) EnvelopeCopy.overBy(by) else EnvelopeCopy.overByCover(by),
+                Metro.typography.caption,
+                Modifier.padding(bottom = OVER_LINE_GAP).testTag("category-over-${category.id}"),
+                color = Metro.colors.error,
             )
         }
         if (progress != null) GoalBar(progress, Modifier.padding(bottom = GOAL_BAR_GAP).testTag("category-goal-${category.id}"))
     }
 }
+
+/** The faint red behind an overspent row: the red swatch, light enough that the row's figures still read on it. */
+internal val overspentTint: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = Metro.colors.errorFill.copy(alpha = if (Metro.colors.isDark) 0.24f else 0.09f)
+
+private val OVER_LINE_GAP = 8.dp
 
 /** A thin bar across the row: the accent fills as much of the goal as is funded, the rest is a faint track. */
 @Composable

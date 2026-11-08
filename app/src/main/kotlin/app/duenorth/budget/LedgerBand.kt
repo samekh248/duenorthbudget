@@ -44,6 +44,21 @@ internal fun Modifier.ledgerFill(fill: Color): Modifier =
         drawRect(fill, Offset(-gutter, 0f), Size(size.width + 2 * gutter, size.height))
     }
 
+/**
+ * Flags a row that needs attention, such as an overspent category: [tint] behind it as [ledgerFill] paints a band,
+ * and a [stripe] down the screen's (or the panel's) left edge.
+ */
+internal fun Modifier.ledgerFlag(
+    tint: Color,
+    stripe: Color,
+): Modifier =
+    ledgerFill(tint).drawBehind {
+        val gutter = MetroDimens.Gutter.toPx()
+        drawRect(stripe, Offset(-gutter, 0f), Size(LEDGER_FLAG_STRIPE.toPx(), size.height))
+    }
+
+internal val LEDGER_FLAG_STRIPE = 4.dp
+
 /** Whether the row at [index] in a ledger list sits on a band: every second row, counting from the first. */
 internal fun ledgerBanded(index: Int): Boolean = index % 2 == 1
 
