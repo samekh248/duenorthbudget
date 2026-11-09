@@ -217,11 +217,12 @@ object SyncSchema {
 
     fun localWritesOnThread(): Long = localWrites.get()
 
-    fun ensure(session: SqlSession) {
-        session.transaction {
-            statements.forEach(session::exec)
+    fun ensure(session: SqlSession) =
+        SchemaGate.run(session, SchemaGate.Check.SYNC) {
+            session.transaction {
+                statements.forEach(session::exec)
+            }
         }
-    }
 
     fun state(
         session: SqlSession,

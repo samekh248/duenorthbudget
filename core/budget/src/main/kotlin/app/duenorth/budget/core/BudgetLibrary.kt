@@ -309,6 +309,8 @@ class BudgetLibrary(
         val metadata = json.encodeToString(BudgetMetadata(id = id, budgetName = name.trim()))
         writeAtomically(File(staging, "metadata.json"), metadata)
         val dest = File(root, id)
+        // The file at this path is about to be a different one; its schema checks start over.
+        SchemaGate.forget(File(dest, "db.sqlite"))
         if (!dest.exists()) {
             Files.move(staging.toPath(), dest.toPath(), StandardCopyOption.ATOMIC_MOVE)
             return
