@@ -101,8 +101,6 @@ internal fun BudgetItem(
     onOpenServer: (RemoteFile) -> Unit = {},
     error: String? = null,
     manage: SettingsManage = SettingsManage(),
-    closeOutDays: Int = CloseOutWindow.DEFAULT_DAYS,
-    onCloseOutDays: (Int) -> Unit = {},
 ) {
     val open = budgets.find { it.id == openBudgetId }
     // One box is both the open budget and the way to another: the phone's budgets, then the server's.
@@ -168,17 +166,25 @@ internal fun BudgetItem(
                 color = Metro.colors.secondary,
             )
         }
-        // The assistant's end-of-month close out: when its card shows, or never.
-        SettingsHeading(SettingsCopy.CLOSE_OUT, tag = "settings-close-out")
-        ListPicker(
-            CloseOutWindow.CHOICES,
-            closeOutDays.takeIf { it in CloseOutWindow.CHOICES } ?: CloseOutWindow.DEFAULT_DAYS,
-            "settings-close-out-picker",
-            CloseOutWindow::label,
-            onCloseOutDays,
-        )
-        MetroText(SettingsCopy.CLOSE_OUT_HINT, Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
     }
+}
+
+/** Settings that hold whichever budget is open: they live on the phone, not in a budget. */
+@Composable
+internal fun GeneralItem(
+    closeOutDays: Int = CloseOutWindow.DEFAULT_DAYS,
+    onCloseOutDays: (Int) -> Unit = {},
+) {
+    // The assistant's end-of-month close out: when its card shows, or never.
+    SettingsHeading(SettingsCopy.CLOSE_OUT, tag = "settings-close-out", first = true)
+    ListPicker(
+        CloseOutWindow.CHOICES,
+        closeOutDays.takeIf { it in CloseOutWindow.CHOICES } ?: CloseOutWindow.DEFAULT_DAYS,
+        "settings-close-out-picker",
+        CloseOutWindow::label,
+        onCloseOutDays,
+    )
+    MetroText(SettingsCopy.CLOSE_OUT_HINT, Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
 }
 
 @Composable
@@ -195,7 +201,8 @@ internal fun ServerItem(
     // A server's commands open from its row, as the categories page's do.
     var menu by remember { mutableStateOf<Pair<Rect, List<MetroMenuItem>>?>(null) }
     var activeBounds by remember { mutableStateOf(Rect.Zero) }
-    SettingsHeading("this phone syncs with", first = true)
+    // Under the budget's own settings on settings › budget, so it is never the page's first heading.
+    SettingsHeading("this phone syncs with", tag = "settings-server")
     MetroText(
         activeInstance?.let { it.label ?: it.address } ?: SettingsCopy.NOT_CONNECTED,
         Metro.typography.subheader,

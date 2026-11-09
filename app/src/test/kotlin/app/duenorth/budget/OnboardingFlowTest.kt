@@ -203,13 +203,13 @@ class OnboardingFlowTest {
     }
 
     @Test
-    fun addServerFromSettingsReturnsToTheServerItem() {
+    fun addServerFromSettingsReturnsToTheBudgetItem() {
         val root = root("settings-add")
         library(root).create("Home", "USD")
         val model = model(root)
         awaitMain { model.state.value.shell != null }
         model.settingsUi.show()
-        model.settingsUi.selectPage(SettingsPage.SERVER)
+        model.settingsUi.selectPage(SettingsPage.BUDGET)
 
         model.onboarding.addServer()
         assertEquals(ShellRoute.OnboardingAddress, model.state.value.route)
@@ -218,10 +218,10 @@ class OnboardingFlowTest {
             model.state.value.onboarding!!
                 .progress.addressText,
         )
-        // Back from the address page: nothing saved, server item showing.
+        // Back from the address page: nothing saved, budget item (with the server) showing.
         assertTrue(model.back())
         assertEquals(ShellRoute.Settings, model.state.value.route)
-        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+        assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
         assertNull(model.state.value.onboarding)
         assertTrue(library(root).settings().instances.isEmpty())
 
@@ -236,7 +236,7 @@ class OnboardingFlowTest {
         assertEquals("home server", library(root).settings().activeInstance()?.label)
         assertTrue(model.back())
         assertEquals(ShellRoute.Settings, model.state.value.route)
-        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+        assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
         assertEquals(listOf("Home"), library(root).list().map { it.name })
         assertNull(model.state.value.onboarding)
         awaitMain { library(root).onboarding().read() == null }
@@ -264,7 +264,7 @@ class OnboardingFlowTest {
         )
         assertTrue(model.back())
         assertEquals(ShellRoute.Settings, model.state.value.route)
-        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+        assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
     }
 
     @Test
@@ -342,7 +342,7 @@ class OnboardingFlowTest {
         model.servers.confirmRemove()
         awaitMain { library(root).settings().instances.isEmpty() }
         assertEquals(ShellRoute.Settings, model.state.value.route)
-        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+        assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
     }
 
     @Test
@@ -354,7 +354,7 @@ class OnboardingFlowTest {
         val model = model(root)
         awaitMain { model.state.value.shell != null }
         model.settingsUi.show()
-        model.settingsUi.selectPage(SettingsPage.SERVER)
+        model.settingsUi.selectPage(SettingsPage.BUDGET)
         model.onboarding.addServer()
         model.onboarding.setAddress("budget.example.com")
         model.onboarding.check()
@@ -426,7 +426,7 @@ class OnboardingFlowTest {
         awaitMain { model.state.value.route == ShellRoute.OnboardingFiles }
         assertTrue(model.back())
         assertEquals(ShellRoute.Settings, model.state.value.route)
-        assertEquals(SettingsPage.SERVER, model.state.value.settingsPage)
+        assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
     }
 
     @Test

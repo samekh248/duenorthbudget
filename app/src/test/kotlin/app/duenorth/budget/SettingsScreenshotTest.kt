@@ -36,11 +36,20 @@ class SettingsScreenshotTest {
     @Test
     fun budgetSignedOutDark() = snap("settings_budget_signed_out_dark", SettingsPage.BUDGET, dark = true, signedIn = false)
 
+    // The whole budget item, tall enough to show the server section under the budget's own settings.
     @Test
-    fun serverLight() = snap("settings_server_light", SettingsPage.SERVER, dark = false)
+    @Config(qualifiers = "w411dp-h1250dp-xxhdpi")
+    fun budgetFullLight() = snap("settings_budget_full_light", SettingsPage.BUDGET, dark = false, height = 1250)
 
     @Test
-    fun serverDark() = snap("settings_server_dark", SettingsPage.SERVER, dark = true)
+    @Config(qualifiers = "w411dp-h1250dp-xxhdpi")
+    fun budgetFullDark() = snap("settings_budget_full_dark", SettingsPage.BUDGET, dark = true, height = 1250)
+
+    @Test
+    fun generalLight() = snap("settings_general_light", SettingsPage.GENERAL, dark = false)
+
+    @Test
+    fun generalDark() = snap("settings_general_dark", SettingsPage.GENERAL, dark = true)
 
     @Test
     fun formatLight() = snap("settings_format_light", SettingsPage.FORMAT, dark = false)
@@ -127,7 +136,8 @@ class SettingsScreenshotTest {
         budgetOpen: Boolean = true,
         prefs: FormatPrefs = FormatPrefs(),
         signedIn: Boolean = true,
-    ) = page(name, dark) { settingsScreen(settingsPage, dark, budgetOpen, prefs, signedIn) }
+        height: Int = 780,
+    ) = page(name, dark, height = height) { settingsScreen(settingsPage, dark, budgetOpen, prefs, signedIn) }
 
     @androidx.compose.runtime.Composable
     private fun settingsScreen(
@@ -202,11 +212,12 @@ class SettingsScreenshotTest {
         name: String,
         dark: Boolean,
         hosted: Boolean = false,
+        height: Int = 780,
         content: @androidx.compose.runtime.Composable () -> Unit,
     ) {
         captureRoboImage("src/test/snapshots/$name.png") {
             MetroTheme(darkTheme = dark) {
-                if (hosted) HostedPage(content) else Box(Modifier.width(390.dp).height(780.dp)) { content() }
+                if (hosted) HostedPage(content) else Box(Modifier.width(390.dp).height(height.dp)) { content() }
             }
         }
     }

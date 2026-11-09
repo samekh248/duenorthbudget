@@ -48,10 +48,32 @@ class SettingsContentTest {
     @Test
     fun headerRowHasSixItemsWithABudgetOpen() {
         show(SettingsPage.BUDGET)
-        listOf("budget", "server", "format", "appearance", "advanced", "experimental").forEach {
+        listOf("budget", "general", "format", "appearance", "advanced", "experimental").forEach {
             compose.onNodeWithText(it).assertExists()
         }
+        // The server has no item of its own: it sits on the budget item.
+        compose.onNodeWithText("server").assertDoesNotExist()
         compose.onNodeWithTag("settings-item-budget").assertIsDisplayed()
+        compose.onNodeWithTag("settings-server").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun generalHoldsCloseOutWithOrWithoutABudget() {
+        var days: Int? = null
+        show(SettingsPage.GENERAL, openBudgetId = null, onCloseOutDays = { days = it })
+        compose.onNodeWithText("general").assertExists()
+        compose.onNodeWithTag("settings-item-general").assertIsDisplayed()
+        compose.onNodeWithTag("settings-close-out").assertIsDisplayed()
+        compose.onNodeWithTag("settings-close-out-picker").performClick()
+        compose.onNodeWithTag("settings-close-out-picker-0").performClick()
+        assertEquals(0, days)
+    }
+
+    @Test
+    fun budgetItemNoLongerHoldsCloseOut() {
+        show(SettingsPage.BUDGET)
+        val item = hasAnyAncestor(hasTestTag("settings-item-budget"))
+        compose.onAllNodes(hasTestTag("settings-close-out") and item).assertCountEquals(0)
     }
 
     @Test
@@ -169,7 +191,8 @@ class SettingsContentTest {
     @Test
     fun serverItemNamesActiveServerAndListsSaved() {
         var removed: String? = null
-        show(SettingsPage.SERVER, instanceReachable = false, onRemove = { removed = it })
+        show(SettingsPage.BUDGET, instanceReachable = false, onRemove = { removed = it })
+        compose.onNodeWithTag("instance-i2").performScrollTo()
         compose.onNodeWithTag("instance-status").assertTextEquals("home")
         compose.onNodeWithTag("instance-address-line").assertTextEquals(home.address)
         compose.onNodeWithTag("instance-state").assertTextEquals(SyncCopy.NOT_REACHED)
@@ -181,14 +204,14 @@ class SettingsContentTest {
         compose.onNodeWithTag("instance-remove-i2").performClick()
         assertEquals("i2", removed)
         compose.onNodeWithTag("instance-menu").assertDoesNotExist()
-        compose.onNodeWithTag("instance-status").performClick()
+        compose.onNodeWithTag("instance-status").performScrollTo().performClick()
         compose.onNodeWithTag("instance-remove-i1").performClick()
         assertEquals("i1", removed)
     }
 
     @Test
     fun serverItemWithNoServerSaysNotConnected() {
-        show(SettingsPage.SERVER, instances = emptyList(), active = null)
+        show(SettingsPage.BUDGET, instances = emptyList(), active = null)
         compose.onNodeWithTag("instance-status").assertTextEquals("not connected")
         compose.onNodeWithTag("instance-state").assertDoesNotExist()
     }
@@ -225,7 +248,7 @@ class SettingsContentTest {
         compose.onNodeWithTag("encryption-set").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("encryption-change").assertDoesNotExist()
         val risky = listOf("settings-rebuild", "settings-repair", "settings-reset-sync", "encryption-set", "settings-export")
-        listOf(SettingsPage.BUDGET, SettingsPage.SERVER, SettingsPage.FORMAT, SettingsPage.APPEARANCE).forEach { page ->
+        listOf(SettingsPage.BUDGET, SettingsPage.GENERAL, SettingsPage.FORMAT, SettingsPage.APPEARANCE).forEach { page ->
             current = page
             compose.waitForIdle()
             val item = hasAnyAncestor(hasTestTag("settings-item-${page.name.lowercase()}"))
@@ -302,6 +325,7 @@ class SettingsContentTest {
         onPage: (SettingsPage) -> Unit = {},
         onOpenBudget: (String) -> Unit = {},
         onRemove: (String) -> Unit = {},
+        onCloseOutDays: (Int) -> Unit = {},
     ) {
         compose.setContent {
             MetroTheme {
@@ -316,6 +340,7 @@ class SettingsContentTest {
                         onPage = onPage,
                         onOpenBudget = onOpenBudget,
                         onRemove = onRemove,
+                        onCloseOutDays = onCloseOutDays,
                     )
                 }
             }
@@ -335,6 +360,7 @@ class SettingsContentTest {
         onOpenBudget: (String) -> Unit = {},
         onRemove: (String) -> Unit = {},
         onTheme: (String) -> Unit = {},
+        onCloseOutDays: (Int) -> Unit = {},
     ) {
         SettingsScreen(
             page = page,
@@ -364,6 +390,7 @@ class SettingsContentTest {
             onExport = {},
             onEncryption = {},
             onRequestAdvanced = {},
+            onCloseOutDays = onCloseOutDays,
         )
     }
 }

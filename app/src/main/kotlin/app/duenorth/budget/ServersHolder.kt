@@ -59,23 +59,23 @@ class ServersHolder internal constructor(
         }
     }
 
-    /** Settings → server → server budgets: the server page with a budget open, the pick-a-budget page without (research R5). */
+    /** Settings → budget → server budgets: the server page with a budget open, the pick-a-budget page without (research R5). */
     fun showBudgets() {
         if (state.shell == null) {
-            host.openFromSettings(ShellRoute.OnboardingFiles, SettingsPage.SERVER)
+            host.openFromSettings(ShellRoute.OnboardingFiles, SettingsPage.BUDGET)
             host.refreshOnboardingFiles()
         } else {
             show()
-            host.mutate { it.copy(settingsReturn = true, settingsPage = SettingsPage.SERVER) }
+            host.mutate { it.copy(settingsReturn = true, settingsPage = SettingsPage.BUDGET) }
         }
     }
 
-    fun requestRemove(instanceId: String) = host.openFromSettings(ShellRoute.ConfirmRemoveInstance(instanceId), SettingsPage.SERVER)
+    fun requestRemove(instanceId: String) = host.openFromSettings(ShellRoute.ConfirmRemoveInstance(instanceId), SettingsPage.BUDGET)
 
     fun confirmRemove() {
         val id = (state.route as? ShellRoute.ConfirmRemoveInstance)?.instanceId ?: return
         remove(id)
-        host.returnToSettings(SettingsPage.SERVER)
+        host.returnToSettings(SettingsPage.BUDGET)
     }
 
     fun connect(
@@ -176,7 +176,7 @@ class ServersHolder internal constructor(
     }
 
     fun requestSwitch(instanceId: String) {
-        host.mutate { it.copy(settingsPage = SettingsPage.SERVER) }
+        host.mutate { it.copy(settingsPage = SettingsPage.BUDGET) }
         val settings = state.settings
         val target = settings.instances.firstOrNull { it.id == instanceId } ?: return
         val current = settings.activeInstance()
@@ -210,7 +210,7 @@ class ServersHolder internal constructor(
             probeReachability()
             // A signed-in server goes straight to picking which of its budgets to use.
             if (host.sync.signedIn()) {
-                host.openFromSettings(ShellRoute.OnboardingFiles, SettingsPage.SERVER)
+                host.openFromSettings(ShellRoute.OnboardingFiles, SettingsPage.BUDGET)
                 host.refreshOnboardingFiles()
             }
         }

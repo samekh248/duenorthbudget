@@ -392,13 +392,13 @@ data class PhoneSettings(
     val backgroundSyncHours: Int = BackgroundSync.DEFAULT_HOURS,
     /** Budgets made on this phone that still show the get started list over their month. */
     val getStarted: List<String> = emptyList(),
-    /** How many of a month's last days the assistant offers close out; 0 turns it off (settings → budget). */
+    /** How many of a month's last days the assistant offers close out; 0 turns it off (settings → general). */
     val closeOutDays: Int = CloseOutWindow.DEFAULT_DAYS,
     /** Close out's marks on this phone: months closed and categories kept as they are ([CloseOutMarks]). */
     val closeOutMarks: List<String> = emptyList(),
 )
 
-/** The background sync's choices (settings → server). */
+/** The background sync's choices (settings → budget). */
 object BackgroundSync {
     const val DEFAULT_HOURS = 3
     val CHOICES = listOf(1, 3, 6, 12, 24, 0)

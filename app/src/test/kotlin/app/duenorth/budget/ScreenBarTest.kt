@@ -435,11 +435,14 @@ class ScreenBarTest {
                 mode = BudgetMode.ENVELOPE,
                 settings = SettingsBar(page, signedIn, serverActive),
             ).map { it.id }
-        // Payees has its link on the page's manage list, so the bar only adds a budget.
-        assertEquals(listOf("settings-new"), ids(SettingsPage.BUDGET))
-        assertEquals(listOf("settings-new"), ids(SettingsPage.BUDGET, hasBudget = false))
-        assertEquals(listOf("add-server"), ids(SettingsPage.SERVER))
-        assertEquals(listOf("add-server", "server-budgets", "sign-out"), ids(SettingsPage.SERVER, signedIn = true, serverActive = true))
+        // Payees has its link on the page's manage list; the budget page also holds the server, so its commands follow.
+        assertEquals(listOf("settings-new", "add-server"), ids(SettingsPage.BUDGET))
+        assertEquals(listOf("settings-new", "add-server"), ids(SettingsPage.BUDGET, hasBudget = false))
+        assertEquals(
+            listOf("settings-new", "add-server", "server-budgets", "sign-out"),
+            ids(SettingsPage.BUDGET, signedIn = true, serverActive = true),
+        )
+        assertTrue(ids(SettingsPage.GENERAL).isEmpty())
         assertTrue(ids(SettingsPage.FORMAT).isEmpty())
         assertTrue(ids(SettingsPage.APPEARANCE).isEmpty())
         assertEquals(listOf("export"), ids(SettingsPage.ADVANCED))
@@ -556,7 +559,7 @@ class ScreenBarTest {
                 if (spec.glyph == AppGlyph.Save) assertFalse(spec.label, spec.label.startsWith("add"))
             }
         }
-        val server = ScreenBar.specsFor(ShellRoute.Settings, true, BudgetMode.ENVELOPE, settings = SettingsBar(SettingsPage.SERVER))
+        val server = ScreenBar.specsFor(ShellRoute.Settings, true, BudgetMode.ENVELOPE, settings = SettingsBar(SettingsPage.BUDGET))
         assertEquals(ScreenBarCopy.ADD_SERVER, server.single { it.id == "add-server" }.label)
     }
 
@@ -574,7 +577,7 @@ class ScreenBarTest {
             )
         val specs =
             routes.flatMap { ScreenBar.specsFor(it, hasBudget = true, mode = BudgetMode.ENVELOPE) } +
-                ScreenBar.specsFor(ShellRoute.Settings, true, BudgetMode.ENVELOPE, settings = SettingsBar(SettingsPage.SERVER))
+                ScreenBar.specsFor(ShellRoute.Settings, true, BudgetMode.ENVELOPE, settings = SettingsBar(SettingsPage.BUDGET))
         specs.filter { it.primary }.forEach { spec ->
             // One word, so the caption never wraps; + is already "add", so a noun caption never says it again.
             assertFalse(spec.caption, ' ' in spec.caption)

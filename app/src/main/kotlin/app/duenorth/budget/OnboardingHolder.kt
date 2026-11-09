@@ -85,7 +85,7 @@ class OnboardingHolder internal constructor(
                     onboarding = OnboardingUi(stored),
                     route = route(stored),
                     settingsReturn = true,
-                    settingsPage = SettingsPage.SERVER,
+                    settingsPage = SettingsPage.BUDGET,
                 )
             }
             return
@@ -93,7 +93,7 @@ class OnboardingHolder internal constructor(
         host.mutate { it.copy(onboarding = OnboardingUi(stored)) }
     }
 
-    /** Settings → server → add: the onboarding server path, starting on an empty address (spec 012 FR-005). */
+    /** Settings → budget → add server: the onboarding server path, starting on an empty address (spec 012 FR-005). */
     fun addServer() {
         cancelJob()
         val progress =
@@ -104,15 +104,15 @@ class OnboardingHolder internal constructor(
             )
         host.mutate { it.copy(onboarding = OnboardingUi(progress)) }
         host.scope.launch(writes) { host.library.onboarding().write(progress) }
-        settings.openFrom(ShellRoute.OnboardingAddress, SettingsPage.SERVER)
+        settings.openFrom(ShellRoute.OnboardingAddress, SettingsPage.BUDGET)
     }
 
-    /** The settings-origin path is over without a pick: drop its progress and show the server item. */
+    /** The settings-origin path is over without a pick: drop its progress and show the budget item, where servers are. */
     private fun leaveSettings() {
         cancelJob()
         host.mutate { it.copy(onboarding = null) }
         host.scope.launch(writes) { host.library.onboarding().clear() }
-        settings.returnTo(SettingsPage.SERVER)
+        settings.returnTo(SettingsPage.BUDGET)
     }
 
     /** After the first load, the file list needs the server's budgets again. */

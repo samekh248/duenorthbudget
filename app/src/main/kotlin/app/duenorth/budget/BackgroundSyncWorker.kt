@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * While the app is away, with a network, fetches the open budget's linked banks and then syncs
- * it, every few hours as settings → server says (three by default), so bank transactions and
+ * it, every few hours as settings → budget says (three by default), so bank transactions and
  * desktop changes are already on the phone when it opens. The screen syncs on its own while shown.
  * A one-off run as the app closes sends changes the phone could not send then, once there is a network.
  */
