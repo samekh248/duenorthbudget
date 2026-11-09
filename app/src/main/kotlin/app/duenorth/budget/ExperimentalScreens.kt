@@ -75,6 +75,17 @@ enum class ExperimentalFeature(
             AUTOMATIONS -> prefs.goalTemplatesUI
             FREE_AFTER_PLANS -> phone.freeAfterPlans
         }
+
+    companion object {
+        /**
+         * What `flags.experimental` should hold: on while any feature is on, off once none are. Settings no
+         * longer shows that switch, so it follows the features instead of gating them.
+         */
+        fun anyOn(
+            prefs: FormatPrefs,
+            phone: PhoneSettings,
+        ): Boolean = entries.any { it.isOn(prefs, phone) }
+    }
 }
 
 object ExperimentalCopy {
@@ -93,7 +104,6 @@ object ExperimentalCopy {
     const val NOW_ON = "This budget already has them on."
     const val NOW_OFF = "This budget has them off."
     const val LATER = "change this any time in settings → experimental"
-    const val NEEDS_MASTER = "turn on experimental features to use this"
     const val NEEDS_PARENT = "turn on budget templates to use this"
     const val ON = "on"
     const val OFF = "off"
@@ -151,14 +161,13 @@ fun ExperimentalOfferScreen(
 }
 
 /**
- * Settings → experimental: the master switch, then each feature with what it does and where it
- * shows up. Features stay listed while the switch is off, so the item says what turning it on
- * would bring.
+ * Settings → experimental: each feature's own switch, with what it does and where it shows up.
+ * There is no master switch here; `flags.experimental` is kept on while any feature is on and off
+ * once none are (see [ExperimentalFeature.anyOn]).
  */
 @Composable
 internal fun ExperimentalItem(
     prefs: FormatPrefs,
-    onExperimental: (Boolean) -> Unit,
     onFeature: (ExperimentalFeature, Boolean) -> Unit,
     phone: PhoneSettings = PhoneSettings(),
 ) {
@@ -166,12 +175,6 @@ internal fun ExperimentalItem(
         Modifier.testTag("experimental-screen"),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        SwitchRow(
-            label = ExperimentalCopy.TITLE,
-            on = prefs.experimental,
-            tag = "experimental-master",
-            onChange = onExperimental,
-        )
         MetroText(ExperimentalCopy.ABOUT, Metro.typography.body)
         MetroText(ExperimentalCopy.PER_BUDGET, Metro.typography.body)
         Heading(ExperimentalCopy.FEATURES)
@@ -189,7 +192,7 @@ private fun FeatureRow(
     onFeature: (ExperimentalFeature, Boolean) -> Unit,
 ) {
     val parentOff = feature.parent?.let { !it.isOn(prefs, phone) } == true
-    val usable = prefs.experimental && !parentOff
+    val usable = !parentOff
     val ink = if (usable) Metro.colors.foreground else Metro.colors.secondary
     Column(
         Modifier.fillMaxWidth().padding(vertical = MetroDimens.Row).testTag("experimental-${feature.tag}"),
@@ -202,11 +205,7 @@ private fun FeatureRow(
         }
         MetroText(feature.hint, Metro.typography.body, color = ink)
         MetroText(
-            when {
-                usable -> feature.where
-                prefs.experimental -> ExperimentalCopy.NEEDS_PARENT
-                else -> ExperimentalCopy.NEEDS_MASTER
-            },
+            if (usable) feature.where else ExperimentalCopy.NEEDS_PARENT,
             Metro.typography.caption,
             Modifier.testTag("experimental-${feature.tag}-note"),
             color = if (usable) Metro.colors.secondary else Metro.accent.text,
@@ -244,6 +243,6 @@ object FreeAfterPlansCopy {
     const val LABEL = "unassigned"
 }
 
-/** Experimental free-after-later-plans: on only with the master switch and this phone's setting. */
+/** Experimental free-after-later-plans: on with this phone's setting, while the budget's `flags.experimental` agrees. */
 val ShellUiState.freeAfterPlansOn: Boolean
     get() = formatPrefs.experimental && settings.freeAfterPlans

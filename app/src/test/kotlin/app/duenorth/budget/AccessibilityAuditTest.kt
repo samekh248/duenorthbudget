@@ -258,7 +258,6 @@ internal fun SettingsSample(
         onNumberFormat = {},
         onFirstDay = {},
         onHideFraction = {},
-        onExperimental = {},
         onExport = {},
         onEncryption = {},
         onRequestAdvanced = {},

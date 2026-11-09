@@ -4,10 +4,12 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.viewModelScope
 import app.duenorth.budget.ParityTestSupport.await
 import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.design.theme.MetroTheme
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -64,7 +66,6 @@ class ExperimentalContentTest {
         val (model, _) = household("experimental-page")
         model.settingsUi.show()
         model.settingsUi.selectPage(SettingsPage.EXPERIMENTAL)
-        model.settingsUi.setExperimental(true)
         model.settingsUi.setExperimentalFeature(ExperimentalFeature.TEMPLATES, true)
         assertTrue(model.state.value.formatPrefs.templatesOn)
         assertEquals(ShellRoute.Settings, model.state.value.route)
@@ -74,26 +75,59 @@ class ExperimentalContentTest {
     fun freeAfterPlansStaysOnThisPhone() {
         val (model, library) = household("experimental-free-after-plans")
         val budgetId = model.state.value.settings.openBudgetId!!
-        model.settingsUi.setExperimental(true)
         assertFalse(model.state.value.freeAfterPlansOn)
         model.settingsUi.setExperimentalFeature(ExperimentalFeature.FREE_AFTER_PLANS, true)
         assertTrue(model.state.value.settings.freeAfterPlans)
         assertTrue(model.state.value.freeAfterPlansOn)
-        // Nothing for it goes into the budget file, so nothing syncs.
+        // Only the experimental switch, which follows the features, goes into the budget file.
         await { library.readFormatPrefs(budgetId).experimental }
         assertFalse(library.readFormatPrefs(budgetId).goalTemplates)
-        model.settingsUi.setExperimental(false)
+        model.settingsUi.setExperimentalFeature(ExperimentalFeature.FREE_AFTER_PLANS, false)
         await { !model.state.value.formatPrefs.experimental }
         assertFalse(model.state.value.freeAfterPlansOn)
     }
 
     @Test
-    fun featuresWaitForTheMasterSwitch() {
+    fun featureSwitchesShowWithNoMasterSwitch() {
         compose.setContent {
-            MetroTheme { ExperimentalItem(FormatPrefs(), {}, { _, _ -> }) }
+            MetroTheme { ExperimentalItem(FormatPrefs(), { _, _ -> }) }
         }
-        compose.onNodeWithTag("experimental-templates-switch").assertDoesNotExist()
-        compose.onAllNodesWithText(ExperimentalCopy.NEEDS_MASTER).assertCountEquals(ExperimentalFeature.entries.size)
+        compose.onNodeWithTag("experimental-master").assertDoesNotExist()
+        compose.onNodeWithTag("experimental-templates-switch").assertExists()
+        compose.onNodeWithTag("experimental-free-after-plans-switch").assertExists()
+    }
+
+    @Test
+    fun theSwitchFollowsTheFeatures() {
+        val (model, library) = household("experimental-follows")
+        val budgetId = model.state.value.settings.openBudgetId!!
+        model.settingsUi.setExperimentalFeature(ExperimentalFeature.TEMPLATES, true)
+        assertTrue(model.state.value.formatPrefs.experimental)
+        model.settingsUi.setExperimentalFeature(ExperimentalFeature.AUTOMATIONS, true)
+        model.settingsUi.setExperimentalFeature(ExperimentalFeature.FREE_AFTER_PLANS, true)
+        model.settingsUi.setExperimentalFeature(ExperimentalFeature.FREE_AFTER_PLANS, false)
+        // Templates (and automations under them) are still on, so the switch stays on.
+        assertTrue(model.state.value.formatPrefs.experimental)
+        model.settingsUi.setExperimentalFeature(ExperimentalFeature.TEMPLATES, false)
+        assertFalse(model.state.value.formatPrefs.experimental)
+        await { !library.readFormatPrefs(budgetId).experimental }
+    }
+
+    @Test
+    fun aBudgetFromBeforeGetsTheSwitchItsFeaturesCallFor() {
+        val (model, library) = household("experimental-upgrade")
+        val budgetId = model.state.value.settings.openBudgetId!!
+        // Saved by an older version: templates on, master switch off.
+        model.settingsUi.setExperimental(false)
+        model.settingsUi.setGoalTemplates(true)
+        await { library.readFormatPrefs(budgetId).let { it.goalTemplates && it.experimentalAsked && !it.experimental } }
+        model.viewModelScope.launch { model.settingsUi.syncExperimental() }
+        await { library.readFormatPrefs(budgetId).templatesOn }
+        // And the other way: master on with nothing under it turns off.
+        model.settingsUi.setGoalTemplates(false)
+        await { !library.readFormatPrefs(budgetId).goalTemplates }
+        model.viewModelScope.launch { model.settingsUi.syncExperimental() }
+        await { !library.readFormatPrefs(budgetId).experimental }
     }
 
     @Test
@@ -101,7 +135,7 @@ class ExperimentalContentTest {
         var flipped: Pair<ExperimentalFeature, Boolean>? = null
         compose.setContent {
             MetroTheme {
-                ExperimentalItem(FormatPrefs(experimental = true), {}, { feature, on -> flipped = feature to on })
+                ExperimentalItem(FormatPrefs(experimental = true), { feature, on -> flipped = feature to on })
             }
         }
         compose.onNodeWithTag("experimental-templates-switch-on", useUnmergedTree = true).performClick()
@@ -111,7 +145,7 @@ class ExperimentalContentTest {
     @Test
     fun budgetAutomationsSitUnderBudgetTemplates() {
         compose.setContent {
-            MetroTheme { ExperimentalItem(FormatPrefs(experimental = true), {}, { _, _ -> }) }
+            MetroTheme { ExperimentalItem(FormatPrefs(experimental = true), { _, _ -> }) }
         }
         compose.onNodeWithTag("experimental-automations-switch").assertDoesNotExist()
         compose.onAllNodesWithText(ExperimentalCopy.NEEDS_PARENT).assertCountEquals(1)
@@ -121,7 +155,6 @@ class ExperimentalContentTest {
     fun turningTemplatesOffTurnsAutomationsOff() {
         val (model, library) = household("experimental-automations")
         val budgetId = model.state.value.settings.openBudgetId!!
-        model.settingsUi.setExperimental(true)
         model.settingsUi.setExperimentalFeature(ExperimentalFeature.TEMPLATES, true)
         model.settingsUi.setExperimentalFeature(ExperimentalFeature.AUTOMATIONS, true)
         assertTrue(model.state.value.formatPrefs.automationsOn)
