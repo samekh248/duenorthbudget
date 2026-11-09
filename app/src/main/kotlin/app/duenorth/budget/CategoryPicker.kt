@@ -227,7 +227,7 @@ fun CategoryPickerScreen(
             color = Metro.accent.text,
         )
         if (error != null) {
-            MetroText(error, Metro.typography.body, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)
+            WarningText(error, Modifier.padding(top = MetroDimens.Gutter))
         }
         CategoryFilterField(filter, enter, Modifier.padding(top = MetroDimens.Grid))
         val list = rememberLazyListState()

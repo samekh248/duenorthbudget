@@ -93,7 +93,7 @@ fun AddAccountScreen(
             Choice(AccountScreenCopy.ON_BUDGET, !offBudget, "account-add-on") { offBudget = false }
             Choice(AccountScreenCopy.OFF_BUDGET, offBudget, "account-add-off") { offBudget = true }
         }
-        if (error != null) MetroText(error, Metro.typography.body, Modifier.testTag("account-error"), color = Metro.accent.text)
+        if (error != null) WarningText(error, Modifier.testTag("account-error"))
         RememberFormSave { onSave(name, offBudget, prefs.readAmount(balance)) }
         if (!formSaveOnBar()) {
             MetroButton("save", Modifier.testTag("account-add-save")) { onSave(name, offBudget, prefs.readAmount(balance)) }
@@ -148,7 +148,7 @@ fun EditAccountScreen(
                 )
             }
         }
-        if (error != null) MetroText(error, Metro.typography.body, Modifier.testTag("account-error"), color = Metro.accent.text)
+        if (error != null) WarningText(error, Modifier.testTag("account-error"))
         RememberFormSave { save() }
         if (!formSaveOnBar()) {
             MetroButton("save", Modifier.testTag("account-edit-save")) { save() }

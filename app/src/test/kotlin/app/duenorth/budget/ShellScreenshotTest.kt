@@ -666,80 +666,84 @@ class ShellScreenshotTest {
             )
         }
 
-    private fun manyAccounts(): List<AccountRow> =
-        listOf(
-            AccountRow("checking", "Checking", offBudget = false, closed = false, balanceMinor = 226_000),
-            AccountRow("joint", "Joint checking", offBudget = false, closed = false, balanceMinor = 84_250),
-            AccountRow("card", "Credit card", offBudget = false, closed = false, balanceMinor = -41_870),
-            AccountRow("savings", "Savings", offBudget = true, closed = false, balanceMinor = 1_250_000),
-            AccountRow("mortgage", "Mortgage", offBudget = true, closed = false, balanceMinor = -18_400_000),
-            AccountRow("old-card", "Old card", offBudget = false, closed = true, balanceMinor = 0),
-        )
+    private fun manyAccounts(): List<AccountRow> = manyAccountsSample()
 
-    private fun sample(): MonthShell =
-        MonthShell(
-            budgetId = "home",
-            budgetName = "Home",
-            mode = BudgetMode.ENVELOPE,
-            currency = Currencies.byCode("USD")!!,
-            month = YearMonth.of(2026, 10),
-            headerLabel = "to budget",
-            headerMinor = 42_000,
-            bufferedMinor = 25_000,
-            groups =
-                listOf(
-                    GroupRow(
-                        "g-bills",
-                        "Bills",
-                        124_000,
-                        listOf(
-                            CategoryRow("c-rent", "Rent", 110_000, 0, 110_000, false),
-                            CategoryRow("c-power", "Power", 14_000, 0, 14_000, false),
-                        ),
-                    ),
-                    GroupRow(
-                        "g-every",
-                        "Everyday",
-                        18_640,
-                        listOf(
-                            CategoryRow("c-gas", "Gas", 12_000, 4_360, 7_640, false),
-                            CategoryRow("c-phone", "Phone", 11_000, 0, 11_000, false),
-                        ),
-                    ),
-                    GroupRow(
-                        "g-food",
-                        "Food",
-                        -3_200,
-                        listOf(
-                            CategoryRow("c-groceries", "Groceries", 20_000, 28_000, -8_000, false),
-                            CategoryRow("c-dining", "Dining", 8_000, 3_200, 4_800, false),
-                        ),
-                    ),
-                    GroupRow("g-save", "Savings", 80_000, listOf(CategoryRow("c-rainy", "Rainy day", 80_000, 0, 80_000, false))),
-                ),
-            accounts =
-                listOf(
-                    AccountRow("checking", "Checking", offBudget = false, closed = false, balanceMinor = 226_000),
-                    AccountRow("savings", "Savings", offBudget = true, closed = false, balanceMinor = 10_000),
-                ),
-            inbox =
-                listOf(
-                    InboxRow("coffee", "Corner Coffee", -575, 20261015, "visa", "Visa", "", "c-dining", "Dining"),
-                    InboxRow("amazon", "Amazon", -6_318, 20261015, "visa", "Visa", "2 items", "c-house", "Household"),
-                    InboxRow("shell", "Shell", -4_210, 20261014, "checking", "Checking", "", "c-gas", "Gas"),
-                    InboxRow("acme", "Acme Payroll", 185_000, 20261014, "checking", "Checking", "", "c-pay", "Paycheck"),
-                    InboxRow(
-                        "rent",
-                        "Riverside Property Management",
-                        -120_000,
-                        20261012,
-                        "checking",
-                        "Checking",
-                        "October rent",
-                        "c-rent",
-                        "Rent",
-                    ),
-                    InboxRow("atm", "(no payee)", -2_000, 20261011, "checking", "Checking", "ATM withdrawal"),
-                ),
-        )
+    private fun sample(): MonthShell = shellSample()
 }
+
+internal fun manyAccountsSample(): List<AccountRow> =
+    listOf(
+        AccountRow("checking", "Checking", offBudget = false, closed = false, balanceMinor = 226_000),
+        AccountRow("joint", "Joint checking", offBudget = false, closed = false, balanceMinor = 84_250),
+        AccountRow("card", "Credit card", offBudget = false, closed = false, balanceMinor = -41_870),
+        AccountRow("savings", "Savings", offBudget = true, closed = false, balanceMinor = 1_250_000),
+        AccountRow("mortgage", "Mortgage", offBudget = true, closed = false, balanceMinor = -18_400_000),
+        AccountRow("old-card", "Old card", offBudget = false, closed = true, balanceMinor = 0),
+    )
+
+internal fun shellSample(): MonthShell =
+    MonthShell(
+        budgetId = "home",
+        budgetName = "Home",
+        mode = BudgetMode.ENVELOPE,
+        currency = Currencies.byCode("USD")!!,
+        month = YearMonth.of(2026, 10),
+        headerLabel = "to budget",
+        headerMinor = 42_000,
+        bufferedMinor = 25_000,
+        groups =
+            listOf(
+                GroupRow(
+                    "g-bills",
+                    "Bills",
+                    124_000,
+                    listOf(
+                        CategoryRow("c-rent", "Rent", 110_000, 0, 110_000, false),
+                        CategoryRow("c-power", "Power", 14_000, 0, 14_000, false),
+                    ),
+                ),
+                GroupRow(
+                    "g-every",
+                    "Everyday",
+                    18_640,
+                    listOf(
+                        CategoryRow("c-gas", "Gas", 12_000, 4_360, 7_640, false),
+                        CategoryRow("c-phone", "Phone", 11_000, 0, 11_000, false),
+                    ),
+                ),
+                GroupRow(
+                    "g-food",
+                    "Food",
+                    -3_200,
+                    listOf(
+                        CategoryRow("c-groceries", "Groceries", 20_000, 28_000, -8_000, false),
+                        CategoryRow("c-dining", "Dining", 8_000, 3_200, 4_800, false),
+                    ),
+                ),
+                GroupRow("g-save", "Savings", 80_000, listOf(CategoryRow("c-rainy", "Rainy day", 80_000, 0, 80_000, false))),
+            ),
+        accounts =
+            listOf(
+                AccountRow("checking", "Checking", offBudget = false, closed = false, balanceMinor = 226_000),
+                AccountRow("savings", "Savings", offBudget = true, closed = false, balanceMinor = 10_000),
+            ),
+        inbox =
+            listOf(
+                InboxRow("coffee", "Corner Coffee", -575, 20261015, "visa", "Visa", "", "c-dining", "Dining"),
+                InboxRow("amazon", "Amazon", -6_318, 20261015, "visa", "Visa", "2 items", "c-house", "Household"),
+                InboxRow("shell", "Shell", -4_210, 20261014, "checking", "Checking", "", "c-gas", "Gas"),
+                InboxRow("acme", "Acme Payroll", 185_000, 20261014, "checking", "Checking", "", "c-pay", "Paycheck"),
+                InboxRow(
+                    "rent",
+                    "Riverside Property Management",
+                    -120_000,
+                    20261012,
+                    "checking",
+                    "Checking",
+                    "October rent",
+                    "c-rent",
+                    "Rent",
+                ),
+                InboxRow("atm", "(no payee)", -2_000, 20261011, "checking", "Checking", "ATM withdrawal"),
+            ),
+    )

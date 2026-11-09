@@ -25,7 +25,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -76,7 +78,8 @@ fun MetroField(
             singleLine = lines == null,
             minLines = lines?.first ?: 1,
             maxLines = lines?.last ?: Int.MAX_VALUE,
-            modifier = Modifier.fillMaxWidth().then(if (lines != null) Modifier.padding(vertical = 10.dp) else Modifier),
+            modifier = Modifier.fieldTarget(hint).then(if (lines != null) Modifier.padding(vertical = 10.dp) else Modifier),
+            decorationBox = CenteredLine,
         )
     }
 }
@@ -104,9 +107,24 @@ fun MetroField(
             keyboardOptions = fieldKeyboard(keyboardOptions, null),
             keyboardActions = fieldActions(null, submit),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fieldTarget(hint),
+            decorationBox = CenteredLine,
         )
     }
+}
+
+/**
+ * The typed text's own box fills the frame's 48dp, so a tap anywhere on the box starts typing, not only on the line of
+ * text, and it carries the hint as its name, so TalkBack says what the box is for once something is typed in it.
+ */
+private fun Modifier.fieldTarget(hint: String): Modifier =
+    fillMaxWidth()
+        .heightIn(min = MetroDimens.TouchTarget)
+        .semantics { contentDescription = hint }
+
+/** Keeps the line of text centred in the taller [fieldTarget] box, where the frame centred it before. */
+private val CenteredLine: @Composable (@Composable () -> Unit) -> Unit = { inner ->
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) { inner() }
 }
 
 @Composable

@@ -169,7 +169,7 @@ fun ReconcileRegisterScreen(
         } else {
             ReconcileHeader(page, tally(rows))
             if (error != null) {
-                MetroText(error, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
+                WarningText(error, Modifier.padding(top = 8.dp))
             }
         }
         val hints = if (page != null && !confirming) ReconcileHelp.hints(page) else emptyList()
@@ -215,7 +215,7 @@ private fun StartPanel(
             MetroComboValue(dateText, "statement-date", onPickDate, Modifier.fillMaxWidth())
         }
         if (error != null) {
-            MetroText(error, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
+            WarningText(error, Modifier.padding(top = 8.dp))
         }
     }
 }
@@ -425,6 +425,7 @@ private fun ReconcileList(
                         .fillMaxWidth()
                         .heightIn(min = MetroDimens.TouchTarget)
                         .metroPress({ showLocked = !showLocked })
+                        .expandState(showLocked)
                         .testTag("locked-heading"),
                 ) {
                     Box(Modifier.fillMaxWidth().height(2.dp).background(Metro.colors.foreground.copy(alpha = LOCK_ALPHA)))

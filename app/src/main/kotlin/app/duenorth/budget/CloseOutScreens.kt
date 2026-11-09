@@ -655,7 +655,7 @@ private fun FixCard(
                 ),
             )
         }
-        ui.error?.let { MetroText(it, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.colors.error) }
+        ui.error?.let { WarningText(it, Modifier.padding(top = 8.dp), color = Metro.colors.error) }
         Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             MetroText(
                 "‹ ${CloseOutCopy.REVIEW_LINK}",

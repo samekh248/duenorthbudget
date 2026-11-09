@@ -65,7 +65,7 @@ fun PayeesScreen(
                 MetroField(name, { name = it }, "name", Modifier.padding(top = MetroDimens.Grid))
                 RowChoice("remember as rule", rememberRule) { rememberRule = !rememberRule }
                 if (error != null) {
-                    MetroText(error, Metro.typography.body, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)
+                    WarningText(error, Modifier.padding(top = MetroDimens.Gutter))
                 }
                 PageBar(
                     listOf(
@@ -76,7 +76,7 @@ fun PayeesScreen(
             }
         } else {
             if (error != null) {
-                MetroText(error, Metro.typography.body, Modifier.padding(MetroDimens.Gutter), color = Metro.accent.text)
+                WarningText(error, Modifier.padding(MetroDimens.Gutter))
             }
             LazyColumn(Modifier.fillMaxSize()) {
                 items(payees.filter { !it.transfer }, key = { it.id }) { payee ->

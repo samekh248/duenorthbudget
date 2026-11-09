@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,7 +87,9 @@ private fun Segment(
     Box(
         Modifier
             .fillMaxHeight()
-            .heightIn(min = if (style.layers) MetroDimens.TouchTarget - 8.dp else MetroDimens.TouchTarget)
+            // Every option is a full 48dp target, even a short one like "on", and in mica's track too.
+            .heightIn(min = MetroDimens.TouchTarget)
+            .widthIn(min = MetroDimens.TouchTarget)
             .then(
                 when {
                     // The chosen option stands out in the accent.

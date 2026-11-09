@@ -321,9 +321,8 @@ internal fun FindingPanel(
             }
         }
         if (failed != null) {
-            MetroText(
+            WarningText(
                 failed,
-                Metro.typography.body,
                 Modifier.padding(top = 10.dp).testTag("finding-failed-${finding.key}"),
                 color = Metro.colors.error,
             )

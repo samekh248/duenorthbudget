@@ -140,7 +140,7 @@ internal fun BudgetItem(
         MetroText(hint, Metro.typography.body, Modifier.padding(top = top).testTag(tag), color = Metro.colors.secondary)
     }
     if (error != null) {
-        MetroText(error, Metro.typography.body, Modifier.testTag("settings-open-budget-error"), color = Metro.accent.text)
+        WarningText(error, Modifier.testTag("settings-open-budget-error"))
     }
     if (open != null) {
         // Every tool the budget has, in one list; each also has a home next to related work.

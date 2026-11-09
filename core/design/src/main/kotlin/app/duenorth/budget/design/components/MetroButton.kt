@@ -178,8 +178,8 @@ private fun Mobile10Button(
 
 /** Sizes of the Windows 10 Mobile style that differ from Metro's. */
 object Mobile10Dimens {
-    /** A button: taller than the 32epx desktop button, so it stays an easy touch target. */
-    val Button = 40.dp
+    /** A button: taller than the 32epx desktop button, a full 48dp touch target. */
+    val Button = 48.dp
 
     /** The closed command bar. */
     val CommandBar = 48.dp

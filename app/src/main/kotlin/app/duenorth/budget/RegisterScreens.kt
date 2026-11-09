@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -515,6 +516,15 @@ internal fun RegisterLine(
     val letter = if (row.cleared) Metro.colors.background else Metro.colors.secondary.copy(alpha = 0.7f)
     val measurer = rememberTextMeasurer()
     val mark = Metro.typography.caption.copy(color = letter, fontWeight = FontWeight.SemiBold)
+    val options = formatOptions()
+    val spoken =
+        Spoken.registerLine(
+            row.payee,
+            transfer = row.transferAccountId != null,
+            detail = detail,
+            amount = MoneyFormat.format(row.amountMinor, page.currency, options),
+            parts = row.parts.map { it.categoryName to MoneyFormat.format(it.amountMinor, page.currency, options) },
+        )
     // A relief style marks cleared with a small square key at the row's end instead of the edge bar: standing up
     // and dim when not cleared, pressed in and filled with the accent when cleared.
     val surface = Metro.surface
@@ -594,6 +604,8 @@ internal fun RegisterLine(
                             MetroDimens.Gutter
                     },
             ).semantics {
+                // The amount and a split's parts sit in a column with no spoken heading; the row says them in order.
+                contentDescription = spoken
                 stateDescription =
                     when {
                         locked -> RegisterCopy.LOCKED

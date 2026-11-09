@@ -305,6 +305,7 @@ fun MonthControl(
                 Modifier
                     .heightIn(min = MetroDimens.TouchTarget)
                     .metroPress { expanded = !expanded }
+                    .expandState(expanded)
                     .testTag("month-label"),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -521,7 +522,7 @@ fun BudgetSection(
                         if (onToBudget == null) {
                             Modifier
                         } else {
-                            Modifier.metroPress(onClick = onToBudget).testTag("to-budget-figure")
+                            Modifier.heightIn(min = MetroDimens.TouchTarget).metroPress(onClick = onToBudget).testTag("to-budget-figure")
                         },
                     ),
             )
@@ -988,7 +989,7 @@ fun AccountsSection(
                         ShellCopy.CLOSED_ACCOUNTS,
                         "account-group",
                         "closed",
-                        Modifier.metroPress { showClosed = !showClosed },
+                        Modifier.metroPress { showClosed = !showClosed }.expandState(showClosed),
                     ) {
                         Box(it.graphicsLayer { rotationZ = if (showClosed) 180f else 0f }) {
                             AppGlyphIcon(AppGlyph.ChevronDown)
@@ -1114,7 +1115,7 @@ fun CreateBudgetScreen(
             "name",
         )
         if (error != null) {
-            MetroText(error, Metro.typography.body, color = Metro.accent.text)
+            WarningText(error)
         }
         LazyColumn(Modifier.weight(1f), state = currencyList) {
             items(Currencies.all, key = { it.code }) { item ->
@@ -1162,7 +1163,7 @@ fun SampleBudgetsScreen(
             color = Metro.colors.secondary,
         )
         if (error != null) {
-            MetroText(error, Metro.typography.body, color = Metro.accent.text)
+            WarningText(error)
         }
         LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Gutter)) {
             items(samples, key = { it.id }) { sample ->

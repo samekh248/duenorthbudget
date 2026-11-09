@@ -90,10 +90,10 @@ fun ServerScreen(
         if (!signedIn) {
             MetroField(server, { server = it }, "address", Modifier.testTag("server-address"))
             MetroField(password, { password = it }, "sign in", Modifier.testTag("server-password"), conceal = true)
-            if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+            if (error != null) WarningText(error)
             PageBar(listOf(ScreenAction("server-connect", AppGlyph.Save, "connect") { onConnect(server, password) }))
         } else {
-            if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+            if (error != null) WarningText(error)
             if (files.isEmpty()) {
                 MetroText(SyncCopy.NO_SERVER_FILES, Metro.typography.body)
             }
@@ -151,7 +151,7 @@ fun BudgetPasswordScreen(
         MetroText("budget password", Metro.typography.header)
         MetroField(password, { password = it }, "password", Modifier.testTag("budget-password"), conceal = true)
         if (error != null) {
-            MetroText(error, Metro.typography.body, Modifier.testTag("password-error"), color = Metro.accent.text)
+            WarningText(error, Modifier.testTag("password-error"))
         }
         val askLabel = if (askEachTime) "ask each time" else "ask once"
         MetroText(

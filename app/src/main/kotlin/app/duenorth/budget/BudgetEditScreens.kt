@@ -150,7 +150,11 @@ fun BudgetEditSection(
             }
         }
         if (error != null) {
-            MonthNotice(error, Modifier.padding(horizontal = MetroDimens.Gutter, vertical = 4.dp), color = Metro.accent.text)
+            WarningText(
+                error,
+                Modifier.padding(horizontal = MetroDimens.Gutter, vertical = 4.dp).testTag("month-notice"),
+                style = Metro.typography.caption,
+            )
         }
         Row(
             Modifier.fillMaxWidth().padding(start = MetroDimens.Gutter, end = MetroDimens.Gutter, top = MetroDimens.Row),

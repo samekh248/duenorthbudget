@@ -506,7 +506,7 @@ private fun AllSchedules(
                     ScheduleScreenCopy.ENDED,
                     "schedule-group",
                     "ended",
-                    Modifier.metroPress { showEnded = !showEnded },
+                    Modifier.metroPress { showEnded = !showEnded }.expandState(showEnded),
                 ) {
                     Box(it.graphicsLayer { rotationZ = if (showEnded) 180f else 0f }) {
                         AppGlyphIcon(AppGlyph.ChevronDown)

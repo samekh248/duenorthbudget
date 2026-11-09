@@ -139,7 +139,7 @@ fun BankLinkScreen(
             MetroText("${BankLinkCopy.LINKED} $bank · ${provider.label}", Metro.typography.subheader, Modifier.testTag("bank-linked"))
         }
         if (ui.error != null) {
-            MetroText(ui.error, Metro.typography.body, Modifier.testTag("bank-link-error"), color = Metro.accent.text)
+            WarningText(ui.error, Modifier.testTag("bank-link-error"))
         }
         PageBar(
             listOfNotNull(

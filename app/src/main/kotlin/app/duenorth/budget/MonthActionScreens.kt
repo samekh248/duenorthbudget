@@ -124,7 +124,7 @@ fun ToBudgetScreen(
             color = Metro.colors.secondary,
         )
         MetroField(amount, { amount = it }, "amount", Modifier.testTag("to-budget-amount"))
-        if (error != null) MetroText(error, Metro.typography.body, Modifier.testTag("to-budget-error"), color = Metro.accent.text)
+        if (error != null) WarningText(error, Modifier.testTag("to-budget-error"))
         RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
         if (!formSaveOnBar()) {
             MetroButton(

@@ -56,7 +56,7 @@ fun ImportPreviewScreen(
             modifier = Modifier.testTag("import-preview-counts"),
         )
         if (error != null) {
-            MetroText(error, Metro.typography.body, color = Metro.accent.text)
+            WarningText(error)
         }
         LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid)) {
             items(preview.rows, key = { it.index }) { row ->
@@ -121,7 +121,7 @@ fun ImportReviewScreen(
             modifier = Modifier.testTag("import-review-inbox"),
         )
         if (error != null) {
-            MetroText(error, Metro.typography.body, color = Metro.accent.text)
+            WarningText(error)
         }
         LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Grid), state = listState) {
             items(page.rows, key = { it.id }) { row ->

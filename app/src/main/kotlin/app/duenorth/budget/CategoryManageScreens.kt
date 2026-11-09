@@ -36,6 +36,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
@@ -63,6 +64,7 @@ import app.duenorth.budget.design.theme.MetroDimens
 
 object CategoryManageCopy {
     const val NEW_GROUP = "new group"
+    const val GROUP_MENU = "group menu"
     const val ADD_GROUP = "add group"
     const val GROUP = "group"
     const val NEW_CATEGORY = "new category"
@@ -264,7 +266,7 @@ fun ManageCategoriesScreen(
                 )
             }
             if (error != null) {
-                MetroText(error, Metro.typography.body, Modifier.padding(top = 4.dp), color = Metro.accent.text)
+                WarningText(error, Modifier.padding(top = 4.dp))
             }
             CompositionLocalProvider(LocalFieldSubmit provides { save() }) {
                 LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Row)) {
@@ -445,8 +447,15 @@ private fun GroupLine(
             .fillMaxWidth()
             .background(if (lifted) Metro.colors.chrome else Color.Transparent)
             .onGloballyPositioned { bounds = it.boundsInWindow() }
-            .then(if (renaming || reorder) Modifier else Modifier.metroPress(onToggle, onLongClick = { onMenu(bounds) }))
-            .padding(top = MetroDimens.Row)
+            .then(
+                if (renaming ||
+                    reorder
+                ) {
+                    Modifier
+                } else {
+                    Modifier.metroPress(onToggle, onLongClick = { onMenu(bounds) }).expandState(expanded)
+                },
+            ).padding(top = MetroDimens.Row)
             .testTag("manage-group-${group.id}"),
     ) {
         Row(Modifier.fillMaxWidth().heightIn(min = MetroDimens.TouchTarget), verticalAlignment = Alignment.CenterVertically) {
@@ -482,6 +491,8 @@ private fun GroupLine(
                         Modifier
                             .heightIn(min = MetroDimens.TouchTarget)
                             .metroPress { onMenu(bounds) }
+                            // Not "bullet bullet bullet": the dots are the group's menu.
+                            .semantics { contentDescription = CategoryManageCopy.GROUP_MENU }
                             .padding(horizontal = 12.dp, vertical = 10.dp)
                             .testTag("manage-group-menu-${group.id}"),
                         color = Metro.accent.text,
