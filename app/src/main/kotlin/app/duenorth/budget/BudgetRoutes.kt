@@ -73,6 +73,7 @@ internal fun CategoryBudgetRoute(
                 onMoveTemplate = model.templates::move,
                 recent = state.categoryMonth,
                 onSeeAll = { model.openReviewCategory(route.categoryId) },
+                onOpenTransaction = { row -> model.register.openTransaction(row.accountId, row.registerId) },
             )
             LaunchedEffect(state.templates.note, state.templates.automations, shell.month) { model.templates.refreshAmounts() }
             // Read again whenever the month's figures change, so a saved transaction shows.

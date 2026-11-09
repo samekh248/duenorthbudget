@@ -51,6 +51,7 @@ import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MoneyMath
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.RegisterEntry
+import app.duenorth.budget.core.ReviewTransactionRow
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
@@ -88,6 +89,8 @@ fun CategoryBudgetScreen(
     // The category's transactions this month, newest first; recent shows the top few once they are read.
     recent: CategoryMonthPage? = null,
     onSeeAll: () -> Unit = {},
+    // A tap on a recent transaction opens its account's register at that transaction.
+    onOpenTransaction: (ReviewTransactionRow) -> Unit = {},
 ) {
     val category = shell.groups.flatMap { it.categories }.first { it.id == categoryId }
     val prefs = LocalFormatPrefs.current
@@ -121,7 +124,7 @@ fun CategoryBudgetScreen(
         }
         AvailableBar(category, template, shell.currency)
         Spacer(Modifier.height(SECTION_GAP))
-        RecentSpending(recent?.takeIf { it.categoryId == categoryId && it.month == shell.month }, onSeeAll)
+        RecentSpending(recent?.takeIf { it.categoryId == categoryId && it.month == shell.month }, onSeeAll, onOpenTransaction)
         Spacer(Modifier.height(SECTION_GAP))
         BudgetedField(
             amount = amount,
@@ -251,6 +254,7 @@ private fun LegendKey(
 private fun RecentSpending(
     page: CategoryMonthPage?,
     onSeeAll: () -> Unit,
+    onOpen: (ReviewTransactionRow) -> Unit,
 ) {
     val options = formatOptions()
     val dates = dateFormat()
@@ -271,6 +275,7 @@ private fun RecentSpending(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 40.dp)
+                    .metroPress({ onOpen(row) })
                     .testTag("category-recent-${row.id}"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

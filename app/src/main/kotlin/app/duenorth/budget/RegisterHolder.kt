@@ -13,6 +13,8 @@ data class RegisterUi(
     val selection: Set<String>? = null,
     /** The search, open over the rows; null when closed. */
     val search: RegisterSearch? = null,
+    /** A transaction to bring into view and flash once the register shows it; cleared once it has. */
+    val focus: String? = null,
 )
 
 /**
@@ -55,6 +57,20 @@ class RegisterHolder internal constructor(
         host.mutate { it.copy(registerUi = RegisterUi(), editFromHome = false) }
         host.scope.launch { host.reloadAccount(accountId) }
     }
+
+    /** Opens [accountId]'s register scrolled to [transactionId], which flashes so the eye finds it. */
+    fun openTransaction(
+        accountId: String,
+        transactionId: String,
+    ) {
+        if (accountId.isEmpty()) return
+        host.push(ShellRoute.Register(accountId))
+        host.mutate { it.copy(registerUi = RegisterUi(focus = transactionId), editFromHome = false) }
+        host.scope.launch { host.reloadAccount(accountId) }
+    }
+
+    /** The register has scrolled to and flashed its focused transaction. */
+    fun focusShown() = update { it.copy(focus = null) }
 
     fun openNew() {
         val accountId = state.openAccountId() ?: return

@@ -61,6 +61,8 @@ internal fun RegisterRoute(
             onNotAMatch = { model.register.notAMatch(it, stayOnRegister = true) },
             search = state.registerUi.search,
             onSearch = model.register::setSearch,
+            focus = state.registerUi.focus,
+            onFocused = model.register::focusShown,
             // Long-press shows the row's menu, select first, as the inbox's does.
             rowMenu = { row ->
                 listOfNotNull(
