@@ -124,6 +124,8 @@ data class ReconcileSession(
     val statementMinor: Long,
     val statementDate: Int,
     val baseline: Map<String, ReconcileBaselineEntry>,
+    /** The cleared marks this reconcile set, by transaction; cancel puts back only these. */
+    val touched: Map<String, Boolean> = emptyMap(),
 )
 
 data class ReconcileRow(
@@ -230,8 +232,12 @@ class ReconcileBook(
         val sessionData = loadSession(accountId) ?: return null
         val row = find(accountId, transactionId) ?: return page(account, sessionData)
         if (row.reconciled) return page(account, sessionData)
-        SyncSchema.write(session, "transactions", transactionId, "cleared", !row.cleared)
-        return page(account, sessionData)
+        var updated = sessionData
+        session.transaction {
+            SyncSchema.write(session, "transactions", transactionId, "cleared", !row.cleared)
+            updated = touch(accountId, sessionData, mapOf(transactionId to !row.cleared))
+        }
+        return page(account, updated)
     }
 
     /** Sets several rows' cleared mark at once, as a helper's "clear both" does. Reconciled rows are left alone. */
@@ -242,13 +248,18 @@ class ReconcileBook(
     ): ReconcilePage? {
         val account = account(accountId) ?: return null
         val sessionData = loadSession(accountId) ?: return null
+        var updated = sessionData
         session.transaction {
+            val set = mutableMapOf<String, Boolean>()
             for (id in transactionIds) {
                 val row = find(accountId, id) ?: continue
-                if (!row.reconciled) SyncSchema.write(session, "transactions", id, "cleared", cleared)
+                if (row.reconciled) continue
+                SyncSchema.write(session, "transactions", id, "cleared", cleared)
+                set[id] = cleared
             }
+            updated = touch(accountId, sessionData, set)
         }
-        return page(account, sessionData)
+        return page(account, updated)
     }
 
     /**
@@ -349,16 +360,39 @@ class ReconcileBook(
         return ReconcileFinishResult.Finished
     }
 
+    /**
+     * Puts back only the cleared marks this reconcile set. A mark that changed some other way since it started (on
+     * desktop, by a bank sync, or in the register) stays, so cancel never undoes a change the reconcile didn't make.
+     * A mark this reconcile set that no longer holds what it set stays too.
+     */
     fun cancel(accountId: String): Boolean {
         val sessionData = loadSession(accountId) ?: return false
         session.transaction {
-            for ((id, entry) in sessionData.baseline) {
-                SyncSchema.write(session, "transactions", id, "cleared", entry.cleared)
-                SyncSchema.write(session, "transactions", id, "reconciled", entry.reconciled)
+            for ((id, set) in sessionData.touched) {
+                val before = sessionData.baseline[id] ?: continue
+                val now = find(accountId, id) ?: continue
+                if (now.reconciled || now.cleared != set) continue
+                SyncSchema.write(session, "transactions", id, "cleared", before.cleared)
             }
             clearSession(accountId)
         }
         return true
+    }
+
+    /** Notes the cleared marks just set, dropping any that are back where the reconcile found them. */
+    private fun touch(
+        accountId: String,
+        sessionData: ReconcileSession,
+        set: Map<String, Boolean>,
+    ): ReconcileSession {
+        if (set.isEmpty()) return sessionData
+        val touched = sessionData.touched.toMutableMap()
+        for ((id, cleared) in set) {
+            if (sessionData.baseline[id]?.cleared == cleared) touched.remove(id) else touched[id] = cleared
+        }
+        val updated = sessionData.copy(touched = touched)
+        saveSession(accountId, updated)
+        return updated
     }
 
     private fun page(
