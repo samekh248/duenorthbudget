@@ -110,8 +110,10 @@ class BudgetEditHolder internal constructor(
         host.scope.launch {
             val (result, amounts) =
                 withContext(host.io) { host.library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
+            var filled = false
             host.mutate { current ->
                 val open = current.budgetEdit?.takeIf { it.budgetId == budgetId && it.month == month }
+                filled = open != null && result is TemplateResult.Applied
                 if (open == null || result !is TemplateResult.Applied) {
                     current.copy(templates = current.templates.copy(result = result, busy = false))
                 } else {
@@ -121,6 +123,8 @@ class BudgetEditHolder internal constructor(
                     )
                 }
             }
+            // Back to edit mode's boxes, now filled, from the templates page.
+            if (filled && state.route == ShellRoute.Templates) host.back()
         }
     }
 
