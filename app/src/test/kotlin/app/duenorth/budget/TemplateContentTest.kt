@@ -193,6 +193,7 @@ class TemplateContentTest {
         await { model.state.value.templates.note != null }
         model.templates.saveNote("#template 123")
         await { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }
+        val budgetPage = model.state.value.route
         model.templates.open()
         assertEquals(ShellRoute.Templates, model.state.value.route)
         await { model.state.value.templates.result == TemplateResult.Valid }
@@ -205,6 +206,8 @@ class TemplateContentTest {
                 ?.budgetedMinor == 12_300L
         }
         assertEquals(TemplateResult.Applied(1), model.state.value.templates.result)
+        // Applied: back to the budget page templates were opened from.
+        assertEquals(budgetPage, model.state.value.route)
         assertEquals(UndoCopy.TEMPLATES, library.undoLabel(model.state.value.settings.openBudgetId!!))
     }
 
@@ -642,6 +645,8 @@ class TemplateContentTest {
                 ?.get("c-gas") == 15_000L
         }
         assertEquals(null, model.state.value.templates.applyPreview)
+        // The apply list's apply goes back to the budget it filled.
+        await { model.state.value.route == ShellRoute.Home }
     }
 
     private fun MonthShell.category(id: String): CategoryRow? = groups.flatMap { it.categories }.firstOrNull { it.id == id }

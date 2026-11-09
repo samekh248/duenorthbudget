@@ -103,6 +103,7 @@ class TemplatesHolder internal constructor(
                     }
                 is TemplateResult.Applied -> {
                     host.mutate { it.copy(templates = it.templates.copy(result = result, busy = false)) }
+                    leaveAfterApply()
                     host.afterMonthWrite(budgetId)
                 }
                 else -> host.mutate { it.copy(templates = it.templates.copy(result = result, busy = false)) }
@@ -111,6 +112,11 @@ class TemplatesHolder internal constructor(
     }
 
     fun confirmOverwrite() = apply(overwrite = true, confirmed = true)
+
+    /** Templates applied: back to the budget they filled, so the new amounts show. */
+    internal fun leaveAfterApply() {
+        if (state.route == ShellRoute.Templates) host.back()
+    }
 
     /** Templates ••• → end-of-month cleanup: `#cleanup` notes move what is left over, as one undo step. */
     fun cleanup() {

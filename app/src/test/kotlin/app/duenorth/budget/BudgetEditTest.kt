@@ -20,6 +20,7 @@ import app.duenorth.budget.core.createFromMock
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -283,9 +284,9 @@ class BudgetEditTest {
         settleMain()
         assertEquals(before.category("c-gas")!!.budgetedMinor, model.saved().category("c-gas")!!.budgetedMinor)
         assertEquals(UndoCopy.CATEGORY_NOTE, model.state.value.undoLabel)
-
-        model.back()
+        // Applying returns to the budget, still in edit mode.
         assertEquals(ShellRoute.Home, model.state.value.route)
+        assertNotNull(model.state.value.budgetEdit)
         model.budgetEdit.end()
         awaitMain { model.saved().category("c-gas")?.budgetedMinor == 12_300L }
         awaitMain { model.state.value.undoLabel == UndoCopy.BUDGET_EDIT }
