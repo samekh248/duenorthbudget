@@ -43,5 +43,8 @@ start lands on a real month instead of onboarding. Release and debug never carry
 
 The emulator draws in software and has no real phone's clocks, so its numbers are slower than a
 Pixel 6a's. `budgets.json` holds limits set from the emulator's measured results with headroom, so CI
-catches a change that makes startup or scrolling clearly worse. The constitution's own numbers (1 s,
+catches a change that makes startup or scrolling clearly worse. The first runs measured a cold start
+of 2.1 to 2.4 s with the profile (2.3 to 2.4 s without), and frame overruns at P90 of about 144 ms
+(budget scroll) and 104 ms (pivot swipe): the software GPU misses nearly every frame, so these frame
+limits only catch large regressions. The constitution's own numbers (1 s,
 no dropped frames) are checked on a real phone with the command above.
