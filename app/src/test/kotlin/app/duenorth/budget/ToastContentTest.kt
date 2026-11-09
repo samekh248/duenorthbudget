@@ -15,6 +15,8 @@ import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.MockBudgets
+import app.duenorth.budget.core.TemplateCopy
+import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.WriteResult
 import app.duenorth.budget.core.createFromMock
 import app.duenorth.budget.design.components.MetroText
@@ -133,6 +135,43 @@ class ToastContentTest {
         val toast = host.state.value.toast!!
         assertEquals(ToastKind.Failure, toast.kind)
         assertEquals(ToastCopy.CATEGORY_SAVE_FAILED, toast.title)
+    }
+
+    @Test
+    fun applyingTemplatesOnTheMonthSaysHowItWent() {
+        val host = host("toast-apply-templates")
+        val budgetId = host.state.value.settings.openBudgetId!!
+        host.mutate { it.copy(route = ShellRoute.Templates) }
+        // Templates are off in a new budget, so apply is refused and says why.
+        TemplatesHolder(host).apply(overwrite = false)
+        val refused = host.state.value.toast!!
+        assertEquals(ToastKind.Failure, refused.kind)
+        assertEquals(ToastCopy.TEMPLATES_FAILED, refused.title)
+        assertEquals(TemplateCopy.OFF, refused.message)
+
+        host.library.setPreference(budgetId, "flags.experimental", "true")
+        host.library.setPreference(budgetId, "flags.goalTemplatesEnabled", "true")
+        TemplatesHolder(host).apply(overwrite = false)
+        val applied = host.state.value.toast!!
+        assertEquals(ToastKind.Success, applied.kind)
+        assertEquals(ToastCopy.TEMPLATES_APPLIED, applied.title)
+        assertEquals(ToastAction.Undo, applied.action)
+    }
+
+    @Test
+    fun aTemplatesRunSaysHowItWent() {
+        val host = host("toast-templates-result")
+        host.toastTemplates(TemplateResult.Applied(3), written = false)
+        val filled = host.state.value.toast!!
+        assertEquals(ToastCopy.TEMPLATES_FILLED, filled.title)
+        assertEquals("3 categories", filled.message)
+        // Edit mode only fills the boxes, so there is nothing yet to undo.
+        assertNull(filled.action)
+        host.toastTemplates(TemplateResult.Rejected("Budget is locked"))
+        val failed = host.state.value.toast!!
+        assertEquals(ToastKind.Failure, failed.kind)
+        assertEquals(ToastCopy.TEMPLATES_FAILED, failed.title)
+        assertEquals("Budget is locked", failed.message)
     }
 
     private fun host(name: String): FakeShellHost {

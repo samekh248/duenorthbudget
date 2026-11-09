@@ -109,6 +109,7 @@ class BudgetEditHolder internal constructor(
         host.scope.launch {
             val (result, amounts) =
                 withContext(host.io) { host.library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
+            host.toastTemplates(result, written = false)
             var filled = false
             host.mutate { current ->
                 val open = current.budgetEdit?.takeIf { it.budgetId == budgetId && it.month == month }

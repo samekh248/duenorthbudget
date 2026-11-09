@@ -377,12 +377,10 @@ internal fun ShellHost.distribute(kind: DistributeKind) {
             }
         when (result) {
             is TemplateResult.Applied -> {
-                host.toastSuccess(ToastCopy.MONTH_FILLED)
+                host.toastTemplates(result)
                 host.afterMonthWrite(budgetId)
             }
-            is TemplateResult.Invalid -> host.toastFailure(ToastCopy.MONTH_FILL_FAILED, DistributeCopy.unreadable(result.errors.size))
-            is TemplateResult.Rejected -> host.toastFailure(ToastCopy.MONTH_FILL_FAILED, result.reason)
-            is TemplateResult.NeedsConfirm, TemplateResult.Valid -> Unit
+            else -> host.toastTemplates(result)
         }
     }
 }
