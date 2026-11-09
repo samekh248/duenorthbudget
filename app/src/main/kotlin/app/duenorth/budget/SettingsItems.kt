@@ -76,7 +76,7 @@ internal fun SettingsItem(
     )
 }
 
-/** The budget's tools, listed together on settings › budget so there is always one place that has them all. */
+/** The budget's tools, listed together on settings › general so there is always one place that has them all. */
 data class SettingsManage(
     val onCategories: () -> Unit = {},
     val onRules: () -> Unit = {},
@@ -90,17 +90,13 @@ internal fun BudgetItem(
     budgets: List<BudgetSummary>,
     openBudgetId: String?,
     budgetType: String,
-    learning: Boolean,
     onOpen: (String) -> Unit,
-    onPayees: () -> Unit,
-    onLearning: (Boolean) -> Unit,
     serverName: String? = null,
     signedIn: Boolean = false,
     cloudFileId: String? = null,
     remoteFiles: List<RemoteFile> = emptyList(),
     onOpenServer: (RemoteFile) -> Unit = {},
     error: String? = null,
-    manage: SettingsManage = SettingsManage(),
 ) {
     val open = budgets.find { it.id == openBudgetId }
     // One box is both the open budget and the way to another: the phone's budgets, then the server's.
@@ -140,9 +136,25 @@ internal fun BudgetItem(
     if (error != null) {
         WarningText(error, Modifier.testTag("settings-open-budget-error"))
     }
-    if (open != null) {
+}
+
+/**
+ * Everything in settings but which budget is open and the server it syncs with. The open budget's tools and
+ * learning show while one is open; end of month lives on the phone, so it always shows.
+ */
+@Composable
+internal fun GeneralItem(
+    budgetOpen: Boolean,
+    learning: Boolean = true,
+    onPayees: () -> Unit = {},
+    onLearning: (Boolean) -> Unit = {},
+    manage: SettingsManage = SettingsManage(),
+    closeOutDays: Int = CloseOutWindow.DEFAULT_DAYS,
+    onCloseOutDays: (Int) -> Unit = {},
+) {
+    if (budgetOpen) {
         // Every tool the budget has, in one list; each also has a home next to related work.
-        SettingsHeading(SettingsCopy.MANAGE, tag = "settings-manage")
+        SettingsHeading(SettingsCopy.MANAGE, tag = "settings-manage", first = true)
         SettingsLinkRow(
             SettingsCopy.MANAGE_CATEGORIES,
             SettingsCopy.MANAGE_CATEGORIES_HINT,
@@ -167,16 +179,8 @@ internal fun BudgetItem(
             )
         }
     }
-}
-
-/** Settings that hold whichever budget is open: they live on the phone, not in a budget. */
-@Composable
-internal fun GeneralItem(
-    closeOutDays: Int = CloseOutWindow.DEFAULT_DAYS,
-    onCloseOutDays: (Int) -> Unit = {},
-) {
     // The assistant's end-of-month close out: when its card shows, or never.
-    SettingsHeading(SettingsCopy.CLOSE_OUT, tag = "settings-close-out", first = true)
+    SettingsHeading(SettingsCopy.CLOSE_OUT, tag = "settings-close-out", first = !budgetOpen)
     ListPicker(
         CloseOutWindow.CHOICES,
         closeOutDays.takeIf { it in CloseOutWindow.CHOICES } ?: CloseOutWindow.DEFAULT_DAYS,
@@ -201,7 +205,7 @@ internal fun ServerItem(
     // A server's commands open from its row, as the categories page's do.
     var menu by remember { mutableStateOf<Pair<Rect, List<MetroMenuItem>>?>(null) }
     var activeBounds by remember { mutableStateOf(Rect.Zero) }
-    // Under the budget's own settings on settings › budget, so it is never the page's first heading.
+    // Under the open budget box on settings › budget, so it is never the page's first heading.
     SettingsHeading("this phone syncs with", tag = "settings-server")
     MetroText(
         activeInstance?.let { it.label ?: it.address } ?: SettingsCopy.NOT_CONNECTED,

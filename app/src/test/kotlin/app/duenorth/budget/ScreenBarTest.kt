@@ -435,7 +435,7 @@ class ScreenBarTest {
                 mode = BudgetMode.ENVELOPE,
                 settings = SettingsBar(page, signedIn, serverActive),
             ).map { it.id }
-        // Payees has its link on the page's manage list; the budget page also holds the server, so its commands follow.
+        // Payees has its link on general's manage list; the budget page holds the server, so its commands follow.
         assertEquals(listOf("settings-new", "add-server"), ids(SettingsPage.BUDGET))
         assertEquals(listOf("settings-new", "add-server"), ids(SettingsPage.BUDGET, hasBudget = false))
         assertEquals(

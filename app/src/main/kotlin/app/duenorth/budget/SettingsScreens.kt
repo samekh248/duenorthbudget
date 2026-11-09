@@ -42,7 +42,7 @@ enum class SettingsPage(
 ) {
     BUDGET("budget", false),
 
-    /** Settings that hold whichever budget is open, so it shows with no budget open too. */
+    /** Everything but the budget picker and server: the open budget's tools while one is open, and phone-wide settings. */
     GENERAL("general", false),
     FORMAT("format", true),
     APPEARANCE("appearance", false),
@@ -129,7 +129,7 @@ object SettingsCopy {
 }
 
 /**
- * Settings as a pivot (spec 012): budget (with the server it syncs through), general, format,
+ * Settings as a pivot (spec 012): budget (the open budget box and the server), general, format,
  * appearance, advanced, experimental. Format, advanced and experimental only show while a budget is open. Forms open their own pages; no item holds a field.
  */
 @Composable
@@ -191,19 +191,15 @@ fun SettingsScreen(
                                 budgets = budgets,
                                 openBudgetId = openBudgetId,
                                 budgetType = formatPrefs.budgetType,
-                                learning = formatPrefs.learnCategories,
                                 onOpen = onOpenBudget,
-                                onPayees = onPayees,
-                                onLearning = onLearning,
                                 serverName = activeInstance?.let { it.label ?: it.address },
                                 signedIn = signedIn,
                                 cloudFileId = cloudFileId,
                                 remoteFiles = remoteFiles,
                                 onOpenServer = onOpenServer,
                                 error = budgetError,
-                                manage = manage,
                             )
-                            // The server the budgets sync through sits under them, on the same page.
+                            // The server the budgets sync through sits under the box, on the same page.
                             ServerItem(
                                 instances = instances,
                                 activeInstance = activeInstance,
@@ -217,6 +213,11 @@ fun SettingsScreen(
                         }
                         SettingsPage.GENERAL ->
                             GeneralItem(
+                                budgetOpen = budgetOpen,
+                                learning = formatPrefs.learnCategories,
+                                onPayees = onPayees,
+                                onLearning = onLearning,
+                                manage = manage,
                                 closeOutDays = phoneSettings.closeOutDays,
                                 onCloseOutDays = onCloseOutDays,
                             )

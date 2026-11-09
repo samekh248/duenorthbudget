@@ -64,16 +64,31 @@ class SettingsContentTest {
         compose.onNodeWithText("general").assertExists()
         compose.onNodeWithTag("settings-item-general").assertIsDisplayed()
         compose.onNodeWithTag("settings-close-out").assertIsDisplayed()
+        // With no budget open there are no budget tools to manage.
+        compose.onNodeWithTag("settings-manage").assertDoesNotExist()
         compose.onNodeWithTag("settings-close-out-picker").performClick()
         compose.onNodeWithTag("settings-close-out-picker-0").performClick()
         assertEquals(0, days)
     }
 
     @Test
-    fun budgetItemNoLongerHoldsCloseOut() {
+    fun budgetItemHoldsOnlyThePickerAndTheServer() {
         show(SettingsPage.BUDGET)
         val item = hasAnyAncestor(hasTestTag("settings-item-budget"))
-        compose.onAllNodes(hasTestTag("settings-close-out") and item).assertCountEquals(0)
+        compose.onAllNodes(hasTestTag("settings-open-budget-value") and item, useUnmergedTree = true).assertCountEquals(1)
+        compose.onAllNodes(hasTestTag("settings-server") and item).assertCountEquals(1)
+        listOf("settings-manage", "settings-payees", "settings-learning", "settings-close-out").forEach { tag ->
+            compose.onAllNodes(hasTestTag(tag) and item).assertCountEquals(0)
+        }
+    }
+
+    @Test
+    fun generalHoldsTheBudgetsToolsWhileOneIsOpen() {
+        show(SettingsPage.GENERAL)
+        compose.onNodeWithTag("settings-manage").assertIsDisplayed()
+        compose.onNodeWithTag("settings-payees").assertIsDisplayed()
+        compose.onNodeWithTag("settings-learning").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("settings-close-out").performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -117,10 +132,7 @@ class SettingsContentTest {
                         budgets = budgets,
                         openBudgetId = "b",
                         budgetType = "envelope",
-                        learning = false,
                         onOpen = {},
-                        onPayees = {},
-                        onLearning = {},
                         serverName = "home",
                         signedIn = signedIn,
                         cloudFileId = "b",

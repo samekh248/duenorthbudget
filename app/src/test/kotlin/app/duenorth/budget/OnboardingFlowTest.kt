@@ -292,7 +292,7 @@ class OnboardingFlowTest {
         model.settingsUi.showPayees()
         assertEquals(ShellRoute.Payees, model.state.value.route)
         assertTrue(model.back())
-        assertEquals(SettingsPage.BUDGET, model.state.value.settingsPage)
+        assertEquals(SettingsPage.GENERAL, model.state.value.settingsPage)
 
         // New budget from settings opens it and comes back to the budget item.
         model.settingsUi.showCreate()

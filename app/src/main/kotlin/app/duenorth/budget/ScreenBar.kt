@@ -154,7 +154,7 @@ object ScreenBar {
         overspent: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
-            // Spec 012: each settings pivot item has its own bar. Payees has its link on the budget page's manage list.
+            // Spec 012: each settings pivot item has its own bar. Payees has its link on the general page's manage list.
             ShellRoute.Settings ->
                 when (settings.page) {
                     // The budget page also holds the server its budgets sync through, so the server's commands follow.
