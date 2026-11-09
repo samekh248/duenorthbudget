@@ -396,7 +396,7 @@ class RegisterBook(
                 tombstone(partner.id)
                 setColumns(existing.id, "transferred_id" to null)
             }
-            val ruled = keepSplit(draft, applyRules(draft, note))
+            val ruled = keepSplit(draft, applyRules(draft, note, existingId = existing.id))
             updateFields(
                 existing.id,
                 ruled.accountId,
@@ -416,12 +416,25 @@ class RegisterBook(
         ruled: TransactionDraft,
     ): TransactionDraft = if (draft.parts.isNullOrEmpty()) ruled else ruled.copy(amountMinor = draft.amountMinor, categoryId = null)
 
+    /**
+     * Runs the file's rules over [draft]. A new transaction comes in cleared unless the draft says otherwise; an
+     * edit ([existingId]) reads its stored cleared, reconciled and bank payee, so conditions on them see the row.
+     */
     private fun applyRules(
         draft: TransactionDraft,
         note: String?,
+        existingId: String? = null,
+        importedPayee: String? = null,
+        cleared: Boolean? = null,
     ): TransactionDraft {
         if (draft.scheduleId != null) return draft
         val payeeId = payeeFor(draft.payee)
+        val stored =
+            existingId?.let { id ->
+                session
+                    .query("SELECT cleared, reconciled, imported_description FROM transactions WHERE id = ?", listOf(id))
+                    .firstOrNull()
+            }
         val view =
             RuleTransactionView(
                 account = draft.accountId,
@@ -431,6 +444,9 @@ class RegisterBook(
                 amount = draft.amountMinor,
                 notes = note,
                 dateIso = ScheduleDates.toIso(draft.date),
+                cleared = cleared ?: draft.cleared ?: stored?.bool("cleared") ?: true,
+                importedPayee = importedPayee ?: stored?.str("imported_description"),
+                reconciled = stored?.bool("reconciled") == true,
             )
         val ruled = RulesBook(session, ids).applyRules(view)
         val payeeName =
@@ -895,7 +911,11 @@ class RegisterBook(
     private fun nextSort(): Double =
         session.query("SELECT COALESCE(MAX(sort_order), 0) AS sort FROM transactions").first().double("sort") + 1.0
 
-    fun applyRulesForImport(draft: TransactionDraft): TransactionDraft = applyRules(draft, draft.note?.trim()?.ifEmpty { null })
+    fun applyRulesForImport(
+        draft: TransactionDraft,
+        importedPayee: String? = null,
+        cleared: Boolean = true,
+    ): TransactionDraft = applyRules(draft, draft.note?.trim()?.ifEmpty { null }, importedPayee = importedPayee, cleared = cleared)
 
     fun payeeIdForName(name: String): String = payeeFor(name)
 

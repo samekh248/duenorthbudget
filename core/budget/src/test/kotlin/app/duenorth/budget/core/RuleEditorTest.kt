@@ -68,7 +68,8 @@ class RuleEditorTest {
             val odd =
                 RulePart.fromRaw(
                     buildJsonObject {
-                        put("op", "hasTags")
+                        // An op from a newer Actual than the phone knows (hasTags now runs; see RuleConditionsTest).
+                        put("op", "hasSomethingNew")
                         put("field", "notes")
                         put("value", "#x")
                         put("type", "string")

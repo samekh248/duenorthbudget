@@ -49,6 +49,9 @@ data class RuleTransactionView(
     var dateIso: String,
     var schedule: String? = null,
     var cleared: Boolean? = null,
+    /** The bank's own wording for the payee, Actual's `imported_payee` (`imported_description` in the file). */
+    var importedPayee: String? = null,
+    var reconciled: Boolean = false,
 )
 
 class RulesBook(
@@ -327,12 +330,42 @@ class RulesBook(
         when (field) {
             "payee", "description" -> evalId(view.payee, op, value)
             "category" -> evalId(view.category, op, value)
-            "account", "acct" -> evalId(view.account, op, value)
+            "account", "acct" ->
+                when (op) {
+                    "onBudget", "offBudget" -> accountOffBudget(view.account)?.let { it == (op == "offBudget") } ?: false
+                    else -> evalId(view.account, op, value)
+                }
             "amount" -> evalAmount(view.amount, op, value, cond["options"] as? JsonObject)
             "notes" -> evalString(view.notes.orEmpty(), op, value)
             "date" -> evalDate(view.dateIso, op, value)
+            "imported_payee", "imported_description" -> evalString(view.importedPayee.orEmpty(), op, value)
+            // Actual reads the payee's stored name; a transaction with no payee reads as empty.
+            "payee_name" -> evalString(view.payee?.let(::storedPayeeName).orEmpty(), op, value)
+            // With no category there is no group, and Actual's condition is false whatever the op.
+            "category_group" -> view.category?.let(::categoryGroup)?.let { evalId(it, op, value) } ?: false
+            "cleared" -> op == "is" && view.cleared != null && (value as? JsonPrimitive)?.booleanOrNull == view.cleared
+            "reconciled" -> op == "is" && (value as? JsonPrimitive)?.booleanOrNull == view.reconciled
+            // `transfer`, `parent` and `saved` only filter the register in Actual; its rules never match on them.
             else -> false
         }
+
+    private fun accountOffBudget(id: String): Boolean? =
+        session
+            .query("SELECT offbudget FROM accounts WHERE id = ?", listOf(id))
+            .firstOrNull()
+            ?.bool("offbudget")
+
+    private fun storedPayeeName(id: String): String? =
+        session
+            .query("SELECT name FROM payees WHERE id = ?", listOf(id))
+            .firstOrNull()
+            ?.str("name")
+
+    private fun categoryGroup(id: String): String? =
+        session
+            .query("SELECT cat_group FROM categories WHERE id = ?", listOf(id))
+            .firstOrNull()
+            ?.str("cat_group")
 
     private fun evalId(
         fieldValue: String?,
@@ -360,21 +393,34 @@ class RulesBook(
             val options = (expected as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.lowercase() } ?: return false
             return if (op == "oneOf") hay in options else hay !in options
         }
-        val needle = (expected as? JsonPrimitive)?.contentOrNull?.lowercase().orEmpty()
+        val raw = (expected as? JsonPrimitive)?.contentOrNull.orEmpty()
+        val needle = raw.lowercase()
         return when (op) {
             "is" -> hay == needle
             "isNot" -> hay != needle
             "contains" -> needle.isNotEmpty() && hay.contains(needle)
             "doesNotContain" -> needle.isEmpty() || !hay.contains(needle)
-            "matches" ->
-                runCatching {
-                    Regex(
-                        (expected as? JsonPrimitive)?.contentOrNull.orEmpty(),
-                    ).containsMatchIn(fieldValue)
-                }.getOrDefault(false)
+            // Actual lowercases both the pattern and the text before matching.
+            "matches" -> needle.isNotEmpty() && runCatching { Regex(needle).containsMatchIn(hay) }.getOrDefault(false)
+            "hasTags" -> tags(raw).let { tags -> tags.isNotEmpty() && tags.all { hasTag(hay, it) } }
+            "hasAnyTag" -> tags(raw).any { hasTag(hay, it) }
             else -> false
         }
     }
+
+    /** `extractTagsForFilter`: each `#word` (or bare word) in the condition, once, with its `#`. */
+    private fun tags(value: String): List<String> =
+        Regex("#*([^#\\s]+)")
+            .findAll(value)
+            .map { "#" + it.groupValues[1] }
+            .distinct()
+            .toList()
+
+    /** A tag counts when it is not escaped by a doubled `#` and ends at a space, another `#`, or the end. */
+    private fun hasTag(
+        notes: String,
+        tag: String,
+    ): Boolean = Regex("(?<!#)" + Regex.escape(tag.lowercase()) + "([\\s#]|$)").containsMatchIn(notes)
 
     private fun evalAmount(
         rawValue: Long,
