@@ -148,7 +148,12 @@ object ActualSchema {
     }
 
     /** Adds columns and tables introduced after the first phone files. Safe to call on every open. */
-    fun ensure(session: SqlSession) {
+    fun ensure(session: SqlSession) =
+        SchemaGate.run(session, SchemaGate.Check.ACTUAL) {
+            ensureAll(session)
+        }
+
+    private fun ensureAll(session: SqlSession) {
         ensureAccountType(session)
         ensureScheduleTables(session)
         ensureTransactionScheduleColumn(session)

@@ -89,7 +89,7 @@ class JdbcSessionOpener : SessionOpener {
         Class.forName("org.sqlite.JDBC")
         val connection = DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}")
         connection.use {
-            return block(JdbcSqlSession(it))
+            return block(SchemaGate.track(file, JdbcSqlSession(it)))
         }
     }
 }

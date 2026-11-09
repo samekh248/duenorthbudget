@@ -4,6 +4,7 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteCursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteProgram
+import app.duenorth.budget.core.SchemaGate
 import app.duenorth.budget.core.SessionOpener
 import app.duenorth.budget.core.SqlRow
 import app.duenorth.budget.core.SqlSession
@@ -121,7 +122,7 @@ class AndroidSessionOpener : SessionOpener {
         // Opening sets the journal mode, which needs the file unlocked too.
         val database = lock.withLock { SQLiteDatabase.openOrCreateDatabase(file, null) }
         try {
-            return block(AndroidSqlSession(database, lock))
+            return block(SchemaGate.track(file, AndroidSqlSession(database, lock)))
         } finally {
             lock.withLock { database.close() }
         }
