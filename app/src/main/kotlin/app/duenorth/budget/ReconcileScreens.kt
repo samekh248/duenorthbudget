@@ -185,6 +185,7 @@ fun ReconcileRegisterScreen(
             onFlip = onFlip,
             onOpen = onOpen,
             onAddMissing = onAddMissing,
+            today = today,
             modifier = Modifier.weight(1f).padding(top = MetroDimens.Grid),
         )
     }
@@ -383,6 +384,7 @@ private fun ReconcileList(
     onFlip: (String) -> Unit,
     onOpen: (String) -> Unit,
     onAddMissing: () -> Unit,
+    today: Int,
     modifier: Modifier = Modifier,
 ) {
     val list = rememberLazyListState()
@@ -397,7 +399,7 @@ private fun ReconcileList(
     val statementDate = page?.statementDate
     LazyColumn(modifier.testTag("reconcile-list"), state = list) {
         if (page != null && confirming) {
-            item(key = "adjust") { AdjustPanel(register.account.name, page) }
+            item(key = "adjust") { AdjustPanel(register.account.name, page, today) }
         } else if (page != null && hints.isNotEmpty()) {
             item(key = "hints") { LeadsCard(page, hints, onSetCleared, onFlip, onOpen, onAddMissing) }
         }
@@ -722,6 +724,7 @@ private fun Tinted(
 private fun AdjustPanel(
     account: String,
     page: ReconcilePage,
+    today: Int,
 ) {
     val options = formatOptions()
     val locks = page.rows.count { it.cleared && !it.reconciled }
@@ -750,8 +753,9 @@ private fun AdjustPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
-                MetroText(ReconcileCopy.ADJUSTMENT_PAYEE, Metro.typography.body, maxLines = 2)
-                MetroText(RegisterEntry.registerDateLabel(page.statementDate), Metro.typography.caption, color = Metro.colors.secondary)
+                MetroText(ReconcileCopy.ADJUSTMENT_NOTE, Metro.typography.body, maxLines = 2)
+                // Actual dates the adjustment today, not on the statement date.
+                MetroText(RegisterEntry.registerDateLabel(today), Metro.typography.caption, color = Metro.colors.secondary)
             }
             MetroText(
                 MoneyFormat.format(page.differenceMinor, page.currency, options),

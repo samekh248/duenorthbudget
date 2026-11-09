@@ -605,9 +605,10 @@ class RegisterContentTest {
         compose.onNodeWithTag("transaction-split-1-amount").assertExists()
         compose.onNodeWithTag("transaction-split-2-amount").assertDoesNotExist()
         compose.onNodeWithTag("transaction-split-0-category-value").performScrollTo().performClick()
-        compose.onNodeWithText("Groceries").performClick()
+        compose.onNodeWithText("Groceries").performScrollTo().performClick()
         compose.onNodeWithTag("transaction-split-1-category-value").performScrollTo().performClick()
-        compose.onNodeWithText("Household").performClick()
+        // Each line has its payee and note boxes under it, so the unfolded list can sit below the screen.
+        compose.onNodeWithText("Household").performScrollTo().performClick()
 
         // Line one has no amount, and only the last line takes the rest: the red block sits under line one.
         compose.runOnIdle { host.save() }
@@ -627,7 +628,8 @@ class RegisterContentTest {
         compose.onNodeWithTag("transaction-split-2-amount").assertExists()
         compose.runOnIdle { host.save() }
         assertEquals(null, saved)
-        compose.onNodeWithTag("transaction-split-2-error", useUnmergedTree = true).assertTextEquals(RegisterCopy.CHOOSE_CATEGORY)
+        // A line needs no category, as in Actual, but it does need an amount.
+        compose.onNodeWithTag("transaction-split-2-error", useUnmergedTree = true).assertTextEquals(RegisterCopy.ENTER_AMOUNT)
         compose.onNodeWithTag("transaction-split-2-remove").performScrollTo().performClick()
         compose.onNodeWithTag("transaction-split-2-amount").assertDoesNotExist()
 

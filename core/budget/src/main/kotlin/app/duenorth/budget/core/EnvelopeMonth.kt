@@ -6,6 +6,8 @@ object EnvelopeCopy {
     const val ENTER_AMOUNT = "enter an amount"
     const val NOT_ENOUGH = "not enough available"
     const val HOLD_TOO_MUCH = "cannot hold that much"
+    const val TRANSFER_ELSEWHERE = "choose another category"
+    const val TRANSFER_SAME_KIND = "move income to an income category"
     const val STILL_USED = "category still has money or transactions"
     const val GROUP_STILL_USED = "group still has categories in use"
     const val MOVE = "move"
@@ -281,27 +283,115 @@ class EnvelopeBook(
         return EnvelopeEditResult.Saved
     }
 
-    fun deleteCategory(categoryId: String): EnvelopeEditResult {
-        if (hasCategoryActivity(categoryId)) return EnvelopeEditResult.Rejected(EnvelopeCopy.STILL_USED)
+    /**
+     * Actual's `deleteCategory`: a category in use needs [transferId], the category that takes its money and
+     * transactions. Its budgeted amounts are added to that one's month by month (`doTransfer`, expense categories
+     * only), and `category_mapping` points it, and anything already pointing at it, there.
+     */
+    fun deleteCategory(
+        categoryId: String,
+        transferId: String? = null,
+    ): EnvelopeEditResult {
+        if (transferId == null) {
+            if (hasCategoryActivity(categoryId)) return EnvelopeEditResult.Rejected(EnvelopeCopy.STILL_USED)
+        } else {
+            transferProblem(listOf(categoryId), transferId)?.let { return EnvelopeEditResult.Rejected(it) }
+            transfer(listOf(categoryId), transferId)
+        }
         SyncSchema.recordLocal(session, clock, "categories", categoryId, "tombstone", "1")
         return EnvelopeEditResult.Saved
     }
 
-    fun deleteGroup(groupId: String): EnvelopeEditResult {
-        val living =
+    /** Actual's `deleteCategoryGroup`: its categories go too, into [transferId] when any is in use. */
+    fun deleteGroup(
+        groupId: String,
+        transferId: String? = null,
+    ): EnvelopeEditResult {
+        val categories =
             session
                 .query(
-                    """
-                    SELECT COUNT(*) AS n FROM categories
-                    WHERE cat_group = ? AND IFNULL(tombstone, 0) = 0
-                    """.trimIndent(),
+                    "SELECT id FROM categories WHERE cat_group = ? AND IFNULL(tombstone, 0) = 0",
                     listOf(groupId),
-                ).first()
-                .long("n")
-        if (living > 0L) return EnvelopeEditResult.Rejected(EnvelopeCopy.GROUP_STILL_USED)
+                ).mapNotNull { it.str("id") }
+        if (transferId == null) {
+            if (categories.any(::hasCategoryActivity)) return EnvelopeEditResult.Rejected(EnvelopeCopy.GROUP_STILL_USED)
+        } else if (categories.isNotEmpty()) {
+            transferProblem(categories, transferId)?.let { return EnvelopeEditResult.Rejected(it) }
+            transfer(categories, transferId)
+        }
+        categories.forEach { SyncSchema.recordLocal(session, clock, "categories", it, "tombstone", "1") }
         SyncSchema.recordLocal(session, clock, "category_groups", groupId, "tombstone", "1")
         return EnvelopeEditResult.Saved
     }
+
+    private fun transferProblem(
+        categoryIds: List<String>,
+        transferId: String,
+    ): String? {
+        if (transferId in categoryIds) return EnvelopeCopy.TRANSFER_ELSEWHERE
+        val target =
+            session
+                .query("SELECT is_income FROM categories WHERE id = ? AND IFNULL(tombstone, 0) = 0", listOf(transferId))
+                .firstOrNull() ?: return EnvelopeCopy.TRANSFER_ELSEWHERE
+        val income =
+            session
+                .query(
+                    "SELECT DISTINCT IFNULL(is_income, 0) AS income FROM categories WHERE id IN (${categoryIds.joinToString(",") { "?" }})",
+                    categoryIds,
+                ).map { it.bool("income") }
+        return if (income.any { it != target.bool("is_income") }) EnvelopeCopy.TRANSFER_SAME_KIND else null
+    }
+
+    private fun transfer(
+        categoryIds: List<String>,
+        transferId: String,
+    ) {
+        val tracking =
+            session
+                .query("SELECT value FROM preferences WHERE id = 'budgetType'")
+                .firstOrNull()
+                ?.str("value") == "tracking"
+        val table = if (tracking) "reflect_budgets" else "zero_budgets"
+        val marks = categoryIds.joinToString(",") { "?" }
+        val expense =
+            session
+                .query("SELECT id FROM categories WHERE id IN ($marks) AND IFNULL(is_income, 0) = 0", categoryIds)
+                .mapNotNull { it.str("id") }
+        if (expense.isNotEmpty()) {
+            session
+                .query(
+                    """
+                    SELECT month, SUM(amount) AS amount FROM $table
+                    WHERE category IN (${expense.joinToString(",") { "?" }}) AND amount != 0
+                    GROUP BY month
+                    """.trimIndent(),
+                    expense,
+                ).forEach { row ->
+                    val month = row.long("month").toInt()
+                    val kept =
+                        session
+                            .query("SELECT amount FROM $table WHERE month = ? AND category = ?", listOf(month, transferId))
+                            .firstOrNull()
+                            ?.long("amount") ?: 0L
+                    BudgetEdits.assign(session, clock, month, transferId, kept + row.long("amount"))
+                }
+        }
+        if (columnsOf("category_mapping").isNotEmpty()) {
+            session
+                .query("SELECT id FROM category_mapping WHERE transferId IN ($marks) OR id IN ($marks)", categoryIds + categoryIds)
+                .mapNotNull { it.str("id") }
+                .toSet()
+                .plus(categoryIds)
+                .forEach { SyncSchema.recordLocal(session, clock, "category_mapping", it, "transferId", transferId) }
+        }
+        // The phone reads a transaction's own category, so its transactions are filed under the new one too.
+        session
+            .query("SELECT id FROM transactions WHERE category IN ($marks)", categoryIds)
+            .mapNotNull { it.str("id") }
+            .forEach { SyncSchema.recordLocal(session, clock, "transactions", it, "category", transferId) }
+    }
+
+    private fun columnsOf(table: String): List<String> = session.query("PRAGMA table_info($table)").mapNotNull { it.str("name") }
 
     private fun hasCategoryActivity(categoryId: String): Boolean {
         val budgeted =

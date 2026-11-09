@@ -16,7 +16,7 @@ object ReconcileCopy {
     const val RECONCILE = "reconcile"
     const val FINISH = "finish"
     const val CANCEL = "cancel"
-    const val ADJUSTMENT_PAYEE = "Reconciliation balance adjustment"
+    const val ADJUSTMENT_NOTE = "Reconciliation balance adjustment"
     const val START = "start"
     const val STATEMENT_BALANCE = "statement ending balance"
     const val STATEMENT_DATE = "statement ending date"
@@ -168,6 +168,7 @@ sealed interface ReconcileFinishResult {
 
 class ReconcileBook(
     private val session: SqlSession,
+    private val clock: BudgetClock = BudgetClock.System,
 ) {
     private val json =
         Json {
@@ -287,7 +288,8 @@ class ReconcileBook(
 
     /**
      * Locks the cleared rows. When the cleared total is still off and [adjust] is set, a cleared
-     * "reconciliation balance adjustment" for the difference is added on the statement date first, as Actual does.
+     * transaction for the difference is added first, as Actual adds it: dated today, "Reconciliation balance
+     * adjustment" in its notes, and run through the rules.
      */
     fun finish(
         accountId: String,
@@ -302,32 +304,37 @@ class ReconcileBook(
         }
         session.transaction {
             if (current.differenceMinor != 0L) {
-                val register = RegisterBook(session, ids)
-                register.insertImportedTransaction(
-                    id = ids(),
+                val today = clock.today()
+                RegisterBook(session, ids).addAdjustment(
                     accountId = accountId,
-                    categoryId = null,
                     amount = current.differenceMinor,
-                    payeeId = register.payeeIdForName(ReconcileCopy.ADJUSTMENT_PAYEE),
-                    note = null,
-                    date = sessionData.statementDate,
-                    financialId = null,
-                    importedPayee = null,
+                    date = today.year * 10000 + today.monthValue * 100 + today.dayOfMonth,
+                    note = ReconcileCopy.ADJUSTMENT_NOTE,
                 )
             }
-            session
-                .query(
-                    """
-                    SELECT id FROM transactions
-                    WHERE acct = ?
-                        AND IFNULL(tombstone, 0) = 0
-                        AND IFNULL(isChild, 0) = 0
-                        AND IFNULL(reconciled, 0) = 0
-                        AND IFNULL(cleared, 0) = 1
-                    """.trimIndent(),
-                    listOf(accountId),
-                ).mapNotNull { it.str("id") }
-                .forEach { id -> SyncSchema.write(session, "transactions", id, "reconciled", 1) }
+            // Actual's `lockTransactions` locks a split's lines with it.
+            val locked =
+                session
+                    .query(
+                        """
+                        SELECT id FROM transactions
+                        WHERE acct = ?
+                            AND IFNULL(tombstone, 0) = 0
+                            AND IFNULL(isChild, 0) = 0
+                            AND IFNULL(reconciled, 0) = 0
+                            AND IFNULL(cleared, 0) = 1
+                        """.trimIndent(),
+                        listOf(accountId),
+                    ).mapNotNull { it.str("id") }
+            val lines =
+                locked.flatMap { parent ->
+                    session
+                        .query(
+                            "SELECT id FROM transactions WHERE parent_id = ? AND IFNULL(isChild, 0) = 1 AND IFNULL(tombstone, 0) = 0 AND IFNULL(reconciled, 0) = 0",
+                            listOf(parent),
+                        ).mapNotNull { it.str("id") }
+                }
+            (locked + lines).forEach { id -> SyncSchema.write(session, "transactions", id, "reconciled", 1) }
             session.exec(
                 "INSERT OR REPLACE INTO preferences (id, value) VALUES (?, ?)",
                 listOf(statementBalanceKey(accountId), sessionData.statementMinor.toString()),

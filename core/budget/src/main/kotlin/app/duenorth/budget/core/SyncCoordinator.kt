@@ -809,15 +809,18 @@ class SyncCoordinator(
         return EditResult.Saved
     }
 
+    /** Deletes [categoryId]; one in use moves its money and transactions to [transferId], as in Actual. */
     fun deleteEnvelopeCategory(
         budgetId: String,
         categoryId: String,
-    ): EditResult = envelopeEdit(budgetId) { deleteCategory(categoryId) }
+        transferId: String? = null,
+    ): EditResult = envelopeEdit(budgetId) { deleteCategory(categoryId, transferId) }
 
     fun deleteCategoryGroup(
         budgetId: String,
         groupId: String,
-    ): EditResult = envelopeEdit(budgetId) { deleteGroup(groupId) }
+        transferId: String? = null,
+    ): EditResult = envelopeEdit(budgetId) { deleteGroup(groupId, transferId) }
 
     fun hideCategoryGroup(
         budgetId: String,

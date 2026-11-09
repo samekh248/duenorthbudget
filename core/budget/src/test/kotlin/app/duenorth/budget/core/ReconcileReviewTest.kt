@@ -83,24 +83,21 @@ class ReconcileReviewTest {
     fun finishWhileOffNeedsAdjustAndThenAddsAReconciledAdjustment() {
         db { session, register ->
             register.save(draft("a", amount = 1_000))
-            val reconcile = ReconcileBook(session)
+            val reconcile = ReconcileBook(session, BudgetClock { java.time.LocalDate.parse("2026-10-05") })
             reconcile.start("checking", "9.69", "2026-09-30")
             assertEquals(ReconcileFinishResult.Rejected(ReconcileCopy.NOT_BALANCED), reconcile.finish("checking"))
             assertEquals(ReconcileFinishResult.Finished, reconcile.finish("checking", adjust = true, ids = { "adj" }))
             val adjustment =
                 session
-                    .query(
-                        """
-                        SELECT t.amount, t.date, t.category, t.reconciled, p.name
-                        FROM transactions t JOIN payees p ON p.id = t.description
-                        WHERE t.id = 'adj'
-                        """.trimIndent(),
-                    ).first()
+                    .query("SELECT amount, date, category, reconciled, description, notes FROM transactions WHERE id = 'adj'")
+                    .first()
             assertEquals(-31L, adjustment.long("amount"))
-            assertEquals(20260930L, adjustment.long("date"))
+            // As in Actual: dated the day it is made, no payee, the words in its notes.
+            assertEquals(20261005L, adjustment.long("date"))
             assertEquals(null, adjustment.str("category"))
             assertTrue(adjustment.bool("reconciled"))
-            assertEquals(ReconcileCopy.ADJUSTMENT_PAYEE, adjustment.str("name"))
+            assertEquals(null, adjustment.str("description"))
+            assertEquals(ReconcileCopy.ADJUSTMENT_NOTE, adjustment.str("notes"))
             assertTrue(row(session, "a").reconciled)
             assertEquals(null, reconcile.read("checking"))
         }

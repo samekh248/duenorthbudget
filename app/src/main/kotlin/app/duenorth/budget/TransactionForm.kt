@@ -137,7 +137,7 @@ fun TransactionForm(
         mutableStateOf(
             row?.parts.orEmpty().map { part ->
                 val text = MoneyParse.editText(abs(part.amountMinor), page.currency.decimals, FormatOptions(hideFraction, numberFormat))
-                SplitLine(part.categoryId, text)
+                SplitLine(part.categoryId.ifBlank { null }, text, part.payee.orEmpty(), part.note.orEmpty())
             },
         )
     }
@@ -186,11 +186,11 @@ fun TransactionForm(
         if (!splitting) return (if (row?.parent == true) emptyList<SplitPart>() else null) to null
         val parts =
             splits.mapIndexed { index, line ->
-                val category = line.categoryId ?: return null to (index to RegisterCopy.CHOOSE_CATEGORY)
                 // A rest line past the total is the whole split's problem; one with nothing left, or a bad amount, is the line's.
                 if (index == restIndex && rest != 0L && restPart == null) return null to (null to RegisterCopy.SPLIT_MUST_ADD)
                 val part = splitAmount(index) ?: return null to (index to RegisterCopy.ENTER_AMOUNT)
-                SplitPart(category, part)
+                // As in Actual, a line may go without a category, and may have its own payee and notes.
+                SplitPart(line.categoryId, part, line.payee.trim().ifEmpty { null }, line.note.trim().ifEmpty { null })
             }
         return if (parts.sumOf { it.amountMinor } == total) parts to null else null to (null to RegisterCopy.SPLIT_MUST_ADD)
     }
@@ -455,10 +455,13 @@ fun TransactionForm(
     }
 }
 
-/** One split line as typed: its category (none picked yet is null) and its amount box. */
+/** One split line as typed: its category (none is null), its amount box, and its own payee and notes. */
 data class SplitLine(
     val categoryId: String?,
     val amount: String,
+    /** Blank takes the transaction's payee. */
+    val payee: String = "",
+    val note: String = "",
 )
 
 /**
@@ -515,6 +518,26 @@ private fun SplitLines(
                     ) {
                         AppGlyphIcon(AppGlyph.Cancel, Metro.colors.secondary)
                     }
+                }
+                // The line's own payee and notes, as a split line in Actual has; left blank, it takes the transaction's.
+                Row(
+                    Modifier.padding(top = 8.dp, end = MetroDimens.TouchTarget + 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    MetroField(
+                        line.payee,
+                        { onLine(index, line.copy(payee = it)) },
+                        TransactionFormCopy.PAYEE,
+                        Modifier.weight(1f).testTag("transaction-split-$index-payee"),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    )
+                    MetroField(
+                        line.note,
+                        { onLine(index, line.copy(note = it)) },
+                        TransactionFormCopy.NOTE,
+                        Modifier.weight(1f).testTag("transaction-split-$index-note"),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    )
                 }
                 lineError?.takeIf { it.first == index }?.let { (_, reason) ->
                     FieldErrorBlock(reason, "transaction-split-$index-error")

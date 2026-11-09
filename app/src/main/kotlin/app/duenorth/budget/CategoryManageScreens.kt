@@ -82,7 +82,8 @@ object CategoryManageCopy {
     const val HIDE_HINT = "keeps its history"
     const val DELETE = "delete"
     const val HIDDEN = "hidden"
-    const val IN_USE = "has transactions · hide it instead"
+    const val IN_USE = "moves its money and transactions"
+    const val MOVE_INTO = "move its money and transactions to"
     const val DELETE_CATEGORY_BODY = "it has no transactions and no money budgeted, so nothing else in the budget changes"
     const val DELETE_CATEGORY_NOTE = "deleting syncs to your other devices; to keep it without seeing it, hide it instead"
     const val DELETE_GROUP_BODY = "the group is empty, so nothing else in the budget changes"
@@ -92,7 +93,12 @@ object CategoryManageCopy {
 
     fun count(n: Int) = if (n == 1) "1 category" else "$n categories"
 
-    fun emptyFirst(n: Int) = "move or delete its ${count(n)} first"
+    fun deletesAll(n: Int) = "deletes its ${count(n)} too"
+
+    /** What deleting does when the money and transactions go to [target], as Actual's delete does. */
+    fun movesTo(target: String) = "its money budgeted and its transactions move to $target"
+
+    const val DELETE_GROUP_CATEGORIES_BODY = "its categories have no transactions and no money budgeted, so they go with it"
 
     fun hidesAll(n: Int) = "hides all ${count(n)}"
 
@@ -113,6 +119,12 @@ private sealed interface ManageSheet {
     data class MoveTo(
         val group: ManageGroupRow,
         val category: ManageCategoryRow,
+    ) : ManageSheet
+
+    /** The categories that can take the money and transactions of [delete], which is in use. */
+    data class TransferTo(
+        val delete: ManageDelete,
+        val exclude: Set<String>,
     ) : ManageSheet
 }
 
@@ -136,14 +148,23 @@ private sealed interface ManageEdit {
 private sealed interface ManageDelete {
     val name: String
 
+    /** The category that takes the money and transactions, and its name; null when nothing is in use. */
+    val transferId: String?
+    val transferName: String?
+
     data class Category(
         val id: String,
         override val name: String,
+        override val transferId: String? = null,
+        override val transferName: String? = null,
     ) : ManageDelete
 
     data class Group(
         val id: String,
         override val name: String,
+        val categories: Int = 0,
+        override val transferId: String? = null,
+        override val transferName: String? = null,
     ) : ManageDelete
 }
 
@@ -166,8 +187,8 @@ fun ManageCategoriesScreen(
     onHideCategory: (String, Boolean) -> Unit,
     onHideGroup: (String, Boolean) -> Unit,
     onMoveToGroup: (String, String) -> Unit,
-    onDeleteCategory: (String) -> Unit,
-    onDeleteGroup: (String) -> Unit,
+    onDeleteCategory: (String, String?) -> Unit,
+    onDeleteGroup: (String, String?) -> Unit,
     onPlaceGroup: (String, String?) -> Unit,
     onPlaceCategory: (String, String?) -> Unit,
     modifier: Modifier = Modifier,
@@ -355,9 +376,16 @@ fun ManageCategoriesScreen(
                             CategoryManageCopy.DELETE,
                             "manage-action-delete",
                             detail = if (current.category.inUse) CategoryManageCopy.IN_USE else null,
-                            enabled = !current.category.inUse,
                             accent = true,
-                        ) { confirm = ManageDelete.Category(current.category.id, current.category.name) },
+                        ) {
+                            val delete = ManageDelete.Category(current.category.id, current.category.name)
+                            // One in use asks where its money and transactions go first, as Actual's delete does.
+                            if (current.category.inUse) {
+                                sheet = ManageSheet.TransferTo(delete, setOf(current.category.id))
+                            } else {
+                                confirm = delete
+                            }
+                        },
                     )
                 }
                 is ManageSheet.Group -> {
@@ -380,10 +408,16 @@ fun ManageCategoriesScreen(
                         MetroMenuItem(
                             CategoryManageCopy.DELETE,
                             "manage-action-delete",
-                            detail = if (group.categories.isEmpty()) null else CategoryManageCopy.emptyFirst(group.categories.size),
-                            enabled = group.categories.isEmpty(),
+                            detail = if (group.categories.isEmpty()) null else CategoryManageCopy.deletesAll(group.categories.size),
                             accent = true,
-                        ) { confirm = ManageDelete.Group(group.id, group.name) },
+                        ) {
+                            val delete = ManageDelete.Group(group.id, group.name, group.categories.size)
+                            if (group.categories.any { it.inUse }) {
+                                sheet = ManageSheet.TransferTo(delete, group.categories.map { it.id }.toSet())
+                            } else {
+                                confirm = delete
+                            }
+                        },
                     )
                 }
                 // Move to opens a second menu under the same row, one line per other group.
@@ -391,6 +425,20 @@ fun ManageCategoriesScreen(
                     manage.groups.filter { it.id != current.group.id }.map { target ->
                         MetroMenuItem(target.name, "manage-move-${target.id}") { onMoveToGroup(current.category.id, target.id) }
                     }
+                // Delete into opens a menu of every other category, headed by what it is for.
+                is ManageSheet.TransferTo ->
+                    listOf(MetroMenuItem(CategoryManageCopy.MOVE_INTO, "manage-transfer-title", enabled = false) {}) +
+                        manage.groups.flatMap { group ->
+                            group.categories.filter { it.id !in current.exclude }.map { target ->
+                                MetroMenuItem(target.name, "manage-transfer-${target.id}", detail = group.name) {
+                                    confirm =
+                                        when (val delete = current.delete) {
+                                            is ManageDelete.Category -> delete.copy(transferId = target.id, transferName = target.name)
+                                            is ManageDelete.Group -> delete.copy(transferId = target.id, transferName = target.name)
+                                        }
+                                }
+                            }
+                        }
                 null -> null
             }
         if (menu != null) {
@@ -404,8 +452,8 @@ fun ManageCategoriesScreen(
                 onDelete = {
                     confirm = null
                     when (current) {
-                        is ManageDelete.Category -> onDeleteCategory(current.id)
-                        is ManageDelete.Group -> onDeleteGroup(current.id)
+                        is ManageDelete.Category -> onDeleteCategory(current.id, current.transferId)
+                        is ManageDelete.Group -> onDeleteGroup(current.id, current.transferId)
                     }
                 },
                 onKeep = { confirm = null },
@@ -618,7 +666,13 @@ private fun DeletePage(
     val category = current is ManageDelete.Category
     ConfirmPage(
         title = CategoryManageCopy.delete(current.name),
-        body = if (category) CategoryManageCopy.DELETE_CATEGORY_BODY else CategoryManageCopy.DELETE_GROUP_BODY,
+        body =
+            when {
+                current.transferName != null -> CategoryManageCopy.movesTo(current.transferName!!)
+                category -> CategoryManageCopy.DELETE_CATEGORY_BODY
+                (current as ManageDelete.Group).categories > 0 -> CategoryManageCopy.DELETE_GROUP_CATEGORIES_BODY
+                else -> CategoryManageCopy.DELETE_GROUP_BODY
+            },
         note = if (category) CategoryManageCopy.DELETE_CATEGORY_NOTE else CategoryManageCopy.DELETE_GROUP_NOTE,
         yes = CategoryManageCopy.DELETE,
         onYes = onDelete,

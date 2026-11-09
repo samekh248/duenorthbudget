@@ -833,7 +833,7 @@ class BudgetLibrary(
         accountId: String,
         adjust: Boolean = false,
     ): ReconcileFinishResult =
-        edit(budgetId, UndoCopy.RECONCILE) { ReconcileBook(it).finish(accountId, adjust) }
+        edit(budgetId, UndoCopy.RECONCILE) { ReconcileBook(it, clock).finish(accountId, adjust) }
             ?: ReconcileFinishResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
     fun cancelReconcile(

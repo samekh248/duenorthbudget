@@ -44,8 +44,8 @@ class CategoryManageContentTest {
                         onHideCategory = { c, h -> calls += "hide $c $h" },
                         onHideGroup = { g, h -> calls += "hide-group $g $h" },
                         onMoveToGroup = { c, g -> calls += "move $c $g" },
-                        onDeleteCategory = { calls += "delete $it" },
-                        onDeleteGroup = { calls += "delete-group $it" },
+                        onDeleteCategory = { c, t -> calls += "delete $c" + (t?.let { " into $it" } ?: "") },
+                        onDeleteGroup = { g, t -> calls += "delete-group $g" + (t?.let { " into $it" } ?: "") },
                         onPlaceGroup = { g, t -> calls += "place-group $g $t" },
                         onPlaceCategory = { c, t -> calls += "place $c $t" },
                     )
@@ -100,13 +100,18 @@ class CategoryManageContentTest {
     }
 
     @Test
-    fun aUsedCategoryCannotBeDeleted() {
+    fun aUsedCategoryMovesItsMoneyAndTransactionsWhenDeleted() {
         show()
         compose.onNodeWithTag("manage-group-g-food").performClick()
         compose.onNodeWithTag("manage-category-c-coffee").performClick()
         compose.onNodeWithTag("manage-action-delete").performClick()
+        // As in Actual, deleting a category in use asks which category takes its money and transactions.
         assertEquals(0, compose.onAllNodes(hasTestTag("manage-delete")).fetchSemanticsNodes().size)
-        assertEquals(emptyList<String>(), calls)
+        compose.onNodeWithTag("manage-transfer-c-coffee").assertDoesNotExist()
+        compose.onNodeWithTag("manage-transfer-c-groc").performClick()
+        compose.onNodeWithTag("manage-delete").assertIsDisplayed()
+        tapBar(CONFIRM_YES)
+        assertEquals(listOf("delete c-coffee into c-groc"), calls)
     }
 
     @Test
@@ -146,7 +151,6 @@ class CategoryManageContentTest {
         compose.onNodeWithTag("manage-action-delete").performClick()
         tapBar(CONFIRM_YES)
         compose.onNodeWithTag("manage-group-g-bills").performTouchInput { longClick() }
-        compose.onNodeWithTag("manage-action-delete").performClick()
         compose.onNodeWithTag("manage-action-hide").performClick()
         assertEquals(listOf("delete-group g-pets", "hide-group g-bills true"), calls)
     }

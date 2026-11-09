@@ -330,7 +330,9 @@ class RegisterBook(
         if (draft.cleared == null && parts == null) return saveFields(draft)
         // The split and the cleared flag join the same write, so the save is one undo step.
         return write {
-            if (parts?.any { !categoryAlive(it.categoryId) } == true) return@write WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
+            if (parts?.any { part -> part.categoryId?.let { !categoryAlive(it) } == true } == true) {
+                return@write WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
+            }
             // Rules run only over a new ordinary transaction; a transfer or a schedule's post keeps the draft's flag.
             val ruledHere = find(draft.id) == null && draft.transferAccountId == null && draft.scheduleId == null
             val result = saveFields(draft)
@@ -396,7 +398,7 @@ class RegisterBook(
                 }
                 val payeeId = payeeFor(draft.payee)
                 updateFields(existing.id, draft.accountId, null, existing.amount, payeeId, note, draft.date)
-                propagateChildren(existing.id, draft.accountId, payeeId, draft.date)
+                propagateChildren(existing.id, draft.accountId, payeeId, draft.date, existing.payeeId)
                 return@write WriteResult.Saved
             }
             if (partner != null) {
@@ -529,6 +531,49 @@ class RegisterBook(
         }
     }
 
+    private fun rulesOver(view: RuleTransactionView): RuleTransactionView = RulesBook(session, ids).applyRules(view)
+
+    private fun storedSchedule(id: String): String? =
+        session
+            .query("SELECT schedule FROM transactions WHERE id = ?", listOf(id))
+            .firstOrNull()
+            ?.str("schedule")
+
+    /**
+     * Actual's reconciliation adjustment: a cleared transaction with no payee, "Reconciliation balance adjustment"
+     * in its notes, dated [date] (today), run through the rules, which may change or delete it.
+     */
+    fun addAdjustment(
+        accountId: String,
+        amount: Long,
+        date: Int,
+        note: String,
+    ) {
+        val ruled =
+            rulesOver(RuleTransactionView(accountId, null, "", null, amount, note, ScheduleDates.toIso(date), cleared = true))
+        val id = ids()
+        insert(
+            id = id,
+            accountId = accountId,
+            categoryId = ruled.category?.takeIf { categoryAlive(it) },
+            amount = ruled.amount,
+            payeeId =
+                ruled.payee ?: ruled.payeeName
+                    .trim()
+                    .ifEmpty { null }
+                    ?.let(::payeeFor),
+            note = ruled.notes?.ifEmpty { null },
+            date = ScheduleDates.fromIso(ruled.dateIso)?.takeIf { validDate(it) } ?: date,
+            sort = nextSort(),
+            scheduleId = ruled.schedule,
+            cleared = ruled.cleared ?: true,
+        )
+        finishRuled(
+            id,
+            RuledDraft(TransactionDraft(id, accountId, date, "", amount, null, null), deleted = ruled.deleted, splits = ruled.splits),
+        )
+    }
+
     private fun storedCleared(id: String): Boolean? =
         session
             .query("SELECT cleared FROM transactions WHERE id = ?", listOf(id))
@@ -647,7 +692,9 @@ class RegisterBook(
                 return@write WriteResult.Rejected(RegisterCopy.SPLIT_MUST_ADD)
             }
             if (parts.sumOf { it.amountMinor } != txn.amount) return@write WriteResult.Rejected(RegisterCopy.SPLIT_MUST_ADD)
-            if (parts.any { !categoryAlive(it.categoryId) }) return@write WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
+            if (parts.any { part -> part.categoryId?.let { !categoryAlive(it) } == true }) {
+                return@write WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
+            }
             val kids = children(txn.id)
             guard(listOf(txn) + kids, force, ForcedWrite.Split(transactionId, parts))?.let { return@write it }
             kids.forEach { tombstone(it.id) }
@@ -660,8 +707,12 @@ class RegisterBook(
                     accountId = txn.accountId,
                     categoryId = part.categoryId,
                     amount = part.amountMinor,
-                    payeeId = txn.payeeId,
-                    note = txn.note,
+                    payeeId =
+                        part.payee
+                            ?.trim()
+                            ?.ifEmpty { null }
+                            ?.let(::payeeFor) ?: txn.payeeId,
+                    note = part.note?.trim()?.ifEmpty { null },
                     date = txn.date,
                     sort = txn.sort + (index + 1) * 0.01,
                 )
@@ -716,34 +767,80 @@ class RegisterBook(
             }
             partner?.let { tombstone(it.id) }
             val partnerId = ids()
+            val dateIso = ScheduleDates.toIso(draft.date)
+            var sideNote = note
+            var sideSchedule = draft.scheduleId ?: existing?.let { storedSchedule(it.id) }
             if (existing == null) {
+                // A new transfer gets its rules like any new transaction: they fill what was left empty.
+                val startCleared = draft.cleared ?: true
+                var sideCleared = startCleared
+                if (draft.scheduleId == null) {
+                    val ruled =
+                        rulesOver(
+                            RuleTransactionView(
+                                side.id,
+                                sidePayee,
+                                side.name,
+                                placed.first,
+                                draft.amountMinor,
+                                note,
+                                dateIso,
+                                cleared = startCleared,
+                            ),
+                        )
+                    val ruledNote = ruled.notes?.ifEmpty { null }
+                    if (note == null || ruledNote?.contains(note) == true) sideNote = ruledNote ?: note
+                    sideCleared = startCleared || ruled.cleared == true
+                    sideSchedule = ruled.schedule
+                }
                 insert(
                     id = draft.id,
                     accountId = side.id,
                     categoryId = placed.first,
                     amount = draft.amountMinor,
                     payeeId = sidePayee,
-                    note = note,
+                    note = sideNote,
                     date = draft.date,
                     transferId = partnerId,
                     sort = nextSort(),
-                    scheduleId = draft.scheduleId,
+                    scheduleId = sideSchedule,
+                    cleared = sideCleared,
                 )
             } else {
                 updateFields(draft.id, side.id, placed.first, draft.amountMinor, sidePayee, note, draft.date)
                 setColumns(draft.id, "transferred_id" to partnerId)
             }
+            // Actual's `addTransfer`: the other side comes in uncleared, and its own rules set its notes, cleared
+            // flag and schedule.
+            val partnerRuled =
+                rulesOver(
+                    RuleTransactionView(
+                        other.id,
+                        partnerPayee,
+                        side.name,
+                        placed.second,
+                        -draft.amountMinor,
+                        sideNote,
+                        dateIso,
+                        schedule = sideSchedule,
+                        cleared = false,
+                    ),
+                )
+            val partnerSchedule = partnerRuled.schedule ?: sideSchedule
             insert(
                 id = partnerId,
                 accountId = other.id,
                 categoryId = placed.second,
                 amount = -draft.amountMinor,
                 payeeId = partnerPayee,
-                note = note,
+                note = partnerRuled.notes?.ifEmpty { null },
                 date = draft.date,
                 transferId = draft.id,
                 sort = nextSort(),
+                scheduleId = partnerSchedule,
+                cleared = partnerRuled.cleared ?: false,
             )
+            if (partnerSchedule != null && partnerSchedule != sideSchedule) setColumns(draft.id, "schedule" to partnerSchedule)
             WriteResult.Saved
         }
     }
@@ -779,9 +876,13 @@ class RegisterBook(
             .query(
                 """
                 SELECT t.id AS id, t.parent_id AS parent_id, t.amount AS amount, t.category AS category,
-                       COALESCE(c.name, '') AS category_name
+                       COALESCE(c.name, '') AS category_name,
+                       CASE WHEN IFNULL(t.notes, '') != IFNULL(p.notes, '') THEN t.notes END AS notes,
+                       CASE WHEN t.description IS NOT NULL AND t.description != IFNULL(p.description, '') THEN lp.name END AS payee
                 FROM transactions t
                 LEFT JOIN categories c ON c.id = t.category AND IFNULL(c.tombstone, 0) = 0
+                LEFT JOIN transactions p ON p.id = t.parent_id
+                LEFT JOIN payees lp ON lp.id = t.description
                 WHERE t.acct = ?
                     AND IFNULL(t.tombstone, 0) = 0
                     AND IFNULL(t.isChild, 0) = 1
@@ -796,6 +897,8 @@ class RegisterBook(
                         categoryId = row.str("category").orEmpty(),
                         categoryName = row.str("category_name").orEmpty().ifBlank { RegisterCopy.NO_CATEGORY },
                         amountMinor = row.long("amount"),
+                        payee = row.str("payee")?.ifBlank { null },
+                        note = row.str("notes")?.ifBlank { null },
                     )
                 grouped.getOrPut(parentId) { mutableListOf() }.add(part)
             }
@@ -956,14 +1059,17 @@ class RegisterBook(
         )
     }
 
+    /** A split's lines follow its account and date; a line keeps a payee of its own, and the rest follow the new one. */
     private fun propagateChildren(
         parentId: String,
         accountId: String,
         payeeId: String,
         date: Int,
+        oldPayeeId: String?,
     ) {
         children(parentId).forEach { child ->
-            setColumns(child.id, "acct" to accountId, "description" to payeeId, "date" to date)
+            val payee = if (child.payeeId == null || child.payeeId == oldPayeeId) payeeId else child.payeeId
+            setColumns(child.id, "acct" to accountId, "description" to payee, "date" to date)
         }
     }
 
