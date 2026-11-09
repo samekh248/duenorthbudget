@@ -116,7 +116,7 @@ internal object ScheduleChecks {
         val todayInt = today.toInt()
         val oldest = today.minusDays(MISSED_DAYS.toLong()).toInt()
         return schedules
-            .filter { it.nextDate in oldest until todayInt }
+            .filter { it.nextDate in oldest until todayInt && !it.paid }
             .map { schedule ->
                 Finding(
                     key = AssistantBook.key(MISSED_KEY, schedule.id, "${schedule.nextDate}"),

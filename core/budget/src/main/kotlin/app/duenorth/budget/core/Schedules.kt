@@ -53,6 +53,8 @@ data class ScheduleSummary(
     val dates: List<Int>,
     /** Desktop's `sort_order` (Actual 26.10): higher comes first among schedules due the same day. */
     val sortOrder: Double = 0.0,
+    /** A transaction linked to the schedule covers its next date: Actual's "paid". */
+    val paid: Boolean = false,
 ) {
     /** The schedule's own name, or its payee's when it has none. */
     val title: String get() = name.ifBlank { payee }
@@ -170,7 +172,12 @@ class SchedulesBook(
                     categoryLabel = schedule.categoryLabel,
                     nextDate = ScheduleDates.fromIso(schedule.nextIso) ?: today.toActualDate(),
                     dueToday = schedule.nextIso == todayIso,
-                    status = if (schedule.nextIso == todayIso) "due" else "upcoming",
+                    status =
+                        when {
+                            isPaid(schedule) -> "paid"
+                            schedule.nextIso == todayIso -> "due"
+                            else -> "upcoming"
+                        },
                 )
             }
     }
@@ -261,6 +268,7 @@ class SchedulesBook(
                     ?.coerceAtLeast(1) ?: 1,
             dates = dates,
             sortOrder = schedule.sortOrder,
+            paid = !schedule.completed && isPaid(schedule),
         )
     }
 
@@ -301,7 +309,7 @@ class SchedulesBook(
         val nextDate =
             ScheduleDates.fromIso(schedule.nextIso)
                 ?: return ScheduleWriteResult.Rejected(RegisterCopy.ENTER_DATE)
-        if (!forceDuplicate && hasMatchingTransaction(schedule, nextDate)) {
+        if (!forceDuplicate && (isPaid(schedule) || hasMatchingTransaction(schedule, nextDate))) {
             return ScheduleWriteResult.ConfirmDuplicate(ScheduleCopy.DUPLICATE)
         }
         val book = RegisterBook(session, ids)
@@ -332,7 +340,8 @@ class SchedulesBook(
             TransactionDraft(
                 id = ids(),
                 accountId = schedule.accountId,
-                date = nextDate,
+                // A rule's date and cleared flag are saved, as Actual saves everything its rules set.
+                date = ScheduleDates.fromIso(ruled.dateIso) ?: nextDate,
                 payee = payeeName,
                 amountMinor = amount,
                 categoryId = categoryId,
@@ -340,12 +349,14 @@ class SchedulesBook(
                 force = false,
                 transferAccountId = transferAccountId,
                 scheduleId = schedule.id,
+                cleared = ruled.cleared ?: false,
             )
         when (val saved = book.save(draft)) {
             is WriteResult.Saved -> Unit
             is WriteResult.Rejected -> return ScheduleWriteResult.Rejected(saved.reason)
             is WriteResult.Confirm -> return ScheduleWriteResult.Rejected(RegisterCopy.RECONCILE_WARN)
         }
+        book.finishRuled(draft.id, RuledDraft(draft, deleted = ruled.deleted, splits = ruled.splits))
         advanceNextDate(schedule)
         return ScheduleWriteResult.Posted
     }
@@ -591,48 +602,80 @@ class SchedulesBook(
     }
 
     /**
-     * Posts or advances the first due auto-post occurrence (`advanceSchedulesService`).
-     * Returns false when nothing is due; the caller runs it once per undo step.
+     * One step of Actual's `advanceSchedulesService`: posts the first due or missed auto-post occurrence, or moves
+     * on a schedule a linked transaction has paid. Returns false when nothing is left; the caller runs it once per
+     * undo step.
      */
     fun autoPostOne(): Boolean {
-        val due = nextAutoPost() ?: return false
-        val date = ScheduleDates.fromIso(due.nextIso) ?: return false
-        if (hasMatchingTransaction(due, date)) {
-            advanceNextDate(due)
-            return true
-        }
-        val before = session.query("SELECT id FROM transactions").mapNotNull { it.str("id") }.toSet()
-        when (post(due.id, forceDuplicate = true)) {
-            ScheduleWriteResult.Posted -> {
-                // Actual posts scheduled transactions uncleared.
-                session
-                    .query("SELECT id FROM transactions WHERE schedule = ? AND IFNULL(tombstone, 0) = 0", listOf(due.id))
-                    .mapNotNull { it.str("id") }
-                    .filter { it !in before }
-                    .forEach { SyncSchema.write(session, "transactions", it, "cleared", 0) }
-            }
-            else -> {
-                advanceNextDate(due)
-            }
+        val (schedule, step) = nextStep() ?: return false
+        when (step) {
+            Step.POST -> if (post(schedule.id, forceDuplicate = true) != ScheduleWriteResult.Posted) advanceNextDate(schedule)
+            Step.ADVANCE -> advanceNextDate(schedule)
+            Step.CATCH_UP -> catchUpDate(schedule)?.let { updateNextDate(schedule.id, it) }
+            Step.COMPLETE -> markCompleted(schedule.id)
         }
         return true
     }
 
-    /** True when an auto-post schedule is due; a read, so callers can skip opening an undo step. */
-    fun hasAutoPostDue(): Boolean = nextAutoPost() != null
+    /** True when a schedule is due to post or be moved on; a read, so callers can skip opening an undo step. */
+    fun hasAutoPostDue(): Boolean = nextStep() != null
 
-    private fun nextAutoPost(): LoadedSchedule? {
-        val todayIso = clock.today().toString()
-        val posting =
+    private enum class Step { POST, ADVANCE, CATCH_UP, COMPLETE }
+
+    private fun nextStep(): Pair<LoadedSchedule, Step>? {
+        val today = clock.today()
+        val todayIso = today.toString()
+        val closed =
             session
-                .query(
-                    "SELECT id FROM schedules WHERE IFNULL(posts_transaction, 0) = 1 AND IFNULL(completed, 0) = 0 AND IFNULL(tombstone, 0) = 0",
-                ).mapNotNull { it.str("id") }
+                .query("SELECT id FROM accounts WHERE IFNULL(closed, 0) = 1 OR IFNULL(tombstone, 0) = 1")
+                .mapNotNull { it.str("id") }
                 .toSet()
-        if (posting.isEmpty()) return null
-        return loadSchedules()
-            .filter { it.id in posting && !it.completed && it.nextIso <= todayIso }
-            .minByOrNull { it.nextIso }
+        val steps =
+            loadSchedules()
+                .filter { !it.completed && it.accountId !in closed }
+                .mapNotNull { schedule ->
+                    val paid = isPaid(schedule)
+                    val recurring = schedule.dateCondition["value"] is JsonObject
+                    val step =
+                        when {
+                            schedule.postsTransaction && (!paid || recurring) ->
+                                when {
+                                    // A paid occurrence moves on, but not on the day it is due.
+                                    paid -> Step.ADVANCE.takeIf { schedule.nextIso != todayIso }
+                                    schedule.nextIso <= todayIso -> Step.POST
+                                    else -> null
+                                }
+                            !paid -> null
+                            // A paid schedule goes to its first date from today (`setNextDate`).
+                            recurring -> Step.CATCH_UP.takeIf { catchUpDate(schedule) != null }
+                            // A paid one-time schedule is finished once its date has gone by.
+                            else -> Step.COMPLETE.takeIf { schedule.nextIso < todayIso }
+                        }
+                    step?.let { schedule to it }
+                }
+        return steps.minByOrNull { it.first.nextIso }
+    }
+
+    /** The first date on or after today, when that is later than the schedule's next date. */
+    private fun catchUpDate(schedule: LoadedSchedule): String? =
+        ScheduleRecurrence
+            .firstOnOrAfter(schedule.dateCondition, clock.today())
+            ?.takeIf { it > schedule.nextIso }
+
+    /**
+     * Actual's `getHasTransactionsQuery`: a transaction linked to the schedule (`transactions.schedule`, which a
+     * post or the schedule's `link-schedule` rule sets) dated on or after its next date, or two days before it for
+     * an approximate date that does not post itself.
+     */
+    private fun isPaid(schedule: LoadedSchedule): Boolean {
+        val next = ScheduleDates.parseIso(schedule.nextIso) ?: return false
+        val exact = schedule.dateCondition["op"]?.jsonPrimitive?.contentOrNull == "is"
+        val start = if (exact || schedule.postsTransaction) next else next.minusDays(2)
+        return session
+            .query(
+                "SELECT 1 FROM transactions WHERE schedule = ? AND IFNULL(tombstone, 0) = 0 AND date >= ? LIMIT 1",
+                listOf(schedule.id, start.toActualDate()),
+            ).isNotEmpty()
     }
 
     private fun dateCondition(draft: ScheduleDraft): JsonObject {

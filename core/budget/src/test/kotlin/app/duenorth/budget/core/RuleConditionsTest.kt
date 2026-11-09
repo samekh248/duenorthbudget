@@ -64,7 +64,7 @@ class RuleConditionsTest {
             session.rule("""{"op":"is","field":"imported_description","value":"POS 1234 CAFE","type":"string"}""")
             val draft = TransactionDraft("t-new", checking, 20261007, "Cafe", -3000L, null, null)
             val ruled = RegisterBook(session).applyRulesForImport(draft, importedPayee = "POS 1234 CAFE")
-            assertEquals(bills, ruled.categoryId)
+            assertEquals(bills, ruled.draft.categoryId)
         }
     }
 

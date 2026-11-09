@@ -36,7 +36,7 @@ object ShellReader {
             } else {
                 BudgetMode.ENVELOPE
             }
-        val currency = Currencies.byCode(preferences["currency"].orEmpty()) ?: Currencies.byCode("USD")!!
+        val currency = BudgetCurrency.read(preferences)
         val month = viewMonth
         // Hidden groups and categories stay out of the screen unless asked for, as in Actual.
         val groups = detailed.groups.filter { showHidden || !it.bool("hidden") }

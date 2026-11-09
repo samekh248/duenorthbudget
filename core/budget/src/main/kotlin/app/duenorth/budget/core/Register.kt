@@ -331,11 +331,15 @@ class RegisterBook(
         // The split and the cleared flag join the same write, so the save is one undo step.
         return write {
             if (parts?.any { !categoryAlive(it.categoryId) } == true) return@write WriteResult.Rejected(RegisterCopy.CHOOSE_CATEGORY)
+            // Rules run only over a new ordinary transaction; a transfer or a schedule's post keeps the draft's flag.
+            val ruledHere = find(draft.id) == null && draft.transferAccountId == null && draft.scheduleId == null
             val result = saveFields(draft)
             if (result !is WriteResult.Saved || find(draft.id)?.tombstone != false) return@write result
             // The fields were saved (and any reconciled warning answered), so the split goes ahead.
             if (parts != null) split(draft.id, parts, force = true)
-            draft.cleared?.let { cleared ->
+            // A new transaction keeps the cleared flag it was saved with, which a rule may have filled in.
+            val cleared = if (ruledHere) storedCleared(draft.id) else draft.cleared
+            cleared?.let { cleared ->
                 (listOf(draft.id) + children(draft.id).map { it.id }).forEach { setColumns(it, "cleared" to cleared) }
             }
             result
@@ -357,7 +361,9 @@ class RegisterBook(
             val existing = find(draft.id)
             if (existing != null && existing.tombstone) return@write WriteResult.Saved
             if (existing == null) {
-                val ruled = keepSplit(draft, applyRules(draft, note))
+                // Rules fill in what the person left empty, as Actual's forms apply them to a new transaction.
+                val outcome = applyRules(draft, note, fillEmptyOnly = true)
+                val ruled = keepSplit(draft, outcome.draft)
                 insert(
                     id = ruled.id,
                     accountId = ruled.accountId,
@@ -368,7 +374,9 @@ class RegisterBook(
                     date = ruled.date,
                     sort = nextSort(),
                     scheduleId = ruled.scheduleId,
+                    cleared = ruled.cleared ?: true,
                 )
+                finishRuled(ruled.id, outcome)
                 return@write WriteResult.Saved
             }
             if (existing.child) return@write WriteResult.Rejected(RegisterCopy.SPLIT_MUST_ADD)
@@ -396,15 +404,16 @@ class RegisterBook(
                 tombstone(partner.id)
                 setColumns(existing.id, "transferred_id" to null)
             }
-            val ruled = keepSplit(draft, applyRules(draft, note, existingId = existing.id))
+            // Actual runs rules only on new transactions: an edit saves what the person typed.
+            val kept = keepSplit(draft, draft.copy(note = note))
             updateFields(
                 existing.id,
-                ruled.accountId,
-                ruled.categoryId,
-                ruled.amountMinor,
-                payeeFor(ruled.payee),
-                ruled.note,
-                ruled.date,
+                kept.accountId,
+                kept.categoryId,
+                kept.amountMinor,
+                payeeFor(kept.payee),
+                kept.note,
+                kept.date,
             )
             WriteResult.Saved
         }
@@ -417,24 +426,21 @@ class RegisterBook(
     ): TransactionDraft = if (draft.parts.isNullOrEmpty()) ruled else ruled.copy(amountMinor = draft.amountMinor, categoryId = null)
 
     /**
-     * Runs the file's rules over [draft]. A new transaction comes in cleared unless the draft says otherwise; an
-     * edit ([existingId]) reads its stored cleared, reconciled and bank payee, so conditions on them see the row.
+     * Runs the file's rules over a new [draft]. It comes in cleared unless the draft says otherwise. With
+     * [fillEmptyOnly], as Actual's forms do, a rule only fills what the person left empty (the category, the notes,
+     * an uncleared flag, the schedule, a split) or adds to the notes, and renames the payee they entered; a bank
+     * import takes everything the rules set, the date and cleared flag included.
      */
     private fun applyRules(
         draft: TransactionDraft,
         note: String?,
-        existingId: String? = null,
         importedPayee: String? = null,
         cleared: Boolean? = null,
-    ): TransactionDraft {
-        if (draft.scheduleId != null) return draft
+        fillEmptyOnly: Boolean = false,
+    ): RuledDraft {
+        if (draft.scheduleId != null) return RuledDraft(draft, importedPayee)
         val payeeId = payeeFor(draft.payee)
-        val stored =
-            existingId?.let { id ->
-                session
-                    .query("SELECT cleared, reconciled, imported_description FROM transactions WHERE id = ?", listOf(id))
-                    .firstOrNull()
-            }
+        val startCleared = cleared ?: draft.cleared ?: true
         val view =
             RuleTransactionView(
                 account = draft.accountId,
@@ -444,9 +450,8 @@ class RegisterBook(
                 amount = draft.amountMinor,
                 notes = note,
                 dateIso = ScheduleDates.toIso(draft.date),
-                cleared = cleared ?: draft.cleared ?: stored?.bool("cleared") ?: true,
-                importedPayee = importedPayee ?: stored?.str("imported_description"),
-                reconciled = stored?.bool("reconciled") == true,
+                cleared = startCleared,
+                importedPayee = importedPayee,
             )
         val ruled = RulesBook(session, ids).applyRules(view)
         val payeeName =
@@ -456,13 +461,79 @@ class RegisterBook(
                     .firstOrNull()
                     ?.str("name")
             } ?: ruled.payeeName
-        return draft.copy(
-            payee = payeeName.ifBlank { draft.payee },
-            categoryId = ruled.category,
-            amountMinor = ruled.amount,
-            note = ruled.notes ?: note,
+        val ruledNote = ruled.notes?.ifEmpty { null }
+        val ruledDate = ScheduleDates.fromIso(ruled.dateIso)?.takeIf { validDate(it) }
+        val ruledCleared = ruled.cleared ?: startCleared
+        val split = draft.parts.isNullOrEmpty()
+        val result =
+            if (fillEmptyOnly) {
+                draft.copy(
+                    payee = payeeName.ifBlank { draft.payee },
+                    categoryId = draft.categoryId ?: ruled.category,
+                    note = if (note == null || ruledNote?.contains(note) == true) ruledNote ?: note else note,
+                    cleared = startCleared || ruledCleared,
+                    scheduleId = ruled.schedule,
+                )
+            } else {
+                draft.copy(
+                    accountId = ruled.account.takeIf { account(it)?.tombstone == false } ?: draft.accountId,
+                    payee = payeeName.ifBlank { draft.payee },
+                    categoryId = ruled.category,
+                    amountMinor = ruled.amount,
+                    note = ruledNote,
+                    date = ruledDate ?: draft.date,
+                    cleared = ruledCleared,
+                    scheduleId = ruled.schedule,
+                )
+            }
+        return RuledDraft(
+            draft = result,
+            importedPayee = ruled.importedPayee,
+            deleted = ruled.deleted,
+            splits = ruled.splits?.takeIf { split && it.isNotEmpty() },
         )
     }
+
+    /** What a rule did beyond the fields: split the new transaction [id] into its lines, or delete it. */
+    fun finishRuled(
+        id: String,
+        ruled: RuledDraft,
+    ) {
+        val parent = find(id) ?: return
+        val lines = ruled.splits
+        if (lines != null && parent.transferId == null) {
+            val cleared = storedCleared(id) ?: true
+            setColumns(id, "isParent" to 1, "isChild" to 0, "category" to null)
+            lines.forEachIndexed { index, line ->
+                insert(
+                    id = ids(),
+                    child = true,
+                    parentId = id,
+                    accountId = parent.accountId,
+                    categoryId = line.category?.takeIf { categoryAlive(it) },
+                    amount = line.amount,
+                    payeeId =
+                        line.payee ?: line.payeeName
+                            .trim()
+                            .ifEmpty { null }
+                            ?.let(::payeeFor) ?: parent.payeeId,
+                    note = line.notes,
+                    date = parent.date,
+                    sort = parent.sort + (index + 1) * 0.01,
+                    cleared = cleared,
+                )
+            }
+        }
+        if (ruled.deleted) {
+            (listOf(id) + children(id).map { it.id }).forEach(::tombstone)
+        }
+    }
+
+    private fun storedCleared(id: String): Boolean? =
+        session
+            .query("SELECT cleared FROM transactions WHERE id = ?", listOf(id))
+            .firstOrNull()
+            ?.bool("cleared")
 
     fun setCategory(
         transactionId: String,
@@ -771,15 +842,7 @@ class RegisterBook(
                 )
             }
 
-    private fun currency(): CurrencySpec {
-        val code =
-            session
-                .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
-                .firstOrNull()
-                ?.str("value")
-                .orEmpty()
-        return Currencies.byCode(code) ?: Currencies.byCode("USD")!!
-    }
+    private fun currency(): CurrencySpec = BudgetCurrency.read(session)
 
     private fun payeeFor(name: String): String {
         val trimmed = name.trim()
@@ -911,11 +974,12 @@ class RegisterBook(
     private fun nextSort(): Double =
         session.query("SELECT COALESCE(MAX(sort_order), 0) AS sort FROM transactions").first().double("sort") + 1.0
 
+    /** The file's rules over a bank row about to be added, taking everything they set, as Actual's import does. */
     fun applyRulesForImport(
         draft: TransactionDraft,
         importedPayee: String? = null,
         cleared: Boolean = true,
-    ): TransactionDraft = applyRules(draft, draft.note?.trim()?.ifEmpty { null }, importedPayee = importedPayee, cleared = cleared)
+    ): RuledDraft = applyRules(draft, draft.note?.trim()?.ifEmpty { null }, importedPayee = importedPayee, cleared = cleared)
 
     fun payeeIdForName(name: String): String = payeeFor(name)
 
@@ -933,6 +997,7 @@ class RegisterBook(
         importedPayee: String?,
         cleared: Boolean = true,
         rawSyncedData: String? = null,
+        scheduleId: String? = null,
     ) {
         insert(
             id = id,
@@ -947,6 +1012,7 @@ class RegisterBook(
             importedPayee = importedPayee,
             cleared = cleared,
             rawSyncedData = rawSyncedData,
+            scheduleId = scheduleId,
         )
     }
 

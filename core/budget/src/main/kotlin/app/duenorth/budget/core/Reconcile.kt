@@ -519,15 +519,7 @@ class ReconcileBook(
                 )
             }
 
-    private fun currency(): CurrencySpec {
-        val code =
-            session
-                .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
-                .firstOrNull()
-                ?.str("value")
-                .orEmpty()
-        return Currencies.byCode(code) ?: Currencies.byCode("USD")!!
-    }
+    private fun currency(): CurrencySpec = BudgetCurrency.read(session)
 
     private data class AccountRow(
         val id: String,

@@ -50,16 +50,26 @@ class ScheduleAutoPostTest {
     }
 
     @Test
-    fun anExistingMatchOnlyAdvancesTheDate() {
+    fun aTypedPaymentLinksToTheScheduleAndMovesItOn() {
         fixture.open().use { opened ->
             opened.db { session ->
                 val book = SchedulesBook(session, BudgetClock { fixture.today })
                 book.save(internet("2026-10-07"))
                 RegisterBook(session).save(TransactionDraft("typed", checking, 20261007, "Cafe", -6000L, null, null))
+                // The schedule's rule links the payment, as desktop does, so nothing more is posted.
+                val scheduleId = session.query("SELECT id FROM schedules").single().str("id")
+                assertEquals(scheduleId, session.query("SELECT schedule FROM transactions WHERE id = 'typed'").single().str("schedule"))
                 while (book.autoPostOne()) Unit
-                assertEquals(emptyList<Long>(), posted(session))
-                val next = session.query("SELECT local_next_date FROM schedules_next_date").single().long("local_next_date")
-                assertEquals(20261107L, next)
+                assertEquals(listOf(20261007L), posted(session))
+                assertEquals("paid", book.listUpcoming().single().status)
+
+                fun next() = session.query("SELECT local_next_date FROM schedules_next_date").single().long("local_next_date")
+                // Paid on the day it is due, it stays there until the day is over.
+                assertEquals(20261007L, next())
+                val tomorrow = SchedulesBook(session, BudgetClock { fixture.today.plusDays(1) })
+                while (tomorrow.autoPostOne()) Unit
+                assertEquals(listOf(20261007L), posted(session))
+                assertEquals(20261107L, next())
             }
         }
     }

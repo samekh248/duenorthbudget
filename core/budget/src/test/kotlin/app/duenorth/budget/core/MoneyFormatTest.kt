@@ -12,8 +12,10 @@ class MoneyFormatTest {
         assertEquals("$12.34", MoneyFormat.format(1_234, usd))
         assertEquals("-$12.34", MoneyFormat.format(-1_234, usd))
         assertEquals("$1,800.00", MoneyFormat.format(180_000, usd))
-        assertEquals("¥1,500", MoneyFormat.format(1_500, yen))
-        assertEquals("-¥40", MoneyFormat.format(-40, yen))
+        // Yen is kept in hundredths, as Actual keeps it, and shown in whole yen.
+        assertEquals("¥1,500", MoneyFormat.format(150_000, yen))
+        assertEquals("-¥40", MoneyFormat.format(-4_000, yen))
+        assertEquals("¥3", MoneyFormat.format(250, yen))
     }
 
     @Test
