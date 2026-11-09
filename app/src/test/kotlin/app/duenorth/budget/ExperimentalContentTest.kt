@@ -4,11 +4,12 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.lifecycle.viewModelScope
 import app.duenorth.budget.ParityTestSupport.await
 import app.duenorth.budget.ParityTestSupport.household
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.design.theme.MetroTheme
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -120,12 +121,12 @@ class ExperimentalContentTest {
         model.settingsUi.setExperimental(false)
         model.settingsUi.setGoalTemplates(true)
         await { library.readFormatPrefs(budgetId).let { it.goalTemplates && it.experimentalAsked && !it.experimental } }
-        runBlocking { model.settingsUi.syncExperimental() }
+        model.viewModelScope.launch { model.settingsUi.syncExperimental() }
         await { library.readFormatPrefs(budgetId).templatesOn }
         // And the other way: master on with nothing under it turns off.
         model.settingsUi.setGoalTemplates(false)
         await { !library.readFormatPrefs(budgetId).goalTemplates }
-        runBlocking { model.settingsUi.syncExperimental() }
+        model.viewModelScope.launch { model.settingsUi.syncExperimental() }
         await { !library.readFormatPrefs(budgetId).experimental }
     }
 
