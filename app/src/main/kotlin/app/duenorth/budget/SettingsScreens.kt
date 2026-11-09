@@ -372,7 +372,7 @@ fun EncryptionPasswordScreen(
                 MetroField(first, { first = it }, SettingsCopy.CURRENT_PASSWORD, Modifier.testTag("encryption-current"), conceal = true)
         }
         if (error != null) {
-            MetroText(error, Metro.typography.body, Modifier.testTag("encryption-error"), color = Metro.accent.text)
+            WarningText(error, Modifier.testTag("encryption-error"))
         }
         if (!formSaveOnBar()) {
             MetroButtonGrid {

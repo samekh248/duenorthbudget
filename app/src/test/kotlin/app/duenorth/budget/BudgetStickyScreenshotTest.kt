@@ -75,7 +75,7 @@ class BudgetStickyScreenshotTest {
         compose.waitForIdle()
         val px = SCROLL_DP * compose.density.density
         compose
-            .onAllNodes(hasScrollAction() and hasAnyDescendant(hasTestTag("category-budgeted-g0-c0")))
+            .onAllNodes(hasScrollAction() and hasAnyDescendant(hasTestTag("category-budgeted-g0-c0")), useUnmergedTree = true)
             .onLast()
             .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, px) }
         compose.waitForIdle()

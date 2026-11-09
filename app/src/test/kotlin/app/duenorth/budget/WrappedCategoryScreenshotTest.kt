@@ -94,8 +94,20 @@ class WrappedCategoryScreenshotTest {
         captureScreenRoboImage("src/test/snapshots/$name.png")
         val (oneAbove, oneBelow) = air(ONE_LINE)
         val (wrapAbove, wrapBelow) = air(WRAPPED)
-        val wrapHeight = compose.onNodeWithTag("category-name-$WRAPPED").getBoundsInRoot().let { it.bottom - it.top }
-        val oneHeight = compose.onNodeWithTag("category-name-$ONE_LINE").getBoundsInRoot().let { it.bottom - it.top }
+        val wrapHeight =
+            compose
+                .onNodeWithTag(
+                    "category-name-$WRAPPED",
+                    useUnmergedTree = true,
+                ).getBoundsInRoot()
+                .let { it.bottom - it.top }
+        val oneHeight =
+            compose
+                .onNodeWithTag(
+                    "category-name-$ONE_LINE",
+                    useUnmergedTree = true,
+                ).getBoundsInRoot()
+                .let { it.bottom - it.top }
         assertTrue("$style: the long name should wrap", wrapHeight > oneHeight * 1.5f)
         assertEquals("$style: one-line name centered", oneAbove.value, oneBelow.value, 0.5f)
         assertEquals("$style: wrapped name keeps the air above", oneAbove.value, wrapAbove.value, 0.5f)
@@ -104,8 +116,8 @@ class WrappedCategoryScreenshotTest {
 
     /** Space between the category row's top and the name, and between the name and the row's text area bottom. */
     private fun air(id: String): Pair<Dp, Dp> {
-        val row = compose.onNodeWithTag("category-line-$id").getBoundsInRoot()
-        val name = compose.onNodeWithTag("category-name-$id").getBoundsInRoot()
+        val row = compose.onNodeWithTag("category-line-$id", useUnmergedTree = true).getBoundsInRoot()
+        val name = compose.onNodeWithTag("category-name-$id", useUnmergedTree = true).getBoundsInRoot()
         return (name.top - row.top) to (row.bottom - name.bottom)
     }
 }

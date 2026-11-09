@@ -500,16 +500,16 @@ class ShellContentTest {
             }
         }
         compose
-            .onNodeWithTag("category-goal-c-power")
+            .onNodeWithTag("category-goal-c-power", useUnmergedTree = true)
             .assertIsDisplayed()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(10f / 14f, 0f..1f)))
         // A category without a goal keeps an empty bar, so every row lines up.
         compose
-            .onNodeWithTag("category-goal-c-dining")
+            .onNodeWithTag("category-goal-c-dining", useUnmergedTree = true)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(0f, 0f..1f)))
         templatesOn.value = false
-        compose.onAllNodesWithTag("category-goal-c-power").assertCountEquals(0)
-        compose.onAllNodesWithTag("category-goal-c-dining").assertCountEquals(0)
+        compose.onAllNodesWithTag("category-goal-c-power", useUnmergedTree = true).assertCountEquals(0)
+        compose.onAllNodesWithTag("category-goal-c-dining", useUnmergedTree = true).assertCountEquals(0)
     }
 
     private fun sample(): MonthShell =

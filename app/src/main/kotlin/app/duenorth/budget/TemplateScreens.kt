@@ -136,7 +136,7 @@ private fun CleanupOutcome(result: CleanupResult) {
             is CleanupResult.Rejected -> MetroText(result.reason, Metro.typography.subheader, color = Metro.accent.text)
             is CleanupResult.NoFunds -> {
                 MetroText(CleanupCopy.NOTES, Metro.typography.subheader)
-                result.warnings.forEach { MetroText(it, Metro.typography.body, color = Metro.accent.text) }
+                result.warnings.forEach { WarningText(it) }
             }
         }
     }
@@ -158,7 +158,7 @@ private fun TemplateOutcome(
             Column(tag, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 result.errors.forEachIndexed { index, error ->
                     MetroText(error.categoryName, Metro.typography.subheader, Modifier.testTag("templates-error-$index"))
-                    MetroText(error.line, Metro.typography.body, color = Metro.accent.text)
+                    WarningText(error.line)
                 }
             }
     }

@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AutoHoldChoice
@@ -106,10 +108,14 @@ fun IncomeCategoryLine(
 ) {
     val money = shell.currency
     val nameAir = ledgerNameAir(Metro.typography.body)
+    val budgeted = MoneyFormat.format(category.budgetedMinor, money, formatOptions).takeIf { shell.mode == BudgetMode.TRACKING }
+    val received = MoneyFormat.format(category.receivedMinor, money, formatOptions)
+    val spoken = Spoken.incomeLine(category.name, budgeted, received, category.hidden)
     Row(
         modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
+            .semantics(mergeDescendants = true) { contentDescription = spoken }
             .ledgerFill(if (banded) ledgerBand else Color.Transparent)
             .then(if (onOpen != null) Modifier.metroPress { onOpen(category.id) } else Modifier)
             .testTag("income-category-${category.id}"),
@@ -125,9 +131,9 @@ fun IncomeCategoryLine(
             color = if (category.hidden) Metro.colors.secondary else Metro.colors.foreground,
             maxLines = 2,
         )
-        if (shell.mode == BudgetMode.TRACKING) {
+        if (budgeted != null) {
             LedgerFigure(
-                MoneyFormat.format(category.budgetedMinor, money, formatOptions),
+                budgeted,
                 Metro.typography.body,
                 Metro.colors.foreground,
                 "income-budgeted-${category.id}",
@@ -137,7 +143,7 @@ fun IncomeCategoryLine(
         }
         Spacer(Modifier.weight(LEDGER_FIGURE))
         LedgerFigure(
-            MoneyFormat.format(category.receivedMinor, money, formatOptions),
+            received,
             Metro.typography.body,
             Metro.accent.text,
             "income-received-${category.id}",
@@ -181,7 +187,7 @@ fun IncomeCategoryScreen(
         )
         if (shell.mode == BudgetMode.TRACKING) {
             MetroField(amount, { amount = it }, IncomeCopy.BUDGETED, Modifier.testTag("income-budget-amount"))
-            if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+            if (error != null) WarningText(error)
             RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
             if (!formSaveOnBar()) {
                 MetroButton("save") { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
@@ -204,7 +210,7 @@ fun IncomeCategoryScreen(
                     MetroButton(IncomeCopy.HOLD_OFF, Modifier.testTag("auto-hold-off")) { onAutoHold(AutoHoldChoice.OFF) }
                 }
             }
-            if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+            if (error != null) WarningText(error)
             MetroText(IncomeCopy.HOLD_NOTE, Metro.typography.caption, color = Metro.colors.secondary)
         }
     }

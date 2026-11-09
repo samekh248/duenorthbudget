@@ -347,7 +347,7 @@ fun ScheduleEditorScreen(
             form.postsTransaction,
             "schedule-posts",
         ) { form = form.copy(postsTransaction = !form.postsTransaction) }
-        if (error != null) MetroText(error, Metro.typography.body, Modifier.testTag("schedule-error"), color = Metro.accent.text)
+        if (error != null) WarningText(error, Modifier.testTag("schedule-error"))
         RememberFormSave { onSave(form.read(prefs, decimals)) }
         if (!formSaveOnBar()) {
             MetroButton("save", Modifier.testTag("schedule-save")) { onSave(form.read(prefs, decimals)) }

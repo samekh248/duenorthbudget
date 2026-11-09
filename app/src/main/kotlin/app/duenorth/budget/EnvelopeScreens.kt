@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -129,7 +130,7 @@ fun CategoryBudgetScreen(
             template = template?.let { prefs.editSignedAmount(it, shell.currency.decimals) },
             currency = shell.currency,
         )
-        if (error != null) MetroText(error, Metro.typography.body, Modifier.padding(top = 8.dp), color = Metro.accent.text)
+        if (error != null) WarningText(error, Modifier.padding(top = 8.dp))
         // One save on the bar keeps both a changed note and the amount.
         RememberFormSave {
             noteDraft?.let(onSaveNote)
@@ -438,7 +439,7 @@ fun MoveCategoryScreen(
                 }
             }
         }
-        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+        if (error != null) WarningText(error)
         MetroText("to", Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
         LazyColumn(Modifier.weight(1f)) {
             if (envelope) {
@@ -613,7 +614,7 @@ fun CoverCategoryScreen(
                 }
             }
         }
-        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+        if (error != null) WarningText(error)
         MetroText(EnvelopeCopy.COVER_FROM, Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
         LazyColumn(Modifier.weight(1f).testTag("cover-sources")) {
             if (envelope) {
@@ -691,7 +692,7 @@ fun HoldMonthScreen(
             )
         }
         MetroField(amount, { amount = it }, "amount for next month")
-        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+        if (error != null) WarningText(error)
         RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
         MetroButtonGrid {
             if (!formSaveOnBar()) {
@@ -725,9 +726,23 @@ fun CategoryLine(
     // Overspent, the row is flagged: a red tint and stripe, the figure in red, and how far over under the name.
     // While a month loads, last month's figures would flag the wrong rows.
     val over = category.availableMinor < 0 && !figuresLoading()
+    val budgeted = MoneyFormat.format(category.budgetedMinor, money, formatOptions)
+    val spent = MoneyFormat.format(category.spentMinor, money, formatOptions)
+    val available = MoneyFormat.format(category.availableMinor, money, formatOptions)
+    val overLine =
+        if (over) {
+            val by = MoneyFormat.format(-category.availableMinor, money, formatOptions)
+            // A tap opens the category's page, whose bar offers cover; tracking budgets have nothing to cover from.
+            if (shell.mode == BudgetMode.TRACKING) EnvelopeCopy.overBy(by) else EnvelopeCopy.overByCover(by)
+        } else {
+            null
+        }
+    // The columns' headings sit above the list, out of TalkBack's reach, so the row names each figure itself.
+    val spoken = Spoken.categoryLine(category.name, budgeted, spent, available, overLine, category.hidden)
     Column(
         modifier
             .fillMaxWidth()
+            .semantics(mergeDescendants = true) { contentDescription = spoken }
             .then(
                 if (over) {
                     Modifier.ledgerFlag(overspentTint, Metro.colors.errorFill)
@@ -751,30 +766,18 @@ fun CategoryLine(
                 color = if (category.hidden) Metro.colors.secondary else Metro.colors.foreground,
                 maxLines = 2,
             )
+            LedgerFigure(budgeted, Metro.typography.body, Metro.colors.foreground, "category-budgeted-${category.id}")
+            LedgerFigure(spent, Metro.typography.body, Metro.colors.foreground, "category-spent-${category.id}")
             LedgerFigure(
-                MoneyFormat.format(category.budgetedMinor, money, formatOptions),
-                Metro.typography.body,
-                Metro.colors.foreground,
-                "category-budgeted-${category.id}",
-            )
-            LedgerFigure(
-                MoneyFormat.format(category.spentMinor, money, formatOptions),
-                Metro.typography.body,
-                Metro.colors.foreground,
-                "category-spent-${category.id}",
-            )
-            LedgerFigure(
-                MoneyFormat.format(category.availableMinor, money, formatOptions),
+                available,
                 if (over) Metro.typography.body.copy(fontWeight = FontWeight.SemiBold) else Metro.typography.body,
                 if (over) Metro.colors.error else Metro.accent.text,
                 "category-available-${category.id}",
             )
         }
-        if (over) {
-            val by = MoneyFormat.format(-category.availableMinor, money, formatOptions)
+        if (overLine != null) {
             MetroText(
-                // A tap opens the category's page, whose bar offers cover; tracking budgets have nothing to cover from.
-                if (shell.mode == BudgetMode.TRACKING) EnvelopeCopy.overBy(by) else EnvelopeCopy.overByCover(by),
+                overLine,
                 Metro.typography.caption,
                 Modifier.padding(bottom = OVER_LINE_GAP).testTag("category-over-${category.id}"),
                 color = Metro.colors.error,

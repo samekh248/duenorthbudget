@@ -126,7 +126,7 @@ fun StarterCategoriesScreen(
     ) {
         MetroText(StarterCategoriesCopy.TITLE, Metro.typography.header)
         MetroText(StarterCategoriesCopy.LEAD, Metro.typography.caption, color = Metro.colors.secondary)
-        if (error != null) MetroText(error, Metro.typography.body, color = Metro.accent.text)
+        if (error != null) WarningText(error)
         LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Row)) {
             itemsIndexed(StarterCategories.all, key = { _, group -> group.name }) { index, group ->
                 Row(
