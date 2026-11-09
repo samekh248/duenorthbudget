@@ -46,9 +46,14 @@ data class RegisterAccount(
 
 data class RegisterPart(
     val id: String,
+    /** Empty when the line has no category, which Actual allows. */
     val categoryId: String,
     val categoryName: String,
     val amountMinor: Long,
+    /** The line's own payee, when it is not the transaction's. */
+    val payee: String? = null,
+    /** The line's own notes. */
+    val note: String? = null,
 )
 
 data class RegisterRow(
@@ -258,9 +263,13 @@ data class RuledDraft(
     val splits: List<RuleSplit>? = null,
 )
 
+/** One split line to save. As in Actual, a line may have no category, and its own payee (by name) and notes. */
 data class SplitPart(
-    val categoryId: String,
+    val categoryId: String?,
     val amountMinor: Long,
+    /** A payee for this line alone; null or blank takes the transaction's. */
+    val payee: String? = null,
+    val note: String? = null,
 )
 
 sealed interface ForcedWrite {

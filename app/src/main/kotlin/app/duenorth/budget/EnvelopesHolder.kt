@@ -302,14 +302,20 @@ class EnvelopesHolder internal constructor(
         applyEdit { host.sync.hideEnvelopeCategory(budgetId, categoryId, hidden) }
     }
 
-    fun deleteCategory(categoryId: String) {
+    fun deleteCategory(
+        categoryId: String,
+        transferId: String? = null,
+    ) {
         val budgetId = state.settings.openBudgetId ?: return
-        applyEdit { host.sync.deleteEnvelopeCategory(budgetId, categoryId) }
+        applyEdit { host.sync.deleteEnvelopeCategory(budgetId, categoryId, transferId) }
     }
 
-    fun deleteGroup(groupId: String) {
+    fun deleteGroup(
+        groupId: String,
+        transferId: String? = null,
+    ) {
         val budgetId = state.settings.openBudgetId ?: return
-        applyEdit { host.sync.deleteCategoryGroup(budgetId, groupId) }
+        applyEdit { host.sync.deleteCategoryGroup(budgetId, groupId, transferId) }
     }
 
     fun hideGroup(

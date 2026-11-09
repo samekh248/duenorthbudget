@@ -102,8 +102,15 @@ class EnvelopeMonthTest {
                 """.trimIndent(),
             )
             assertEquals(EnvelopeEditResult.Saved, book.deleteGroup("g-empty"))
-            assertTrue(
-                book.deleteGroup("g-exp") is EnvelopeEditResult.Rejected,
+            // As in Actual, a group's unused categories go with it.
+            assertEquals(EnvelopeEditResult.Saved, book.deleteGroup("g-exp"))
+            assertEquals(
+                0L,
+                session
+                    .query(
+                        "SELECT COUNT(*) AS n FROM categories WHERE cat_group = 'g-exp' AND IFNULL(tombstone, 0) = 0",
+                    ).first()
+                    .long("n"),
             )
         }
     }
