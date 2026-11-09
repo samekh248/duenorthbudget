@@ -99,6 +99,9 @@ fun RegisterScreen(
     pendingOpen: Boolean = true,
     /** A row's long-press menu; select is its first line. Null keeps long-press starting select mode. */
     rowMenu: ((RegisterRow) -> List<MetroMenuItem>)? = null,
+    /** A transaction to scroll to and flash, as when opened from a category's recent spending. */
+    focus: String? = null,
+    onFocused: () -> Unit = {},
 ) {
     val rows = if (search == null) page.rows else page.searched(search)
     // Every row the account holds, not just the ones a search keeps, so closing a search brings nothing "new".
@@ -150,6 +153,8 @@ fun RegisterScreen(
                 pendingOpen = pendingOpen,
                 rowMenu = rowMenu.takeIf { selection == null },
                 arrivals = arrivals,
+                focus = focus,
+                onFocused = onFocused,
             )
         }
     }
@@ -220,6 +225,8 @@ private fun RegisterList(
     rowMenu: ((RegisterRow) -> List<MetroMenuItem>)? = null,
     /** Rows that have just arrived (a sync, an import, a new entry) ease into place instead of popping in. */
     arrivals: Arrivals? = null,
+    focus: String? = null,
+    onFocused: () -> Unit = {},
 ) {
     val menu = rememberRowMenu()
     RowMenu(menu, tag = "register-menu")
@@ -248,6 +255,34 @@ private fun RegisterList(
     val position = listed.withIndex().associate { it.value.id to it.index }
     val byId = rows.associateBy { it.id }
     val cards = ledgerBlocks
+    // The focused transaction: once the page holds it, the list jumps to its day (or its pair, or the pending
+    // heading) so the date shows above it, then the row flashes.
+    val flash = rememberFocusFlash()
+    LaunchedEffect(focus, rows, cards) {
+        val id = focus ?: return@LaunchedEffect
+        val row = byId[id] ?: return@LaunchedEffect
+        if (row.pending && id !in paired) showPending = true
+        val at =
+            focusItems(
+                id,
+                pairs.map { it.ids },
+                pending.map { it.id },
+                showPending = true,
+                days.map { day -> day.map { it.id } },
+                cards,
+            )
+        if (at != null) {
+            list.scrollToItem(at.heading)
+            // A long day can leave the row itself below the fold; then bring the row up instead.
+            if (at.row != at.heading) {
+                val shown = list.layoutInfo.visibleItemsInfo.firstOrNull { it.index == at.row }
+                val fits = shown != null && shown.offset + shown.size <= list.layoutInfo.viewportEndOffset
+                if (!fits) list.scrollToItem(at.row)
+            }
+        }
+        onFocused()
+        flash.start(id)
+    }
     LazyColumn(modifier.bleedGutter(cards), state = list, contentPadding = cardListPadding(cards)) {
         pairs.forEach { pair ->
             item(key = "match-${pair.key}") {
@@ -259,6 +294,7 @@ private fun RegisterList(
                     onPress = onPress,
                     onMatch = { onMatch(pair) },
                     onNotAMatch = { onNotAMatch(pair) },
+                    flash = flash,
                 )
             }
         }
@@ -279,7 +315,7 @@ private fun RegisterList(
                         menuItems = { rowMenu?.invoke(row).orEmpty() },
                         detail = pendingDetail(row),
                         extraAir = air,
-                        modifier = Modifier.arriving(arrivals, row.id),
+                        modifier = Modifier.arriving(arrivals, row.id).focusFlash(flash, row.id),
                     )
                 }
                 if (cards) {
@@ -323,7 +359,7 @@ private fun RegisterList(
                                     // The last row holds the panel's bottom air, so a picked one is tinted to the edge.
                                     extraAir = if (row === day.last()) MetroDimens.Row else 0.dp,
                                     showLock = true,
-                                    modifier = Modifier.arriving(arrivals.takeUnless { dayNew }, row.id),
+                                    modifier = Modifier.arriving(arrivals.takeUnless { dayNew }, row.id).focusFlash(flash, row.id),
                                 )
                             }
                         }
@@ -356,7 +392,7 @@ private fun RegisterList(
                     menu = menu.takeIf { rowMenu != null },
                     menuItems = { rowMenu?.invoke(row).orEmpty() },
                     showLock = true,
-                    modifier = Modifier.arriving(arrivals, row.id),
+                    modifier = Modifier.arriving(arrivals, row.id).focusFlash(flash, row.id),
                 )
             }
         }
@@ -420,6 +456,7 @@ private fun RegisterMatch(
     onPress: (String) -> Unit,
     onMatch: () -> Unit,
     onNotAMatch: () -> Unit,
+    flash: FocusFlash? = null,
 ) {
     Column(Modifier.fillMaxWidth().testTag("register-match-${pair.key}")) {
         MetroText(
@@ -454,6 +491,7 @@ private fun RegisterMatch(
                             onPress = { onPress(row.id) },
                             onLongPress = { onPress(row.id) },
                             detail = detail,
+                            modifier = flash?.let { Modifier.focusFlash(it, row.id) } ?: Modifier,
                         )
                     }
                 }

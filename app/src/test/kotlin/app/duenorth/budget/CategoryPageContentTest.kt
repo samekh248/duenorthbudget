@@ -65,6 +65,27 @@ class CategoryPageContentTest {
     }
 
     @Test
+    fun tappingARecentTransactionOpensIt() {
+        var opened: ReviewTransactionRow? = null
+        compose.setContent {
+            MetroTheme {
+                CategoryBudgetScreen(
+                    shell,
+                    "c-food",
+                    null,
+                    {},
+                    {},
+                    {},
+                    recent = CategoryMonthPage("c-food", "Food", TemplateSamples.october, shell.currency, -15_000, rows),
+                    onOpenTransaction = { opened = it },
+                )
+            }
+        }
+        compose.onNodeWithTag("category-recent-t2").performScrollTo().performClick()
+        assertEquals("t2", opened?.id)
+    }
+
+    @Test
     fun recentIgnoresAnotherCategorysTransactions() {
         compose.setContent {
             MetroTheme {

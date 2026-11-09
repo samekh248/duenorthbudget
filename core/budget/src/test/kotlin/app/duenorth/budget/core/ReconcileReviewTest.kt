@@ -178,6 +178,22 @@ class ReconcileReviewTest {
             val category = ReviewReader.categoryMonth(session, "c-food", month)!!
             assertEquals(1, category.rows.size)
             assertEquals(-4_000L, category.totalMinor)
+            assertEquals("checking", category.rows.single().accountId)
+            assertEquals("food", category.rows.single().registerId)
+        }
+    }
+
+    @Test
+    fun categoryMonthPointsASplitPartAtItsParent() {
+        db { session, register ->
+            register.save(
+                draft("split", amount = -3_000, category = null)
+                    .copy(parts = listOf(SplitPart("c-food", -2_000), SplitPart("c-fun", -1_000))),
+            )
+            val row = ReviewReader.categoryMonth(session, "c-food", YearMonth.of(2026, 10))!!.rows.single()
+            assertEquals(-2_000L, row.amountMinor)
+            assertEquals("checking", row.accountId)
+            assertEquals("split", row.registerId)
         }
     }
 

@@ -31,6 +31,10 @@ data class ReviewTransactionRow(
     val date: Int,
     val payee: String,
     val amountMinor: Long,
+    /** The account the transaction sits in, so a tap can open its register. */
+    val accountId: String = "",
+    /** The row the register lists it as: a split's part shows there as its parent. */
+    val registerId: String = id,
 )
 
 data class CategoryMonthPage(
@@ -144,7 +148,9 @@ object ReviewReader {
             session
                 .query(
                     """
-                    SELECT t.id AS id, t.date AS date, t.amount AS amount, COALESCE(p.name, '') AS payee
+                    SELECT t.id AS id, t.date AS date, t.amount AS amount, COALESCE(p.name, '') AS payee, t.acct AS acct,
+                        CASE WHEN IFNULL(t.isChild, 0) = 1 AND t.parent_id IS NOT NULL THEN t.parent_id ELSE t.id END
+                            AS register_id
                     FROM transactions t
                     JOIN accounts a ON a.id = t.acct AND IFNULL(a.tombstone, 0) = 0
                     LEFT JOIN payees p ON p.id = t.description AND IFNULL(p.tombstone, 0) = 0
@@ -162,6 +168,8 @@ object ReviewReader {
                         date = row.long("date").toInt(),
                         payee = row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE },
                         amountMinor = row.long("amount"),
+                        accountId = row.str("acct").orEmpty(),
+                        registerId = row.str("register_id") ?: row.str("id").orEmpty(),
                     )
                 }
         val total = rows.sumOf { it.amountMinor }
