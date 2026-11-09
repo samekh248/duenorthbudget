@@ -360,7 +360,6 @@ class SettingsContentTest {
             onNumberFormat = {},
             onFirstDay = {},
             onHideFraction = {},
-            onExperimental = {},
             onExport = {},
             onEncryption = {},
             onRequestAdvanced = {},

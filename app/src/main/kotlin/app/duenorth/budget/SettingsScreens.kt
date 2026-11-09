@@ -157,7 +157,6 @@ fun SettingsScreen(
     onNumberFormat: (String) -> Unit,
     onFirstDay: (Int) -> Unit,
     onHideFraction: (Boolean) -> Unit,
-    onExperimental: (Boolean) -> Unit,
     onExport: () -> Unit,
     onEncryption: (EncryptionMode) -> Unit,
     onRequestAdvanced: (AdvancedConfirm) -> Unit,
@@ -245,7 +244,6 @@ fun SettingsScreen(
                         SettingsPage.EXPERIMENTAL ->
                             ExperimentalItem(
                                 prefs = formatPrefs,
-                                onExperimental = onExperimental,
                                 onFeature = onExperimentalFeature,
                                 phone = phoneSettings,
                             )

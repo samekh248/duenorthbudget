@@ -284,6 +284,8 @@ class ShellViewModel(
             onboarding.resume()
             val id = _state.value.settings.openBudgetId ?: return@launch
             if (_state.value.locked) return@launch
+            // A budget from before settings lost its experimental switch gets the switch its features call for.
+            settingsUi.syncExperimental()
             autoSync(id)
         }
     }

@@ -53,7 +53,6 @@ internal fun SettingsRoute(
         onNumberFormat = model.settingsUi::setNumberFormat,
         onFirstDay = model.settingsUi::setFirstDay,
         onHideFraction = model.settingsUi::setHideFraction,
-        onExperimental = model.settingsUi::setExperimental,
         onExperimentalFeature = model.settingsUi::setExperimentalFeature,
         onLearning = model.settingsUi::setLearning,
         onExport = model.settingsUi::exportBudget,

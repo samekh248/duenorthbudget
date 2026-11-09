@@ -122,7 +122,8 @@ class SettingsHolder internal constructor(
 
     fun setHideFraction(hide: Boolean) = setOpenBudgetPreference("hideFraction", if (hide) "true" else "false")
 
-    fun setExperimental(enabled: Boolean) = setOpenBudgetPreference("flags.experimental", if (enabled) "true" else "false")
+    /** Sets `flags.experimental` directly. Settings has no switch for it any more; it follows the features. */
+    internal fun setExperimental(enabled: Boolean) = setOpenBudgetPreference("flags.experimental", if (enabled) "true" else "false")
 
     /** Settings → learn categories (spec 010 US3). */
     fun setLearning(enabled: Boolean) = setOpenBudgetPreference("learn-categories", if (enabled) "true" else "false")
@@ -137,6 +138,33 @@ class SettingsHolder internal constructor(
         if (preference == null) setPhoneFeature(feature, enabled) else setOpenBudgetPreference(preference, if (enabled) "true" else "false")
         // As desktop does, turning a feature off turns off the ones that sit under it.
         if (!enabled) ExperimentalFeature.entries.filter { it.parent == feature }.forEach { setExperimentalFeature(it, false) }
+        followFeatures()
+    }
+
+    /**
+     * Keeps the open budget's `flags.experimental` in step with its features: on while any is on,
+     * off once none are. Reads the screen's state, which each switch above has already updated.
+     */
+    private fun followFeatures() {
+        val wanted = ExperimentalFeature.anyOn(state.formatPrefs, state.settings)
+        if (wanted != state.formatPrefs.experimental) setExperimental(wanted)
+    }
+
+    /**
+     * The same for a budget just opened, or the one open at launch: a budget saved before settings
+     * lost its master switch can have it off with features on, or on with none. A budget that has
+     * never had the choice is left alone, so it still gets asked.
+     */
+    internal suspend fun syncExperimental() {
+        val (budgetId, prefs, phone) =
+            withContext(host.io) {
+                val phone = host.library.settings()
+                val id = phone.openBudgetId ?: return@withContext null
+                Triple(id, host.library.readFormatPrefs(id), phone)
+            } ?: return
+        if (!prefs.experimentalAsked) return
+        val wanted = ExperimentalFeature.anyOn(prefs, phone)
+        if (wanted != prefs.experimental) setBudgetPreference(budgetId, "flags.experimental", if (wanted) "true" else "false")
     }
 
     /** A feature with no Actual flag is this phone's setting; nothing goes into the budget file. */
@@ -153,7 +181,10 @@ class SettingsHolder internal constructor(
     /** `turn on` on the offer: the switch and every feature come on for the budget it asked about. */
     fun acceptExperimentalOffer() = answerExperimentalOffer(on = true)
 
-    /** `keep off` on the offer: saved as off, so that budget is not asked again. Back asks next time. */
+    /**
+     * `keep off` on the offer: saved as off, with every feature off, so that budget is not asked again
+     * and nothing turns the switch back on. Back asks next time.
+     */
     fun declineExperimentalOffer() = answerExperimentalOffer(on = false)
 
     private fun answerExperimentalOffer(on: Boolean) {
@@ -162,11 +193,9 @@ class SettingsHolder internal constructor(
         if (offer.current != on) {
             val value = if (on) "true" else "false"
             setBudgetPreference(offer.budgetId, "flags.experimental", value)
-            if (on) {
-                ExperimentalFeature.entries.forEach { feature ->
-                    val preference = feature.preference
-                    if (preference == null) setPhoneFeature(feature, true) else setBudgetPreference(offer.budgetId, preference, value)
-                }
+            ExperimentalFeature.entries.forEach { feature ->
+                val preference = feature.preference
+                if (preference == null) setPhoneFeature(feature, on) else setBudgetPreference(offer.budgetId, preference, value)
             }
         }
         host.mutate { it.copy(route = ShellRoute.Home) }
@@ -181,7 +210,7 @@ class SettingsHolder internal constructor(
     internal suspend fun offerExperimental(always: Boolean = false) {
         val budgetId = withContext(host.io) { host.library.settings().openBudgetId } ?: return
         val prefs = withContext(host.io) { host.library.readFormatPrefs(budgetId) }
-        if (prefs.experimentalAsked && !always) return
+        if (prefs.experimentalAsked && !always) return syncExperimental()
         val current = prefs.experimental.takeIf { prefs.experimentalAsked }
         host.mutate {
             val ask = it.route == ShellRoute.Home && it.shell != null && !it.locked
