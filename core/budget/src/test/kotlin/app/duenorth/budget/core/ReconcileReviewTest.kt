@@ -69,6 +69,34 @@ class ReconcileReviewTest {
     }
 
     @Test
+    fun cancelKeepsAClearMadeElsewhereDuringTheReconcile() {
+        db { session, register ->
+            register.save(draft("coffee", amount = 100))
+            register.save(draft("rent", amount = 200))
+            register.save(draft("mine", amount = 300))
+            session.exec("UPDATE transactions SET cleared = 0")
+            val reconcile = ReconcileBook(session)
+            reconcile.start("checking", "6.00", "2026-10-07")
+            reconcile.toggleCleared("checking", "mine")
+            // Desktop clears coffee, and the register clears rent, while the reconcile is open.
+            val desktop = SyncClock("REMOTE0000000001", { System.currentTimeMillis() + 60_000 })
+            SyncSchema.applyRemote(session, desktop.send(), CellMessage("transactions", "coffee", "cleared", "N:1"))
+            assertTrue(row(session, "coffee").cleared)
+            register.setCleared(listOf("rent"), true, force = false)
+            val pendingBefore = session.query("SELECT COUNT(*) AS n FROM messages WHERE row = 'coffee' AND pending = 1").first().long("n")
+            assertTrue(reconcile.cancel("checking"))
+            assertTrue(row(session, "coffee").cleared)
+            assertTrue(row(session, "rent").cleared)
+            assertFalse(row(session, "mine").cleared)
+            // Nothing is sent that would un-clear coffee on the server.
+            assertEquals(
+                pendingBefore,
+                session.query("SELECT COUNT(*) AS n FROM messages WHERE row = 'coffee' AND pending = 1").first().long("n"),
+            )
+        }
+    }
+
+    @Test
     fun anOwedStatementKeepsItsMinus() {
         db { session, register ->
             register.save(draft("a", amount = -4_240))
