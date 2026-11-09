@@ -109,7 +109,7 @@ class SettingsHolder internal constructor(
 
     fun showPayees() {
         payees.show()
-        host.mutate { it.copy(settingsReturn = true, settingsPage = SettingsPage.BUDGET) }
+        host.mutate { it.copy(settingsReturn = true, settingsPage = SettingsPage.GENERAL) }
     }
 
     fun showEncryption(mode: EncryptionMode) = openFrom(ShellRoute.EncryptionPassword(mode), SettingsPage.ADVANCED)

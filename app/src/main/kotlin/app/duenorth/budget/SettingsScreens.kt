@@ -41,7 +41,9 @@ enum class SettingsPage(
     val needsBudget: Boolean,
 ) {
     BUDGET("budget", false),
-    SERVER("server", false),
+
+    /** Everything but the budget picker and server: the open budget's tools while one is open, and phone-wide settings. */
+    GENERAL("general", false),
     FORMAT("format", true),
     APPEARANCE("appearance", false),
     ADVANCED("advanced", true),
@@ -116,7 +118,7 @@ object SettingsCopy {
     /** Under the box while it lists the server's budgets as well as the phone's. */
     fun serverChoices(server: String) = "a budget from $server downloads when you pick it"
 
-    fun signInFor(server: String) = "sign in to $server on the server page to open its budgets"
+    fun signInFor(server: String) = "sign in to $server to open its budgets"
 
     fun encryptionTitle(mode: EncryptionMode) =
         when (mode) {
@@ -127,8 +129,8 @@ object SettingsCopy {
 }
 
 /**
- * Settings as a pivot (spec 012): budget, server, format, appearance, advanced. Format and
- * advanced only show while a budget is open. Forms open their own pages; no item holds a field.
+ * Settings as a pivot (spec 012): budget (the open budget box and the server), general, format,
+ * appearance, advanced, experimental. Format, advanced and experimental only show while a budget is open. Forms open their own pages; no item holds a field.
  */
 @Composable
 fun SettingsScreen(
@@ -184,26 +186,20 @@ fun SettingsScreen(
             PivotItem(item.header) {
                 SettingsItem(item, scroll[item] ?: 0, onScroll) {
                     when (item) {
-                        SettingsPage.BUDGET ->
+                        SettingsPage.BUDGET -> {
                             BudgetItem(
                                 budgets = budgets,
                                 openBudgetId = openBudgetId,
                                 budgetType = formatPrefs.budgetType,
-                                learning = formatPrefs.learnCategories,
                                 onOpen = onOpenBudget,
-                                onPayees = onPayees,
-                                onLearning = onLearning,
                                 serverName = activeInstance?.let { it.label ?: it.address },
                                 signedIn = signedIn,
                                 cloudFileId = cloudFileId,
                                 remoteFiles = remoteFiles,
                                 onOpenServer = onOpenServer,
                                 error = budgetError,
-                                manage = manage,
-                                closeOutDays = phoneSettings.closeOutDays,
-                                onCloseOutDays = onCloseOutDays,
                             )
-                        SettingsPage.SERVER ->
+                            // The server the budgets sync through sits under the box, on the same page.
                             ServerItem(
                                 instances = instances,
                                 activeInstance = activeInstance,
@@ -213,6 +209,17 @@ fun SettingsScreen(
                                 onRemove = onRemoveInstance,
                                 backgroundSyncHours = phoneSettings.backgroundSyncHours,
                                 onBackgroundSyncHours = onBackgroundSyncHours,
+                            )
+                        }
+                        SettingsPage.GENERAL ->
+                            GeneralItem(
+                                budgetOpen = budgetOpen,
+                                learning = formatPrefs.learnCategories,
+                                onPayees = onPayees,
+                                onLearning = onLearning,
+                                manage = manage,
+                                closeOutDays = phoneSettings.closeOutDays,
+                                onCloseOutDays = onCloseOutDays,
                             )
                         SettingsPage.FORMAT ->
                             FormatItem(

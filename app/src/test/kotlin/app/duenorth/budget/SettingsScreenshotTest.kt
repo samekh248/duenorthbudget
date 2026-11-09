@@ -37,10 +37,10 @@ class SettingsScreenshotTest {
     fun budgetSignedOutDark() = snap("settings_budget_signed_out_dark", SettingsPage.BUDGET, dark = true, signedIn = false)
 
     @Test
-    fun serverLight() = snap("settings_server_light", SettingsPage.SERVER, dark = false)
+    fun generalLight() = snap("settings_general_light", SettingsPage.GENERAL, dark = false)
 
     @Test
-    fun serverDark() = snap("settings_server_dark", SettingsPage.SERVER, dark = true)
+    fun generalDark() = snap("settings_general_dark", SettingsPage.GENERAL, dark = true)
 
     @Test
     fun formatLight() = snap("settings_format_light", SettingsPage.FORMAT, dark = false)

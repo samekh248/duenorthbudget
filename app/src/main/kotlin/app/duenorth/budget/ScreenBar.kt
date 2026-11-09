@@ -154,12 +154,13 @@ object ScreenBar {
         overspent: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
-            // Spec 012: each settings pivot item has its own bar. Payees has its link on the budget page's manage list.
+            // Spec 012: each settings pivot item has its own bar. Payees has its link on the general page's manage list.
             ShellRoute.Settings ->
                 when (settings.page) {
-                    SettingsPage.BUDGET -> listOf(spec("settings-new", AppGlyph.Add, ScreenBarCopy.ADD_BUDGET, ScreenBarCopy.BUDGET))
-                    SettingsPage.SERVER ->
+                    // The budget page also holds the server its budgets sync through, so the server's commands follow.
+                    SettingsPage.BUDGET ->
                         buildList {
+                            add(spec("settings-new", AppGlyph.Add, ScreenBarCopy.ADD_BUDGET, ScreenBarCopy.BUDGET))
                             add(spec("add-server", AppGlyph.Add, ScreenBarCopy.ADD_SERVER, ScreenBarCopy.SERVER))
                             if (settings.signedIn) {
                                 add(
@@ -169,7 +170,7 @@ object ScreenBar {
                             if (settings.serverActive) add(destructive("sign-out", AppGlyph.Cancel, SettingsCopy.SIGN_OUT))
                         }
                     SettingsPage.ADVANCED -> listOf(spec("export", AppGlyph.Export, SettingsCopy.EXPORT))
-                    SettingsPage.FORMAT, SettingsPage.APPEARANCE, SettingsPage.EXPERIMENTAL -> emptyList()
+                    SettingsPage.GENERAL, SettingsPage.FORMAT, SettingsPage.APPEARANCE, SettingsPage.EXPERIMENTAL -> emptyList()
                 }
             is ShellRoute.EncryptionPassword -> saveCancel()
             // Spec 011: one primary action per onboarding page, in the bar where the thumb is.
