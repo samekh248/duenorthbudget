@@ -213,7 +213,12 @@ fun CloseAccountScreen(
                 if (needsCategory) {
                     item { AccountHeading(AccountScreenCopy.CATEGORY) }
                     items(categories.filter { !it.income }, key = { "cat-${it.id}" }) { category ->
-                        Choice(category.name, category.id == categoryId, "account-close-category-${category.id}") {
+                        Choice(
+                            category.name,
+                            category.id == categoryId,
+                            "account-close-category-${category.id}",
+                            detail = { CategoryBalance(category.availableMinor, currency, Modifier) },
+                        ) {
                             categoryId = category.id
                         }
                     }
@@ -265,17 +270,23 @@ internal fun Choice(
     label: String,
     selected: Boolean,
     tag: String,
+    /** A line under the label, such as a category's balance; null keeps the choice to its label. */
+    detail: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
 ) {
-    MetroText(
-        label,
-        Metro.typography.subheader,
+    val box =
         Modifier
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick)
             .padding(end = MetroDimens.Grid, top = MetroDimens.Row, bottom = MetroDimens.Row)
-            .testTag(tag),
-        color = if (selected) Metro.accent.text else Metro.colors.foreground,
-        maxLines = 2,
-    )
+            .testTag(tag)
+    val color = if (selected) Metro.accent.text else Metro.colors.foreground
+    if (detail == null) {
+        MetroText(label, Metro.typography.subheader, box, color = color, maxLines = 2)
+    } else {
+        Column(box) {
+            MetroText(label, Metro.typography.subheader, color = color, maxLines = 2)
+            detail()
+        }
+    }
 }

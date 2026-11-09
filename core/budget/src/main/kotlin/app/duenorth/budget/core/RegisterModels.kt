@@ -84,6 +84,8 @@ data class CategoryChoice(
     val income: Boolean,
     /** The category or its group is hidden in the budget (spec 013). */
     val hidden: Boolean = false,
+    /** What the category has available this month, shown beside it in every category picker; null for income. */
+    val availableMinor: Long? = null,
 )
 
 data class AccountChoice(

@@ -2,6 +2,7 @@ package app.duenorth.budget
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.TextStyle
 import app.duenorth.budget.core.CategoryTarget
+import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.design.components.MetroText
@@ -38,6 +40,7 @@ internal fun CategoryListPage(
     options: CategoryOptions,
     onPick: (String?) -> Unit,
     onBack: () -> Unit,
+    currency: CurrencySpec? = null,
 ) {
     BackHandler(onBack = onBack)
     RememberBarOverride(emptyList())
@@ -102,7 +105,12 @@ internal fun CategoryListPage(
                         CategoryGroupLabel(entry.name, "transaction-category-group-${entry.key}", afterSuggestions = entry.key == "all")
                     is CategoryRow.Choice -> {
                         val tag = if (entry.suggested) "transaction-category-suggested-${entry.id}" else "transaction-category-${entry.id}"
-                        CategoryListRow(options.label(entry.id), entry.id == options.current, tag) { onPick(entry.id) }
+                        CategoryListRow(
+                            options.label(entry.id),
+                            entry.id == options.current,
+                            tag,
+                            balance = { CategoryBalance(options.available(entry.id), currency) },
+                        ) { onPick(entry.id) }
                     }
                 }
             }
@@ -177,21 +185,10 @@ private fun CategoryListRow(
     label: String,
     selected: Boolean,
     tag: String,
+    balance: @Composable () -> Unit = {},
     onClick: () -> Unit,
 ) {
-    MetroText(
-        label,
-        choiceStyle,
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress(onClick)
-            .choiceSelection(selected)
-            .padding(vertical = MetroDimens.Row)
-            .testTag(tag),
-        color = choiceColor(selected),
-        maxLines = 2,
-    )
+    ChoiceLine(label, selected, Modifier.testTag(tag), balance, onClick)
 }
 
 @Composable
@@ -241,7 +238,12 @@ fun CategoryPickerScreen(
             if (query.isBlank() && suggested.isNotEmpty()) {
                 item(key = "suggested") { CategoryGroupLabel(RegisterCopy.SUGGESTED, "category-group-suggested") }
                 items(suggested, key = { "suggested-${it.id}" }) { category ->
-                    ChoiceLine(category.name, category.id == current?.id, Modifier.testTag("category-suggested-${category.id}")) {
+                    ChoiceLine(
+                        category.name,
+                        category.id == current?.id,
+                        Modifier.testTag("category-suggested-${category.id}"),
+                        balance = { CategoryBalance(category.availableMinor, target.currency) },
+                    ) {
                         onPick(category.id)
                     }
                 }
@@ -251,7 +253,12 @@ fun CategoryPickerScreen(
                 item { ChoiceLine(RegisterCopy.NO_CATEGORY, current == null) { onPick(null) } }
             }
             items(shown, key = { it.id }) { category ->
-                ChoiceLine(category.name, category.id == current?.id) { onPick(category.id) }
+                ChoiceLine(
+                    category.name,
+                    category.id == current?.id,
+                    Modifier.testTag("category-choice-${category.id}"),
+                    balance = { CategoryBalance(category.availableMinor, target.currency) },
+                ) { onPick(category.id) }
             }
             if (query.isNotBlank() && none) {
                 item { ChoiceLine(RegisterCopy.NO_CATEGORY, current == null) { onPick(null) } }
@@ -260,23 +267,26 @@ fun CategoryPickerScreen(
     }
 }
 
+/** A category choice in a picker list, with its balance (when it has one) at the end of the line. */
 @Composable
 private fun ChoiceLine(
     label: String,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    balance: @Composable () -> Unit = {},
     onClick: () -> Unit,
 ) {
-    MetroText(
-        label,
-        choiceStyle,
-        modifier
+    Row(
+        Modifier
             .fillMaxWidth()
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onClick)
             .choiceSelection(selected)
-            .padding(vertical = MetroDimens.Row),
-        color = choiceColor(selected),
-        maxLines = 2,
-    )
+            .padding(vertical = MetroDimens.Row)
+            .then(modifier),
+    ) {
+        // The name keeps its place at the top of the line; the balance sits on its baseline.
+        MetroText(label, choiceStyle, Modifier.weight(1f).alignByBaseline(), color = choiceColor(selected), maxLines = 2)
+        Box(Modifier.alignByBaseline()) { balance() }
+    }
 }

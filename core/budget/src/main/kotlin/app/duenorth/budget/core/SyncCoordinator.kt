@@ -1009,7 +1009,7 @@ class SyncCoordinator(
                         groupName = it.str("group_name").orEmpty(),
                         income = false,
                     )
-                }
+                }.let { CategoryBalances.attach(session, YearMonth.from(dates.today()), it) }
         } ?: emptyList()
 
     fun setEncryptionPassword(

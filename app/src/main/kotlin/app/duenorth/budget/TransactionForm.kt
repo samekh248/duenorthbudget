@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.AccountChoice
 import app.duenorth.budget.core.CategoryChoice
+import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.DateFormats
 import app.duenorth.budget.core.EntryResult
 import app.duenorth.budget.core.FormatOptions
@@ -337,6 +338,7 @@ fun TransactionForm(
                         tag = "transaction-category",
                         fullScreenThreshold = CategoryOptions.IN_PLACE_LIMIT,
                         onOpenFull = { overlay = FormOverlay.CategoryList() },
+                        trailing = { id -> CategoryBalance(options.available(id), page.currency, style = Metro.typography.control) },
                     )
                     // A transfer has no split, even one across the budget's edge that keeps a category.
                     if (transferTo == null) {
@@ -354,6 +356,7 @@ fun TransactionForm(
                     SplitLines(
                         lines = splits,
                         categories = page.categories,
+                        currency = page.currency,
                         restIndex = restIndex,
                         rest = restPart?.let(::editText) ?: editText(0L),
                         lineError = lineError,
@@ -439,6 +442,7 @@ fun TransactionForm(
                         overlay = FormOverlay.None
                     },
                     onBack = { overlay = FormOverlay.None },
+                    currency = page.currency,
                 )
             is FormOverlay.DatePicker ->
                 DatePickerPage(
@@ -472,6 +476,7 @@ data class SplitLine(
 private fun SplitLines(
     lines: List<SplitLine>,
     categories: List<CategoryChoice>,
+    currency: CurrencySpec,
     restIndex: Int?,
     rest: String,
     lineError: Pair<Int, String>?,
@@ -498,6 +503,7 @@ private fun SplitLines(
                         modifier = Modifier.weight(1f),
                         fullScreenThreshold = CategoryOptions.IN_PLACE_LIMIT,
                         onOpenFull = { onOpenFull(index) },
+                        trailing = { id -> CategoryBalance(options.available(id), currency, style = Metro.typography.control) },
                     )
                     MetroField(
                         line.amount,
@@ -769,6 +775,9 @@ class CategoryOptions private constructor(
 
     /** The category's own name, without the hidden mark. */
     fun name(id: String): String = byId[id]?.name.orEmpty()
+
+    /** What the category has available this month; null for "no category", income, or an unknown balance. */
+    fun available(id: String?): Long? = id?.let { byId[it]?.availableMinor }
 
     companion object {
         /** WP8.1 unfolds a combo box in place up to five items; past that it opens a full-screen list. */

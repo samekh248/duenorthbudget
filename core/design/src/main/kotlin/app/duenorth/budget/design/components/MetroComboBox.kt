@@ -1,6 +1,7 @@
 package app.duenorth.budget.design.components
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,6 +45,8 @@ fun <T> MetroComboBox(
     onOpenFull: () -> Unit = {},
     /** What the closed box says while [selected] is none of [choices]. */
     placeholder: String = "",
+    /** Drawn at the end of each unfolded choice, such as a category's balance; null draws nothing. */
+    trailing: (@Composable (T) -> Unit)? = null,
 ) {
     var open by remember { mutableStateOf(false) }
     Column(
@@ -82,9 +85,7 @@ fun <T> MetroComboBox(
             val wash = Metro.colors.foreground.copy(alpha = if (Metro.colors.isDark) 0.08f else 0.05f)
             choices.forEach { choice ->
                 val chosen = choice == selected
-                MetroText(
-                    label(choice),
-                    Metro.typography.control,
+                val line =
                     Modifier
                         .fillMaxWidth()
                         .then(if (layers && chosen) Modifier.layerChosen(wash, accent) else Modifier)
@@ -93,10 +94,18 @@ fun <T> MetroComboBox(
                             open = false
                             if (choice != selected) onPick(choice)
                         }.padding(horizontal = comboInset(), vertical = MetroDimens.Row)
-                        .testTag("$tag-$choice"),
-                    // Mica marks the chosen item with a wash and an accent pill, as a Windows 11 list does, not with colored text.
-                    color = if (chosen && !layers) Metro.accent.text else Metro.colors.foreground,
-                )
+                        .testTag("$tag-$choice")
+                // Mica marks the chosen item with a wash and an accent pill, as a Windows 11 list does, not with colored text.
+                val ink = if (chosen && !layers) Metro.accent.text else Metro.colors.foreground
+                if (trailing == null) {
+                    MetroText(label(choice), Metro.typography.control, line, color = ink)
+                } else {
+                    // The label keeps its place at the top; the trailing text sits on its baseline.
+                    Row(line) {
+                        MetroText(label(choice), Metro.typography.control, Modifier.weight(1f).alignByBaseline(), color = ink)
+                        Box(Modifier.alignByBaseline()) { trailing(choice) }
+                    }
+                }
             }
         }
     }

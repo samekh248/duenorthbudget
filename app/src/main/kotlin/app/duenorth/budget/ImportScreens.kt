@@ -1,6 +1,7 @@
 package app.duenorth.budget
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -157,7 +158,11 @@ private fun ReviewRowEditor(
         if (expanded) {
             ChoiceLine(RegisterCopy.NO_CATEGORY, row.categoryId == null) { onCategory(row.id, null) }
             categories.forEach { category ->
-                ChoiceLine(category.name, category.id == row.categoryId) { onCategory(row.id, category.id) }
+                ChoiceLine(
+                    category.name,
+                    category.id == row.categoryId,
+                    balance = { CategoryBalance(category.availableMinor, page.currency) },
+                ) { onCategory(row.id, category.id) }
             }
         }
     }
@@ -167,15 +172,21 @@ private fun ReviewRowEditor(
 private fun ChoiceLine(
     label: String,
     selected: Boolean,
+    balance: @Composable () -> Unit = {},
     onClick: () -> Unit,
 ) {
-    MetroText(
-        if (selected) "• $label" else label,
-        Metro.typography.body,
+    Row(
         Modifier
             .fillMaxWidth()
             .metroPress(onClick = onClick)
             .padding(vertical = MetroDimens.Row),
-        color = if (selected) Metro.accent.text else Metro.colors.foreground,
-    )
+    ) {
+        MetroText(
+            if (selected) "• $label" else label,
+            Metro.typography.body,
+            Modifier.weight(1f).alignByBaseline(),
+            color = if (selected) Metro.accent.text else Metro.colors.foreground,
+        )
+        Box(Modifier.alignByBaseline()) { balance() }
+    }
 }
