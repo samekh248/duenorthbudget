@@ -88,6 +88,21 @@ class OnboardingFlowTest {
     }
 
     @Test
+    fun sampleFromWelcomeOpensAFilledInBudgetAndEndsSetup() {
+        val (library, model) = model("sample")
+        model.budgetFiles.trySample()
+        awaitMain { model.state.value.shell != null }
+        val state = model.state.value
+        assertEquals(ShellRoute.Home, state.route)
+        assertEquals("Sample budget", state.shell!!.budgetName)
+        assertTrue(state.shell!!.inbox.isNotEmpty())
+        assertNull(state.onboarding)
+        assertEquals(1, library.list().size)
+        awaitMain { library.onboarding().read() == null }
+        assertTrue(transport.logins.isEmpty())
+    }
+
+    @Test
     fun serverPathSignsInNamesTheInstanceAndSendsANewBudget() {
         val (library, model) = model("server")
         model.onboarding.chooseServer()

@@ -60,6 +60,9 @@ object OnboardingScreenCopy {
     const val PHONE = "only on this phone"
     const val PHONE_ONLY = "phone only"
     const val PHONE_HINT = "start here, add a server later in settings"
+    const val JUST_LOOKING = "just looking?"
+    const val SAMPLE = "try a sample budget"
+    const val SAMPLE_HINT = "a filled-in household budget to look around in"
     const val SERVER_TITLE = "server"
     const val WHERE_SERVER = "where does Actual run?"
     const val ADDRESS = "address"
@@ -199,6 +202,7 @@ fun ProgressDots(modifier: Modifier = Modifier) {
 fun WelcomeScreen(
     onServer: () -> Unit,
     onPhone: () -> Unit,
+    onSample: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     OnboardingPage(OnboardingScreenCopy.WELCOME, "onboarding-welcome", modifier) {
@@ -206,6 +210,14 @@ fun WelcomeScreen(
         Spacer(Modifier.height(MetroDimens.Grid))
         ChoiceRow(OnboardingScreenCopy.SERVER, OnboardingScreenCopy.SERVER_HINT, "welcome-server", onServer)
         ChoiceRow(OnboardingScreenCopy.PHONE, OnboardingScreenCopy.PHONE_HINT, "welcome-phone", onPhone)
+        // Set apart from the two real choices: the sample is a look around, not where the person's budget lives.
+        MetroText(
+            OnboardingScreenCopy.JUST_LOOKING,
+            Metro.typography.caption,
+            Modifier.padding(top = MetroDimens.Grid),
+            color = Metro.colors.secondary,
+        )
+        ChoiceRow(OnboardingScreenCopy.SAMPLE, OnboardingScreenCopy.SAMPLE_HINT, "welcome-sample", onSample)
     }
 }
 

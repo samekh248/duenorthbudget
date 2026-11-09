@@ -136,7 +136,7 @@ class OnboardingScreenshotTest {
     fun confirmReplaceDark() = snap(ShellRoute.ConfirmReplaceBudget, "budget_picker_confirm_dark", dark = true) { confirmReplace() }
 
     @Composable
-    private fun welcome() = WelcomeScreen(onServer = {}, onPhone = {})
+    private fun welcome() = WelcomeScreen(onServer = {}, onPhone = {}, onSample = {})
 
     @Composable
     private fun confirmReplace() = ConfirmReplaceBudgetScreen(opening = "Household", clearing = listOf("Home"), onUse = {}, onKeep = {})
