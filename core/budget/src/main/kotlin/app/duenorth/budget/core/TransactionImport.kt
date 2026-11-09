@@ -263,7 +263,8 @@ class ImportBook(
                 note = row.note,
             )
         val book = RegisterBook(session, ids)
-        val ruled = book.applyRulesForImport(draft, importedPayee = row.importedPayee ?: row.payee, cleared = !row.pending)
+        val outcome = book.applyRulesForImport(draft, importedPayee = row.importedPayee ?: row.payee, cleared = !row.pending)
+        val ruled = outcome.draft
         val payeeId = book.payeeIdForName(ruled.payee)
         book.insertImportedTransaction(
             id = ruled.id,
@@ -274,10 +275,12 @@ class ImportBook(
             note = ruled.note,
             date = ruled.date,
             financialId = row.financialId,
-            importedPayee = row.importedPayee ?: row.payee,
-            cleared = !row.pending,
+            importedPayee = outcome.importedPayee,
+            cleared = ruled.cleared ?: !row.pending,
             rawSyncedData = row.raw,
+            scheduleId = ruled.scheduleId,
         )
+        book.finishRuled(ruled.id, outcome)
         return ruled.id
     }
 
@@ -471,15 +474,7 @@ class ImportBook(
         val tombstone: Boolean,
     )
 
-    private fun currency(): CurrencySpec {
-        val code =
-            session
-                .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
-                .firstOrNull()
-                ?.str("value")
-                .orEmpty()
-        return Currencies.byCode(code) ?: Currencies.byCode("USD")!!
-    }
+    private fun currency(): CurrencySpec = BudgetCurrency.read(session)
 
     private fun categories(): List<CategoryChoice> =
         session

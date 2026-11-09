@@ -326,7 +326,7 @@ class MonthFillBook(
         val prefix = if (existing.isNullOrEmpty()) "" else "$existing\n"
         val preferences =
             session.query("SELECT id, value FROM preferences").associate { it.str("id").orEmpty() to it.str("value").orEmpty() }
-        val currency = Currencies.byCode(preferences["currency"].orEmpty()) ?: Currencies.byCode("USD")!!
+        val currency = BudgetCurrency.read(preferences)
         val shown =
             MoneyFormat.format(
                 amountMinor,

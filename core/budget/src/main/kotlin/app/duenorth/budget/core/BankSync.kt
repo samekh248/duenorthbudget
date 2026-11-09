@@ -289,11 +289,7 @@ class BankSyncBook(
                     .toString()
             }
         val currency =
-            session
-                .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
-                .firstOrNull()
-                ?.str("value")
-                .let { Currencies.byCode(it.orEmpty()) ?: Currencies.byCode("USD")!! }
+            BudgetCurrency.read(session)
         val preview = import.previewCandidates(accountId, currency, rows)
         return ImportPreviewBundle(preview, rows) to null
     }

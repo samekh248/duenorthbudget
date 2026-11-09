@@ -52,6 +52,19 @@ data class RuleTransactionView(
     /** The bank's own wording for the payee, Actual's `imported_payee` (`imported_description` in the file). */
     var importedPayee: String? = null,
     var reconciled: Boolean = false,
+    /** A `delete-transaction` action ran: Actual saves the transaction deleted. */
+    var deleted: Boolean = false,
+    /** The split lines a rule with `set-split-amount` (or other split) actions made, in order; null when unsplit. */
+    var splits: List<RuleSplit>? = null,
+)
+
+/** One split line a rule made: Actual's child transaction, with its category, payee, notes, and amount. */
+data class RuleSplit(
+    val category: String?,
+    val payee: String?,
+    val payeeName: String,
+    val notes: String?,
+    val amount: Long,
 )
 
 class RulesBook(
@@ -104,6 +117,14 @@ class RulesBook(
         scheduleRuleId: String? = null,
     ): RuleTransactionView {
         val disabled = disabledIds()
+        // A transaction that already belongs to a schedule runs that schedule's rule whatever its date, as in Actual.
+        val linkedRuleId =
+            scheduleRuleId ?: view.schedule?.let { id ->
+                session
+                    .query("SELECT rule FROM schedules WHERE id = ? AND IFNULL(tombstone, 0) = 0", listOf(id))
+                    .firstOrNull()
+                    ?.str("rule")
+            }
         val scheduleRuleIds =
             session
                 .query(
@@ -114,12 +135,13 @@ class RulesBook(
                 ).mapNotNull { it.str("rule") }
                 .toSet()
         val rules =
-            RuleCache.ranked(session) { rankRules(loadRules().filter { !isScheduleOnlyRule(it) }) }.filter { it.id !in disabled }
+            // Schedule rules run like any other, so a payment entered by hand links to its schedule (`link-schedule`).
+            RuleCache.ranked(session) { rankRules(loadRules()) }.filter { it.id !in disabled }
         var current = view
         for (rule in rules) {
-            if (scheduleRuleId != null) {
+            if (linkedRuleId != null) {
                 when {
-                    rule.id == scheduleRuleId -> {
+                    rule.id == linkedRuleId -> {
                         current = applyActions(rule, current, skipConditions = true)
                     }
                     rule.id in scheduleRuleIds -> continue
@@ -196,11 +218,6 @@ class RulesBook(
         return insertRule("pre", conditions, actions)
     }
 
-    private fun isScheduleOnlyRule(rule: RuleRecord): Boolean =
-        rule.actions.any { action ->
-            action.jsonObject["op"]?.jsonPrimitive?.contentOrNull == "link-schedule"
-        }
-
     private fun disabledIds(): Set<String> {
         val raw =
             session
@@ -242,28 +259,95 @@ class RulesBook(
         return method
     }
 
+    /**
+     * Actual's `execActions`: actions with no split index change the transaction itself; with any split index the
+     * transaction is split, each line taking its own actions, then the fixed amounts, the percentages of what is
+     * left, and the remainder shared out, the last remainder line taking the rounding.
+     */
     private fun applyActions(
         rule: RuleRecord,
         view: RuleTransactionView,
         skipConditions: Boolean,
     ): RuleTransactionView {
         if (!skipConditions && !conditionsMatch(rule, view)) return view
+        val actions = rule.actions.mapNotNull { it as? JsonObject }
+        val (lineActions, parentActions) = actions.partition { splitIndex(it) > 0 }
         var next = view
-        for (element in rule.actions) {
-            val action = element.jsonObject
-            when (action["op"]?.jsonPrimitive?.contentOrNull) {
-                "set" -> next = applySet(action, next)
-                "prepend-notes", "append-notes" -> next = applyNotes(action, next)
-                "link-schedule", "delete-transaction", "set-split-amount" -> Unit
-            }
-        }
-        return next
+        for (action in parentActions) next = applyAction(action, next)
+        if (lineActions.isEmpty()) return next
+        return next.copy(splits = split(next, lineActions))
     }
 
+    private fun applyAction(
+        action: JsonObject,
+        view: RuleTransactionView,
+    ): RuleTransactionView =
+        when (action["op"]?.jsonPrimitive?.contentOrNull) {
+            "set" -> applySet(action, view)
+            "prepend-notes", "append-notes" -> applyNotes(action, view)
+            "link-schedule" -> (action["value"] as? JsonPrimitive)?.contentOrNull?.let { view.copy(schedule = it) } ?: view
+            "delete-transaction" -> view.copy(deleted = true)
+            "set-split-amount" ->
+                when ((action["options"] as? JsonObject)?.get("method")?.jsonPrimitive?.contentOrNull) {
+                    "fixed-amount" -> jsonNumber(action["value"])?.let { view.copy(amount = it) } ?: view
+                    else -> view
+                }
+            else -> view
+        }
+
+    private fun split(
+        parent: RuleTransactionView,
+        actions: List<JsonObject>,
+    ): List<RuleSplit> {
+        val count = actions.maxOf { splitIndex(it) }
+        // Each line starts as Actual's `makeChild`: no amount, the parent's category and payee, no notes.
+        val lines =
+            MutableList(count) {
+                parent.copy(amount = 0, notes = null, schedule = null, deleted = false, splits = null)
+            }
+        for (action in actions) {
+            val index = splitIndex(action) - 1
+            lines[index] = applyAction(action, lines[index])
+        }
+
+        fun method(action: JsonObject) = (action["options"] as? JsonObject)?.get("method")?.jsonPrimitive?.contentOrNull
+        val amountActions = actions.filter { it["op"]?.jsonPrimitive?.contentOrNull == "set-split-amount" }
+        val afterFixed = parent.amount - lines.sumOf { it.amount }
+        amountActions.filter { method(it) == "fixed-percent" }.forEach { action ->
+            val percent = (action["value"] as? JsonPrimitive)?.doubleOrNull ?: return@forEach
+            val index = splitIndex(action) - 1
+            lines[index] = lines[index].copy(amount = Math.round(afterFixed * percent / 100))
+        }
+        val remainders = amountActions.filter { method(it) == "remainder" }
+        if (remainders.isNotEmpty()) {
+            val afterPercent = parent.amount - lines.sumOf { it.amount }
+            val each = Math.round(afterPercent.toDouble() / remainders.size)
+            remainders.forEach { action ->
+                val index = splitIndex(action) - 1
+                lines[index] = lines[index].copy(amount = each)
+            }
+            val last = remainders.maxOf { splitIndex(it) } - 1
+            lines[last] = lines[last].copy(amount = lines[last].amount + parent.amount - lines.sumOf { it.amount })
+        }
+        return lines.map { RuleSplit(it.category, it.payee, it.payeeName, it.notes, it.amount) }
+    }
+
+    private fun splitIndex(action: JsonObject): Int =
+        (action["options"] as? JsonObject)
+            ?.get("splitIndex")
+            ?.jsonPrimitive
+            ?.intOrNull ?: 0
+
+    /**
+     * A `set` action. One whose value comes from a formula or a template is left alone: those are worked out by
+     * desktop's spreadsheet and template engines, which the phone does not have, and the stored value is not it.
+     */
     private fun applySet(
         action: JsonObject,
         view: RuleTransactionView,
     ): RuleTransactionView {
+        val options = action["options"] as? JsonObject
+        if (options?.get("formula").isGiven() || options?.get("template").isGiven()) return view
         val field = action["field"]?.jsonPrimitive?.contentOrNull ?: return view
         val value = action["value"]
         return when (field) {
@@ -272,6 +356,11 @@ class RulesBook(
                 val name = payeeName(id)
                 view.copy(payee = id, payeeName = name)
             }
+            // Actual's "new payee" action: the payee with this name, made if there is none.
+            "payee_name" -> {
+                val name = (value as? JsonPrimitive)?.contentOrNull?.trim()?.ifEmpty { null } ?: return view
+                view.copy(payee = null, payeeName = name)
+            }
             "category" -> {
                 if (value == null || value is JsonPrimitive && value.contentOrNull == null) {
                     view.copy(category = null)
@@ -279,7 +368,9 @@ class RulesBook(
                     view.copy(category = value.jsonPrimitive.contentOrNull)
                 }
             }
+            "account", "acct" -> (value as? JsonPrimitive)?.contentOrNull?.let { view.copy(account = it) } ?: view
             "notes" -> view.copy(notes = value?.jsonPrimitive?.contentOrNull)
+            "imported_payee", "imported_description" -> view.copy(importedPayee = (value as? JsonPrimitive)?.contentOrNull)
             "amount" -> {
                 val amount = jsonNumber(value) ?: return view
                 view.copy(amount = amount)
@@ -292,6 +383,8 @@ class RulesBook(
             else -> view
         }
     }
+
+    private fun JsonElement?.isGiven(): Boolean = this is JsonPrimitive && !contentOrNull.isNullOrEmpty()
 
     private fun applyNotes(
         action: JsonObject,

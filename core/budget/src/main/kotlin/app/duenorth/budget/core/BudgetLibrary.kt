@@ -363,7 +363,8 @@ class BudgetLibrary(
                 )
                 session.exec(
                     "INSERT INTO preferences (id, value) VALUES (?, ?)",
-                    listOf("currency", currency.code),
+                    // Actual's synced currency setting, so desktop shows the same currency.
+                    listOf(BudgetCurrency.PREF, currency.code),
                 )
                 seedIncome(session)
             }
@@ -957,15 +958,7 @@ class BudgetLibrary(
         span: NetWorthSpan,
     ): NetWorthHistory? = open(budgetId) { session -> ReportsReader(session, clock.today()).netWorthHistory(span, reportCurrency(session)) }
 
-    private fun reportCurrency(session: SqlSession): CurrencySpec {
-        val code =
-            session
-                .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
-                .firstOrNull()
-                ?.str("value")
-                .orEmpty()
-        return Currencies.byCode(code) ?: Currencies.byCode("USD")!!
-    }
+    private fun reportCurrency(session: SqlSession): CurrencySpec = BudgetCurrency.read(session)
 
     /** Lists bad template lines across category notes; writes nothing (spec 010 US5). */
     fun checkTemplates(budgetId: String): TemplateResult =
@@ -1321,13 +1314,7 @@ class BudgetLibrary(
                 ""
             } else {
                 sessions.use(database) { session ->
-                    session
-                        .query(
-                            "SELECT value FROM preferences WHERE id = ?",
-                            listOf("currency"),
-                        ).firstOrNull()
-                        ?.str("value")
-                        .orEmpty()
+                    BudgetCurrency.code(session)
                 }
             }
         return BudgetSummary(id = metadata.id, name = metadata.budgetName, currencyCode = currency)

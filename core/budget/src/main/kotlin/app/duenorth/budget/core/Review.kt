@@ -313,13 +313,5 @@ object ReviewReader {
         }
     }
 
-    private fun currency(session: SqlSession): CurrencySpec {
-        val code =
-            session
-                .query("SELECT value FROM preferences WHERE id = ?", listOf("currency"))
-                .firstOrNull()
-                ?.str("value")
-                .orEmpty()
-        return Currencies.byCode(code) ?: Currencies.byCode("USD")!!
-    }
+    private fun currency(session: SqlSession): CurrencySpec = BudgetCurrency.read(session)
 }

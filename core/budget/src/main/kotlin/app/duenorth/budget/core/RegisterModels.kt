@@ -248,6 +248,16 @@ data class TransactionDraft(
     val parts: List<SplitPart>? = null,
 )
 
+/** A draft after the file's rules ran over it, with what they did beyond its fields. */
+data class RuledDraft(
+    val draft: TransactionDraft,
+    /** The bank's wording for the payee, which a rule may have changed. */
+    val importedPayee: String? = null,
+    val deleted: Boolean = false,
+    /** Split lines a rule made, for a transaction the person did not split themselves. */
+    val splits: List<RuleSplit>? = null,
+)
+
 data class SplitPart(
     val categoryId: String,
     val amountMinor: Long,

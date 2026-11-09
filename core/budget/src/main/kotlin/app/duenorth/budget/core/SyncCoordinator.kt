@@ -1277,11 +1277,8 @@ class SyncCoordinator(
     private fun decimals(budgetId: String): Int = currency(budgetId).decimals
 
     private fun currency(budgetId: String): CurrencySpec {
-        val code =
-            library.useDatabase(budgetId) { session ->
-                session.query("SELECT value FROM preferences WHERE id = ?", listOf("currency")).firstOrNull()?.str("value")
-            }
-        return Currencies.byCode(code.orEmpty()) ?: Currencies.byCode("USD")!!
+        val code = library.useDatabase(budgetId) { session -> BudgetCurrency.code(session) }
+        return BudgetCurrency.spec(code.orEmpty())
     }
 
     private fun budgetName(budgetId: String): String = library.list().find { it.id == budgetId }?.name ?: "budget"

@@ -30,11 +30,45 @@ fun interface BudgetClock {
     }
 }
 
+/**
+ * A budget's currency. Amounts are kept in hundredths whatever the currency, as Actual keeps them
+ * (`amountToInteger` always scales by 100), so [decimals], the scale every parse and edit box uses, is
+ * always 2; [shownDecimals] is only how many digits are shown, 0 for yen and won.
+ */
 data class CurrencySpec(
     val code: String,
     val symbol: String,
-    val decimals: Int,
-)
+    val shownDecimals: Int,
+) {
+    val decimals: Int get() = STORED_DECIMALS
+
+    companion object {
+        const val STORED_DECIMALS = 2
+    }
+}
+
+/**
+ * The budget's currency as Actual saves it: the synced `defaultCurrencyCode` preference, then the
+ * `currency` preference phone files used before, then USD.
+ */
+object BudgetCurrency {
+    const val PREF = "defaultCurrencyCode"
+    private const val OLD_PREF = "currency"
+
+    fun code(session: SqlSession): String =
+        session
+            .query("SELECT id, value FROM preferences WHERE id IN (?, ?)", listOf(PREF, OLD_PREF))
+            .associate { it.str("id").orEmpty() to it.str("value").orEmpty() }
+            .let(::code)
+
+    fun code(preferences: Map<String, String>): String = preferences[PREF]?.takeIf { it.isNotBlank() } ?: preferences[OLD_PREF].orEmpty()
+
+    fun read(session: SqlSession): CurrencySpec = spec(code(session))
+
+    fun read(preferences: Map<String, String>): CurrencySpec = spec(code(preferences))
+
+    fun spec(code: String): CurrencySpec = Currencies.byCode(code) ?: Currencies.byCode("USD")!!
+}
 
 object Currencies {
     val all: List<CurrencySpec> =
@@ -260,13 +294,12 @@ object MoneyFormat {
         val (groupSep, decimalSep) = separators(options.numberFormat)
         var scale = 1L
         repeat(currency.decimals) { scale *= 10 }
-        val whole = if (currency.decimals == 0) absolute else absolute / scale
-        val fraction = if (currency.decimals == 0) 0L else absolute % scale
         val digits =
-            if (options.hideFraction || currency.decimals == 0) {
-                group(whole, groupSep)
-            } else {
-                group(whole, groupSep) + decimalSep + fraction.toString().padStart(currency.decimals, '0')
+            when {
+                // Yen and won are kept in hundredths too, and shown rounded to whole units, as Actual shows them.
+                currency.shownDecimals == 0 -> group(absolute / scale + if (absolute % scale * 2 >= scale) 1 else 0, groupSep)
+                options.hideFraction -> group(absolute / scale, groupSep)
+                else -> group(absolute / scale, groupSep) + decimalSep + (absolute % scale).toString().padStart(currency.decimals, '0')
             }
         val body = currency.symbol + digits
         return if (negative) "-$body" else body
