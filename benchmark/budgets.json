@@ -1,0 +1,20 @@
+{
+  "note": "Limits for the CI emulator (Pixel 6, API 34, software GPU), set with headroom from two measured runs on 2026-11-09. See benchmark/README.md.",
+  "measured": {
+    "StartupBenchmark.coldStart[BaselineProfile] timeToFullDisplayMs.median": [2148.5, 2428.7],
+    "StartupBenchmark.coldStart[None] timeToFullDisplayMs.median": [2324.2, 2448.2],
+    "ScrollBenchmark.budgetScroll frameOverrunMs.P90": [143.9],
+    "ScrollBenchmark.pivotSwipe frameOverrunMs.P90": [103.5]
+  },
+  "budgets": {
+    "StartupBenchmark.coldStart?BaselineProfile?": {
+      "timeToFullDisplayMs.median": 3000
+    },
+    "ScrollBenchmark.budgetScroll": {
+      "frameOverrunMs.P90": 200
+    },
+    "ScrollBenchmark.pivotSwipe": {
+      "frameOverrunMs.P90": 150
+    }
+  }
+}

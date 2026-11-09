@@ -10,6 +10,7 @@ import android.os.StrictMode
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.ReportDrawnWhen
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -115,7 +118,9 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(intent?.data) {
                 model.servers.completeOpenId(intent?.dataString)
             }
-            DueNorthApp(model)
+            ReportBudgetDrawn(model)
+            // Lets the :benchmark module's UiAutomator find screens by their test tags.
+            Box(Modifier.semantics { testTagsAsResourceId = true }) { DueNorthApp(model) }
         }
     }
 
@@ -124,6 +129,16 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         shellModel?.servers?.completeOpenId(intent.dataString)
     }
+}
+
+/**
+ * Tells the system the first real screen is up: the open budget's month, or onboarding when there is none.
+ * The startup benchmark's time to full display ends here, which is the constitution's "budget appears" moment.
+ */
+@Composable
+private fun ReportBudgetDrawn(model: ShellViewModel) {
+    val state by model.state.collectAsStateWithLifecycle()
+    ReportDrawnWhen { state.shell != null || (!state.loading && state.settings.openBudgetId == null) }
 }
 
 private const val EXPORTS_DIR = "exports"
