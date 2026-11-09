@@ -1,5 +1,7 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.CleanupResult
+import app.duenorth.budget.core.TemplateResult
 import app.duenorth.budget.core.WriteResult
 import java.util.concurrent.atomic.AtomicLong
 
@@ -66,6 +68,38 @@ internal fun ShellHost.toastFor(
     }
 }
 
+/**
+ * A toast for a templates run. [written] is a run on the month itself, which undo can take back; in budget edit mode
+ * templates only fill the boxes, which done then saves.
+ */
+internal fun ShellHost.toastTemplates(
+    result: TemplateResult,
+    written: Boolean = true,
+) {
+    when (result) {
+        is TemplateResult.Applied ->
+            toastSuccess(
+                if (written) ToastCopy.TEMPLATES_APPLIED else ToastCopy.TEMPLATES_FILLED,
+                ToastCopy.categories(result.categories),
+                undo = written,
+            )
+        is TemplateResult.Invalid -> toastFailure(ToastCopy.TEMPLATES_FAILED, DistributeCopy.unreadable(result.errors.size))
+        is TemplateResult.Rejected -> toastFailure(ToastCopy.TEMPLATES_FAILED, result.reason)
+        // A question comes first; the toast follows its answer.
+        is TemplateResult.NeedsConfirm, TemplateResult.Valid -> Unit
+    }
+}
+
+/** A toast for end-of-month cleanup. */
+internal fun ShellHost.toastCleanup(result: CleanupResult) {
+    when (result) {
+        is CleanupResult.Applied -> toastSuccess(ToastCopy.CLEANUP_DONE, ToastCopy.categories(result.sources))
+        CleanupResult.UpToDate -> toastSuccess(ToastCopy.CLEANUP_NOTHING, undo = false)
+        is CleanupResult.NoFunds -> toastFailure(ToastCopy.CLEANUP_PARTLY, result.warnings.firstOrNull())
+        is CleanupResult.Rejected -> toastFailure(ToastCopy.CLEANUP_FAILED, result.reason)
+    }
+}
+
 object ToastCopy {
     const val UNDO = "undo"
     const val DISMISS = "dismiss"
@@ -116,4 +150,14 @@ object ToastCopy {
     const val MOVE_FAILED = "couldn't move"
     const val UNDO_FAILED = "couldn't undo"
     const val NOTHING_DONE = "nothing changed"
+
+    const val TEMPLATES_APPLIED = "templates applied"
+    const val TEMPLATES_FILLED = "templates filled in"
+    const val TEMPLATES_FAILED = "couldn't apply templates"
+    const val CLEANUP_DONE = "cleanup done"
+    const val CLEANUP_NOTHING = "nothing to clean up"
+    const val CLEANUP_PARTLY = "cleanup couldn't move everything"
+    const val CLEANUP_FAILED = "couldn't clean up"
+
+    fun categories(count: Int): String = if (count == 1) "1 category" else "$count categories"
 }

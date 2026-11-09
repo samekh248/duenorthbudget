@@ -94,6 +94,8 @@ class TemplatesHolder internal constructor(
         host.mutate { it.copy(templates = it.templates.copy(busy = true, confirm = null)) }
         host.scope.launch {
             val result = withContext(host.io) { host.library.applyTemplates(budgetId, month, overwrite, confirmed) }
+            // Posted before the page closes, so the toast greets the budget it lands on.
+            host.toastTemplates(result)
             when (result) {
                 is TemplateResult.NeedsConfirm ->
                     host.mutate {
@@ -126,6 +128,7 @@ class TemplatesHolder internal constructor(
         host.mutate { it.copy(templates = it.templates.copy(busy = true, confirm = null, cleanup = null)) }
         host.scope.launch {
             val result = withContext(host.io) { host.library.cleanupMonth(budgetId, month) }
+            host.toastCleanup(result)
             host.mutate { it.copy(templates = it.templates.copy(cleanup = result, busy = false)) }
             if (result !is CleanupResult.Rejected) host.afterMonthWrite(budgetId)
         }
