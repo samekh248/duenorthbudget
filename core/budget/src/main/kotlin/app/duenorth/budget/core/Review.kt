@@ -149,11 +149,13 @@ object ReviewReader {
                 .query(
                     """
                     SELECT t.id AS id, t.date AS date, t.amount AS amount, COALESCE(p.name, '') AS payee, t.acct AS acct,
+                        p.transfer_acct AS transfer_acct, COALESCE(target.name, '') AS transfer_name,
                         CASE WHEN IFNULL(t.isChild, 0) = 1 AND t.parent_id IS NOT NULL THEN t.parent_id ELSE t.id END
                             AS register_id
                     FROM transactions t
                     JOIN accounts a ON a.id = t.acct AND IFNULL(a.tombstone, 0) = 0
                     LEFT JOIN payees p ON p.id = t.description AND IFNULL(p.tombstone, 0) = 0
+                    LEFT JOIN accounts target ON target.id = p.transfer_acct
                     WHERE $alive
                         AND t.category = ?
                         AND t.date / 100 = ?
@@ -163,11 +165,21 @@ object ReviewReader {
                     """.trimIndent(),
                     listOf(categoryId, target),
                 ).map { row ->
+                    val amount = row.long("amount")
                     ReviewTransactionRow(
                         id = row.str("id").orEmpty(),
                         date = row.long("date").toInt(),
-                        payee = row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE },
-                        amountMinor = row.long("amount"),
+                        // A transfer's payee has no name of its own; label it as the register does.
+                        payee =
+                            if (row.str("transfer_acct") != null) {
+                                RegisterEntry.transferLabel(
+                                    amount,
+                                    row.str("transfer_name").orEmpty().ifBlank { row.str("payee").orEmpty() },
+                                )
+                            } else {
+                                row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE }
+                            },
+                        amountMinor = amount,
                         accountId = row.str("acct").orEmpty(),
                         registerId = row.str("register_id") ?: row.str("id").orEmpty(),
                     )
