@@ -2,6 +2,7 @@ package app.duenorth.budget
 
 import app.duenorth.budget.core.CategoryAutomations
 import app.duenorth.budget.core.CleanupResult
+import app.duenorth.budget.core.ScheduleSummary
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplateChip
 import app.duenorth.budget.core.TemplateKind
@@ -34,6 +35,8 @@ data class TemplatesUi(
     val preview: Pair<Template, Long?>? = null,
     /** The schedule names a schedule template can pick from. */
     val schedules: List<String> = emptyList(),
+    /** Each of [schedules] by name: its amount, how often it comes and when next, which the form shows beside it. */
+    val scheduleInfo: Map<String, ScheduleSummary> = emptyMap(),
     /** The templates screen's lanes: every category's templates by priority. */
     val plan: TemplatePlan? = null,
     /** Apply's before and after list, while it shows. */
@@ -356,12 +359,13 @@ class TemplatesHolder internal constructor(
     private fun loadSchedules() {
         val budgetId = state.settings.openBudgetId ?: return
         host.scope.launch {
-            val names =
+            val open =
                 withContext(host.io) { host.library.readSchedules(budgetId) }
                     .filter { !it.completed && it.name.isNotBlank() }
-                    .map { it.name }
-                    .distinct()
-            host.mutate { it.copy(templates = it.templates.copy(schedules = names)) }
+            val names = open.map { it.name }.distinct()
+            // Two schedules can share a name; the first, as the list shows them, is the one described.
+            val info = open.groupBy { it.name }.mapValues { it.value.first() }
+            host.mutate { it.copy(templates = it.templates.copy(schedules = names, scheduleInfo = info)) }
         }
     }
 

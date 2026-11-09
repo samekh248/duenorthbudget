@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
@@ -16,6 +17,8 @@ import app.duenorth.budget.core.CleanupCopy
 import app.duenorth.budget.core.CleanupResult
 import app.duenorth.budget.core.LimitPeriod
 import app.duenorth.budget.core.MonthShell
+import app.duenorth.budget.core.ScheduleRepeat
+import app.duenorth.budget.core.ScheduleSummary
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplateAdjustment
 import app.duenorth.budget.core.TemplateChip
@@ -269,6 +272,8 @@ class TemplateContentTest {
         kind: TemplateKind,
         initial: Template,
         automations: Boolean = false,
+        info: Map<String, ScheduleSummary> = emptyMap(),
+        onSave: (Template) -> Unit = {},
     ) {
         compose.setContent {
             MetroTheme {
@@ -279,13 +284,14 @@ class TemplateContentTest {
                     isNew = false,
                     month = TemplateSamples.october,
                     currency = TemplateSamples.shell.currency,
-                    schedules = listOf("Rent"),
+                    schedules = info.keys.toList().ifEmpty { listOf("Rent") },
                     sources = emptyList(),
                     preview = null,
                     onPreview = {},
-                    onSave = {},
+                    onSave = onSave,
                     onRemove = {},
                     automations = automations,
+                    scheduleInfo = info,
                 )
             }
         }
@@ -317,6 +323,62 @@ class TemplateContentTest {
         compose.onNodeWithText("#template-1 900 by 2027-06 spend from 2026-10 repeat every year").assertExists()
     }
 
+    private fun schedule(
+        name: String,
+        amount: Long,
+        interval: Int,
+        next: Int,
+    ) = ScheduleSummary(
+        name,
+        name,
+        "checking",
+        "Checking",
+        name,
+        amount,
+        "isapprox",
+        "Bills",
+        next,
+        completed = false,
+        postsTransaction = false,
+        repeat = ScheduleRepeat.MONTHLY,
+        interval = interval,
+        dates = listOf(next),
+    )
+
+    @Test
+    fun aScheduleShowsItsBillAndTheSumOfItsAdjust() {
+        form(
+            TemplateKind.SCHEDULE,
+            Template.Schedule("Electric", full = false, priority = 1),
+            info = mapOf("Electric" to schedule("Electric", -14_000, 1, 20261203)),
+        )
+        compose.onNodeWithText("about \$140.00 · every month · next dec 3").assertExists()
+        // A monthly bill budgets the same saved ahead or not, so the choice stays away.
+        compose.onNodeWithTag("template-full-ahead").assertDoesNotExist()
+        compose.onNodeWithTag("template-adjust-more").performClick()
+        type("template-adjust-by", "10")
+        compose.onNodeWithText("of the schedule's \$140.00").assertExists()
+        compose.onNodeWithText("+\$14.00").assertExists()
+        compose.onNodeWithText("\$154.00").assertExists()
+        compose.onNodeWithTag("template-adjust-percent-\$").performClick()
+        compose.onNodeWithText("+ \$10.00").assertExists()
+        compose.onNodeWithText("\$150.00").assertExists()
+    }
+
+    @Test
+    fun aRareScheduleAsksToSaveAheadOrPayWhenDue() {
+        form(
+            TemplateKind.SCHEDULE,
+            Template.Schedule("Car insurance", full = false, priority = 1),
+            info = mapOf("Car insurance" to schedule("Car insurance", -60_000, 6, 20270414)),
+        )
+        compose.onNodeWithText("it comes every 6 months, so").assertExists()
+        compose.onNodeWithText("a share each month, all \$600.00 ready by april").assertExists()
+        compose.onNodeWithTag("template-full-due").performClick()
+        compose.onNodeWithTag("template-full-due").assertIsSelected()
+        compose.onNodeWithText("\$600.00 in april, nothing before").assertExists()
+    }
+
     @Test
     fun anAdjustmentDesktopWouldRefuseSavesNothing() {
         form(
@@ -329,9 +391,10 @@ class TemplateContentTest {
                 adjustment = TemplateAdjustment(BigDecimal("-10"), percent = true),
             ),
         )
-        compose.onNodeWithText("#template-1 schedule Rent [decrease 10%]").assertExists()
+        compose.onNodeWithText("− 10%").assertExists()
         clear("template-adjust-by")
         type("template-adjust-by", "100")
+        compose.onNodeWithText(TemplateAdjustCopy.NOT_ALL).assertExists()
         compose.onNodeWithText(TemplateEditorCopy.NEEDS).assertExists()
     }
 
