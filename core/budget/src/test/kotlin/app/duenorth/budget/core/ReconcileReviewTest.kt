@@ -226,6 +226,28 @@ class ReconcileReviewTest {
     }
 
     @Test
+    fun categoryMonthLabelsATransferAsTheRegisterDoes() {
+        db { session, register ->
+            register.save(
+                TransactionDraft(
+                    id = "to-savings",
+                    accountId = "checking",
+                    date = 20261007,
+                    payee = "",
+                    amountMinor = -2_500,
+                    categoryId = "c-food",
+                    note = null,
+                    transferAccountId = "savings",
+                ),
+            )
+            val row = ReviewReader.categoryMonth(session, "c-food", YearMonth.of(2026, 10))!!.rows.single()
+            assertEquals("transfer to Savings", row.payee)
+            assertEquals("checking", row.accountId)
+            assertEquals("to-savings", row.registerId)
+        }
+    }
+
+    @Test
     fun netWorthSplitsOnAndOffBudget() {
         db { session, register ->
             register.save(draft("on", amount = 1_000))
