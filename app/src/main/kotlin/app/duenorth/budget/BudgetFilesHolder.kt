@@ -9,6 +9,7 @@ import app.duenorth.budget.core.SampleBudgets
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.UnlockResult
 import app.duenorth.budget.core.UploadResult
+import app.duenorth.budget.core.createSample
 import app.duenorth.budget.core.syncFraction
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -105,6 +106,24 @@ class BudgetFilesHolder internal constructor(
                     host.mutate { it.copy(createError = null, route = ShellRoute.Home) }
                     host.reload()
                     settings.offerExperimental(always = settingUp)
+                }
+            }
+        }
+    }
+
+    /**
+     * The welcome page's "try a sample budget": makes the household sample, which every build carries, and opens its
+     * home. It skips the get started list and the experimental features question, since the sample is for looking
+     * around; the person makes their own budget later from settings.
+     */
+    fun trySample() {
+        host.scope.launch {
+            when (val result = withContext(host.io) { host.library.createSample() }) {
+                is CreateResult.Rejected -> host.mutate { it.copy(createError = result.reason) }
+                is CreateResult.Created -> {
+                    host.finishOnboarding()
+                    host.mutate { it.copy(createError = null, route = ShellRoute.Home) }
+                    host.reload()
                 }
             }
         }

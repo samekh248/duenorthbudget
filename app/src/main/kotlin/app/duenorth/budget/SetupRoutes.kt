@@ -191,6 +191,7 @@ internal fun WelcomeRoute(
     WelcomeScreen(
         onServer = model.onboarding::chooseServer,
         onPhone = model.onboarding::choosePhone,
+        onSample = model.budgetFiles::trySample,
         modifier = modifier,
     )
 }

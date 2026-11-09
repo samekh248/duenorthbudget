@@ -1,5 +1,14 @@
 package app.duenorth.budget.core
 
+import app.duenorth.budget.core.SampleSeed.account
+import app.duenorth.budget.core.SampleSeed.budget
+import app.duenorth.budget.core.SampleSeed.category
+import app.duenorth.budget.core.SampleSeed.date
+import app.duenorth.budget.core.SampleSeed.group
+import app.duenorth.budget.core.SampleSeed.payee
+import app.duenorth.budget.core.SampleSeed.prefs
+import app.duenorth.budget.core.SampleSeed.toActualDate
+import app.duenorth.budget.core.SampleSeed.txn
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -84,59 +93,10 @@ object MockBudgets : SampleBudgets {
     ) {
         val dataset = byId(datasetId) ?: error("unknown mock budget: $datasetId")
         when (dataset.id) {
-            HOUSEHOLD -> seedHousehold(session, today)
+            HOUSEHOLD -> HouseholdSample.seed(session, today)
             FULL_TOUR -> seedFullTour(session, today)
             WIDE -> seedWide(session, today)
         }
-    }
-
-    private fun seedHousehold(
-        session: SqlSession,
-        today: LocalDate,
-    ) {
-        val thisMonth = YearMonth.from(today)
-        val lastMonth = thisMonth.minusMonths(1)
-        val last = lastMonth.toActualMonth()
-        val current = thisMonth.toActualMonth()
-
-        prefs(session, "USD")
-        group(session, "g-inc", "Income", income = true, order = 0)
-        group(session, "g-liv", "Living", order = 1)
-        group(session, "g-bills", "Bills", order = 2)
-        category(session, "c-sal", "Salary", "g-inc", income = true, order = 0)
-        category(session, "c-food", "Food", "g-liv", order = 0)
-        category(session, "c-gas", "Gas", "g-liv", order = 1)
-        category(session, "c-rent", "Rent", "g-bills", order = 0)
-        category(session, "c-util", "Utilities", "g-bills", order = 1)
-
-        account(session, "checking", "Checking", type = "checking", order = 0)
-        account(session, "savings", "Savings", offBudget = true, type = "savings", order = 1)
-
-        payee(session, "p-work", "Acme Payroll")
-        payee(session, "p-cafe", "Cafe")
-        payee(session, "p-bus", "Bus")
-        payee(session, "p-rent", "Oak Street Rent")
-        payee(session, "p-power", "City Power")
-        payee(session, "p-market", "Market")
-
-        budget(session, "b-food-l", last, "c-food", 200_000)
-        budget(session, "b-gas-l", last, "c-gas", 80_000)
-        budget(session, "b-rent-l", last, "c-rent", 1_200_000)
-        budget(session, "b-util-l", last, "c-util", 120_000)
-        budget(session, "b-food", current, "c-food", 220_000)
-        budget(session, "b-gas", current, "c-gas", 80_000)
-        budget(session, "b-rent", current, "c-rent", 1_200_000)
-        budget(session, "b-util", current, "c-util", 120_000)
-
-        txn(session, "t-pay", "checking", "c-sal", 4_200_000, "p-work", date(lastMonth, 15), 1.0)
-        txn(session, "t-food-l", "checking", "c-food", -150_000, "p-cafe", date(lastMonth, 16), 2.0)
-        txn(session, "t-gas-l", "checking", "c-gas", -60_000, "p-bus", date(lastMonth, 18), 3.0)
-        txn(session, "t-rent-l", "checking", "c-rent", -1_200_000, "p-rent", date(lastMonth, 1), 0.5)
-        txn(session, "t-util-l", "checking", "c-util", -95_000, "p-power", date(lastMonth, 12), 1.5)
-        txn(session, "t-save", "savings", null, 500_000, null, date(thisMonth, 1), 1.0)
-        txn(session, "t-cafe", "checking", null, -2_500, "p-cafe", date(thisMonth, minOf(2, today.dayOfMonth)), 2.0)
-        txn(session, "t-market", "checking", null, -4_800, "p-market", date(thisMonth, minOf(3, today.dayOfMonth)), 3.0)
-        txn(session, "t-bus", "checking", null, -1_000, "p-bus", date(thisMonth, minOf(4, today.dayOfMonth)), 4.0)
     }
 
     private fun seedFullTour(
@@ -313,149 +273,6 @@ object MockBudgets : SampleBudgets {
         }
     }
 
-    private fun prefs(
-        session: SqlSession,
-        currency: String,
-    ) {
-        session.exec(
-            "INSERT OR REPLACE INTO preferences (id, value) VALUES (?, ?)",
-            listOf("budgetType", "envelope"),
-        )
-        session.exec(
-            "INSERT OR REPLACE INTO preferences (id, value) VALUES (?, ?)",
-            listOf("currency", currency),
-        )
-    }
-
-    private fun group(
-        session: SqlSession,
-        id: String,
-        name: String,
-        income: Boolean = false,
-        order: Int,
-    ) {
-        session.exec(
-            """
-            INSERT INTO category_groups (id, name, is_income, sort_order, tombstone)
-            VALUES (?, ?, ?, ?, 0)
-            """.trimIndent(),
-            listOf(id, name, if (income) 1 else 0, order.toDouble()),
-        )
-    }
-
-    private fun category(
-        session: SqlSession,
-        id: String,
-        name: String,
-        groupId: String,
-        income: Boolean = false,
-        order: Int,
-    ) {
-        session.exec(
-            """
-            INSERT INTO categories (id, name, is_income, cat_group, sort_order, tombstone)
-            VALUES (?, ?, ?, ?, ?, 0)
-            """.trimIndent(),
-            listOf(id, name, if (income) 1 else 0, groupId, order.toDouble()),
-        )
-    }
-
-    private fun account(
-        session: SqlSession,
-        id: String,
-        name: String,
-        offBudget: Boolean = false,
-        type: String,
-        order: Int,
-        bankLinked: Boolean = false,
-    ) {
-        session.exec(
-            """
-            INSERT INTO accounts (
-                id, name, offbudget, closed, type, sort_order, tombstone,
-                account_id, account_sync_source
-            ) VALUES (?, ?, ?, 0, ?, ?, 0, ?, ?)
-            """.trimIndent(),
-            listOf(
-                id,
-                name,
-                if (offBudget) 1 else 0,
-                type,
-                order.toDouble(),
-                if (bankLinked) "bank-$id" else null,
-                if (bankLinked) "simpleFin" else null,
-            ),
-        )
-    }
-
-    private fun payee(
-        session: SqlSession,
-        id: String,
-        name: String,
-    ) {
-        session.exec(
-            "INSERT INTO payees (id, name, tombstone) VALUES (?, ?, 0)",
-            listOf(id, name),
-        )
-    }
-
-    private fun budget(
-        session: SqlSession,
-        id: String,
-        month: Int,
-        categoryId: String,
-        amount: Long,
-        carryover: Boolean = false,
-    ) {
-        session.exec(
-            """
-            INSERT INTO zero_budgets (id, month, category, amount, carryover)
-            VALUES (?, ?, ?, ?, ?)
-            """.trimIndent(),
-            listOf(id, month, categoryId, amount, if (carryover) 1 else 0),
-        )
-    }
-
-    private fun txn(
-        session: SqlSession,
-        id: String,
-        account: String,
-        category: String?,
-        amount: Long,
-        payee: String?,
-        date: Int,
-        sort: Double,
-        transfer: String? = null,
-        parent: Boolean = false,
-        childOf: String? = null,
-        cleared: Boolean = true,
-        note: String? = null,
-    ) {
-        session.exec(
-            """
-            INSERT INTO transactions (
-                id, isParent, isChild, parent_id, acct, category, amount, description, notes,
-                date, transferred_id, sort_order, cleared, reconciled, tombstone
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
-            """.trimIndent(),
-            listOf(
-                id,
-                if (parent) 1 else 0,
-                if (childOf != null) 1 else 0,
-                childOf,
-                account,
-                category,
-                amount,
-                payee,
-                note,
-                date,
-                transfer,
-                sort,
-                if (cleared) 1 else 0,
-            ),
-        )
-    }
-
     private fun insertMonthlySchedule(
         session: SqlSession,
         scheduleId: String,
@@ -550,11 +367,4 @@ object MockBudgets : SampleBudgets {
             listOf("nd-$scheduleId", scheduleId, nextIso, nextIso),
         )
     }
-
-    private fun date(
-        month: YearMonth,
-        day: Int,
-    ): Int = month.atDay(day.coerceIn(1, month.lengthOfMonth())).toActualDate()
-
-    private fun LocalDate.toActualDate(): Int = year * 10000 + monthValue * 100 + dayOfMonth
 }
