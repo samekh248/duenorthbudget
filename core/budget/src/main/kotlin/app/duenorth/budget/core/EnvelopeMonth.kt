@@ -119,12 +119,27 @@ class EnvelopeBook(
         categoryId: String,
         enabled: Boolean,
     ) {
+        // Rollover lives beside the budgeted amount, in reflect_budgets on a tracking file, as Actual keeps it.
+        val tracking =
+            session
+                .query("SELECT value FROM preferences WHERE id = 'budgetType'")
+                .firstOrNull()
+                ?.str("value") == "tracking"
+        val table = if (tracking) "reflect_budgets" else "zero_budgets"
+        val existing =
+            session
+                .query("SELECT id FROM $table WHERE month = ? AND category = ?", listOf(month, categoryId))
+                .firstOrNull()
+                ?.str("id")
+        if (existing != null) {
+            SyncSchema.recordLocal(session, clock, table, existing, "carryover", if (enabled) "1" else "0")
+            return
+        }
         val id = BudgetEdits.assignmentId(month, categoryId)
-        SyncSchema.recordLocal(session, clock, "zero_budgets", id, "month", month.toString())
-        SyncSchema.recordLocal(session, clock, "zero_budgets", id, "category", categoryId)
-        SyncSchema.recordLocal(session, clock, "zero_budgets", id, "carryover", if (enabled) "1" else "0")
-        val budgeted = readBudgeted(month, categoryId)
-        SyncSchema.recordLocal(session, clock, "zero_budgets", id, "amount", budgeted.toString())
+        SyncSchema.recordLocal(session, clock, table, id, "month", month.toString())
+        SyncSchema.recordLocal(session, clock, table, id, "category", categoryId)
+        SyncSchema.recordLocal(session, clock, table, id, "carryover", if (enabled) "1" else "0")
+        SyncSchema.recordLocal(session, clock, table, id, "amount", "0")
     }
 
     fun setHold(

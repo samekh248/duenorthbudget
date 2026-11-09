@@ -362,7 +362,9 @@ class UndoEveryEditTest {
         )
     }
 
-    private val skip = setOf("messages", "sync_state", "conflicts", "messages_crdt", "messages_clock")
+    // Link rows outlive the category or payee they point at, as in Actual, so undoing a create leaves them.
+    private val skip =
+        setOf("messages", "sync_state", "conflicts", "messages_crdt", "messages_clock", "category_mapping", "payee_mapping")
 
     private val localKeys = listOf("dueNorthReconcile:", "dueNorthStatement", ImportBatch.PREFERENCE_ID)
 

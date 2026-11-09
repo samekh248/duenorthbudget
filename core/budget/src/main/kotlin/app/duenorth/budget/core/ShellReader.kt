@@ -298,6 +298,7 @@ object ShellReader {
                     id = row.str("id").orEmpty(),
                     isIncome = row.bool("is_income"),
                     sortOrder = row.long("sort_order").toDouble(),
+                    hidden = row.bool("hidden"),
                 )
             }
         val categoryFacts =
@@ -306,6 +307,7 @@ object ShellReader {
                     id = row.str("id").orEmpty(),
                     groupId = row.str("cat_group").orEmpty(),
                     isIncome = row.bool("is_income"),
+                    hidden = row.bool("hidden"),
                 )
             }
         val detailed =

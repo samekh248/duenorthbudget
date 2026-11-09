@@ -11,12 +11,16 @@ object ActualMonthMath {
         val id: String,
         val isIncome: Boolean,
         val sortOrder: Double,
+        /** Tracking leaves hidden groups out of the month's totals, as Actual's `tracking.ts` does. */
+        val hidden: Boolean = false,
     )
 
     data class CategoryFact(
         val id: String,
         val groupId: String,
         val isIncome: Boolean,
+        /** Tracking leaves hidden categories out of their group's sum; envelope still counts them. */
+        val hidden: Boolean = false,
     )
 
     data class AssignmentFact(
@@ -118,17 +122,13 @@ object ActualMonthMath {
         expense: List<CategoryFact>,
         spent: Map<Pair<Int, String>, Long>,
         assignments: List<AssignmentFact>,
-    ): Figures {
-        val available = HashMap<String, Long>()
-        for (category in expense) {
-            val balance = assignment(assignments, target, category.id).amount + (spent[target to category.id] ?: 0L)
-            available[category.groupId] = (available[category.groupId] ?: 0L) + balance
-        }
-        val shown = groups.filter { !it.isIncome }.map { it.id }.toSet()
-        val header = shown.sumOf { available[it] ?: 0L }
-        return Figures(ShellCopy.BALANCE, header, available.filterKeys { it in shown })
-    }
+    ): Figures = trackingDetailed(target, groups, expense, spent, assignments).figures
 
+    /**
+     * Actual's tracking sheet: `leftover = budgeted + spent + (last month's carryover ? last month's leftover : 0)`,
+     * so a rollover category carries its whole balance, positive or negative. Group and month totals leave out
+     * hidden categories and hidden groups.
+     */
     private fun trackingDetailed(
         target: Int,
         groups: List<GroupFact>,
@@ -136,25 +136,44 @@ object ActualMonthMath {
         spent: Map<Pair<Int, String>, Long>,
         assignments: List<AssignmentFact>,
     ): DetailedFigures {
+        val byKey = assignments.associateBy { it.month to it.categoryId }
+        val carryMonths = assignments.filter { it.carryover }.map { it.month }
+        val first = carryMonths.minOrNull()?.let { minOf(it, target) } ?: target
+        var previousLeft = HashMap<String, Long>()
+        var previousCarry = HashMap<String, Boolean>()
+        var currentLeft = HashMap<String, Long>()
+        for (month in monthsThrough(first, target)) {
+            val left = HashMap<String, Long>()
+            val carry = HashMap<String, Boolean>()
+            for (category in expense) {
+                val row = byKey[month to category.id]
+                val carried = if (previousCarry[category.id] == true) previousLeft[category.id] ?: 0L else 0L
+                left[category.id] = (row?.amount ?: 0L) + (spent[month to category.id] ?: 0L) + carried
+                carry[category.id] = row?.carryover == true
+            }
+            previousLeft = left
+            previousCarry = carry
+            currentLeft = left
+        }
         val stats = HashMap<String, CategoryMonthStat>()
         val available = HashMap<String, Long>()
         for (category in expense) {
-            val budgeted = assignment(assignments, target, category.id).amount
-            val spentMinor = spent[target to category.id] ?: 0L
-            val balance = budgeted + spentMinor
+            val row = byKey[target to category.id]
+            val balance = currentLeft[category.id] ?: 0L
             stats[category.id] =
                 CategoryMonthStat(
                     categoryId = category.id,
                     groupId = category.groupId,
-                    budgetedMinor = budgeted,
-                    spentMinor = spentMinor,
+                    budgetedMinor = row?.amount ?: 0L,
+                    spentMinor = spent[target to category.id] ?: 0L,
                     availableMinor = balance,
-                    carryover = false,
+                    carryover = row?.carryover == true,
                 )
-            available[category.groupId] = (available[category.groupId] ?: 0L) + balance
+            available[category.groupId] = (available[category.groupId] ?: 0L) + if (category.hidden) 0L else balance
         }
         val shown = groups.filter { !it.isIncome }.map { it.id }.toSet()
-        val header = shown.sumOf { available[it] ?: 0L }
+        val counted = groups.filter { !it.isIncome && !it.hidden }.map { it.id }.toSet()
+        val header = counted.sumOf { available[it] ?: 0L }
         return DetailedFigures(
             figures = Figures(ShellCopy.BALANCE, header, available.filterKeys { it in shown }),
             categories = stats,
