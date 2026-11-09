@@ -299,6 +299,12 @@ class SettingsHolder internal constructor(
         host.onBackgroundSyncHours(hours)
     }
 
+    /** Settings → budget → end of month: the last days of a month the assistant offers close out; 0 is off. */
+    fun setCloseOutDays(days: Int) {
+        if (days == state.settings.closeOutDays) return
+        save(state.settings.copy(closeOutDays = days))
+    }
+
     internal fun save(settings: PhoneSettings) {
         host.mutate { it.copy(settings = settings) }
         host.scope.launch(host.io) { host.library.save(settings) }

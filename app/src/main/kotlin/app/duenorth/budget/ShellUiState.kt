@@ -120,6 +120,8 @@ data class ShellUiState(
     val inbox: InboxUi = InboxUi(),
     /** The assistant's own state, kept by [AssistantHolder]. */
     val assistant: AssistantUi = AssistantUi(),
+    /** End-of-month close out's own state, kept by [CloseOutHolder]. */
+    val closeOut: CloseOutUi = CloseOutUi(),
     /** The budget's edit mode, with the box being typed into; null when not editing. */
     val budgetEdit: BudgetEdit? = null,
     /** Set while a transaction form was opened from home (the inbox or its add), so saving it goes back home. */

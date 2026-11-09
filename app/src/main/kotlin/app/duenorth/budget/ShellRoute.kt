@@ -72,6 +72,12 @@ sealed interface ShellRoute {
 
     data object HoldMonth : ShellRoute
 
+    /** End-of-month close out for [month], opened from the assistant: review every category, then fix them one by one. */
+    data class CloseOut(
+        val month: YearMonth,
+    ) : ShellRoute,
+        StackRoute
+
     data class ToBudget(
         val categoryId: String,
     ) : ShellRoute

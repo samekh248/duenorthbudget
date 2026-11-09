@@ -82,17 +82,24 @@ fun AssistantSection(
     working: AssistantUi.Working? = null,
     failed: AssistantUi.Failed? = null,
     formatOptions: FormatOptions = formatOptions(),
+    closeOut: CloseOutCard? = null,
+    onCloseOut: () -> Unit = {},
 ) {
     if (report == null) {
         Box(modifier.fillMaxSize()) { Placeholder() }
         return
     }
+    val money = { minor: Long -> MoneyFormat.format(minor, currency, formatOptions) }
     val findings = report.findings.filter { it.key !in settling || it.key == working?.key }
     if (findings.isEmpty()) {
-        AssistantClear(modifier)
+        Column(modifier.fillMaxSize()) {
+            if (closeOut != null) {
+                CloseOutAssistantCard(closeOut, money, onCloseOut, Modifier.padding(MetroDimens.Gutter))
+            }
+            AssistantClear(Modifier.weight(1f))
+        }
         return
     }
-    val money = { minor: Long -> MoneyFormat.format(minor, currency, formatOptions) }
     val list = rememberLazyListState()
     LaunchedEffect(list) { snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) } }
     val byKind = AssistantReport(findings).byKind()
@@ -107,6 +114,9 @@ fun AssistantSection(
                 Metro.accent.text,
                 "assistant-count",
             )
+        }
+        if (closeOut != null) {
+            item(key = "close-out") { CloseOutAssistantCard(closeOut, money, onCloseOut, Modifier.padding(top = 12.dp)) }
         }
         // With one kind there is nothing to scan past, so it starts open; a tap still closes it.
         val alone = byKind.size == 1

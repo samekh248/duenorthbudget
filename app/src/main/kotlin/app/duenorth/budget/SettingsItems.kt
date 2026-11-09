@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.BackgroundSync
 import app.duenorth.budget.core.BudgetSummary
+import app.duenorth.budget.core.CloseOutWindow
 import app.duenorth.budget.core.DateFormats
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.FormatPrefs
@@ -100,6 +101,8 @@ internal fun BudgetItem(
     onOpenServer: (RemoteFile) -> Unit = {},
     error: String? = null,
     manage: SettingsManage = SettingsManage(),
+    closeOutDays: Int = CloseOutWindow.DEFAULT_DAYS,
+    onCloseOutDays: (Int) -> Unit = {},
 ) {
     val open = budgets.find { it.id == openBudgetId }
     // One box is both the open budget and the way to another: the phone's budgets, then the server's.
@@ -165,6 +168,16 @@ internal fun BudgetItem(
                 color = Metro.colors.secondary,
             )
         }
+        // The assistant's end-of-month close out: when its card shows, or never.
+        SettingsHeading(SettingsCopy.CLOSE_OUT, tag = "settings-close-out")
+        ListPicker(
+            CloseOutWindow.CHOICES,
+            closeOutDays.takeIf { it in CloseOutWindow.CHOICES } ?: CloseOutWindow.DEFAULT_DAYS,
+            "settings-close-out-picker",
+            CloseOutWindow::label,
+            onCloseOutDays,
+        )
+        MetroText(SettingsCopy.CLOSE_OUT_HINT, Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
     }
 }
 

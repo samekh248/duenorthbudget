@@ -414,6 +414,7 @@ fun DueNorthApp(model: ShellViewModel) {
                         is ShellRoute.MoveCategory -> MoveCategoryRoute(route, state, model, fill)
                         is ShellRoute.CoverCategory -> CoverCategoryRoute(route, state, model, fill)
                         ShellRoute.HoldMonth -> HoldMonthRoute(state, model, fill)
+                        is ShellRoute.CloseOut -> CloseOutRoute(state, model, fill)
                         ShellRoute.StarterCategories ->
                             StarterCategoriesScreen(
                                 error = state.editError,

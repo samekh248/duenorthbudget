@@ -325,3 +325,31 @@ internal fun ManageCategoriesRoute(
         )
     }
 }
+
+@Composable
+internal fun CloseOutRoute(
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val shell = state.shell
+    if (shell == null) {
+        Placeholder()
+        return
+    }
+    val closeOut = model.closeOut
+    CloseOutScreen(
+        ui = state.closeOut,
+        currency = shell.currency,
+        onFix = closeOut::startFix,
+        onReview = closeOut::showReview,
+        onSkip = closeOut::skip,
+        onCover = closeOut::cover,
+        onRollOver = closeOut::rollOver,
+        onReturn = closeOut::returnToBudget,
+        onTakeFromNext = closeOut::takeFromNext,
+        onShown = closeOut::markShown,
+        onDone = { model.back() },
+        modifier = modifier,
+    )
+}
