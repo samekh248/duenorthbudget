@@ -61,6 +61,10 @@ internal fun SettingsRoute(
         onRequestAdvanced = model.settingsUi::requestAdvanced,
         phoneSettings = state.settings,
         onBackgroundSyncHours = model.settingsUi::setBackgroundSyncHours,
+        onCloseOutDays = {
+            model.settingsUi.setCloseOutDays(it)
+            model.closeOut.loadSummary()
+        },
         scroll = state.settingsUi.scroll,
         onScroll = model.settingsUi::saveScroll,
         remoteFiles = state.remoteFiles,

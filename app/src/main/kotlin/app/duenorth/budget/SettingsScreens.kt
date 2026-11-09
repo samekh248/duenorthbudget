@@ -68,6 +68,8 @@ enum class EncryptionMode {
 object SettingsCopy {
     const val TITLE = "SETTINGS"
     const val NEW = "new"
+    const val CLOSE_OUT = "end of month"
+    const val CLOSE_OUT_HINT = "the assistant offers to close out the month: cover what went over and roll over what is left."
     const val PAYEES = "payees"
     const val ADD_SERVER = "add"
     const val SERVER_BUDGETS = "server budgets"
@@ -166,6 +168,7 @@ fun SettingsScreen(
     onExperimentalFeature: (ExperimentalFeature, Boolean) -> Unit = { _, _ -> },
     phoneSettings: PhoneSettings = PhoneSettings(),
     onBackgroundSyncHours: (Int) -> Unit = {},
+    onCloseOutDays: (Int) -> Unit = {},
     scroll: Map<SettingsPage, Int> = emptyMap(),
     onScroll: (SettingsPage, Int) -> Unit = { _, _ -> },
     remoteFiles: List<RemoteFile> = emptyList(),
@@ -197,6 +200,8 @@ fun SettingsScreen(
                                 onOpenServer = onOpenServer,
                                 error = budgetError,
                                 manage = manage,
+                                closeOutDays = phoneSettings.closeOutDays,
+                                onCloseOutDays = onCloseOutDays,
                             )
                         SettingsPage.SERVER ->
                             ServerItem(

@@ -140,6 +140,9 @@ fun HomePivot(
     assistant: AssistantUi = AssistantUi(),
     onAssistant: (Finding, FindingAction) -> Unit = { _, _ -> },
     onAssistantMore: (FindingKind) -> Unit = {},
+    /** The month the assistant offers to close out, while its last days run; null shows no card. */
+    closeOut: CloseOutCard? = null,
+    onCloseOut: () -> Unit = {},
     /** The unassigned figure's menu of template runs. */
     distribute: DistributeActions = DistributeActions(),
 ) {
@@ -268,6 +271,8 @@ fun HomePivot(
                             working = assistant.working,
                             failed = assistant.failed,
                             formatOptions = formatOptions,
+                            closeOut = closeOut,
+                            onCloseOut = onCloseOut,
                         )
                     }
                 },

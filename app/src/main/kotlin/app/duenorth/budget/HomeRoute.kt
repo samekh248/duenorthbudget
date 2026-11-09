@@ -31,6 +31,8 @@ internal fun HomeRoute(
         assistant = state.assistant,
         onAssistant = model.assistant::act,
         onAssistantMore = model.assistant::toggleExpanded,
+        closeOut = state.closeOut.summary?.let { CloseOutCard(it, state.closeOut.summaryClosed) },
+        onCloseOut = model.closeOut::open,
         onInbox = model.inbox::openPicker,
         onAcceptInbox = model.inbox::accept,
         inboxFiled = state.inbox.filed,

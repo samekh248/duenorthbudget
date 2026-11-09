@@ -242,6 +242,9 @@ class ShellViewModel(
     /** The assistant: what the checks found, and their fixes. */
     val assistant: AssistantHolder = AssistantHolder(host, register, reconcile, bankSync, envelopes, schedules, budgetFiles)
 
+    /** End-of-month close out: the assistant's card and the page that settles every category. */
+    val closeOut: CloseOutHolder = CloseOutHolder(host)
+
     /** Bank link: linking an account to a bank, and repairing a link. */
     val bankLink: BankLinkHolder = BankLinkHolder(host)
 
@@ -511,6 +514,11 @@ class ShellViewModel(
             return true
         }
         if (current.route == ShellRoute.Create && current.shell == null) return false
+        // A close out card goes back to the review it came from before the page closes.
+        if (current.route is ShellRoute.CloseOut && current.closeOut.step != null) {
+            closeOut.showReview()
+            return true
+        }
         if (current.route.isRegisterFlow() || current.route.isHomeFlow()) {
             val previous = if (history.isEmpty()) ShellRoute.Home else history.removeLast()
             val leavePin =
@@ -939,6 +947,7 @@ class ShellViewModel(
             warmMonthWindow()
             // The checks read the whole budget, so they run after the screen has what it needs.
             assistant.load()
+            closeOut.loadSummary()
         }
         getStarted.retireFinished()
     }
