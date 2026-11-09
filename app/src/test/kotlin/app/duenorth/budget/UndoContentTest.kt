@@ -63,7 +63,8 @@ class UndoContentTest {
         model.month.undo()
         await { model.state.value.route == ShellRoute.Conflicts }
         assertTrue(
-            model.state.value.monthUi.notice!!
+            model.state.value.toast!!
+                .message!!
                 .contains(MonthActionCopy.UNDO_CONFLICT),
         )
         await { model.state.value.undoLabel == null }

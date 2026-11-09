@@ -147,8 +147,14 @@ class SchedulesHolder internal constructor(
             }
         host.scope.launch {
             when (val result = withContext(host.io) { host.library.saveSchedule(budgetId, draft) }) {
-                is ScheduleWriteResult.Rejected -> host.mutate { it.copy(editError = result.reason) }
-                else -> rules.afterWrite(budgetId, leave = true)
+                is ScheduleWriteResult.Rejected -> {
+                    host.toastFailure(ToastCopy.SCHEDULE_SAVE_FAILED, result.reason)
+                    host.mutate { it.copy(editError = result.reason) }
+                }
+                else -> {
+                    host.toastSuccess(ToastCopy.SCHEDULE_SAVED, draft.name.takeIf { it.isNotBlank() })
+                    rules.afterWrite(budgetId, leave = true)
+                }
             }
         }
     }
@@ -162,6 +168,7 @@ class SchedulesHolder internal constructor(
         val budgetId = state.settings.openBudgetId ?: return
         host.scope.launch {
             withContext(host.io) { host.library.deleteSchedule(budgetId, scheduleId) }
+            host.toastSuccess(ToastCopy.SCHEDULE_DELETED)
             rules.afterWrite(budgetId, leave = true)
             // Deleted from the editor: the schedule's page under it is gone too.
             if ((state.route as? ShellRoute.ScheduleDetails)?.scheduleId == scheduleId) host.back()
@@ -185,11 +192,14 @@ class SchedulesHolder internal constructor(
     fun skip(scheduleId: String) {
         val budgetId = state.settings.openBudgetId ?: return
         host.scope.launch {
-            when (withContext(host.io) { host.library.skipSchedule(budgetId, scheduleId) }) {
+            when (val result = withContext(host.io) { host.library.skipSchedule(budgetId, scheduleId) }) {
                 is ScheduleWriteResult.Skipped,
                 is ScheduleWriteResult.Posted,
-                -> host.refresh()
-                is ScheduleWriteResult.Rejected -> Unit
+                -> {
+                    host.toastSuccess(ToastCopy.SCHEDULE_SKIPPED)
+                    host.refresh()
+                }
+                is ScheduleWriteResult.Rejected -> host.toastFailure(ToastCopy.SCHEDULE_SKIP_FAILED, result.reason)
                 is ScheduleWriteResult.ConfirmDuplicate -> Unit
             }
         }
@@ -213,14 +223,18 @@ class SchedulesHolder internal constructor(
         val budgetId = state.settings.openBudgetId ?: return
         host.scope.launch {
             when (
-                withContext(host.io) {
-                    host.library.postSchedule(budgetId, scheduleId, forceDuplicate)
-                }
+                val result =
+                    withContext(host.io) {
+                        host.library.postSchedule(budgetId, scheduleId, forceDuplicate)
+                    }
             ) {
-                is ScheduleWriteResult.Posted -> host.refresh()
+                is ScheduleWriteResult.Posted -> {
+                    host.toastSuccess(ToastCopy.SCHEDULE_POSTED)
+                    host.refresh()
+                }
                 is ScheduleWriteResult.ConfirmDuplicate ->
                     host.mutate { it.copy(schedulesUi = it.schedulesUi.copy(duplicateId = scheduleId)) }
-                is ScheduleWriteResult.Rejected -> Unit
+                is ScheduleWriteResult.Rejected -> host.toastFailure(ToastCopy.SCHEDULE_POST_FAILED, result.reason)
                 is ScheduleWriteResult.Skipped -> host.refresh()
             }
         }

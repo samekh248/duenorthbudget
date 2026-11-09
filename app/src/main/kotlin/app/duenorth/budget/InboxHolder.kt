@@ -168,6 +168,11 @@ class InboxHolder internal constructor(
         update { it.copy(selection = null) }
         host.launchWrite { id ->
             val result = withContext(host.io) { host.library.deleteTransactions(id, rows.map { it.id }, false) }
+            host.toastFor(
+                result,
+                if (rows.size == 1) ToastCopy.TRANSACTION_DELETED else ToastCopy.TRANSACTIONS_DELETED,
+                ToastCopy.TRANSACTION_DELETE_FAILED,
+            )
             host.publish(result, rows.first().accountId, stayOnRegister = false)
         }
     }
@@ -184,6 +189,7 @@ class InboxHolder internal constructor(
         update { it.copy(selection = null) }
         host.launchWrite { id ->
             val result = withContext(host.io) { host.library.mergeTransactions(id, rows.map { it.id }, false) }
+            host.toastFor(result, ToastCopy.TRANSACTIONS_MERGED, ToastCopy.MERGE_FAILED)
             host.publish(result, rows.first().accountId, stayOnRegister = false)
         }
     }

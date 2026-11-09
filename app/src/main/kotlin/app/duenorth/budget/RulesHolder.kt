@@ -49,8 +49,14 @@ class RulesHolder internal constructor(
         val budgetId = state.settings.openBudgetId ?: return
         host.scope.launch {
             when (val result = withContext(host.io) { host.library.saveRule(budgetId, draft) }) {
-                is RuleSaveResult.Saved -> afterWrite(budgetId, leave = true)
-                is RuleSaveResult.Rejected -> host.mutate { it.copy(editError = result.reason) }
+                is RuleSaveResult.Saved -> {
+                    host.toastSuccess(ToastCopy.RULE_SAVED)
+                    afterWrite(budgetId, leave = true)
+                }
+                is RuleSaveResult.Rejected -> {
+                    host.toastFailure(ToastCopy.RULE_SAVE_FAILED, result.reason)
+                    host.mutate { it.copy(editError = result.reason) }
+                }
             }
         }
     }
@@ -65,6 +71,7 @@ class RulesHolder internal constructor(
         val fromEditor = (state.route as? ShellRoute.RuleEditor)?.ruleId == ruleId
         host.scope.launch {
             withContext(host.io) { host.library.deleteRule(budgetId, ruleId) }
+            host.toastSuccess(ToastCopy.RULE_DELETED)
             afterWrite(budgetId, leave = fromEditor)
         }
     }

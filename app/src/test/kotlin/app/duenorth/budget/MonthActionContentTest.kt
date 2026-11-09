@@ -335,8 +335,11 @@ class MonthActionContentTest {
         assertEquals(25_000L, budgeted(library, budgetId, month, "c-food"))
 
         model.month.undo()
-        // The label clears when the step is popped; the notice follows the write.
-        awaitMain { model.state.value.monthUi.notice == "${MonthActionCopy.UNDONE} ${UndoCopy.ASSIGN}" }
+        // The label clears when the step is popped; the toast follows the write.
+        awaitMain {
+            model.state.value.toast
+                ?.title == "${MonthActionCopy.UNDONE} ${UndoCopy.ASSIGN}"
+        }
         awaitMain { model.state.value.undoLabel == null }
         assertEquals(220_000L, budgeted(library, budgetId, month, "c-food"))
         awaitMain {

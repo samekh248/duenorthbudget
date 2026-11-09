@@ -14,8 +14,6 @@ import kotlinx.coroutines.withContext
 
 /** The month actions' own state, inside [ShellUiState.monthUi]. */
 data class MonthUi(
-    /** What the last month action or undo said, shown over the month. */
-    val notice: String? = null,
     /** The fill that asks first, while it asks. */
     val fillConfirm: FillConfirm? = null,
 )
@@ -50,19 +48,22 @@ class MonthHolder internal constructor(
         }
         val shell = state.shell ?: return
         val month = host.editorMonth()
-        host.mutate { it.copy(monthUi = it.monthUi.copy(notice = null, fillConfirm = null)) }
+        host.mutate { it.copy(monthUi = it.monthUi.copy(fillConfirm = null)) }
         host.scope.launch {
             val result = withContext(host.io) { host.sync.fillMonth(shell.budgetId, month, kind, confirmed) }
             when (result) {
-                MonthFillResult.Filled -> host.afterMonthWrite(shell.budgetId)
-                MonthFillResult.NothingToCopy -> host.mutate { it.copy(monthUi = it.monthUi.copy(notice = MonthFillCopy.NOTHING_TO_COPY)) }
+                MonthFillResult.Filled -> {
+                    host.toastSuccess(ToastCopy.MONTH_FILLED)
+                    host.afterMonthWrite(shell.budgetId)
+                }
+                MonthFillResult.NothingToCopy -> host.toastFailure(ToastCopy.NOTHING_DONE, MonthFillCopy.NOTHING_TO_COPY)
                 is MonthFillResult.NeedsConfirm ->
                     host.mutate {
                         it.copy(
                             monthUi = it.monthUi.copy(fillConfirm = FillConfirm(kind, result.reason)),
                         )
                     }
-                is MonthFillResult.Rejected -> host.mutate { it.copy(monthUi = it.monthUi.copy(notice = result.reason)) }
+                is MonthFillResult.Rejected -> host.toastFailure(ToastCopy.MONTH_FILL_FAILED, result.reason)
             }
         }
     }
@@ -115,10 +116,14 @@ class MonthHolder internal constructor(
             val result = withContext(host.io) { host.sync.transferToBudget(shell.budgetId, categoryId, month, amountText) }
             when (result) {
                 MonthFillResult.Filled -> {
+                    host.toastSuccess(ToastCopy.MOVED_TO_BUDGET, category.name)
                     host.back()
                     host.afterMonthWrite(shell.budgetId)
                 }
-                is MonthFillResult.Rejected -> host.mutate { it.copy(shell = shell, editError = result.reason) }
+                is MonthFillResult.Rejected -> {
+                    host.toastFailure(ToastCopy.MOVE_FAILED, result.reason)
+                    host.mutate { it.copy(shell = shell, editError = result.reason) }
+                }
                 is MonthFillResult.NeedsConfirm, MonthFillResult.NothingToCopy -> host.mutate { it.copy(shell = shell) }
             }
         }
@@ -147,13 +152,12 @@ class MonthHolder internal constructor(
         val accountId = (state.route as? ShellRoute.Register)?.accountId
         host.scope.launch {
             val result = withContext(host.io) { host.sync.undo(budgetId) }
-            val notice =
-                when (result) {
-                    is UndoResult.Undone -> "${MonthActionCopy.UNDONE} ${result.label}"
-                    is UndoResult.Conflict -> "${result.label}: ${MonthActionCopy.UNDO_CONFLICT}"
-                    UndoResult.Empty -> null
-                }
-            host.mutate { it.copy(monthUi = it.monthUi.copy(notice = notice)) }
+            when (result) {
+                // Undo's own toast has no undo: redo is not a step the menu offers either.
+                is UndoResult.Undone -> host.toastSuccess("${MonthActionCopy.UNDONE} ${result.label}", undo = false)
+                is UndoResult.Conflict -> host.toastFailure(ToastCopy.UNDO_FAILED, "${result.label}: ${MonthActionCopy.UNDO_CONFLICT}")
+                UndoResult.Empty -> Unit
+            }
             if (result is UndoResult.Conflict) {
                 // The changed cell is listed with the server's value (contracts/undo.md).
                 val conflicts = withContext(host.io) { host.sync.conflicts(budgetId) }

@@ -35,7 +35,7 @@ class MonthHolderTest {
     fun undoWithNothingToUndoSaysNothing() {
         val host = host("month-holder-undo")
         MonthHolder(host).undo()
-        assertEquals(null, host.state.value.monthUi.notice)
+        assertEquals(null, host.state.value.toast)
     }
 
     private fun host(name: String): FakeShellHost {
