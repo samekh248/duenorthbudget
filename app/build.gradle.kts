@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.roborazzi)
+    alias(libs.plugins.baselineprofile)
 }
 
 android {
@@ -77,6 +78,15 @@ android {
         compose = true
     }
 
+    // The baseline profile plugin adds two release copies the :benchmark module drives: nonMinifiedRelease
+    // (records the profile) and benchmarkRelease (measures it). Both build what release builds, plus a
+    // seed entry point (src/benchmark) that writes a sample budget, so a benchmark opens on a real month.
+    sourceSets {
+        listOf("nonMinifiedRelease", "benchmarkRelease").forEach { name ->
+            maybeCreate(name).kotlin.srcDirs("src/release/kotlin", "src/benchmark/kotlin")
+        }
+    }
+
     testOptions {
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
@@ -86,6 +96,28 @@ android {
             )
         }
     }
+}
+
+// Benchmark builds never ship, so they always use the shared debug key, and the shell may trace them.
+androidComponents {
+    finalizeDsl { android ->
+        listOf("nonMinifiedRelease", "benchmarkRelease").forEach { name ->
+            android.buildTypes.findByName(name)?.apply {
+                signingConfig = android.signingConfigs.getByName("debug")
+                isProfileable = true
+            }
+            // Set here, after the plugin made the build type, or its default manifest path wins.
+            android.sourceSets
+                .getByName(name)
+                .manifest
+                .srcFile("src/benchmark/AndroidManifest.xml")
+        }
+    }
+}
+
+baselineProfile {
+    // The profile is generated on demand (./gradlew :app:generateBaselineProfile) and committed, not on every build.
+    automaticGenerationDuringBuild = false
 }
 
 kotlin {
@@ -106,6 +138,11 @@ dependencies {
     implementation(libs.security.crypto)
     implementation(libs.browser)
     implementation(libs.work.runtime)
+    // Installs the baseline profile on sideloaded APKs too, where no store compiles it ahead of time.
+    implementation(libs.profileinstaller)
+    baselineProfile(project(":benchmark"))
+    "nonMinifiedReleaseImplementation"(project(":core:samples"))
+    "benchmarkReleaseImplementation"(project(":core:samples"))
 
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.junit4)

@@ -1,0 +1,83 @@
+name: Benchmarks
+
+# Principle I's budgets as a check: records the baseline profile, then measures cold start and frame
+# timing on an emulator and fails when a result is over benchmark/budgets.json. Its own workflow, so the
+# main CI stays fast; it runs when app code or the build changes.
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "core/**"
+      - "benchmark/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - ".github/workflows/benchmark.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The runner has no GPU, so the emulator draws in software; one emulator at a time keeps timings steady.
+  GMD_FLAGS: >-
+    -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
+    -Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices=1
+    -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=20
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # Records the profile into app/src/release/generated/baselineProfiles, so the benchmarks below
+      # measure this change's profile. A difference from the committed one is uploaded to commit.
+      - name: Baseline profile
+        run: ./gradlew :app:generateBaselineProfile $GMD_FLAGS
+
+      - name: Startup and scroll benchmarks
+        run: >-
+          ./gradlew :benchmark:pixel6Api34BenchmarkReleaseAndroidTest $GMD_FLAGS
+          -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.enabledRules=Macrobenchmark
+
+      - name: Check budgets
+        run: python3 benchmark/check_budgets.py benchmark/build
+
+      - name: Profile changed?
+        if: always()
+        run: git diff --stat -- app/src/release/generated || true
+
+      - name: Upload baseline profile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-profile
+          path: app/src/release/generated/baselineProfiles
+          if-no-files-found: ignore
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmark/build/outputs/managed_device_android_test_additional_output
+            benchmark/build/reports/androidTests
+          if-no-files-found: ignore

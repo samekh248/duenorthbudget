@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only the benchmark build types carry this: release and debug never see the seed entry point. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Exported so the benchmark's shell can start it with am start; nothing that ships has it. -->
+        <activity
+            android:name=".BenchmarkSeedActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+    </application>
+</manifest>
