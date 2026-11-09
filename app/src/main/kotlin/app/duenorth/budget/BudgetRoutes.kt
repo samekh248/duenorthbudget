@@ -227,6 +227,7 @@ internal fun TemplateEditorRoute(
             month = shell.month,
             currency = shell.currency,
             schedules = state.templates.schedules,
+            scheduleInfo = state.templates.scheduleInfo,
             sources =
                 listOf(
                     PercentSource(TemplateLines.ALL_INCOME, TemplateLines.ALL_INCOME),

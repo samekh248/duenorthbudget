@@ -10,6 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.LimitPeriod
 import app.duenorth.budget.core.RepeatUnit
+import app.duenorth.budget.core.ScheduleRepeat
+import app.duenorth.budget.core.ScheduleSummary
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplateAdjustment
 import app.duenorth.budget.core.TemplateKind
@@ -93,13 +95,51 @@ class TemplateEditorScreenshotTest {
             NewerForm(
                 TemplateKind.SCHEDULE,
                 Template.Schedule("Rent", full = false, priority = 1, adjustment = TemplateAdjustment(BigDecimal("5"), percent = true)),
+                info = mapOf("Rent" to schedule("Rent", -11_905, ScheduleRepeat.MONTHLY, 1, 20261103, approx = true)),
             )
         }
+
+    @Test
+    fun rareScheduleForm() =
+        every("template_form_schedule_rare") {
+            NewerForm(
+                TemplateKind.SCHEDULE,
+                Template.Schedule("Car insurance", full = false, priority = 1),
+                info = mapOf("Car insurance" to schedule("Car insurance", -60_000, ScheduleRepeat.MONTHLY, 6, 20270414)),
+                preview = 8_571L,
+            )
+        }
+
+    private fun schedule(
+        name: String,
+        amount: Long,
+        repeat: ScheduleRepeat,
+        interval: Int,
+        next: Int,
+        approx: Boolean = false,
+    ) = ScheduleSummary(
+        name.lowercase(),
+        name,
+        "checking",
+        "Checking",
+        name,
+        amount,
+        if (approx) "isapprox" else "is",
+        "Bills",
+        next,
+        completed = false,
+        postsTransaction = false,
+        repeat = repeat,
+        interval = interval,
+        dates = listOf(next),
+    )
 
     @Composable
     private fun NewerForm(
         kind: TemplateKind,
         template: Template,
+        info: Map<String, ScheduleSummary> = emptyMap(),
+        preview: Long = 12_500L,
     ) {
         TemplateEditorScreen(
             categoryName = "Food",
@@ -108,12 +148,13 @@ class TemplateEditorScreenshotTest {
             isNew = false,
             month = TemplateSamples.october,
             currency = TemplateSamples.shell.currency,
-            schedules = listOf("Rent"),
+            schedules = info.keys.toList().ifEmpty { listOf("Rent") },
             sources = emptyList(),
-            preview = template to 12_500L,
+            preview = template to preview,
             onPreview = {},
             onSave = {},
             onRemove = {},
+            scheduleInfo = info,
         )
     }
 

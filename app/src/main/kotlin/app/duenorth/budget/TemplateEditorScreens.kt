@@ -50,6 +50,7 @@ import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.LimitPeriod
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.RepeatUnit
+import app.duenorth.budget.core.ScheduleSummary
 import app.duenorth.budget.core.Template
 import app.duenorth.budget.core.TemplateAdjustment
 import app.duenorth.budget.core.TemplateKind
@@ -94,7 +95,7 @@ object TemplateEditorCopy {
     const val REMOVE = "remove template"
     const val REMOVE_LINE = "remove line"
     const val ORDER = "order"
-    const val ORDER_HINT = "lower numbers are given money first, across every category"
+    const val ORDER_HINT = "lower numbers get money first"
     const val PREVIEW = "this month"
     const val NEEDS = "fill in the amount"
     const val NO_SCHEDULES = "no schedules yet. add one under accounts, schedules."
@@ -609,6 +610,7 @@ fun TemplateEditorScreen(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier,
     automations: Boolean = false,
+    scheduleInfo: Map<String, ScheduleSummary> = emptyMap(),
 ) {
     val prefs = LocalFormatPrefs.current
     val options = formatOptions()
@@ -709,7 +711,6 @@ fun TemplateEditorScreen(
     var lookBack by remember(initial) { mutableStateOf(((initial as? Template.Copy)?.lookBack ?: 1).toString()) }
     var weight by remember(initial) { mutableStateOf(plain((initial as? Template.Remainder)?.weight ?: BigDecimal.ONE)) }
     val initialAdjustment = (initial as? Template.Schedule)?.adjustment ?: (initial as? Template.Average)?.adjustment
-    val adjusts = listOf("no change", "increase", "decrease")
     var adjust by remember(initial) {
         mutableStateOf(
             when {
@@ -868,14 +869,40 @@ fun TemplateEditorScreen(
             }
         }
 
+        // Exactly, more or less; then how much, with its unit on the same line, and what a percent is of.
         @Composable
-        fun adjustFields() {
-            label("adjust")
-            MetroComboBox(adjusts.indices.toList(), adjust, { adjusts[it] }, { adjust = it }, "template-adjust")
+        fun adjustFields(of: String?) {
+            label(TemplateAdjustCopy.BUDGET)
+            MetroSegmentedToggle(TemplateAdjustCopy.WAYS, adjust, { adjust = it }, "template-adjust")
             if (adjust != 0) {
-                label(if (adjust == 1) "increase by" else "decrease by")
-                MetroField(adjustBy, { adjustBy = it }, "10", Modifier.testTag("template-adjust-by"), keyboardOptions = number)
-                MetroSegmentedToggle("percent", "amount", adjustPercent, { adjustPercent = it }, "template-adjust-percent")
+                label(if (adjust == 1) TemplateAdjustCopy.MORE_BY else TemplateAdjustCopy.LESS_BY)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                    MetroField(
+                        adjustBy,
+                        { adjustBy = it },
+                        "10",
+                        Modifier.weight(1f).testTag("template-adjust-by"),
+                        keyboardOptions = number,
+                    )
+                    MetroSegmentedToggle(
+                        "%",
+                        currency.symbol.ifBlank { currency.code },
+                        adjustPercent,
+                        { adjustPercent = it },
+                        "template-adjust-percent",
+                    )
+                }
+                val problem = TemplateAdjustCopy.problem(adjustBy, adjust == 2, adjustPercent, adjustBad)
+                when {
+                    problem != null ->
+                        MetroText(
+                            problem,
+                            Metro.typography.caption,
+                            Modifier.testTag("template-adjust-problem"),
+                            color = Metro.accent.text,
+                        )
+                    adjustPercent && of != null -> MetroText("of $of", Metro.typography.caption, color = Metro.colors.secondary)
+                }
             }
         }
         when (kind) {
@@ -938,9 +965,21 @@ fun TemplateEditorScreen(
                     val choices = if (schedule.isBlank() || schedule in schedules) schedules else listOf(schedule) + schedules
                     MetroComboBox(choices, schedule, { it }, { schedule = it }, "template-schedule")
                 }
-                label("when it comes less often than monthly")
-                MetroSegmentedToggle("save up ahead", "only when due", !full, { full = !it }, "template-full")
-                adjustFields()
+                val info = scheduleInfo[schedule]
+                if (info != null) {
+                    MetroText(
+                        ScheduleFacts.line(info, currency, options),
+                        Metro.typography.caption,
+                        Modifier.testTag("template-schedule-facts"),
+                        color = Metro.colors.secondary,
+                    )
+                }
+                // A monthly or more frequent schedule budgets the same either way, so it asks only when it matters.
+                if (info == null || ScheduleFacts.lessThanMonthly(info)) {
+                    label(info?.let { ScheduleFacts.cadenceHeading(it) } ?: "when it comes less often than monthly")
+                    DueChoices(info, full, month, currency, options, adjustment) { full = it }
+                }
+                adjustFields(info?.let { "the schedule's ${ScheduleFacts.money(it, currency, options)}" })
             }
             TemplateKind.PERCENT -> {
                 label("percent")
@@ -954,7 +993,7 @@ fun TemplateEditorScreen(
             TemplateKind.AVERAGE -> {
                 label("months to average")
                 MetroField(months, { months = it }, "3", Modifier.testTag("template-months"), keyboardOptions = whole)
-                adjustFields()
+                adjustFields("the average")
             }
             TemplateKind.COPY -> {
                 label("months ago")
@@ -970,19 +1009,29 @@ fun TemplateEditorScreen(
                 MetroField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), keyboardOptions = number)
             }
         }
+        val previewAmount = preview?.takeIf { it.first == draft }?.second
+        // A schedule shows its sum before its order: the bill, the change, and what this month gets.
+        if (kind == TemplateKind.SCHEDULE) {
+            Spacer(Modifier.height(12.dp))
+            ScheduleReceipt(draft as? Template.Schedule, scheduleInfo[schedule], previewAmount, currency, options)
+        }
         if (initial.priority != null) {
-            label(TemplateEditorCopy.ORDER)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    MetroText(TemplateEditorCopy.ORDER, Metro.typography.body)
+                    MetroText(TemplateEditorCopy.ORDER_HINT, Metro.typography.caption, color = Metro.colors.secondary)
+                }
                 Stepper("−", "template-order-down") { priority = (priority - 1).coerceAtLeast(0) }
-                Box(Modifier.width(64.dp), contentAlignment = Alignment.Center) {
+                Box(Modifier.width(48.dp), contentAlignment = Alignment.Center) {
                     MetroText(priority.toString(), Metro.typography.subheader, Modifier.testTag("template-order"))
                 }
                 Stepper("+", "template-order-up") { priority += 1 }
             }
-            MetroText(TemplateEditorCopy.ORDER_HINT, Metro.typography.caption, color = Metro.colors.secondary)
         }
-        Spacer(Modifier.height(12.dp))
-        TemplatePreview(kind, draft, preview?.takeIf { it.first == draft }?.second, month, currency, options)
+        if (kind != TemplateKind.SCHEDULE) {
+            Spacer(Modifier.height(12.dp))
+            TemplatePreview(kind, draft, previewAmount, month, currency, options)
+        }
         // In the app remove sits in the bar's menu.
         if (!isNew && !formSaveOnBar()) {
             Spacer(Modifier.height(12.dp))
