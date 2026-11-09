@@ -577,12 +577,22 @@ class BudgetLibrary(
     fun readRegister(
         budgetId: String,
         accountId: String,
-    ): RegisterPage? = open(budgetId) { RegisterBook(it).read(accountId) }
+    ): RegisterPage? =
+        open(budgetId) { session ->
+            RegisterBook(session).read(accountId)?.let { page ->
+                page.copy(categories = CategoryBalances.attach(session, YearMonth.from(clock.today()), page.categories))
+            }
+        }
 
     fun readCategoryTarget(
         budgetId: String,
         transactionId: String,
-    ): CategoryTarget? = open(budgetId) { RegisterBook(it).categoryTarget(transactionId) }
+    ): CategoryTarget? =
+        open(budgetId) { session ->
+            RegisterBook(session).categoryTarget(transactionId)?.let { target ->
+                target.copy(categories = CategoryBalances.attach(session, YearMonth.from(clock.today()), target.categories))
+            }
+        }
 
     fun saveTransaction(
         budgetId: String,
@@ -1190,7 +1200,12 @@ class BudgetLibrary(
         candidates: List<ParsedImportRow>,
     ): ImportConfirmResult? = edit(budgetId, UndoCopy.IMPORT) { ImportBook(it, ids).confirm(accountId, candidates) }
 
-    fun readImportReview(budgetId: String): ImportReviewPage? = open(budgetId) { ImportBook(it, ids).readReview() }
+    fun readImportReview(budgetId: String): ImportReviewPage? =
+        open(budgetId) { session ->
+            ImportBook(session, ids).readReview()?.let { page ->
+                page.copy(categories = CategoryBalances.attach(session, YearMonth.from(clock.today()), page.categories))
+            }
+        }
 
     fun finishImportReview(budgetId: String) {
         open(budgetId) { ImportBook(it, ids).finishReview() }

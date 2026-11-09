@@ -257,6 +257,8 @@ fun ScheduleEditorScreen(
     onSave: (ScheduleForm) -> Unit,
     modifier: Modifier = Modifier,
     payees: List<String> = emptyList(),
+    /** The budget's currency, for each category's balance; null leaves the balances off. */
+    currency: CurrencySpec? = null,
 ) {
     val prefs = LocalFormatPrefs.current
     var form by remember(draft.id, prefs) { mutableStateOf(ScheduleForm.from(draft, decimals, prefs)) }
@@ -297,7 +299,12 @@ fun ScheduleEditorScreen(
                 "schedule-category-none",
             ) { form = form.copy(categoryId = null) }
             categories.forEach { category ->
-                Choice(category.name, form.categoryId == category.id, "schedule-category-${category.id}") {
+                Choice(
+                    category.name,
+                    form.categoryId == category.id,
+                    "schedule-category-${category.id}",
+                    detail = { CategoryBalance(category.availableMinor, currency, Modifier) },
+                ) {
                     form = form.copy(categoryId = category.id)
                 }
             }

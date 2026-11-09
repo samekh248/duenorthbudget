@@ -50,6 +50,7 @@ internal fun ScheduleEditorRoute(
             onSave = model.schedules::submit,
             modifier = modifier,
             payees = PayeeTypeAhead.names(state.payees.rows),
+            currency = shell.currency,
         )
     }
 }
