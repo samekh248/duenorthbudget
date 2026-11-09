@@ -34,30 +34,34 @@ fun MacrobenchmarkScope.waitForBudget() {
     check(device.wait(Until.hasObject(By.res(INBOX_CONTENT)), WAIT_MS)) { "the open budget never loaded" }
 }
 
-/** Taps the budget header, then returns its category list once it shows. */
-fun MacrobenchmarkScope.openBudgetList(): UiObject2 {
+/** Taps the budget header and waits for its category list. */
+fun MacrobenchmarkScope.openBudgetList() {
     device.findObject(By.res("pivot-header-$BUDGET_ITEM")).click()
-    return checkNotNull(device.wait(Until.findObject(By.res("budget-list")), WAIT_MS)) { "the budget list never appeared" }
+    budgetList()
 }
+
+/** The budget's category list, found fresh: a list found before a recomposition goes stale. */
+fun MacrobenchmarkScope.budgetList(): UiObject2 =
+    checkNotNull(device.wait(Until.findObject(By.res("budget-list")), WAIT_MS)) { "the budget list never appeared" }
 
 /** Flings [list] to its end and back, keeping clear of the system's edge gestures. */
 fun MacrobenchmarkScope.flingThrough(list: UiObject2) {
     list.setGestureMargin(device.displayWidth / 5)
     repeat(FLINGS) {
-        list.fling(Direction.DOWN)
+        (device.findObject(By.res("budget-list")) ?: list).fling(Direction.DOWN)
         device.waitForIdle()
     }
     repeat(FLINGS) {
-        list.fling(Direction.UP)
+        (device.findObject(By.res("budget-list")) ?: list).fling(Direction.UP)
         device.waitForIdle()
     }
 }
 
 /** Swipes the home pivot through every item, the way a person pans across it. */
 fun MacrobenchmarkScope.swipeThroughPivot() {
-    val pivot = device.findObject(By.res("pivot"))
-    pivot.setGestureMargin(device.displayWidth / 5)
     repeat(PIVOT_ITEMS) {
+        val pivot = checkNotNull(device.wait(Until.findObject(By.res("pivot")), WAIT_MS)) { "home never appeared" }
+        pivot.setGestureMargin(device.displayWidth / 5)
         pivot.swipe(Direction.LEFT, 0.8f)
         device.waitForIdle()
     }

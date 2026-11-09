@@ -23,7 +23,8 @@ class BaselineProfileGenerator {
             pressHome()
             startActivityAndWait()
             waitForBudget()
-            flingThrough(openBudgetList())
+            openBudgetList()
+            flingThrough(budgetList())
             swipeThroughPivot()
         }
 }

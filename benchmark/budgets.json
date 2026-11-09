@@ -1,8 +1,8 @@
 {
   "note": "Limits for the CI emulator (Pixel 6, API 34, software GPU). See benchmark/README.md for how they were set.",
   "budgets": {
-    "StartupBenchmark.coldStart*Partial*": {
-      "timeToFullDisplayMs.median": 3000
+    "StartupBenchmark.coldStart?BaselineProfile?": {
+      "timeToFullDisplayMs.median": 2800
     },
     "ScrollBenchmark.budgetScroll": {
       "frameOverrunMs.P90": 50
