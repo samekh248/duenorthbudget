@@ -245,6 +245,9 @@ class RegisterScreenshotTest {
     @Test
     fun pendingFoldedLight() = snapPending("register_pending_folded_light", dark = false, folded = true)
 
+    @Test
+    fun pendingFoldedDark() = snapPending("register_pending_folded_dark", dark = true, folded = true)
+
     private fun snapPending(
         name: String,
         dark: Boolean,

@@ -95,8 +95,8 @@ fun RegisterScreen(
     onNotAMatch: (MatchPair) -> Unit = {},
     search: RegisterSearch? = null,
     onSearch: (RegisterSearch) -> Unit = {},
-    /** Whether the pending section starts open; a tap on its heading folds it. */
-    pendingOpen: Boolean = true,
+    /** Whether the pending section starts open. It starts folded; a tap on its heading opens it. */
+    pendingOpen: Boolean = false,
     /** A row's long-press menu; select is its first line. Null keeps long-press starting select mode. */
     rowMenu: ((RegisterRow) -> List<MetroMenuItem>)? = null,
     /** A transaction to scroll to and flash, as when opened from a category's recent spending. */
@@ -220,7 +220,7 @@ private fun RegisterList(
     onMatch: (MatchPair) -> Unit = {},
     onNotAMatch: (MatchPair) -> Unit = {},
     searching: Boolean = false,
-    pendingOpen: Boolean = true,
+    pendingOpen: Boolean = false,
     /** A row's long-press menu outside select mode; null keeps long-press as select. */
     rowMenu: ((RegisterRow) -> List<MetroMenuItem>)? = null,
     /** Rows that have just arrived (a sync, an import, a new entry) ease into place instead of popping in. */
@@ -247,7 +247,7 @@ private fun RegisterList(
             emptyList()
         }
     val paired = pairs.flatMapTo(mutableSetOf()) { it.ids }
-    // Rows the bank has not posted yet sit apart, above the rest, under a heading that folds them away.
+    // Rows the bank has not posted yet sit apart, above the rest, folded under a heading that opens them.
     val pending = rows.filter { it.pending && it.id !in paired }
     var showPending by rememberSaveable { mutableStateOf(pendingOpen) }
     val listed = rows.filter { it.id !in paired && !it.pending }
@@ -404,10 +404,11 @@ private fun RegisterList(
  * what they come to, and a chevron that folds the rows away.
  */
 @Composable
-private fun PendingHeading(
+internal fun PendingHeading(
     rows: List<RegisterRow>,
     page: RegisterPage,
     open: Boolean,
+    tag: String = "register-pending-heading",
     onToggle: () -> Unit,
 ) {
     val ink = Metro.colors.secondary
@@ -418,7 +419,7 @@ private fun PendingHeading(
             .heightIn(min = MetroDimens.TouchTarget)
             .metroPress(onToggle)
             .semantics { stateDescription = if (open) RegisterCopy.PENDING_OPEN else RegisterCopy.PENDING_FOLDED }
-            .testTag("register-pending-heading"),
+            .testTag(tag),
     ) {
         Box(Modifier.fillMaxWidth().height(2.dp).background(ink.copy(alpha = PENDING_RULE_ALPHA)))
         Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
