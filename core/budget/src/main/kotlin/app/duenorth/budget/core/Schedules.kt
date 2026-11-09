@@ -318,6 +318,8 @@ class SchedulesBook(
                 notes = null,
                 dateIso = schedule.nextIso,
                 schedule = schedule.id,
+                // Actual posts a scheduled transaction uncleared.
+                cleared = false,
             )
         val ruled = rules.applyRules(view, scheduleRuleId = schedule.ruleId)
         payeeName = ruled.payeeName

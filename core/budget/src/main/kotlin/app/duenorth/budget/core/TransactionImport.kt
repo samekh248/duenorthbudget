@@ -263,7 +263,7 @@ class ImportBook(
                 note = row.note,
             )
         val book = RegisterBook(session, ids)
-        val ruled = book.applyRulesForImport(draft)
+        val ruled = book.applyRulesForImport(draft, importedPayee = row.importedPayee ?: row.payee, cleared = !row.pending)
         val payeeId = book.payeeIdForName(ruled.payee)
         book.insertImportedTransaction(
             id = ruled.id,

@@ -75,7 +75,8 @@ class CategorySuggester(
                 .query(
                     """
                     SELECT t.acct AS acct, t.description AS payee_id, p.name AS payee, t.amount AS amount,
-                           t.notes AS notes, t.date AS date
+                           t.notes AS notes, t.date AS date, t.cleared AS cleared, t.reconciled AS reconciled,
+                           t.imported_description AS imported_payee
                     FROM transactions t
                     LEFT JOIN payees p ON p.id = t.description
                     WHERE t.id = ? AND IFNULL(t.tombstone, 0) = 0
@@ -97,6 +98,9 @@ class CategorySuggester(
                             amount = amount,
                             notes = txn.str("notes"),
                             dateIso = ScheduleDates.toIso(txn.long("date").toInt()),
+                            cleared = txn.bool("cleared"),
+                            importedPayee = txn.str("imported_payee"),
+                            reconciled = txn.bool("reconciled"),
                         ),
                     ).category
             }.getOrNull()
