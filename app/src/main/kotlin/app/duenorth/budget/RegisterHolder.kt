@@ -88,8 +88,14 @@ class RegisterHolder internal constructor(
     fun submit(draft: TransactionDraft) {
         // Saving goes back to the page that opened the form, even when the form moved the transaction to another account.
         val from = (state.route as? ShellRoute.EditTransaction)?.accountId ?: draft.accountId
+        val adding = (state.route as? ShellRoute.EditTransaction)?.transactionId == null
         host.launchWrite { id ->
             val result = withContext(host.io) { host.library.saveTransaction(id, draft) }
+            host.toastFor(
+                result,
+                if (adding) ToastCopy.TRANSACTION_ADDED else ToastCopy.TRANSACTION_SAVED,
+                ToastCopy.TRANSACTION_SAVE_FAILED,
+            )
             host.publish(result, from, stayOnRegister = true)
         }
     }
@@ -199,6 +205,7 @@ class RegisterHolder internal constructor(
         if (ordered.size < 2 || host.writing) return
         host.launchWrite { id ->
             val result = withContext(host.io) { host.library.mergeTransactions(id, ordered, false) }
+            host.toastFor(result, ToastCopy.TRANSACTIONS_MERGED, ToastCopy.MERGE_FAILED)
             host.publish(result, accountId, stayOnRegister = true)
         }
     }
@@ -207,6 +214,7 @@ class RegisterHolder internal constructor(
         val accountId = state.openAccountId() ?: return
         host.launchWrite { id ->
             val result = withContext(host.io) { host.library.deleteTransaction(id, transactionId, false) }
+            host.toastFor(result, ToastCopy.TRANSACTION_DELETED, ToastCopy.TRANSACTION_DELETE_FAILED)
             host.publish(result, accountId, stayOnRegister = true)
         }
     }
@@ -221,6 +229,7 @@ class RegisterHolder internal constructor(
     ) {
         host.launchWrite { id ->
             val result = withContext(host.io) { host.library.matchTransactions(id, pair.bank.id, pair.entered.id) }
+            host.toastFor(result, ToastCopy.MATCHED, ToastCopy.MATCH_FAILED)
             if (result is WriteResult.Saved) host.mutate { it.copy(inbox = it.inbox.copy(lead = pair.bank.id)) }
             host.publish(result, pair.bank.accountId, stayOnRegister)
         }

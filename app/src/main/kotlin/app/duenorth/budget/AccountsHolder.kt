@@ -68,8 +68,14 @@ class AccountsHolder internal constructor(
             }
         host.scope.launch {
             when (val result = withContext(host.io) { host.library.createAccount(budgetId, name, offBudget, balance) }) {
-                is AccountWriteResult.Saved -> afterWrite(budgetId, leave = true)
-                is AccountWriteResult.Rejected -> host.mutate { it.copy(editError = result.reason) }
+                is AccountWriteResult.Saved -> {
+                    host.toastSuccess(ToastCopy.ACCOUNT_ADDED, name.trim())
+                    afterWrite(budgetId, leave = true)
+                }
+                is AccountWriteResult.Rejected -> {
+                    host.toastFailure(ToastCopy.ACCOUNT_SAVE_FAILED, result.reason)
+                    host.mutate { it.copy(editError = result.reason) }
+                }
                 is AccountWriteResult.NeedsConfirm -> Unit
             }
         }
@@ -125,8 +131,14 @@ class AccountsHolder internal constructor(
                         ?: AccountWriteResult.Saved(accountId)
                 }
             when (result) {
-                is AccountWriteResult.Saved -> afterWrite(budgetId, leave = true)
-                is AccountWriteResult.Rejected -> host.mutate { it.copy(editError = result.reason) }
+                is AccountWriteResult.Saved -> {
+                    host.toastSuccess(ToastCopy.ACCOUNT_SAVED, name.trim())
+                    afterWrite(budgetId, leave = true)
+                }
+                is AccountWriteResult.Rejected -> {
+                    host.toastFailure(ToastCopy.ACCOUNT_SAVE_FAILED, result.reason)
+                    host.mutate { it.copy(editError = result.reason) }
+                }
                 is AccountWriteResult.NeedsConfirm -> Unit
             }
         }
@@ -168,11 +180,15 @@ class AccountsHolder internal constructor(
                 withContext(host.io) { host.library.closeAccount(budgetId, accountId, destinationId, categoryId, forced, confirmed) }
             when (result) {
                 is AccountWriteResult.Saved -> {
+                    host.toastSuccess(ToastCopy.ACCOUNT_CLOSED, detail?.name)
                     host.mutate { it.copy(accounts = it.accounts.copy(forceConfirm = null)) }
                     leaveFlow()
                     afterWrite(budgetId, leave = false)
                 }
-                is AccountWriteResult.Rejected -> host.mutate { it.copy(shell = before ?: it.shell, editError = result.reason) }
+                is AccountWriteResult.Rejected -> {
+                    host.toastFailure(ToastCopy.ACCOUNT_CLOSE_FAILED, result.reason)
+                    host.mutate { it.copy(shell = before ?: it.shell, editError = result.reason) }
+                }
                 is AccountWriteResult.NeedsConfirm ->
                     host.mutate {
                         it.copy(shell = before ?: it.shell, accounts = it.accounts.copy(forceConfirm = result.reason))

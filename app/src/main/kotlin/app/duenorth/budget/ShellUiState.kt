@@ -58,6 +58,8 @@ data class ShellUiState(
     val createError: String? = null,
     val writeError: String? = null,
     val confirm: WriteResult.Confirm? = null,
+    /** How the last save, add or delete went, drawn over every page by [ToastHost]; null when none is up. */
+    val toast: Toast? = null,
     val today: String = RegisterEntry.todayIso(),
     val openMonth: YearMonth = YearMonth.now(),
     val pinnedMonth: YearMonth? = null,

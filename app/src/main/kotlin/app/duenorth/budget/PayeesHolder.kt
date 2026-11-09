@@ -51,11 +51,14 @@ class PayeesHolder internal constructor(
                     }
             ) {
                 is PayeeWriteResult.Saved -> {
+                    host.toastSuccess(ToastCopy.PAYEE_SAVED, name.trim())
                     val rows = withContext(host.io) { host.library.listPayees(budgetId) }
                     host.mutate { it.copy(payees = PayeesState(rows = rows), writeError = null) }
                 }
-                is PayeeWriteResult.Rejected ->
+                is PayeeWriteResult.Rejected -> {
+                    host.toastFailure(ToastCopy.PAYEE_SAVE_FAILED, result.reason)
                     host.mutate { it.copy(writeError = result.reason) }
+                }
                 is PayeeWriteResult.ConfirmMerge ->
                     host.mutate { it.copy(payees = it.payees.copy(mergeTarget = result.targetId), writeError = null) }
             }

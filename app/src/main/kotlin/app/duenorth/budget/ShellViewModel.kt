@@ -669,7 +669,28 @@ class ShellViewModel(
                         is ForcedWrite.Merge -> library.mergeTransactions(id, retry.transactionIds, true)
                     }
                 }
+            when (pending.retry) {
+                is ForcedWrite.Save -> host.toastFor(result, ToastCopy.TRANSACTION_SAVED, ToastCopy.TRANSACTION_SAVE_FAILED)
+                is ForcedWrite.Delete -> host.toastFor(result, ToastCopy.TRANSACTION_DELETED, ToastCopy.TRANSACTION_DELETE_FAILED)
+                is ForcedWrite.Deletes -> host.toastFor(result, ToastCopy.TRANSACTIONS_DELETED, ToastCopy.TRANSACTION_DELETE_FAILED)
+                is ForcedWrite.Merge -> host.toastFor(result, ToastCopy.TRANSACTIONS_MERGED, ToastCopy.MERGE_FAILED)
+                else -> Unit
+            }
             publish(result, accountId, stay)
+        }
+    }
+
+    /** Takes [id]'s toast down, unless a newer one has already replaced it. */
+    fun dismissToast(id: Long) {
+        _state.update { if (it.toast?.id == id) it.copy(toast = null) else it }
+    }
+
+    /** A toast's button: undo runs the same undo as the menu's. */
+    fun onToastAction(toast: Toast) {
+        dismissToast(toast.id)
+        when (toast.action) {
+            ToastAction.Undo -> month.undo()
+            null -> Unit
         }
     }
 

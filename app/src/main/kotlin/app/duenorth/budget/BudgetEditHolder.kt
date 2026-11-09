@@ -62,7 +62,6 @@ class BudgetEditHolder internal constructor(
                 budgetEdit = BudgetEdit(budgetId = shell.budgetId, month = shell.month),
                 homeSection = ScreenBar.HOME_BUDGET,
                 editError = null,
-                monthUi = it.monthUi.copy(notice = null),
             )
         }
     }

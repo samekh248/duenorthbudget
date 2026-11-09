@@ -364,7 +364,7 @@ internal fun ShellHost.distribute(kind: DistributeKind) {
     val state = host.state.value
     val menu = state.templates.distribute ?: return
     val budgetId = state.settings.openBudgetId ?: return
-    host.mutate { it.copy(templates = it.templates.copy(distribute = null), monthUi = it.monthUi.copy(notice = null)) }
+    host.mutate { it.copy(templates = it.templates.copy(distribute = null)) }
     host.scope.launch {
         // The menu already said what overwrite replaces, so picking it is the confirm.
         val result =
@@ -376,10 +376,12 @@ internal fun ShellHost.distribute(kind: DistributeKind) {
                 }
             }
         when (result) {
-            is TemplateResult.Applied -> host.afterMonthWrite(budgetId)
-            is TemplateResult.Invalid ->
-                host.mutate { it.copy(monthUi = it.monthUi.copy(notice = DistributeCopy.unreadable(result.errors.size))) }
-            is TemplateResult.Rejected -> host.mutate { it.copy(monthUi = it.monthUi.copy(notice = result.reason)) }
+            is TemplateResult.Applied -> {
+                host.toastSuccess(ToastCopy.MONTH_FILLED)
+                host.afterMonthWrite(budgetId)
+            }
+            is TemplateResult.Invalid -> host.toastFailure(ToastCopy.MONTH_FILL_FAILED, DistributeCopy.unreadable(result.errors.size))
+            is TemplateResult.Rejected -> host.toastFailure(ToastCopy.MONTH_FILL_FAILED, result.reason)
             is TemplateResult.NeedsConfirm, TemplateResult.Valid -> Unit
         }
     }

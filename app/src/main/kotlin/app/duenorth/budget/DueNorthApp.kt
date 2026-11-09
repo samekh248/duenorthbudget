@@ -364,6 +364,8 @@ fun DueNorthApp(model: ShellViewModel) {
             working = state.writing || state.assistant.working != null || state.bankSync.syncing,
             workingLabel = if (state.bankSync.syncing) BankSyncCopy.SYNCING_BANKS else WorkingCopy.WORKING,
             bar = state.route != ShellRoute.Home || state.budgetEdit?.categoryId == null,
+            // One toast for the whole app, above navigation: a save that leaves its page still says how it went.
+            toast = { at -> ToastHost(state.toast, model::dismissToast, model::onToastAction, at) },
         ) { modifier ->
             val rowMenu = rememberRowMenu()
             val rowMenus = remember(model) { AppRowMenus(model) }

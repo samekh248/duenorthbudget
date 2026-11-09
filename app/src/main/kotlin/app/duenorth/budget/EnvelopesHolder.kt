@@ -106,6 +106,8 @@ class EnvelopesHolder internal constructor(
         applyEdit(
             stayOnRoute = false,
             optimistic = { it.withMoveAvailable(fromId, toId, amount) },
+            done = ToastCopy.CATEGORY_SAVED,
+            doneWhat = categoryName(toId),
         ) {
             host.sync.moveCategory(shell.budgetId, fromId, toId, host.editorMonth(), amountText)
         }
@@ -147,7 +149,13 @@ class EnvelopesHolder internal constructor(
         // The amount already reads, so the save goes through: the page closes at once, with the new amount
         // showing, rather than after the write, which can wait its turn behind a bank sync storing what it fetched.
         val month = host.editorMonth()
-        applyEdit(leaveFirst = !stayOnRoute, optimistic = { it.withBudgetedAssignment(categoryId, budgeted) }) {
+        // A save from a page that then closes says so; typing amounts on the budget itself stays quiet.
+        applyEdit(
+            leaveFirst = !stayOnRoute,
+            optimistic = { it.withBudgetedAssignment(categoryId, budgeted) },
+            done = if (stayOnRoute) null else ToastCopy.CATEGORY_SAVED,
+            doneWhat = categoryName(categoryId),
+        ) {
             host.sync.assign(shell.budgetId, categoryId, month, amountText)
         }
     }
@@ -159,7 +167,10 @@ class EnvelopesHolder internal constructor(
         templates: Boolean? = null,
     ) {
         val shell = state.shell ?: return
-        applyEdit(optimistic = { amounts.entries.fold(it) { s, (id, minor) -> s.withBudgetedAssignment(id, minor) } }) {
+        applyEdit(
+            optimistic = { amounts.entries.fold(it) { s, (id, minor) -> s.withBudgetedAssignment(id, minor) } },
+            done = ToastCopy.CATEGORY_SAVED,
+        ) {
             host.sync.assignBudgets(shell.budgetId, month, amounts, templates)
         }
     }
@@ -198,6 +209,8 @@ class EnvelopesHolder internal constructor(
         applyEdit(
             stayOnRoute = false,
             optimistic = { it.withMoveAvailable(from, toCategoryId, amount) },
+            done = ToastCopy.CATEGORY_SAVED,
+            doneWhat = categoryName(toCategoryId),
         ) {
             host.sync.moveCategory(shell.budgetId, from, toCategoryId, host.editorMonth(), amountText)
         }
@@ -228,7 +241,7 @@ class EnvelopesHolder internal constructor(
             host.mutate { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
             return
         }
-        applyEdit {
+        applyEdit(done = ToastCopy.GROUP_ADDED, doneWhat = name.trim()) {
             host.sync.addCategoryGroup(budgetId, name)
         }
     }
@@ -242,7 +255,7 @@ class EnvelopesHolder internal constructor(
             host.mutate { it.copy(editError = SyncCopy.ENTER_AMOUNT) }
             return
         }
-        applyEdit {
+        applyEdit(done = ToastCopy.CATEGORY_ADDED, doneWhat = name.trim()) {
             host.sync.addEnvelopeCategory(budgetId, groupId, name)
         }
     }
@@ -253,7 +266,7 @@ class EnvelopesHolder internal constructor(
     ) {
         val budgetId = state.settings.openBudgetId ?: return
         if (name.isNotBlank()) renameOnPage { group -> if (group.id == groupId) group.copy(name = name.trim()) else group }
-        applyEdit { host.sync.renameCategoryGroup(budgetId, groupId, name) }
+        applyEdit(done = ToastCopy.RENAMED, doneWhat = name.trim()) { host.sync.renameCategoryGroup(budgetId, groupId, name) }
     }
 
     /** Opens the name on the category's own page for typing, from its `•••` rename. */
@@ -280,7 +293,9 @@ class EnvelopesHolder internal constructor(
             }
         }
         val optimistic = if (trimmed.isEmpty()) null else { shell: MonthShell -> shell.withCategoryName(categoryId, trimmed) }
-        applyEdit(optimistic = optimistic) { host.sync.renameEnvelopeCategory(budgetId, categoryId, name) }
+        applyEdit(optimistic = optimistic, done = ToastCopy.RENAMED, doneWhat = trimmed) {
+            host.sync.renameEnvelopeCategory(budgetId, categoryId, name)
+        }
     }
 
     /**
@@ -307,7 +322,9 @@ class EnvelopesHolder internal constructor(
         transferId: String? = null,
     ) {
         val budgetId = state.settings.openBudgetId ?: return
-        applyEdit { host.sync.deleteEnvelopeCategory(budgetId, categoryId, transferId) }
+        applyEdit(done = ToastCopy.CATEGORY_DELETED, doneWhat = categoryName(categoryId)) {
+            host.sync.deleteEnvelopeCategory(budgetId, categoryId, transferId)
+        }
     }
 
     fun deleteGroup(
@@ -315,7 +332,9 @@ class EnvelopesHolder internal constructor(
         transferId: String? = null,
     ) {
         val budgetId = state.settings.openBudgetId ?: return
-        applyEdit { host.sync.deleteCategoryGroup(budgetId, groupId, transferId) }
+        applyEdit(done = ToastCopy.GROUP_DELETED, doneWhat = groupName(groupId)) {
+            host.sync.deleteCategoryGroup(budgetId, groupId, transferId)
+        }
     }
 
     fun hideGroup(
@@ -385,6 +404,9 @@ class EnvelopesHolder internal constructor(
         stayOnRoute: Boolean = true,
         leaveFirst: Boolean = false,
         optimistic: ((MonthShell) -> MonthShell)? = null,
+        /** The toast a save shows, and what it names; null saves quietly. A refusal always says so. */
+        done: String? = null,
+        doneWhat: String? = null,
         block: suspend () -> EditResult,
     ) {
         val budgetId = state.shell?.budgetId ?: state.settings.openBudgetId ?: return
@@ -398,6 +420,7 @@ class EnvelopesHolder internal constructor(
             host.mutate { it.copy(undoLabel = host.library.undoLabel(budgetId)) }
             when (result) {
                 is EditResult.Rejected -> {
+                    host.toastFailure(ToastCopy.CATEGORY_SAVE_FAILED, result.reason)
                     // Puts back anything the page showed before the write was refused, such as a rename.
                     refreshManage(budgetId)
                     val month = host.editorMonth()
@@ -415,6 +438,7 @@ class EnvelopesHolder internal constructor(
                     }
                 }
                 EditResult.Saved -> {
+                    if (done != null) host.toastSuccess(done, doneWhat)
                     host.mutate { it.copy(editError = null) }
                     // The categories page first: it reads in a moment, while the month can take a while.
                     refreshManage(budgetId)
@@ -439,6 +463,19 @@ class EnvelopesHolder internal constructor(
             }
         }
     }
+
+    private fun categoryName(categoryId: String): String? =
+        state.shell
+            ?.groups
+            ?.flatMap { it.categories }
+            ?.firstOrNull { it.id == categoryId }
+            ?.name
+
+    private fun groupName(groupId: String): String? =
+        state.shell
+            ?.groups
+            ?.firstOrNull { it.id == groupId }
+            ?.name
 
     private suspend fun refreshManage(budgetId: String) {
         if (state.route !is ShellRoute.ManageCategories) return

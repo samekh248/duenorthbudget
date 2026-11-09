@@ -1220,6 +1220,11 @@ fun ShellChrome(
     bar: Boolean = true,
     /** Laid over the bottom of the page, just above the bar, as a failed bank sync's tile is. */
     overBar: (@Composable (Modifier) -> Unit)? = null,
+    /**
+     * The app's toast, drawn over every page: across the top behind the status bar, or under mica floating at the
+     * bottom just above the bar (and the keyboard). It is drawn here rather than by a page, so it outlives the page.
+     */
+    toast: (@Composable (Modifier) -> Unit)? = null,
     content: @Composable (Modifier) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -1229,24 +1234,29 @@ fun ShellChrome(
     BackHandler(enabled = expanded) { expanded = false }
     val keyboard = WindowInsets.ime
     var barHeight by remember { mutableIntStateOf(0) }
+    val toastBelow = Metro.style.layers
     MetroAppBarHost(Modifier.fillMaxSize()) {
         // The background runs up behind the status bar; titles start below it.
-        Column(
-            Modifier
-                .fillMaxSize()
-                .background(Metro.colors.background)
-                .windowInsetsPadding(statusBar),
-        ) {
-            if (syncing) {
-                SyncProgressBar(progress)
-            } else if (working) {
-                WorkingDots(description = workingLabel)
+        Box(Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .background(Metro.colors.background)
+                    .windowInsetsPadding(statusBar),
+            ) {
+                if (syncing) {
+                    SyncProgressBar(progress)
+                } else if (working) {
+                    WorkingDots(description = workingLabel)
+                }
+                Box(Modifier.weight(1f).aboveKeyboard(keyboard) { if (bar) barHeight else 0 }) {
+                    content(Modifier.fillMaxSize())
+                    overBar?.invoke(Modifier.align(Alignment.BottomCenter))
+                    if (toastBelow) toast?.invoke(Modifier.align(Alignment.BottomCenter))
+                }
+                if (bar) MetroAppBar(actions, expanded, { expanded = it }, Modifier.onSizeChanged { barHeight = it.height })
             }
-            Box(Modifier.weight(1f).aboveKeyboard(keyboard) { if (bar) barHeight else 0 }) {
-                content(Modifier.fillMaxSize())
-                overBar?.invoke(Modifier.align(Alignment.BottomCenter))
-            }
-            if (bar) MetroAppBar(actions, expanded, { expanded = it }, Modifier.onSizeChanged { barHeight = it.height })
+            if (!toastBelow) toast?.invoke(Modifier.align(Alignment.TopCenter))
         }
     }
 }
