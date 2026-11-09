@@ -156,7 +156,21 @@ object ActualSchema {
         ensureAccountBankColumns(session)
         ensureParityTables(session)
         ensureParityColumns(session)
+        ensureLinkTables(session)
         SyncSchema.forgetShapes(session)
+        SyncSchema.repairLinks(session)
+    }
+
+    /** Actual's `category_mapping` and `payee_mapping`, which phone files lacked before. */
+    private fun ensureLinkTables(session: SqlSession) {
+        val tables = session.query("SELECT name FROM sqlite_master WHERE type = 'table'").mapNotNull { it.str("name") }.toSet()
+        if ("preferences" !in tables) return
+        if ("category_mapping" !in tables) {
+            session.exec("CREATE TABLE category_mapping (id TEXT PRIMARY KEY, transferId TEXT)")
+        }
+        if ("payee_mapping" !in tables) {
+            session.exec("CREATE TABLE payee_mapping (id TEXT PRIMARY KEY, targetId TEXT)")
+        }
     }
 
     private fun ensureAccountType(session: SqlSession) {

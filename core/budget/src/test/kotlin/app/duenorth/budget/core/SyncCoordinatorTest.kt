@@ -966,6 +966,8 @@ private fun sqliteBytes(
                 listOf("t-pay", "checking", "c-sal", 10_000L, 20261007),
             )
         }
+        // A file from desktop carries a link row for every category and payee.
+        SyncSchema.repairLinks(session)
     }
     return file.readBytes().also { file.delete() }
 }

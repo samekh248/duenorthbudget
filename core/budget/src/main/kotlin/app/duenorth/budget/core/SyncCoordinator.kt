@@ -547,6 +547,7 @@ class SyncCoordinator(
                             }
                             SyncSchema.acceptPending(session, outgoing.map { it.timestamp })
                             SyncSchema.backfill(session, syncClock)
+                            SyncSchema.repairLinks(session, syncClock)
                             val newest = (decoded.map { it.first } + listOfNotNull(SyncSchema.state(session, "lastRemote"))).maxOrNull()
                             if (newest != null) SyncSchema.putState(session, "lastRemote", newest)
                             differs = serverTrie?.let { SyncMerkle.diff(it, SyncSchema.merkle(session)) }

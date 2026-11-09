@@ -151,6 +151,8 @@ object SyncSchema {
                     "cleanup_def",
                 ),
             "cleanup_groups" to setOf("name", "tombstone"),
+            "category_mapping" to setOf("transferId"),
+            "payee_mapping" to setOf("targetId"),
             "transactions" to
                 setOf(
                     "isParent",
@@ -192,7 +194,18 @@ object SyncSchema {
         )
 
     /** Columns that name a budget cell rather than hold a value; undo of a created row leaves them. */
-    private val identityColumns = setOf("month", "category", "schedule_id")
+    private val identityColumns = setOf("month", "category", "schedule_id", "transferId", "targetId")
+
+    /**
+     * Actual reads a transaction's category and payee through these link tables
+     * (`v_transactions_internal`): every category and payee has a row pointing at itself,
+     * and a payee merge or a category deleted into another only repoints that row.
+     */
+    private val links =
+        mapOf(
+            "categories" to ("category_mapping" to "transferId"),
+            "payees" to ("payee_mapping" to "targetId"),
+        )
 
     private val clocks: MutableMap<SqlSession, SyncClock> = Collections.synchronizedMap(WeakHashMap())
     private val captures: MutableMap<SqlSession, MutableList<JournalCell>> = Collections.synchronizedMap(WeakHashMap())
@@ -325,6 +338,7 @@ object SyncSchema {
     ) {
         ensure(session)
         if (dataset == "rules") RuleCache.invalidate()
+        val created = dataset in links && readCell(session, dataset, row, "id") == null
         val stamp = clock.send()
         session.transaction {
             captures[session]?.takeIf { column in columns[dataset].orEmpty() }?.let { cells ->
@@ -346,8 +360,71 @@ object SyncSchema {
                 listOf(stamp, dataset, row, column, SyncValues.serialize(column, value)),
             )
             writeState(session, "clock", stamp)
+            if (created) linkToItself(session, clock, dataset, row)
         }
         localWrites.set(localWrites.get() + 1)
+    }
+
+    /** `insertCategory` / `insertPayee`: the new row's link points at itself, so desktop can see it. */
+    private fun linkToItself(
+        session: SqlSession,
+        clock: SyncClock,
+        dataset: String,
+        row: String,
+    ) {
+        val (table, column) = links[dataset] ?: return
+        if (columnsOf(session, table).isEmpty()) return
+        if (session.query("SELECT 1 AS x FROM $table WHERE id = ?", listOf(row)).isNotEmpty()) return
+        recordLocal(session, clock, table, row, column, row)
+    }
+
+    /**
+     * Gives every category and payee that lacks one its link row (phone files made before the
+     * link tables were kept), then points transactions at what their links say, so a payee
+     * merged or a category deleted into another on desktop reads the same here. The link rows go
+     * to the server when the file is synced; the transaction repointing stays on this phone,
+     * because desktop reads the same result through the links.
+     */
+    fun repairLinks(
+        session: SqlSession,
+        clock: SyncClock? = null,
+    ) {
+        if (links.values.any { (table, _) -> columnsOf(session, table).isEmpty() }) return
+        val synced = !state(session, "cloudFileId").isNullOrBlank()
+        session.transaction {
+            for ((dataset, link) in links) {
+                val (table, column) = link
+                val missing =
+                    session
+                        .query("SELECT d.id AS id FROM $dataset d WHERE NOT EXISTS (SELECT 1 FROM $table m WHERE m.id = d.id)")
+                        .mapNotNull { it.str("id") }
+                for (id in missing) {
+                    if (synced) {
+                        recordLocal(session, clock ?: clockFor(session), table, id, column, id)
+                    } else {
+                        session.exec("INSERT OR IGNORE INTO $table (id, ${quote(column)}) VALUES (?, ?)", listOf(id, id))
+                    }
+                }
+            }
+            session.exec(
+                """
+                UPDATE transactions
+                SET category = (SELECT m.transferId FROM category_mapping m WHERE m.id = transactions.category)
+                WHERE category IN (
+                    SELECT id FROM category_mapping WHERE transferId IS NOT NULL AND transferId != id
+                )
+                """.trimIndent(),
+            )
+            session.exec(
+                """
+                UPDATE transactions
+                SET description = (SELECT m.targetId FROM payee_mapping m WHERE m.id = transactions.description)
+                WHERE description IN (
+                    SELECT id FROM payee_mapping WHERE targetId IS NOT NULL AND targetId != id
+                )
+                """.trimIndent(),
+            )
+        }
     }
 
     internal fun beginCapture(session: SqlSession): MutableList<JournalCell>? {
@@ -703,6 +780,8 @@ object SyncSchema {
             "notes" -> session.exec("INSERT OR IGNORE INTO notes (id) VALUES (?)", listOf(key))
             "banks" -> session.exec("INSERT OR IGNORE INTO banks (id) VALUES (?)", listOf(key))
             "cleanup_groups" -> session.exec("INSERT OR IGNORE INTO cleanup_groups (id, name) VALUES (?, '')", listOf(key))
+            "category_mapping" -> session.exec("INSERT OR IGNORE INTO category_mapping (id) VALUES (?)", listOf(key))
+            "payee_mapping" -> session.exec("INSERT OR IGNORE INTO payee_mapping (id) VALUES (?)", listOf(key))
             "rules" -> session.exec("INSERT OR IGNORE INTO rules (id) VALUES (?)", listOf(key))
             "schedules" -> session.exec("INSERT OR IGNORE INTO schedules (id, rule) VALUES (?, '')", listOf(key))
             "schedules_next_date" ->
