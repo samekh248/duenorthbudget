@@ -36,6 +36,24 @@ class BankSyncHolder internal constructor(
         if (state.bankSync.syncing) return
         update { it.copy(panel = null, unlinking = null) }
         if (state.route == ShellRoute.BankSyncReport) host.back()
+        forgetFailures()
+    }
+
+    /**
+     * Opens the tile for the accounts the last bank sync could not fetch, when it ran with nobody watching (in the
+     * background, or while the app was closing) and nothing on screen has run since. Leaves a tile already showing.
+     */
+    internal suspend fun showLast(id: String) {
+        if (state.bankSync.syncing || state.bankSync.panel != null) return
+        val failures = withContext(host.io) { runCatching { host.sync.lastBankFailures(id) }.getOrDefault(emptyList()) }
+        if (failures.isEmpty() || state.bankSync.syncing || state.bankSync.panel != null) return
+        update { it.copy(panel = BankSyncUi(running = false, started = failures.map { f -> f.accountName }, failures = failures)) }
+    }
+
+    /** Once the person has dealt with the failures, they are not shown again at the next launch. */
+    private fun forgetFailures() {
+        val id = state.settings.openBudgetId ?: return
+        host.scope.launch { withContext(host.io) { host.sync.clearBankFailures(id) } }
     }
 
     /** A tap on the failed sync's tile: the full page, with every account and why each failed. */
@@ -60,6 +78,7 @@ class BankSyncHolder internal constructor(
         val id = state.settings.openBudgetId ?: return
         val failure = state.bankSync.unlinking ?: return
         update { it.copy(unlinking = null) }
+        forgetFailures()
         host.scope.launch {
             when (val result = withContext(host.io) { host.sync.unlinkBankAccount(id, failure.accountId) }) {
                 BankLinkResult.Saved -> {

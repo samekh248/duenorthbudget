@@ -1,5 +1,7 @@
 package app.duenorth.budget.core
 
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
@@ -442,7 +444,28 @@ class SyncCoordinator(
         if (!canSyncUnattended(budgetId)) return null
         val token = syncToken() ?: return null
         val address = activeAddress() ?: return null
-        return library.syncBankAccounts(budgetId, address, token, bankTransport, dates.today(), now(), onAccount, onFailure)
+        val summary = library.syncBankAccounts(budgetId, address, token, bankTransport, dates.today(), now(), onAccount, onFailure)
+        // Kept until the next bank sync, so one that failed in the background still shows when the app opens.
+        summary?.let { runCatching { keepBankFailures(budgetId, it.failures) } }
+        return summary
+    }
+
+    /** The accounts the last bank sync could not fetch, wherever it ran; empty once one runs clean or is dismissed. */
+    fun lastBankFailures(budgetId: String): List<BankSyncFailure> =
+        state(budgetId, BANK_FAILURES)
+            ?.let { raw -> runCatching { bankFailureJson.decodeFromString<List<BankSyncFailure>>(raw) }.getOrNull() }
+            .orEmpty()
+
+    /** Forgets the last bank sync's failures, once the person has seen and closed them. */
+    fun clearBankFailures(budgetId: String) {
+        runCatching { keepBankFailures(budgetId, emptyList()) }
+    }
+
+    private fun keepBankFailures(
+        budgetId: String,
+        failures: List<BankSyncFailure>,
+    ) {
+        library.useDatabase(budgetId) { SyncSchema.putState(it, BANK_FAILURES, bankFailureJson.encodeToString(failures)) }
     }
 
     /**
@@ -1305,6 +1328,9 @@ class SyncCoordinator(
     companion object {
         /** How long after a successful sync the app skips the sync it starts on its own (launch, return): 30 minutes. */
         const val AUTO_SYNC_SKIP_MS = 30 * 60 * 1_000L
+
+        private const val BANK_FAILURES = "bankSyncFailures"
+        private val bankFailureJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
         private const val LEGACY_TOKEN = "actual.token"
         private const val MAX_SYNC_ROUNDS = 5

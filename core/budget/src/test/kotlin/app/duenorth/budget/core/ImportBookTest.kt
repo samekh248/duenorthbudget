@@ -155,6 +155,30 @@ class ImportBookTest {
         }
     }
 
+    // A bank row deleted with nothing standing in for it comes back, as Actual's sync brings it back by default.
+    @Test
+    fun deletedBankRowWithNothingInItsPlaceComesBack() {
+        withBook { session, _, import ->
+            insert(session, "deleted", 20261010, "fit-9", tombstone = 1, amount = -900)
+            val row = ParsedImportRow(20261010, "Cafe", -900, financialId = "fit-9", raw = BOOKED)
+            assertEquals(1, import.confirm("checking", listOf(row), review = false).addedIds.size)
+            assertEquals(0, import.confirm("checking", listOf(row), review = false).addedIds.size)
+            assertEquals(1, alive(session))
+        }
+    }
+
+    // The account's own "don't reimport deleted" switch, set in Actual, keeps it gone.
+    @Test
+    fun deletedBankRowStaysGoneWhenTheAccountSaysSo() {
+        withBook { session, _, import ->
+            session.exec("INSERT INTO preferences (id, value) VALUES ('sync-reimport-deleted-checking', 'false')")
+            insert(session, "deleted", 20261010, "fit-9", tombstone = 1, amount = -900)
+            val row = ParsedImportRow(20261010, "Cafe", -900, financialId = "fit-9", raw = BOOKED)
+            assertEquals(0, import.confirm("checking", listOf(row), review = false).addedIds.size)
+            assertEquals(0, alive(session))
+        }
+    }
+
     @Test
     fun lockedOrHandClearedRowsAreNeverPending() {
         assertEquals(true, BankPending.isPending(UNBOOKED, cleared = false, reconciled = false))
@@ -310,6 +334,71 @@ class ImportBookTest {
             assertEquals(failed, summary.failures)
             assertEquals(1, summary.failed)
             assertEquals(1, summary.added)
+        }
+    }
+
+    // Every bank-linked account syncs, whatever its provider; one the budget cannot take stops only that one.
+    @Test
+    fun syncAllTakesEveryProviderAndOneBadAccountStopsOnlyItself() {
+        withBook { session, _, _ ->
+            session.exec("INSERT INTO accounts (id, name, offbudget, type, sort_order) VALUES ('euro', 'Euro', 0, 'checking', 2)")
+            session.exec("INSERT INTO accounts (id, name, offbudget, type, sort_order) VALUES ('card', 'Card', 0, 'credit', 3)")
+            session.exec("INSERT INTO banks (id, bank_id, name) VALUES ('b-gc', 'req-1', 'Euro Bank')")
+            session.exec("UPDATE accounts SET account_sync_source = 'simpleFin', account_id = 'sf-1' WHERE id = 'checking'")
+            session.exec("UPDATE accounts SET account_sync_source = 'goCardless', account_id = 'gc-1', bank = 'b-gc' WHERE id = 'euro'")
+            session.exec("UPDATE accounts SET account_sync_source = 'pluggyai', account_id = 'pl-1' WHERE id = 'card'")
+            val asked = mutableListOf<List<BankLinkedAccount>>()
+            val transport =
+                object : BankSyncTransport {
+                    override fun fetchTransactions(
+                        serverAddress: String,
+                        token: String,
+                        bankAccountId: String,
+                        startDateIso: String,
+                    ): List<ParsedImportRow> = emptyList()
+
+                    override fun fetchAll(
+                        serverAddress: String,
+                        token: String,
+                        accounts: List<BankLinkedAccount>,
+                        startDateIso: String,
+                    ): Map<String, BankFetch> {
+                        asked += accounts
+                        return accounts.associate {
+                            val id =
+                                if (it.syncSource ==
+                                    "goCardless"
+                                ) {
+                                    HttpBankSyncTransport.INTERNAL_ID_PREFIX + "int-1"
+                                } else {
+                                    "${it.accountId}-1"
+                                }
+                            it.accountId to BankFetch(listOf(ParsedImportRow(20261008, "New", -300, financialId = id)), null)
+                        }
+                    }
+                }
+            val book = BankSyncBook(session, transport)
+            val ids = { UUID.randomUUID().toString() }
+            val failed = mutableListOf<BankSyncFailure>()
+            val summary =
+                BankSyncBook.syncAll(
+                    transport = transport,
+                    serverAddress = "https://example.test",
+                    token = "token",
+                    today = LocalDate.of(2026, 10, 10),
+                    linked = book::linkedAccounts,
+                    store = { account, fetch ->
+                        if (account.accountId == "checking") error("disk full")
+                        book.store(account, fetch, 0L, ids)
+                    },
+                    onFailure = { failed += it },
+                )
+            assertEquals(listOf(listOf("checking"), listOf("euro"), listOf("card")), asked.map { list -> list.map { it.accountId } })
+            assertEquals("req-1", asked[1].single().requisitionId)
+            assertEquals(listOf(BankSyncFailure("Checking", BankSyncBook.STORE_FAILED, "checking")), failed)
+            assertEquals(2, summary.added)
+            val idsHeld = session.query("SELECT financial_id FROM transactions ORDER BY financial_id").map { it.str("financial_id") }
+            assertEquals(listOf("card-1", "euro-int-1"), idsHeld)
         }
     }
 

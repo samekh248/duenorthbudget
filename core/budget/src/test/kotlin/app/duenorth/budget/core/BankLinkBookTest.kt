@@ -182,6 +182,78 @@ class BankLinkBookTest {
         }
     }
 
+    // SimpleFIN Bridge rations how often it is asked: every SimpleFIN account goes in one request, as Actual's sync
+    // of every account sends it, and an account the bank flags still brings the rows it sent.
+    @Test
+    fun simpleFinAccountsFetchInOneRequest() {
+        withPhone { server, phone, _ ->
+            server.providerData["/simplefin/transactions"] =
+                """
+                {"ACT-1":$SIMPLEFIN_TRANSACTIONS,
+                 "ACT-2":{"balances":[{"balanceType":"expected","balanceAmount":{"amount":"12.50"}}],"transactions":{"all":[
+                   {"booked":true,"date":"2026-11-02","payeeName":"Grocer","transactionAmount":{"amount":"-3.10"},"transactionId":"G-1"}]}},
+                 "errors":{
+                   "ACT-2":[{"error_type":"ACCOUNT_NEEDS_ATTENTION","error_code":"ACCOUNT_NEEDS_ATTENTION"}],
+                   "ACT-3":[{"error_type":"ACCOUNT_MISSING","error_code":"ACCOUNT_MISSING"}]}}
+                """.trimIndent()
+            val accounts =
+                listOf("ACT-1", "ACT-2", "ACT-3").map { BankLinkedAccount("a-$it", it, BankProvider.SIMPLEFIN.syncSource, it) }
+            val fetched = HttpBankSyncTransport().fetchAll(server.baseUrl, phone.sync.syncToken()!!, accounts, "2026-08-01")
+            val calls = server.providerCalls.filter { it.first == "/simplefin/transactions" }
+            assertEquals(1, calls.size)
+            assertEquals(
+                """{"accountId":["ACT-1","ACT-2","ACT-3"],"startDate":["2026-08-01","2026-08-01","2026-08-01"]}""",
+                calls.single().second,
+            )
+            assertEquals(listOf("TRN-2", "TRN-1"), fetched.getValue("a-ACT-1").rows.map { it.financialId })
+            assertEquals(null, fetched.getValue("a-ACT-1").error)
+            assertEquals(listOf("G-1"), fetched.getValue("a-ACT-2").rows.map { it.financialId })
+            assertEquals(1_250L, fetched.getValue("a-ACT-2").balanceMinor)
+            assertEquals(BankSyncFix.SIMPLEFIN, fetched.getValue("a-ACT-2").error?.fix)
+            assertEquals(emptyList<ParsedImportRow>(), fetched.getValue("a-ACT-3").rows)
+            assertEquals(BankSyncFix.RELINK, fetched.getValue("a-ACT-3").error?.fix)
+        }
+    }
+
+    // GoCardless and Pluggy.ai accounts sync too, each through its own provider, one account at a time.
+    @Test
+    fun goCardlessAndPluggyAccountsFetchThroughTheirProviders() {
+        withPhone { server, phone, _ ->
+            server.providerData["/gocardless/transactions"] =
+                """
+                {"balances":[{"balanceType":"interimAvailable","balanceAmount":{"amount":"250.00","currency":"EUR"}}],
+                 "startingBalance":20000,"transactions":{"all":[
+                   {"booked":true,"date":"2026-11-03","payeeName":"Bakery","notes":"BAKERY","internalTransactionId":"int-7",
+                    "transactionAmount":{"amount":"-4.20","currency":"EUR"}},
+                   {"booked":false,"date":"2026-11-04","payeeName":"","notes":"CARD 1234","transactionId":"gc-2",
+                    "transactionAmount":{"amount":"-9.00","currency":"EUR"}}]}}
+                """.trimIndent()
+            server.providerData["/pluggyai/transactions"] =
+                """
+                {"balances":[{"balanceType":"expected","balanceAmount":{"amount":-5025}}],"startingBalance":-5025,
+                 "transactions":{"all":[
+                   {"booked":true,"date":"2026-11-05","payeeName":"Farmacia","transactionAmount":{"amount":-12.3},"transactionId":"pl-1"}]}}
+                """.trimIndent()
+            val goCardless = BankLinkedAccount("gc", "Euro", BankProvider.GOCARDLESS.syncSource, "gc-acct", requisitionId = "req-1")
+            val pluggy = BankLinkedAccount("pl", "Card", BankProvider.PLUGGY.syncSource, "pl-acct")
+            val fetched =
+                HttpBankSyncTransport().fetchAll(server.baseUrl, phone.sync.syncToken()!!, listOf(goCardless, pluggy), "2026-08-01")
+            val goCall = server.providerCalls.single { it.first == "/gocardless/transactions" }.second
+            assertEquals(
+                """{"accountId":"gc-acct","startDate":"2026-08-01","requisitionId":"req-1","includeBalance":true}""",
+                goCall,
+            )
+            val euro = fetched.getValue("gc")
+            assertEquals(listOf(-420L, -900L), euro.rows.map { it.amountMinor })
+            assertEquals(listOf("Bakery", "CARD 1234"), euro.rows.map { it.payee })
+            assertEquals(listOf(HttpBankSyncTransport.INTERNAL_ID_PREFIX + "int-7", "gc-2"), euro.rows.map { it.financialId })
+            assertEquals(25_000L, euro.balanceMinor)
+            val card = fetched.getValue("pl")
+            assertEquals(listOf(-1_230L), card.rows.map { it.amountMinor })
+            assertEquals(-5_025L, card.balanceMinor)
+        }
+    }
+
     // Actual's server names what broke; each names its own fix (contracts/bank-link.md, Repair).
     @Test
     fun fetchNamesEachSimpleFinErrorAndItsFix() {

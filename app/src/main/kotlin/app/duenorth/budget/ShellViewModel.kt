@@ -297,7 +297,11 @@ class ShellViewModel(
      * shows once a linked account starts, so a budget with none never sees it. True when it ran.
      */
     internal suspend fun autoSync(id: String): Boolean {
-        if (withContext(io) { runCatching { sync.syncedRecently(id) }.getOrDefault(false) }) return false
+        if (withContext(io) { runCatching { sync.syncedRecently(id) }.getOrDefault(false) }) {
+            // A background sync ran a moment ago: what it could not fetch shows as a sync on screen would show it.
+            bankSync.showLast(id)
+            return false
+        }
         bankSync.run(id, quiet = true)
         return true
     }

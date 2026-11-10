@@ -237,6 +237,34 @@ class SyncCoordinatorTest {
         }
     }
 
+    // A bank sync that failed in the background is kept, so the app shows it when it opens, until one runs clean.
+    @Test
+    fun aBackgroundBankFailureIsKeptUntilTheNextCleanRun() {
+        scenario {
+            val remote = server.addFile("Home", budgetBytes())
+            assertEquals(OpenResult.Opened, openSignedIn(remote))
+            library.useDatabase(remote.fileId) { session ->
+                session.exec(
+                    "UPDATE accounts SET account_sync_source = ?, account_id = ? WHERE id = ?",
+                    listOf("simpleFin", "bank-checking", "checking"),
+                )
+            }
+            assertEquals(emptyList<BankSyncFailure>(), sync.lastBankFailures(remote.fileId))
+            opened.bank.fails = true
+            sync.syncUnattended()
+            val kept = sync.lastBankFailures(remote.fileId)
+            assertEquals(listOf("checking"), kept.map { it.accountId })
+            assertEquals(ImportCopy.FETCH_FAILED, kept.single().message)
+            opened.bank.fails = false
+            sync.syncUnattended()
+            assertEquals(emptyList<BankSyncFailure>(), sync.lastBankFailures(remote.fileId))
+            opened.bank.fails = true
+            sync.syncUnattended()
+            sync.clearBankFailures(remote.fileId)
+            assertEquals(emptyList<BankSyncFailure>(), sync.lastBankFailures(remote.fileId))
+        }
+    }
+
     @Test
     fun autoSyncIsSkippedOnlyWithinHalfAnHourOfTheLastSuccessfulOne() {
         scenario {

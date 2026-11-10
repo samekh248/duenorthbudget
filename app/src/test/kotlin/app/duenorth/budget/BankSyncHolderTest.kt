@@ -7,8 +7,10 @@ import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.MockBudgets
 import app.duenorth.budget.core.PhoneSettings
+import app.duenorth.budget.core.SyncSchema
 import app.duenorth.budget.core.UndoCopy
 import app.duenorth.budget.core.createFromMock
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -107,6 +109,38 @@ class BankSyncHolderTest {
         val host = tour("bank-sync-unlink-none")
         BankSyncHolder(host).askUnlink(BankSyncFailure("Mystery", "fetch did not finish"))
         assertNull(host.state.value.bankSync.unlinking)
+    }
+
+    // A bank sync that failed in the background shows its tile when the app opens; closing it forgets it.
+    @Test
+    fun aBackgroundFailureShowsAtLaunchUntilDismissed() {
+        val host = tour("bank-sync-background", emptyList())
+        host.mutate { it.copy(route = ShellRoute.Home, bankSync = BankSyncState()) }
+        val id = host.state.value.settings.openBudgetId!!
+        host.library.useDatabase(id) {
+            SyncSchema.putState(
+                it,
+                "bankSyncFailures",
+                """[{"accountName":"Checking","message":"fetch did not finish","accountId":"checking"}]""",
+            )
+        }
+        val bankSync = BankSyncHolder(host)
+        runBlocking { bankSync.showLast(id) }
+        assertEquals(
+            listOf(checkingFailure),
+            host.state.value.bankSync.panel
+                ?.failures,
+        )
+        assertEquals(
+            false,
+            host.state.value.bankSync.panel
+                ?.running,
+        )
+        bankSync.dismiss()
+        assertNull(host.state.value.bankSync.panel)
+        assertEquals(emptyList<BankSyncFailure>(), host.sync.lastBankFailures(id))
+        runBlocking { bankSync.showLast(id) }
+        assertNull(host.state.value.bankSync.panel)
     }
 
     private val checkingFailure = BankSyncFailure("Checking", "fetch did not finish", "checking")
