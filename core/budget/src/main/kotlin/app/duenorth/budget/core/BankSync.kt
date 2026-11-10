@@ -141,13 +141,16 @@ class HttpBankSyncTransport : BankSyncTransport {
                     ?.string("amount")
                     ?.let { ImportFileParserAmount.parse(it, decimals) }
                 ?: return null
-        // Actual's server sends `payeeName`, `notes` and `transactionId`, the names its web app imports from.
+        // Actual's server sends `payeeName`, `notes` and `transactionId`, the names its web app imports from. Many banks
+        // send SimpleFIN no payee, only a description (Actual's `notes`): the row still comes in, named by that.
         val payee =
             row.string("payeeName")
                 ?: row.string("payee_name")
                 ?: row.string("imported_payee")
                 ?: row.string("payee")
-                ?: return null
+                ?: row.string("notes")
+                ?: row.string("description")
+                ?: ""
         val financialId = row.string("transactionId") ?: row.string("imported_id") ?: row.string("id")
         val pending = isPending(row)
         return ParsedImportRow(
@@ -155,7 +158,7 @@ class HttpBankSyncTransport : BankSyncTransport {
             payee = payee,
             amountMinor = amount,
             financialId = financialId,
-            importedPayee = row.string("imported_payee") ?: payee,
+            importedPayee = row.string("imported_payee") ?: payee.ifBlank { null },
             note = row.string("notes"),
             pending = pending,
             // `booked` is written either way, so a row that only said `pending` still reads as pending later.

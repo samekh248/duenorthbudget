@@ -113,6 +113,48 @@ class ImportBookTest {
         }
     }
 
+    // Two alike purchases on one day (two fares, two coffees) are two bank rows with their own ids: both come in.
+    @Test
+    fun alikeRowsWithTheirOwnBankIdsAllComeIn() {
+        withBook { session, _, import ->
+            val first = ParsedImportRow(20261105, "Metro", -290, financialId = "t-1", raw = BOOKED)
+            val second = ParsedImportRow(20261105, "Metro", -290, financialId = "t-2", raw = BOOKED)
+            assertEquals(2, import.confirm("checking", listOf(first, second), review = false).addedIds.size)
+            assertEquals(0, import.confirm("checking", listOf(first, second), review = false).addedIds.size)
+            assertEquals(2, alive(session))
+        }
+    }
+
+    // The second of them, landing at the bank after a sync took the first, comes in on the next one.
+    @Test
+    fun alikeRowInALaterSyncComesIn() {
+        withBook { session, _, import ->
+            val first = ParsedImportRow(20261105, "Metro", -290, financialId = "t-1", raw = BOOKED)
+            import.confirm("checking", listOf(first), review = false)
+            val second = ParsedImportRow(20261105, "Metro", -290, financialId = "t-2", raw = BOOKED)
+            assertEquals(1, import.confirm("checking", listOf(first, second), review = false).addedIds.size)
+            assertEquals(2, alive(session))
+        }
+    }
+
+    // A posted charge is not taken for another pending charge of the same amount that the bank still sends as pending.
+    @Test
+    fun postedRowNeverClearsAnotherStillPendingRow() {
+        withBook { session, register, import ->
+            val rows =
+                listOf(
+                    ParsedImportRow(20261108, "Streamer", -1_599, financialId = "p-1", pending = true, raw = UNBOOKED),
+                    ParsedImportRow(20261103, "Music", -1_599, financialId = "b-2", raw = BOOKED),
+                )
+            assertEquals(2, import.confirm("checking", rows, review = false).addedIds.size)
+            assertEquals(0, import.confirm("checking", rows, review = false).addedIds.size)
+            val held = register.read("checking")!!.rows.associateBy { it.payee }
+            assertEquals(true, held.getValue("Streamer").pending)
+            assertEquals(true, held.getValue("Music").cleared)
+            assertEquals(2, alive(session))
+        }
+    }
+
     @Test
     fun lockedOrHandClearedRowsAreNeverPending() {
         assertEquals(true, BankPending.isPending(UNBOOKED, cleared = false, reconciled = false))
