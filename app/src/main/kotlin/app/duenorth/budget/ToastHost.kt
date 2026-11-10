@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,13 +33,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -65,7 +68,7 @@ import kotlin.math.abs
  *
  * - Metro: the Windows Phone 8.1 toast, a square accent strip across the top behind the status bar.
  * - Tile relief: that strip as a raised accent tile just under the status bar.
- * - Mica: a Windows 11 InfoBar card, rounded and tinted by severity, floating above the app bar.
+ * - Mica: a Windows 11 acrylic card washed with the accent (red on failure) and edged in it, above the app bar.
  * - Windows 10 Mobile: the system banner, chrome grey from the top with the app's tile beside the words.
  *
  * A failure is red in every style. The host sits at the app root, over every page, so a toast posted just before a
@@ -231,29 +234,32 @@ private fun TileToast(
     }
 }
 
-/** Windows 11's InfoBar severity tints and badge colors, for light and dark. */
-private object InfoBar {
-    fun tint(
-        failed: Boolean,
-        dark: Boolean,
-    ): Color =
-        when {
-            failed && dark -> Color(0xFF442726)
-            failed -> Color(0xFFFDE7E9)
-            dark -> Color(0xFF393D1B)
-            else -> Color(0xFFDFF6DD)
-        }
+/**
+ * Mica's toast colors, picked on 2026-11-09 from four mockups (an accent wash with a colored edge): the acrylic card
+ * washed with the accent, or with Windows 11's error red on failure, and edged on the left in that same color.
+ */
+private object MicaToastColors {
+    /** How much of the hue washes the card: a little more in dark, where a faint wash disappears. */
+    private const val WASH_LIGHT = 0.09f
+    private const val WASH_DARK = 0.16f
 
-    fun badge(
-        failed: Boolean,
-        dark: Boolean,
-    ): Color =
-        when {
+    /** The toast's own color: the accent for done, Windows 11's error red for failed. */
+    @Composable
+    fun hue(failed: Boolean): Color {
+        val dark = Metro.colors.isDark
+        return when {
             failed && dark -> Color(0xFFFF99A4)
             failed -> Color(0xFFC42B1C)
-            dark -> Color(0xFF6CCB5F)
-            else -> Color(0xFF0F7B0F)
+            dark -> Metro.accent.text
+            else -> Metro.accent.fill
         }
+    }
+
+    @Composable
+    fun card(failed: Boolean): Color {
+        val base = Metro.surface.acrylic.copy(alpha = 1f)
+        return lerp(base, hue(failed), if (Metro.colors.isDark) WASH_DARK else WASH_LIGHT)
+    }
 }
 
 @Composable
@@ -266,18 +272,22 @@ private fun MicaToast(
     val dark = Metro.colors.isDark
     val failed = toast.kind.failed
     val shape = RoundedCornerShape(8.dp)
+    val hue = MicaToastColors.hue(failed)
     Row(
         modifier
             .padding(horizontal = 8.dp, vertical = 8.dp)
             .fillMaxWidth()
             .shadow(12.dp, shape)
-            .background(InfoBar.tint(failed, dark), shape)
+            .clip(shape)
+            .background(MicaToastColors.card(failed))
+            // The colored edge down the left, cut to the card's rounded corners.
+            .drawBehind { drawRect(hue, size = Size(4.dp.toPx(), size.height)) }
             .border(1.dp, Metro.surface.stroke, shape)
-            .padding(start = MetroDimens.Gutter, end = 4.dp, top = 10.dp, bottom = 10.dp),
+            .padding(start = MetroDimens.Gutter + 4.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
     ) {
         Box(
-            Modifier.padding(top = 2.dp).size(20.dp).background(InfoBar.badge(failed, dark), CircleShape),
+            Modifier.padding(top = 2.dp).size(20.dp).background(hue, CircleShape),
             contentAlignment = Alignment.Center,
         ) { StatusGlyph(toast.kind, if (dark) Color.Black else Color.White, size = 12, round = true) }
         Column(Modifier.weight(1f)) {
@@ -314,7 +324,8 @@ private fun Mobile10Toast(
     modifier: Modifier,
 ) {
     val banner = if (Metro.colors.isDark) Color(0xFF2B2B2B) else Color(0xFFE6E6E6)
-    Column(
+    // One line, as Metro's: tile, words, then a compact grey button at the end rather than a full-width one below.
+    Row(
         modifier
             .fillMaxWidth()
             .shadow(8.dp, RectangleShape)
@@ -322,25 +333,22 @@ private fun Mobile10Toast(
             .windowInsetsPadding(WindowInsets.statusBars)
             .metroPress(onDismiss)
             .padding(horizontal = MetroDimens.Gutter, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter)) {
-            Box(Modifier.size(32.dp).background(fill(toast.kind)), contentAlignment = Alignment.Center) {
-                StatusGlyph(toast.kind, onFill(toast.kind))
-            }
-            Column(Modifier.weight(1f)) {
-                MetroText(toast.title, Metro.typography.body.copy(fontWeight = FontWeight.SemiBold))
-                toast.message?.let { MetroText(it, Metro.typography.caption, color = Metro.colors.secondary) }
-            }
+        Box(Modifier.size(32.dp).background(fill(toast.kind)), contentAlignment = Alignment.Center) {
+            StatusGlyph(toast.kind, onFill(toast.kind))
+        }
+        Column(Modifier.weight(1f)) {
+            MetroText(toast.title, Metro.typography.body.copy(fontWeight = FontWeight.SemiBold))
+            toast.message?.let { MetroText(it, Metro.typography.caption, color = Metro.colors.secondary) }
         }
         if (toast.action != null) {
             Box(
                 Modifier
-                    .padding(start = 44.dp, top = 10.dp)
-                    .fillMaxWidth()
-                    .widthIn(min = 120.dp)
                     .background(Metro.colors.foreground.copy(alpha = 0.2f))
                     .then(actionModifier(onAction))
-                    .padding(vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center,
             ) { MetroText(ToastCopy.UNDO, Metro.typography.caption.copy(fontWeight = FontWeight.Normal)) }
         }
