@@ -118,9 +118,10 @@ class ImportBook(
         currency: CurrencySpec,
         candidates: List<ParsedImportRow>,
     ): ImportPreview {
+        val held = matchHeld(accountId, candidates)
         val rows =
             candidates.mapIndexed { index, row ->
-                val dup = findDuplicate(accountId, row) ?: postedPending(accountId, row)
+                val dup = held[index]
                 ImportPreviewRow(
                     index = index,
                     date = row.date,
@@ -145,13 +146,15 @@ class ImportBook(
         val added = mutableListOf<String>()
         var skipped = 0
         session.transaction {
-            candidates.forEach { row ->
-                val held = findDuplicate(accountId, row) ?: postedPending(accountId, row)
+            // Matched before anything is added, so a row added now is never taken for the next one's copy.
+            val matches = matchHeld(accountId, candidates)
+            candidates.forEachIndexed { index, row ->
+                val held = matches[index]
                 if (held != null) {
                     // A row the bank has posted since clears the pending copy, as Actual's sync does.
                     if (!row.pending) settlePending(held, row)
                     skipped++
-                    return@forEach
+                    return@forEachIndexed
                 }
                 val id = insertImported(accountId, row)
                 added += id
@@ -265,7 +268,8 @@ class ImportBook(
         val book = RegisterBook(session, ids)
         val outcome = book.applyRulesForImport(draft, importedPayee = row.importedPayee ?: row.payee, cleared = !row.pending)
         val ruled = outcome.draft
-        val payeeId = book.payeeIdForName(ruled.payee)
+        // A bank row with no payee at all still comes in, with none, as Actual adds it.
+        val payeeId = ruled.payee.takeIf { it.isNotBlank() }?.let { book.payeeIdForName(it) }
         book.insertImportedTransaction(
             id = ruled.id,
             accountId = ruled.accountId,
@@ -291,6 +295,7 @@ class ImportBook(
     private fun postedPending(
         accountId: String,
         row: ParsedImportRow,
+        taken: Set<String>,
     ): String? {
         if (row.pending) return null
         val found =
@@ -304,7 +309,8 @@ class ImportBook(
                     """.trimIndent(),
                     listOf(accountId, row.amountMinor),
                 ).filter {
-                    BankPending.unbooked(it.str("raw_synced_data")) &&
+                    it.str("id") !in taken &&
+                        BankPending.unbooked(it.str("raw_synced_data")) &&
                         MatchFinder.daysBetween(it.long("date").toInt(), row.date) <= BankPending.POSTED_WITHIN_DAYS
                 }
         return found.singleOrNull()?.str("id")
@@ -330,27 +336,49 @@ class ImportBook(
         SyncSchema.writeRow(session, "transactions", id, *values.toTypedArray())
     }
 
-    private fun findDuplicate(
+    /**
+     * The held row each candidate stands for, null for a new one, matched as Actual's sync does: every candidate's
+     * bank id first, then the looser matches (same day, amount and payee; a pending row it posts), each held row taken
+     * once at most. So two alike purchases on one day are two rows, and a row the feed still sends under its own bank
+     * id is never taken for another's copy.
+     */
+    private fun matchHeld(
+        accountId: String,
+        candidates: List<ParsedImportRow>,
+    ): List<String?> {
+        val byId = candidates.map { byFinancialId(accountId, it) }
+        val taken = byId.filterNotNull().toMutableSet()
+        return candidates.mapIndexed { index, row ->
+            byId[index]
+                ?: (sameDayCopy(accountId, row, taken) ?: postedPending(accountId, row, taken))?.also { taken += it }
+        }
+    }
+
+    private fun byFinancialId(
         accountId: String,
         row: ParsedImportRow,
     ): String? {
-        if (!row.financialId.isNullOrBlank()) {
-            // A deleted row counts too: a copy merged away, or a bank row deleted, keeps its bank id, and every sync
-            // fetches the last 90 days again, so without it the dropped copy would come straight back as a new one.
-            val byId =
-                session
-                    .query(
-                        """
-                        SELECT id FROM transactions
-                        WHERE acct = ? AND financial_id = ?
-                        ORDER BY IFNULL(tombstone, 0)
-                        LIMIT 1
-                        """.trimIndent(),
-                        listOf(accountId, row.financialId),
-                    ).firstOrNull()
-                    ?.str("id")
-            if (byId != null) return byId
-        }
+        if (row.financialId.isNullOrBlank()) return null
+        // A deleted row counts too: a copy merged away, or a bank row deleted, keeps its bank id, and every sync
+        // fetches the last 90 days again, so without it the dropped copy would come straight back as a new one.
+        return session
+            .query(
+                """
+                SELECT id FROM transactions
+                WHERE acct = ? AND financial_id = ?
+                ORDER BY IFNULL(tombstone, 0)
+                LIMIT 1
+                """.trimIndent(),
+                listOf(accountId, row.financialId),
+            ).firstOrNull()
+            ?.str("id")
+    }
+
+    private fun sameDayCopy(
+        accountId: String,
+        row: ParsedImportRow,
+        taken: Set<String>,
+    ): String? {
         val payeeId = payeeIdForName(row.payee) ?: return null
         return session
             .query(
@@ -358,11 +386,11 @@ class ImportBook(
                 SELECT id FROM transactions
                 WHERE acct = ? AND IFNULL(tombstone, 0) = 0
                     AND date = ? AND amount = ? AND description = ?
-                LIMIT 1
+                ORDER BY id
                 """.trimIndent(),
                 listOf(accountId, row.date, row.amountMinor, payeeId),
-            ).firstOrNull()
-            ?.str("id")
+            ).mapNotNull { it.str("id") }
+            .firstOrNull { it !in taken }
     }
 
     private fun payeeIdForName(name: String): String? =

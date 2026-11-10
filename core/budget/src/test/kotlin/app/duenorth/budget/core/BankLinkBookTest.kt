@@ -163,6 +163,25 @@ class BankLinkBookTest {
         }
     }
 
+    // Many banks send SimpleFIN no payee: the row still comes in, named by its description, never dropped.
+    @Test
+    fun fetchKeepsRowsWithNoPayee() {
+        withPhone { server, phone, _ ->
+            server.providerData["/simplefin/transactions"] =
+                """
+                {"transactions":{"all":[
+                  {"booked":true,"date":"2026-11-05","payeeName":"","notes":"ATM WITHDRAWAL 123","transactionAmount":{"amount":"-40.00"},"transactionId":"X-1"},
+                  {"booked":true,"date":"2026-11-05","notes":"CHECK 1042","transactionAmount":{"amount":"-120.00"},"transactionId":"X-2"},
+                  {"booked":true,"date":"2026-11-05","transactionAmount":{"amount":"-5.00"},"transactionId":"X-3"}
+                ]}}
+                """.trimIndent()
+            val rows =
+                HttpBankSyncTransport().fetchTransactions(server.baseUrl, phone.sync.syncToken()!!, "ACT-1", "2026-08-01")
+            assertEquals(listOf("ATM WITHDRAWAL 123", "CHECK 1042", ""), rows.map { it.payee })
+            assertEquals(listOf("X-1", "X-2", "X-3"), rows.map { it.financialId })
+        }
+    }
+
     // Actual's server names what broke; each names its own fix (contracts/bank-link.md, Repair).
     @Test
     fun fetchNamesEachSimpleFinErrorAndItsFix() {
