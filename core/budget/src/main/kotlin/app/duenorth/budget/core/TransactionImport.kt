@@ -358,21 +358,51 @@ class ImportBook(
         accountId: String,
         row: ParsedImportRow,
     ): String? {
-        if (row.financialId.isNullOrBlank()) return null
-        // A deleted row counts too: a copy merged away, or a bank row deleted, keeps its bank id, and every sync
-        // fetches the last 90 days again, so without it the dropped copy would come straight back as a new one.
-        return session
+        val financialId = row.financialId?.takeIf { it.isNotBlank() } ?: return null
+        val found =
+            session
+                .query(
+                    """
+                    SELECT id, IFNULL(tombstone, 0) AS gone FROM transactions
+                    WHERE acct = ? AND financial_id = ?
+                    ORDER BY IFNULL(tombstone, 0)
+                    LIMIT 1
+                    """.trimIndent(),
+                    listOf(accountId, financialId),
+                ).firstOrNull() ?: return null
+        val id = found.str("id")
+        if (!found.bool("gone")) return id
+        // A deleted bank row comes back, as Actual's sync brings it back unless the account says not to. A copy merged
+        // away stays gone: every sync fetches the last 90 days again, and the row it was merged into stands in for it.
+        if (!reimportsDeleted(accountId)) return id
+        return id.takeIf { standsIn(accountId, row, financialId) }
+    }
+
+    /** Actual's per-account "reimport deleted transactions" switch, on unless the account turned it off. */
+    private fun reimportsDeleted(accountId: String): Boolean =
+        session
+            .query("SELECT value FROM preferences WHERE id = ?", listOf("sync-reimport-deleted-$accountId"))
+            .firstOrNull()
+            ?.str("value")
+            ?.trim() != "false"
+
+    /**
+     * A live row of the same amount a few days off, holding no copy of this bank id: what a deleted copy was merged
+     * into, by the same measure [foldReturned] uses, so a row brought back is never folded away again.
+     */
+    private fun standsIn(
+        accountId: String,
+        row: ParsedImportRow,
+        financialId: String,
+    ): Boolean =
+        session
             .query(
                 """
-                SELECT id FROM transactions
-                WHERE acct = ? AND financial_id = ?
-                ORDER BY IFNULL(tombstone, 0)
-                LIMIT 1
+                SELECT date FROM transactions
+                WHERE acct = ? AND amount = ? AND IFNULL(tombstone, 0) = 0 AND IFNULL(financial_id, '') <> ?
                 """.trimIndent(),
-                listOf(accountId, row.financialId),
-            ).firstOrNull()
-            ?.str("id")
-    }
+                listOf(accountId, row.amountMinor, financialId),
+            ).any { MatchFinder.daysBetween(it.long("date").toInt(), row.date) <= RETURNED_DAYS }
 
     private fun sameDayCopy(
         accountId: String,

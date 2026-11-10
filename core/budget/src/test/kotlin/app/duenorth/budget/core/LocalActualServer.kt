@@ -56,6 +56,9 @@ class LocalActualServer(
     /** `data` JSON for a provider path such as `/simplefin/accounts`. */
     val providerData: MutableMap<String, String> = java.util.concurrent.ConcurrentHashMap()
 
+    /** Every bank provider call, in order: its path and the body the phone sent. */
+    val providerCalls: MutableList<Pair<String, String>> = java.util.Collections.synchronizedList(mutableListOf())
+
     /** Every `POST /secret`, by name. */
     val secrets: MutableMap<String, String> = java.util.concurrent.ConcurrentHashMap()
 
@@ -229,6 +232,7 @@ class LocalActualServer(
                         .toString(Charsets.UTF_8)
                         .ifBlank { "{}" },
                 ).jsonObject
+        providerCalls += path to body.toString()
         val data =
             when {
                 path == "/secret" -> {
