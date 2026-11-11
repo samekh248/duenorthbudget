@@ -49,7 +49,7 @@ internal class AppRowMenus(
             MetroMenuItem(ScreenBarCopy.RECONCILE, "account-menu-reconcile", run = onRegister(model.reconcile::open))
                 .takeIf { !account.closed },
             MetroMenuItem(BankLinkCopy.TITLE, "account-menu-bank-link", run = onRegister(model.bankLink::open))
-                .takeIf { !account.closed },
+                .takeIf { !account.closed && state.activeInstance != null },
             if (account.closed) {
                 MetroMenuItem(AccountScreenCopy.REOPEN, "account-menu-reopen") { model.accounts.reopen(accountId) }
             } else {

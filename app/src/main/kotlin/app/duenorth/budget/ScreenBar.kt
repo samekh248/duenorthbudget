@@ -275,7 +275,8 @@ object ScreenBar {
                         add(spec("filter", AppGlyph.Filter, LedgerFilterCopy.FILTER))
                         add(spec("reconcile", AppGlyph.Reconcile, ScreenBarCopy.RECONCILE))
                         add(menu("import", AppGlyph.Import, ScreenBarCopy.IMPORT))
-                        add(menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE))
+                        // Bank sync runs through an Actual server, so a phone with none has no bank link to offer.
+                        if (settings.serverActive) add(menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE))
                         add(menu("edit-account", AppGlyph.Settings, AccountScreenCopy.EDIT))
                         if (accountClosed) add(menu("reopen", AppGlyph.Undo, AccountScreenCopy.REOPEN))
                         addAll(objectTail(undoLabel))
