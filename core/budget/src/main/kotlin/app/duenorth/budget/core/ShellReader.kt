@@ -274,9 +274,6 @@ object ShellReader {
             ).forEach { row ->
                 spent[row.long("month").toInt() to row.str("category").orEmpty()] = row.long("spent")
             }
-        if (mode == BudgetMode.ENVELOPE) {
-            applyCardMoves(session, spent)
-        }
         val table = if (mode == BudgetMode.ENVELOPE) "zero_budgets" else "reflect_budgets"
         val assignments =
             session.query(
@@ -381,79 +378,6 @@ object ShellReader {
      * `202609` in files the phone created. Both mean the same month.
      */
     internal fun bufferMonth(id: String?): Int? = id?.replace("-", "")?.toIntOrNull()
-
-    /**
-     * Envelope-only. Adds the negation of card spending and of on-budget card payments
-     * into the payment category's spent. See specs/003-account-register/research.md R3.
-     */
-    private fun applyCardMoves(
-        session: SqlSession,
-        spent: MutableMap<Pair<Int, String>, Long>,
-    ) {
-        val prefix = ActualSchema.CARD_PAYMENT_PREFIX
-        val queries =
-            listOf(
-                """
-                SELECT t.date / 100 AS month, link.value AS payment, SUM(-t.amount) AS moved
-                FROM transactions t
-                JOIN accounts card
-                    ON card.id = t.acct
-                    AND IFNULL(card.tombstone, 0) = 0
-                    AND IFNULL(card.offbudget, 0) = 0
-                    AND card.type = 'credit'
-                JOIN preferences link
-                    ON link.id = ('$prefix' || card.id)
-                    AND IFNULL(link.value, '') != ''
-                JOIN categories spend
-                    ON spend.id = t.category
-                    AND IFNULL(spend.tombstone, 0) = 0
-                    AND IFNULL(spend.is_income, 0) = 0
-                JOIN categories payment
-                    ON payment.id = link.value
-                    AND IFNULL(payment.tombstone, 0) = 0
-                    AND IFNULL(payment.is_income, 0) = 0
-                WHERE $alive
-                    AND t.date IS NOT NULL
-                    AND t.category != link.value
-                    AND t.transferred_id IS NULL
-                GROUP BY t.date / 100, link.value
-                """.trimIndent(),
-                """
-                SELECT t.date / 100 AS month, link.value AS payment, SUM(-t.amount) AS moved
-                FROM transactions t
-                JOIN accounts card
-                    ON card.id = t.acct
-                    AND IFNULL(card.tombstone, 0) = 0
-                    AND IFNULL(card.offbudget, 0) = 0
-                    AND card.type = 'credit'
-                JOIN preferences link
-                    ON link.id = ('$prefix' || card.id)
-                    AND IFNULL(link.value, '') != ''
-                JOIN categories payment
-                    ON payment.id = link.value
-                    AND IFNULL(payment.tombstone, 0) = 0
-                    AND IFNULL(payment.is_income, 0) = 0
-                JOIN transactions other
-                    ON other.id = t.transferred_id
-                    AND IFNULL(other.tombstone, 0) = 0
-                JOIN accounts partner
-                    ON partner.id = other.acct
-                    AND IFNULL(partner.tombstone, 0) = 0
-                    AND IFNULL(partner.offbudget, 0) = 0
-                WHERE $alive
-                    AND t.date IS NOT NULL
-                GROUP BY t.date / 100, link.value
-                """.trimIndent(),
-            )
-        queries.forEach { sql ->
-            session.query(sql).forEach { row ->
-                val category = row.str("payment").orEmpty()
-                if (category.isEmpty()) return@forEach
-                val key = row.long("month").toInt() to category
-                spent[key] = (spent[key] ?: 0L) + row.long("moved")
-            }
-        }
-    }
 
     fun loadCategoryManage(session: SqlSession): CategoryManagePage {
         val groups =
