@@ -129,10 +129,6 @@ object MockBudgets : SampleBudgets {
         account(session, "cash", "Cash", type = "checking", order = 1)
         account(session, "card", "Visa", type = "credit", order = 2)
         account(session, "savings", "Savings", offBudget = true, type = "savings", order = 3)
-        session.exec(
-            "INSERT OR REPLACE INTO preferences (id, value) VALUES (?, ?)",
-            listOf(ActualSchema.cardPaymentKey("card"), "c-card"),
-        )
 
         payee(session, "p-work", "Acme Payroll")
         payee(session, "p-rent", "Oak Street Rent")

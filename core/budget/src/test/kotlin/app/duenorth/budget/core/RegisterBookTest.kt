@@ -366,18 +366,15 @@ class RegisterBookTest {
     }
 
     @Test
-    fun envelopeCardPaymentMovesAndTrackingDoesNot() {
+    fun cardSpendingAndPaymentsLeaveThePaymentCategoryAloneAsActualDoes() {
         db { session, book ->
             session.exec("UPDATE zero_budgets SET amount = 4000 WHERE category = 'c-food'")
-            book.save(draft("debit", account = "checking", amount = -4_000))
-            assertEquals(0L, available(shell(session), "Groceries"))
-            assertEquals(0L, available(shell(session), "Payment"))
-            book.delete("debit", false)
-            session.exec("UPDATE zero_budgets SET amount = 4000 WHERE category = 'c-food'")
+            // An old phone-only link from a card to a payment category no longer moves any money.
+            session.exec("INSERT INTO preferences (id, value) VALUES ('ccPayment:card', 'c-pay')")
             val before = shell(session).headerMinor
             book.save(draft("swipe", account = "card", amount = -4_000, payee = "Store"))
             assertEquals(0L, available(shell(session), "Groceries"))
-            assertEquals(4_000L, available(shell(session), "Payment"))
+            assertEquals(0L, available(shell(session), "Payment"))
             book.save(transfer("bill", to = "card", amount = -4_000))
             val after = shell(session)
             assertEquals(0L, available(after, "Groceries"))
@@ -385,11 +382,6 @@ class RegisterBookTest {
             assertEquals(before, after.headerMinor)
             assertEquals(-4_000L, book.read("checking")!!.balanceMinor)
             assertEquals(0L, book.read("card")!!.balanceMinor)
-        }
-        db(tracking = true) { session, book ->
-            book.save(draft("swipe", account = "card", amount = -4_000, payee = "Store"))
-            assertEquals(0L, available(shell(session), "Groceries"))
-            assertEquals(0L, available(shell(session), "Payment"))
         }
     }
 
@@ -622,10 +614,6 @@ class RegisterBookTest {
             listOf("budgetType", if (tracking) "tracking" else "envelope"),
         )
         session.exec("INSERT OR REPLACE INTO preferences (id, value) VALUES (?, ?)", listOf("currency", "USD"))
-        session.exec(
-            "INSERT OR REPLACE INTO preferences (id, value) VALUES (?, ?)",
-            listOf(ActualSchema.cardPaymentKey("card"), "c-pay"),
-        )
         session.exec(
             "INSERT INTO category_groups (id, name, is_income, sort_order) VALUES ('g-inc', 'Income', 1, 0)",
         )

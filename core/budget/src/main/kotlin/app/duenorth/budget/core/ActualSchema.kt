@@ -2,10 +2,6 @@ package app.duenorth.budget.core
 
 object ActualSchema {
     const val VERSION = "1"
-    const val CARD_PAYMENT_PREFIX = "ccPayment:"
-
-    fun cardPaymentKey(accountId: String): String = CARD_PAYMENT_PREFIX + accountId
-
     val statements: List<String> =
         listOf(
             """
