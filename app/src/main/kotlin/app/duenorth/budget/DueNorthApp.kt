@@ -291,6 +291,8 @@ fun DueNorthApp(model: ShellViewModel) {
                     onUnclearSelected = { model.register.setSelectedCleared(false) },
                     onEndSelecting = model.register::endSelecting,
                     onSearch = model.register::toggleSearch,
+                    onFilter = model.register::toggleFilter,
+                    onClearFilter = model.register::clearFilter,
                     onRemoveTemplate = model.templates::remove,
                     onAddTemplate = { model.templates.openKinds() },
                     onToAutomations = model.templates::switchToAutomations,

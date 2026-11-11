@@ -56,6 +56,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.LedgerFilter
 import app.duenorth.budget.core.MatchCopy
 import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MoneyFormat
@@ -78,6 +79,7 @@ import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
 import app.duenorth.budget.design.theme.Relief
+import java.time.LocalDate
 
 @Composable
 fun RegisterScreen(
@@ -102,8 +104,17 @@ fun RegisterScreen(
     /** A transaction to scroll to and flash, as when opened from a category's recent spending. */
     focus: String? = null,
     onFocused: () -> Unit = {},
+    /** The filters on this register; the rows they drop stay out of the list and out of a search. */
+    filter: LedgerFilter = LedgerFilter.NONE,
+    onFilter: (LedgerFilter) -> Unit = {},
+    /** The filter sheet is up in place of the rows. */
+    filterOpen: Boolean = false,
+    onEditFilter: () -> Unit = {},
+    onClearFilter: () -> Unit = {},
+    today: LocalDate = LocalDate.now(),
 ) {
-    val rows = if (search == null) page.rows else page.searched(search)
+    val filtered = filter.filter(page.rows, today, page.currency.decimals)
+    val rows = if (search == null) filtered else RegisterSearch.filter(filtered, search, page.currency.decimals)
     // Every row the account holds, not just the ones a search keeps, so closing a search brings nothing "new".
     val arrivals = rememberArrivals(page.rows.map { it.id }, key = page.account.id)
     val owed = page.account.type == "credit" && page.balanceMinor < 0
@@ -129,12 +140,34 @@ fun RegisterScreen(
                 color = Metro.accent.text,
             )
         }
+        if (filterOpen) {
+            LedgerFilterSheet(
+                filter,
+                onFilter,
+                page.categories,
+                accounts = null,
+                shown = filtered.size,
+                total = page.rows.size,
+                onClear = onClearFilter,
+                modifier = Modifier.weight(1f).padding(top = MetroDimens.Gutter),
+            )
+            return@Column
+        }
+        if (filter.active) {
+            LedgerFilterStrip(
+                filter.summary(page.categories, page.accounts, page.currency, formatOptions()),
+                filter.count,
+                shown = filtered.size,
+                total = page.rows.size,
+                onEdit = onEditFilter,
+            )
+        }
         if (search != null) {
-            RegisterSearchBar(search, page, shown = rows.size, onSearch = onSearch)
+            RegisterSearchBar(search, page, shown = rows.size, total = filtered.size, onSearch = onSearch)
         }
         if (rows.isEmpty()) {
             MetroText(
-                if (search?.active == true) RegisterSearch.NOTHING else RegisterCopy.NO_TRANSACTIONS,
+                if (search?.active == true || filter.active) RegisterSearch.NOTHING else RegisterCopy.NO_TRANSACTIONS,
                 Metro.typography.body,
                 Modifier.padding(top = MetroDimens.Grid).testTag("register-empty"),
             )
@@ -149,7 +182,7 @@ fun RegisterScreen(
                 modifier = Modifier.weight(1f).padding(top = if (search == null) MetroDimens.Grid else 0.dp),
                 onMatch = onMatch,
                 onNotAMatch = onNotAMatch,
-                searching = search?.active == true,
+                searching = search?.active == true || filter.active,
                 pendingOpen = pendingOpen,
                 rowMenu = rowMenu.takeIf { selection == null },
                 arrivals = arrivals,
@@ -170,6 +203,8 @@ private fun RegisterSearchBar(
     search: RegisterSearch,
     page: RegisterPage,
     shown: Int,
+    /** The rows the search looks through: all of them, or what the filters leave. */
+    total: Int,
     onSearch: (RegisterSearch) -> Unit,
 ) {
     val focus = remember { FocusRequester() }
@@ -195,7 +230,7 @@ private fun RegisterSearchBar(
         }
         if (search.active) {
             MetroText(
-                RegisterSearch.count(shown, page.rows.size),
+                RegisterSearch.count(shown, total),
                 Metro.typography.caption,
                 Modifier.testTag("register-search-count"),
                 color = Metro.colors.secondary,

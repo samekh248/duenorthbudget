@@ -461,7 +461,11 @@ class ShellViewModel(
             register.endSelecting()
             return true
         }
-        // Back closes the register's search before it leaves the account.
+        // Back drops the filter sheet, then the search, before it leaves the account.
+        if (current.registerUi.filterOpen && current.route is ShellRoute.Register && current.confirm == null) {
+            register.closeFilter()
+            return true
+        }
         if (current.registerUi.search != null && current.route is ShellRoute.Register && current.confirm == null) {
             register.closeSearch()
             return true

@@ -6,6 +6,7 @@ import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.InboxRow
+import app.duenorth.budget.core.LedgerFilterCopy
 import app.duenorth.budget.core.MergeCopy
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
@@ -152,6 +153,8 @@ object ScreenBar {
         inboxMerge: Boolean = false,
         /** The open category's available is below zero, so its page offers to cover it. */
         overspent: Boolean = false,
+        /** The register's filter sheet is up: its bar closes it or clears it. */
+        filterOpen: Boolean = false,
     ): List<ScreenBarSpec> =
         when (route) {
             // Spec 012: each settings pivot item has its own bar. Payees has its link on the general page's manage list.
@@ -248,11 +251,18 @@ object ScreenBar {
                         spec("merge-selected", AppGlyph.Merge, MergeCopy.MERGE).takeIf { registerMerge },
                         spec("end-selecting", AppGlyph.Cancel, InboxCopy.CANCEL),
                     )
+                } else if (filterOpen) {
+                    // The filter sheet changes the rows as it goes, so done only closes it.
+                    listOf(
+                        spec("filter-done", AppGlyph.Save, LedgerFilterCopy.DONE),
+                        spec("filter-clear", AppGlyph.Cancel, LedgerFilterCopy.CLEAR_ALL, RegisterCopy.CLEAR),
+                    )
                 } else {
                     // An object page: its verbs on the bar, the rest in the menu, then undo and settings, close last.
                     buildList {
                         add(addTransaction())
                         add(spec("search", AppGlyph.Search, RegisterCopy.SEARCH))
+                        add(spec("filter", AppGlyph.Filter, LedgerFilterCopy.FILTER))
                         add(spec("reconcile", AppGlyph.Reconcile, ScreenBarCopy.RECONCILE))
                         add(menu("import", AppGlyph.Import, ScreenBarCopy.IMPORT))
                         add(menu("bank-link", AppGlyph.Sync, BankLinkCopy.TITLE))
@@ -443,6 +453,7 @@ object ScreenBar {
             registerMerge = registerMerge(state),
             inboxMerge = inboxMerge(state),
             overspent = overspent(state),
+            filterOpen = state.registerUi.filterOpen,
         ).map { spec ->
             ScreenAction(
                 id = spec.id,
@@ -602,6 +613,8 @@ class ScreenBarHandlers(
     val onReconcile: () -> Unit,
     val onImport: () -> Unit,
     val onDismissBankSync: () -> Unit = {},
+    val onFilter: () -> Unit = {},
+    val onClearFilter: () -> Unit = {},
     val onSave: () -> Unit,
     val onCancel: () -> Unit,
     val onFill: (MonthFillKind) -> Unit = {},
@@ -673,6 +686,8 @@ class ScreenBarHandlers(
             "settings" -> onSettings
             "reconcile" -> onReconcile
             "search" -> onSearch
+            "filter", "filter-done" -> onFilter
+            "filter-clear" -> onClearFilter
             "import" -> onImport
             "bank-sync-dismiss" -> onDismissBankSync
             "save" -> onSave
