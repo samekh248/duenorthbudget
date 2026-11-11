@@ -82,6 +82,66 @@ class UndoFlowTest {
         }
     }
 
+    // A deleted bank row stays gone through the next bank sync; undoing the delete brings back that same row, and the
+    // sync after that finds it by its bank id, so nothing doubles. A merge undone works the same way.
+    @Test
+    fun undoingADeletedOrMergedBankRowNeverDoublesIt() {
+        LocalActualServer().use { server ->
+            val remote = server.addFile("Home", phoneFile())
+            SyncPhone(server).use { phone ->
+                phone.openSignedIn(remote)
+                val id = remote.fileId
+                val bank =
+                    ParsedImportRow(20261009, "Cafe", -900, financialId = "fit-9", raw = """{"booked":true,"transactionId":"fit-9"}""")
+                val bankRows = "SELECT COUNT(*) FROM transactions WHERE financial_id = 'fit-9' AND IFNULL(tombstone, 0) = 0"
+                val added =
+                    phone.library
+                        .confirmImport(id, "checking", listOf(bank))!!
+                        .addedIds
+                        .single()
+
+                assertEquals(WriteResult.Saved, phone.library.deleteTransaction(id, added, force = false))
+                assertEquals(
+                    0,
+                    phone.library
+                        .confirmImport(id, "checking", listOf(bank))!!
+                        .addedIds.size,
+                )
+                assertEquals(0L, value(phone, id, bankRows))
+
+                assertEquals(UndoResult.Undone(UndoCopy.DELETE_TRANSACTION), phone.sync.undo(id))
+                assertEquals(1L, value(phone, id, bankRows))
+                assertEquals(
+                    0,
+                    phone.library
+                        .confirmImport(id, "checking", listOf(bank))!!
+                        .addedIds.size,
+                )
+                assertEquals(1L, value(phone, id, bankRows))
+
+                // Merged into a hand-entered copy, then the merge undone: still one bank row, and the entry back.
+                val entered = TransactionDraft("t-entered", "checking", 20261008, "Cafe", -900, "c-food", null)
+                assertEquals(WriteResult.Saved, phone.library.saveTransaction(id, entered))
+                assertEquals(WriteResult.Saved, phone.library.mergeTransactions(id, listOf("t-entered", added), force = false))
+                assertEquals(
+                    0,
+                    phone.library
+                        .confirmImport(id, "checking", listOf(bank))!!
+                        .addedIds.size,
+                )
+                assertEquals(UndoResult.Undone(UndoCopy.MERGE), phone.sync.undo(id))
+                assertEquals(
+                    0,
+                    phone.library
+                        .confirmImport(id, "checking", listOf(bank))!!
+                        .addedIds.size,
+                )
+                assertEquals(1L, value(phone, id, bankRows))
+                assertEquals(0L, value(phone, id, "SELECT IFNULL(tombstone, 0) FROM transactions WHERE id = 't-entered'"))
+            }
+        }
+    }
+
     private fun value(
         phone: SyncPhone,
         budgetId: String,

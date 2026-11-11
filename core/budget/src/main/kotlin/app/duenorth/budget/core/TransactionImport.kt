@@ -158,6 +158,8 @@ class ImportBook(
                 if (held != null) {
                     // A row the bank has posted since clears the pending copy, as Actual's sync does.
                     if (!row.pending) settlePending(held, row, takeAmount = index in matches.newAmount)
+                    // A pending row the person deleted keeps the posted id too, so the next sync finds it by that id.
+                    if (index in matches.deletedPending) rememberPosted(held, row)
                     skipped++
                     return@forEachIndexed
                 }
@@ -167,7 +169,8 @@ class ImportBook(
             if (bankSince != null &&
                 candidates.isNotEmpty()
             ) {
-                dropVanishedPending(accountId, bankSince, matches.held.filterNotNull().toSet())
+                // What this sync just added is sent by the bank too: a pending row added now is never dropped as vanished.
+                dropVanishedPending(accountId, bankSince, matches.held.filterNotNull().toSet() + added)
             }
             if (review && added.isNotEmpty()) {
                 ImportBatch.write(
@@ -350,15 +353,19 @@ class ImportBook(
     private fun postedAs(
         accountId: String,
         row: ParsedImportRow,
+        includeDeleted: Boolean,
     ): String? {
         val financialId = row.financialId?.takeIf { it.isNotBlank() } ?: return null
         if (!row.pending) return null
+        // A posted row the person deleted is still known by its pending copy's id, so that copy stays gone too.
+        val alive = if (includeDeleted) "" else "AND IFNULL(tombstone, 0) = 0"
         return session
             .query(
                 """
                 SELECT id, raw_synced_data FROM transactions
-                WHERE acct = ? AND IFNULL(tombstone, 0) = 0 AND IFNULL(isChild, 0) = 0
+                WHERE acct = ? AND IFNULL(isChild, 0) = 0 $alive
                     AND IFNULL(financial_id, '') <> ? AND instr(raw_synced_data, ?) > 0
+                ORDER BY IFNULL(tombstone, 0)
                 """.trimIndent(),
                 listOf(accountId, financialId, financialId),
             ).firstOrNull { BankPending.bankId(it.str("raw_synced_data")) == financialId }
@@ -408,8 +415,66 @@ class ImportBook(
                     amount = it.long("amount"),
                     payeeId = it.str("description"),
                     importedPayee = it.str("imported_description"),
+                    raw = it.str("raw_synced_data"),
                 )
             }
+
+    /**
+     * Pending bank rows the person deleted (or merged away) that the bank has not posted yet: the bank posts each under
+     * a new id, so that posted copy is known by these, the way [postedPending] knows it by a live one. Rows the sync
+     * itself deleted because the bank dropped them are not among them.
+     */
+    private fun deletedPendingRows(
+        accountId: String,
+        amount: Long,
+    ): List<PendingRow> =
+        session
+            .query(
+                """
+                SELECT t.id, t.date, t.amount, t.description, t.imported_description, t.raw_synced_data, t.financial_id
+                FROM transactions t
+                WHERE t.acct = ? AND t.amount = ? AND IFNULL(t.tombstone, 0) = 1
+                    AND IFNULL(t.isParent, 0) = 0 AND IFNULL(t.isChild, 0) = 0 AND t.transferred_id IS NULL
+                    AND IFNULL(t.cleared, 0) = 0 AND IFNULL(t.reconciled, 0) = 0 AND t.raw_synced_data IS NOT NULL
+                """.trimIndent(),
+                listOf(accountId, amount),
+            ).filter {
+                val raw = it.str("raw_synced_data")
+                val pendingId = BankPending.bankId(raw)
+                // One already known by a posted id was matched before; it is found by that id now.
+                BankPending.unbooked(raw) && !BankPending.dropped(raw) &&
+                    (pendingId == null || pendingId == it.str("financial_id"))
+            }.map {
+                PendingRow(
+                    id = it.str("id").orEmpty(),
+                    date = it.long("date").toInt(),
+                    amount = it.long("amount"),
+                    payeeId = it.str("description"),
+                    importedPayee = it.str("imported_description"),
+                    raw = it.str("raw_synced_data"),
+                )
+            }
+
+    /**
+     * The one deleted pending row a newly posted bank row stands for, matched as [postedPending] matches a live one:
+     * the same amount within a few days, and with two to choose from, neither.
+     */
+    private fun postedDeletedPending(
+        accountId: String,
+        row: ParsedImportRow,
+        taken: Set<String>,
+        heldByPending: Set<String>,
+    ): String? {
+        if (row.pending) return null
+        val near =
+            deletedPendingRows(accountId, row.amountMinor).filter {
+                MatchFinder.daysBetween(it.date, row.date) <=
+                    BankPending.POSTED_WITHIN_DAYS
+            }
+        val free = near.filter { it.id !in taken }
+        if (free.isNotEmpty()) return free.singleOrNull()?.id
+        return near.filter { it.id in heldByPending && samePayee(it, row) }.singleOrNull()?.id
+    }
 
     private data class PendingRow(
         val id: String,
@@ -417,6 +482,7 @@ class ImportBook(
         val amount: Long,
         val payeeId: String?,
         val importedPayee: String?,
+        val raw: String? = null,
     )
 
     private fun samePayee(
@@ -439,7 +505,25 @@ class ImportBook(
     ) {
         pendingRows(accountId)
             .filter { it.date >= since && it.id !in held }
-            .forEach { SyncSchema.writeRow(session, "transactions", it.id, "tombstone" to 1) }
+            .forEach {
+                // Marked, so this row is never taken for one the person deleted: the bank may post the charge later.
+                SyncSchema.writeRow(
+                    session,
+                    "transactions",
+                    it.id,
+                    "tombstone" to 1,
+                    "raw_synced_data" to BankPending.markDropped(it.raw),
+                )
+            }
+    }
+
+    /** Gives a deleted pending row the id its posted copy came with, keeping the pending copy, as [settlePending] does. */
+    private fun rememberPosted(
+        id: String,
+        row: ParsedImportRow,
+    ) {
+        val financialId = row.financialId?.takeIf { it.isNotBlank() } ?: return
+        SyncSchema.writeRow(session, "transactions", id, "financial_id" to financialId)
     }
 
     /**
@@ -471,6 +555,8 @@ class ImportBook(
         val held: List<String?>,
         /** Candidates that clear a pending row posted at another amount. */
         val newAmount: Set<Int>,
+        /** Candidates that are the posted copy of a pending row the person deleted. */
+        val deletedPending: Set<Int> = emptySet(),
     )
 
     /**
@@ -484,7 +570,8 @@ class ImportBook(
         candidates: List<ParsedImportRow>,
         bankSince: Int?,
     ): HeldMatches {
-        val byId = candidates.map { byFinancialId(accountId, it) ?: postedAs(accountId, it) }
+        val remembers = !reimportsDeleted(accountId)
+        val byId = candidates.map { byFinancialId(accountId, it) ?: postedAs(accountId, it, includeDeleted = remembers) }
         val taken = byId.filterNotNull().toMutableSet()
         val heldByPending =
             candidates.indices
@@ -514,7 +601,19 @@ class ImportBook(
                 }
             }
         }
-        return HeldMatches(held, newAmount)
+        // Last, a posted row nothing live stands for may be the posted copy of a pending row the person deleted.
+        val deletedPending = mutableSetOf<Int>()
+        if (remembers) {
+            candidates.forEachIndexed { index, row ->
+                if (held[index] != null) return@forEachIndexed
+                postedDeletedPending(accountId, row, taken + held.filterNotNull(), heldByPending)?.let {
+                    held[index] = it
+                    taken += it
+                    deletedPending += index
+                }
+            }
+        }
+        return HeldMatches(held, newAmount, deletedPending)
     }
 
     private fun byFinancialId(
@@ -535,19 +634,24 @@ class ImportBook(
                 ).firstOrNull() ?: return null
         val id = found.str("id")
         if (!found.bool("gone")) return id
-        // A deleted bank row comes back, as Actual's sync brings it back unless the account says not to. A copy merged
-        // away stays gone: every sync fetches the last 90 days again, and the row it was merged into stands in for it.
+        // A deleted or merged-away bank row stays gone: every sync fetches the last 90 days again, and the deleted row
+        // keeps the bank's id so the sync knows it. Undoing the delete brings back that same row, so nothing doubles.
+        // Only an account that turned Actual's "reimport deleted" switch on gets deleted rows back, and then not a copy
+        // merged away, which the row it was merged into stands in for.
         if (!reimportsDeleted(accountId)) return id
         return id.takeIf { standsIn(accountId, row, financialId) }
     }
 
-    /** Actual's per-account "reimport deleted transactions" switch, on unless the account turned it off. */
+    /**
+     * Actual's per-account "reimport deleted transactions" switch. Off unless the account turned it on: people delete
+     * a bank row to be rid of it, and one that came back on every sync read as the delete not working.
+     */
     private fun reimportsDeleted(accountId: String): Boolean =
         session
             .query("SELECT value FROM preferences WHERE id = ?", listOf("sync-reimport-deleted-$accountId"))
             .firstOrNull()
             ?.str("value")
-            ?.trim() != "false"
+            ?.trim() == "true"
 
     /**
      * A live row of the same amount a few days off, holding no copy of this bank id: what a deleted copy was merged

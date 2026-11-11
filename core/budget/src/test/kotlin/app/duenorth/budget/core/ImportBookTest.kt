@@ -155,10 +155,25 @@ class ImportBookTest {
         }
     }
 
-    // A bank row deleted with nothing standing in for it comes back, as Actual's sync brings it back by default.
+    // Every sync fetches the last 90 days again: a bank row the person deleted keeps its bank id and stays gone.
     @Test
-    fun deletedBankRowWithNothingInItsPlaceComesBack() {
+    fun deletedBankRowStaysGone() {
         withBook { session, _, import ->
+            insert(session, "deleted", 20261010, "fit-9", tombstone = 1, amount = -900)
+            val row = ParsedImportRow(20261010, "Cafe", -900, financialId = "fit-9", raw = BOOKED)
+            val result = import.confirm("checking", listOf(row), review = false, bankSince = 20260801)
+            assertEquals(0, result.addedIds.size)
+            assertEquals(1, result.skipped)
+            assertEquals(0, import.confirm("checking", listOf(row), review = false, bankSince = 20260801).addedIds.size)
+            assertEquals(0, alive(session))
+        }
+    }
+
+    // An account that turned Actual's "reimport deleted" switch on gets a deleted row back, once.
+    @Test
+    fun deletedBankRowComesBackWhenTheAccountSaysSo() {
+        withBook { session, _, import ->
+            session.exec("INSERT INTO preferences (id, value) VALUES ('sync-reimport-deleted-checking', 'true')")
             insert(session, "deleted", 20261010, "fit-9", tombstone = 1, amount = -900)
             val row = ParsedImportRow(20261010, "Cafe", -900, financialId = "fit-9", raw = BOOKED)
             assertEquals(1, import.confirm("checking", listOf(row), review = false).addedIds.size)
@@ -167,7 +182,7 @@ class ImportBookTest {
         }
     }
 
-    // The account's own "don't reimport deleted" switch, set in Actual, keeps it gone.
+    // The switch turned off, as Actual writes it, keeps it gone too.
     @Test
     fun deletedBankRowStaysGoneWhenTheAccountSaysSo() {
         withBook { session, _, import ->
@@ -176,6 +191,94 @@ class ImportBookTest {
             val row = ParsedImportRow(20261010, "Cafe", -900, financialId = "fit-9", raw = BOOKED)
             assertEquals(0, import.confirm("checking", listOf(row), review = false).addedIds.size)
             assertEquals(0, alive(session))
+        }
+    }
+
+    // A pending row a bank sync adds is one the bank sent: the same sync never drops it as vanished.
+    @Test
+    fun pendingRowAddedBySyncStays() {
+        withBook { session, register, import ->
+            val pending = ParsedImportRow(20261101, "Streamer", -1_599, financialId = "p-1", pending = true, raw = UNBOOKED)
+            assertEquals(1, import.confirm("checking", listOf(pending), review = false, bankSince = 20260801).addedIds.size)
+            assertEquals(1, alive(session))
+            assertEquals(
+                true,
+                register
+                    .read("checking")!!
+                    .rows
+                    .single()
+                    .pending,
+            )
+            assertEquals(0, import.confirm("checking", listOf(pending), review = false, bankSince = 20260801).addedIds.size)
+            assertEquals(1, alive(session))
+        }
+    }
+
+    // A pending row deleted before it posted: the bank posts it under a new id, and that copy stays gone as well,
+    // on this sync and every one after, even once the bank stops sending the pending copy.
+    @Test
+    fun deletedPendingRowStaysGoneOnceItPosts() {
+        withBook { session, _, import ->
+            val pending = ParsedImportRow(20261101, "Streamer", -1_599, financialId = "p-1", pending = true, raw = UNBOOKED)
+            val added = import.confirm("checking", listOf(pending), review = false, bankSince = 20260801).addedIds.single()
+            RegisterBook(session).delete(added, force = false)
+            assertEquals(0, import.confirm("checking", listOf(pending), review = false, bankSince = 20260801).addedIds.size)
+
+            val posted = ParsedImportRow(20261103, "Streamer", -1_599, financialId = "b-2", raw = BOOKED)
+            assertEquals(0, import.confirm("checking", listOf(pending, posted), review = false, bankSince = 20260801).addedIds.size)
+            assertEquals(0, import.confirm("checking", listOf(posted), review = false, bankSince = 20260801).addedIds.size)
+            assertEquals(0, alive(session))
+            // The deleted row now holds the posted id, so the next sync knows it by that id alone.
+            assertEquals(
+                "b-2",
+                session.query("SELECT financial_id FROM transactions WHERE id = ?", listOf(added)).single().str("financial_id"),
+            )
+        }
+    }
+
+    // A pending row the bank dropped (a hold released) is not one the person deleted: a charge posted later comes in.
+    @Test
+    fun pendingRowTheBankDroppedLetsALaterChargeIn() {
+        withBook { session, _, import ->
+            val pending = ParsedImportRow(20261101, "Hotel", -10_000, financialId = "p-1", pending = true, raw = UNBOOKED)
+            assertEquals(1, import.confirm("checking", listOf(pending), review = false, bankSince = 20260801).addedIds.size)
+            val other = ParsedImportRow(20261020, "Cafe", -500, financialId = "b-0", raw = BOOKED)
+            assertEquals(1, import.confirm("checking", listOf(other), review = false, bankSince = 20260801).addedIds.size)
+            assertEquals(1, alive(session))
+
+            val posted = ParsedImportRow(20261104, "Hotel", -10_000, financialId = "b-2", raw = BOOKED)
+            assertEquals(1, import.confirm("checking", listOf(other, posted), review = false, bankSince = 20260801).addedIds.size)
+            assertEquals(2, alive(session))
+        }
+    }
+
+    // A posted row deleted after it cleared its pending copy: the pending copy the bank still sends stays gone too.
+    @Test
+    fun deletedPostedRowKeepsItsPendingCopyAway() {
+        withBook { session, _, import ->
+            val pending = ParsedImportRow(20261101, "Streamer", -1_599, financialId = "p-1", pending = true, raw = UNBOOKED)
+            val posted = ParsedImportRow(20261103, "Streamer", -1_599, financialId = "b-2", raw = BOOKED)
+            val id = import.confirm("checking", listOf(pending), review = false, bankSince = 20260801).addedIds.single()
+            assertEquals(0, import.confirm("checking", listOf(pending, posted), review = false, bankSince = 20260801).addedIds.size)
+            RegisterBook(session).delete(id, force = false)
+
+            assertEquals(0, import.confirm("checking", listOf(pending, posted), review = false, bankSince = 20260801).addedIds.size)
+            assertEquals(0, alive(session))
+        }
+    }
+
+    // A bank row merged into a hand-entered one stays one row, though the bank sends it on every sync.
+    @Test
+    fun bankRowMergedIntoAnEntryStaysMerged() {
+        withBook { session, register, import ->
+            register.save(draft("entered", date = 20261005, payee = "Cafe", amount = -700))
+            val bank = ParsedImportRow(20261007, "CAFE 123", -700, financialId = "fit-7", raw = BOOKED)
+            val added = import.confirm("checking", listOf(bank), review = false, bankSince = 20260801).addedIds.single()
+            assertEquals(WriteResult.Saved, MergeBook(session).merge(listOf("entered", added), force = false))
+            assertEquals(1, alive(session))
+
+            assertEquals(0, import.confirm("checking", listOf(bank), review = false, bankSince = 20260801).addedIds.size)
+            assertEquals(1, alive(session))
         }
     }
 
