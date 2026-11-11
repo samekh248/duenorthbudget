@@ -2,7 +2,9 @@ package app.duenorth.budget.core
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -27,6 +29,13 @@ object BankPending {
         if (rawSyncedData.isNullOrBlank() || !rawSyncedData.contains("booked")) return false
         val row = runCatching { json.parseToJsonElement(rawSyncedData) as? JsonObject }.getOrNull() ?: return false
         return row["booked"]?.jsonPrimitive?.booleanOrNull == false
+    }
+
+    /** The bank's own id for the row in its copy: what it sent while the row was pending, for a row cleared since. */
+    fun bankId(rawSyncedData: String?): String? {
+        if (rawSyncedData.isNullOrBlank()) return null
+        val row = runCatching { json.parseToJsonElement(rawSyncedData) as? JsonObject }.getOrNull() ?: return null
+        return (row["transactionId"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
     }
 
     /**

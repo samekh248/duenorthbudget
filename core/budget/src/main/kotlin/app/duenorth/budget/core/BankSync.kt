@@ -67,6 +67,8 @@ data class BankFetch(
     val rows: List<ParsedImportRow>,
     val balanceMinor: Long?,
     val error: BankSyncException? = null,
+    /** The first day asked for, as `yyyyMMdd`; a pending row from then on that the bank no longer sends is dropped. */
+    val since: Int? = null,
 )
 
 class HttpBankSyncTransport : BankSyncTransport {
@@ -473,7 +475,9 @@ class BankSyncBook(
         ids: () -> String,
     ): Int {
         val rows = ownIds(account, fetch.rows)
-        val added = ImportBook(session, ids).confirm(account.accountId, rows, review = false).addedIds.size
+        // Only an answer with nothing wrong in it says which pending rows the bank dropped.
+        val since = fetch.since?.takeIf { fetch.error == null }
+        val added = ImportBook(session, ids).confirm(account.accountId, rows, review = false, bankSince = since).addedIds.size
         // Kept fresh on every sync, as Actual's own sync does, so the assistant can compare it with the register.
         fetch.balanceMinor?.let { SyncSchema.write(session, "accounts", account.accountId, "balance_current", it) }
         SyncSchema.write(session, "accounts", account.accountId, "last_sync", nowMillis.toString())
@@ -532,7 +536,7 @@ class BankSyncBook(
                 if (fetch.rows.isEmpty() && fetch.error != null) return@forEach
                 // One account the budget could not take stops only that account, not the ones after it.
                 try {
-                    added += store(account, fetch)
+                    added += store(account, fetch.copy(since = startDate(today)))
                 } catch (error: Exception) {
                     if (fetch.error == null) fail(account, error)
                 }
@@ -547,6 +551,11 @@ class BankSyncBook(
         private fun startIso(today: LocalDate): String {
             val start = today.minusDays(89)
             return String.format("%04d-%02d-%02d", start.year, start.monthValue, start.dayOfMonth)
+        }
+
+        private fun startDate(today: LocalDate): Int {
+            val start = today.minusDays(89)
+            return start.year * 10_000 + start.monthValue * 100 + start.dayOfMonth
         }
 
         /** Gives a GoCardless row named by the bank's internal id the account's own id, as Actual names it. */
