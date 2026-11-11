@@ -103,6 +103,8 @@ fun HomePivot(
     onGesture: (Boolean) -> Unit,
     onSection: (Int) -> Unit = {},
     onAccount: (String) -> Unit = {},
+    /** The accounts total: every account's transactions in one ledger. */
+    onAllAccounts: (() -> Unit)? = null,
     onInbox: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     onSelectMonth: (YearMonth) -> Unit = {},
@@ -241,6 +243,7 @@ fun HomePivot(
                             formatOptions = formatOptions,
                             reorder = accountsReorder,
                             onMove = onMoveAccount,
+                            onAllAccounts = onAllAccounts,
                         )
                     }
                 },
@@ -893,6 +896,8 @@ fun AccountsSection(
     formatOptions: FormatOptions = formatOptions(),
     reorder: Boolean = false,
     onMove: (String, String?) -> Unit = { _, _ -> },
+    /** The total up top opens every account's transactions in one ledger; null leaves it a plain figure. */
+    onAllAccounts: (() -> Unit)? = null,
 ) {
     if (accounts.isEmpty()) {
         MetroText(
@@ -934,11 +939,19 @@ fun AccountsSection(
         )
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
+        // Reorder holds the list still, so the total opens nothing while it is on.
+        val openAll = onAllAccounts?.takeUnless { reorder }
         BudgetTotal(
             label = ShellCopy.ALL_ACCOUNTS,
             amount = money(open.sumOf { it.balanceMinor }),
             amountColor = Metro.accent.text,
             amountTag = "accounts-total",
+            modifier =
+                if (openAll == null) {
+                    Modifier
+                } else {
+                    Modifier.fillMaxWidth().metroPress(openAll).testTag("accounts-total-open")
+                },
         )
         if (reorder) {
             MetroText(
