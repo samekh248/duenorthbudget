@@ -322,6 +322,8 @@ fun TransactionForm(
                     expense = expense,
                     onExpense = { expense = it },
                     sample = amountSample(page, numberFormat),
+                    decimals = page.currency.decimals,
+                    numberFormat = numberFormat,
                 )
             }
             if (showCategories) {
@@ -363,6 +365,7 @@ fun TransactionForm(
                         left = total - splits.indices.sumOf { splitAmount(it) ?: 0L },
                         total = total,
                         expense = expense,
+                        numberFormat = numberFormat,
                         format = { MoneyFormat.format(it, page.currency, FormatOptions(hideFraction, numberFormat)) },
                         onLine = { index, line ->
                             // A line takes the transaction's sign, so a minus on one turns the whole of it to expense.
@@ -483,6 +486,7 @@ private fun SplitLines(
     left: Long,
     total: Long,
     expense: Boolean,
+    numberFormat: String,
     format: (Long) -> String,
     onLine: (Int, SplitLine) -> Unit,
     onRemove: (Int) -> Unit,
@@ -505,12 +509,14 @@ private fun SplitLines(
                         onOpenFull = { onOpenFull(index) },
                         trailing = { id -> CategoryBalance(options.available(id), currency, style = Metro.typography.control) },
                     )
-                    MetroField(
+                    AmountField(
                         line.amount,
                         { onLine(index, line.copy(amount = it)) },
                         // The rest line's hint is what it takes, until an amount typed on it fixes it.
                         if (index == restIndex) rest else TransactionFormCopy.AMOUNT,
                         Modifier.width(SPLIT_AMOUNT_WIDTH).testTag("transaction-split-$index-amount"),
+                        decimals = currency.decimals,
+                        numberFormat = numberFormat,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         fill = false,
                     )
@@ -907,17 +913,21 @@ private fun AmountLine(
     expense: Boolean,
     onExpense: (Boolean) -> Unit,
     sample: String,
+    decimals: Int,
+    numberFormat: String,
 ) {
     val width = rememberFieldWidth(sample, Metro.typography.control)
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(MetroDimens.Gutter),
         verticalArrangement = Arrangement.spacedBy(MetroDimens.FieldLabelGap),
     ) {
-        MetroField(
+        AmountField(
             amount,
             onAmount,
             TransactionFormCopy.AMOUNT,
             Modifier.width(width).testTag("amount-field"),
+            decimals = decimals,
+            numberFormat = numberFormat,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             fill = false,
         )

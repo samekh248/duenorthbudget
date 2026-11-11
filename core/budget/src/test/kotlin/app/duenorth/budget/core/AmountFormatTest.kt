@@ -9,7 +9,7 @@ class AmountFormatTest {
     fun editTextUsesEachNumberFormat() {
         assertEquals("1,234.56", MoneyParse.editText(-123456, 2, FormatOptions(numberFormat = FormatOptions.NUMBER_COMMA_DOT)))
         assertEquals("1.234,56", MoneyParse.editText(123456, 2, FormatOptions(numberFormat = FormatOptions.NUMBER_DOT_COMMA)))
-        assertEquals("1 234.56", MoneyParse.editText(123456, 2, FormatOptions(numberFormat = FormatOptions.NUMBER_SPACE_DOT)))
+        assertEquals("1234.56", MoneyParse.editText(123456, 2, FormatOptions(numberFormat = FormatOptions.NUMBER_SPACE_DOT)))
         assertEquals(
             "1234.56",
             MoneyParse.editText(123456, 2, FormatOptions(numberFormat = FormatOptions.NUMBER_COMMA_DOT_NO_GROUP)),

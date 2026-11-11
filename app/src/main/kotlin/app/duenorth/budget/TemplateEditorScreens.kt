@@ -850,7 +850,7 @@ fun TemplateEditorScreen(
         @Composable
         fun capFields(optional: Boolean) {
             label(if (optional) "hold no more than (leave empty for no cap)" else "keep it no more than")
-            MetroField(cap, { cap = it }, if (optional) "no cap" else "0", Modifier.testTag("template-cap"), keyboardOptions = number)
+            AmountField(cap, { cap = it }, if (optional) "no cap" else "0", Modifier.testTag("template-cap"), decimals, number)
             if (!optional || cap.isNotBlank()) {
                 label("each")
                 MetroComboBox(
@@ -877,12 +877,13 @@ fun TemplateEditorScreen(
             if (adjust != 0) {
                 label(if (adjust == 1) TemplateAdjustCopy.MORE_BY else TemplateAdjustCopy.LESS_BY)
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
-                    MetroField(
+                    AmountField(
                         adjustBy,
                         { adjustBy = it },
                         "10",
                         Modifier.weight(1f).testTag("template-adjust-by"),
-                        keyboardOptions = number,
+                        decimals,
+                        number,
                     )
                     MetroSegmentedToggle(
                         "%",
@@ -908,12 +909,12 @@ fun TemplateEditorScreen(
         when (kind) {
             TemplateKind.MONTHLY -> {
                 label("amount each month")
-                MetroField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), keyboardOptions = number)
+                AmountField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), decimals, number)
                 if (capped) capFields(optional = true)
             }
             TemplateKind.REPEAT -> {
                 label("amount each time")
-                MetroField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), keyboardOptions = number)
+                AmountField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), decimals, number)
                 label("every")
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
                     MetroField(every, { every = it }, "1", Modifier.weight(1f).testTag("template-every"), keyboardOptions = whole)
@@ -940,14 +941,14 @@ fun TemplateEditorScreen(
                 )
             TemplateKind.BY_DATE -> {
                 label("amount")
-                MetroField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), keyboardOptions = number)
+                AmountField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), decimals, number)
                 label("by")
                 months(byMonth, "template-month") { byMonth = it }
                 repeatFields()
             }
             TemplateKind.SPEND -> {
                 label("amount to spend")
-                MetroField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), keyboardOptions = number)
+                AmountField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), decimals, number)
                 label("by")
                 months(byMonth, "template-month") { byMonth = it }
                 label("counting what's budgeted from")
@@ -1006,7 +1007,7 @@ fun TemplateEditorScreen(
             }
             TemplateKind.GOAL -> {
                 label("goal")
-                MetroField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), keyboardOptions = number)
+                AmountField(amount, { amount = it }, "0", Modifier.testTag("template-amount"), decimals, number)
             }
         }
         val previewAmount = preview?.takeIf { it.first == draft }?.second

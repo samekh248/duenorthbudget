@@ -186,7 +186,13 @@ fun IncomeCategoryScreen(
             Modifier.testTag("income-received"),
         )
         if (shell.mode == BudgetMode.TRACKING) {
-            MetroField(amount, { amount = it }, IncomeCopy.BUDGETED, Modifier.testTag("income-budget-amount"))
+            AmountField(
+                amount,
+                { amount = it },
+                IncomeCopy.BUDGETED,
+                Modifier.testTag("income-budget-amount"),
+                decimals = shell.currency.decimals,
+            )
             if (error != null) WarningText(error)
             RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
             if (!formSaveOnBar()) {

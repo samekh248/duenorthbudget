@@ -279,9 +279,13 @@ fun ScheduleEditorScreen(
             listOf("is" to ScheduleScreenCopy.EXACTLY, "isapprox" to ScheduleScreenCopy.ABOUT, "isbetween" to ScheduleScreenCopy.BETWEEN)
                 .forEach { (op, label) -> Choice(label, form.amountOp == op, "schedule-amount-$op") { form = form.copy(amountOp = op) } }
         }
-        MetroField(form.amount, { form = form.copy(amount = it) }, ScheduleScreenCopy.AMOUNT, Modifier.testTag("schedule-amount"))
+        AmountField(form.amount, {
+            form = form.copy(amount = it)
+        }, ScheduleScreenCopy.AMOUNT, Modifier.testTag("schedule-amount"), decimals = decimals)
         if (form.amountOp == "isbetween") {
-            MetroField(form.amount2, { form = form.copy(amount2 = it) }, ScheduleScreenCopy.AMOUNT_TO, Modifier.testTag("schedule-amount2"))
+            AmountField(form.amount2, {
+                form = form.copy(amount2 = it)
+            }, ScheduleScreenCopy.AMOUNT_TO, Modifier.testTag("schedule-amount2"), decimals = decimals)
         }
         Heading(ScheduleScreenCopy.ACCOUNT)
         Choices {

@@ -165,6 +165,7 @@ fun ReconcileRegisterScreen(
                 dateText = DateFormats.withWeekday(date, prefs.dateFormat),
                 onPickDate = { picking = date },
                 error = error,
+                decimals = decimals,
             )
         } else {
             ReconcileHeader(page, tally(rows))
@@ -198,6 +199,7 @@ private fun StartPanel(
     dateText: String,
     onPickDate: () -> Unit,
     error: String?,
+    decimals: Int,
 ) {
     Column(
         Modifier
@@ -209,7 +211,7 @@ private fun StartPanel(
     ) {
         MetroText(ReconcileCopy.RECONCILE, Metro.typography.caption, color = Metro.accent.text)
         Label(ReconcileCopy.STATEMENT_BALANCE, Modifier.padding(top = 8.dp))
-        MetroField(balance, onBalance, ReconcileCopy.STATEMENT, Modifier.testTag("statement-balance"))
+        AmountField(balance, onBalance, ReconcileCopy.STATEMENT, Modifier.testTag("statement-balance"), decimals = decimals)
         MetroText(ReconcileCopy.PREFILLED, Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
         Label(ReconcileCopy.STATEMENT_DATE, Modifier.padding(top = 10.dp))
         Box(Modifier.widthIn(max = 240.dp).fillMaxWidth().controlFrame()) {
