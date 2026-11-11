@@ -428,6 +428,7 @@ fun DueNorthApp(model: ShellViewModel) {
                         is ShellRoute.Reconcile -> ReconcileRoute(state, model, fill)
                         is ShellRoute.ReviewCategory -> ReviewCategoryRoute(state, model, fill)
                         is ShellRoute.CategoryBudget -> CategoryBudgetRoute(route, state, model, fill)
+                        is ShellRoute.Ledger -> LedgerRoute(route, state, model, fill)
                         is ShellRoute.MoveCategory -> MoveCategoryRoute(route, state, model, fill)
                         is ShellRoute.CoverCategory -> CoverCategoryRoute(route, state, model, fill)
                         ShellRoute.HoldMonth -> HoldMonthRoute(state, model, fill)

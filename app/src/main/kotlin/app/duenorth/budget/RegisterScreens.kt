@@ -56,6 +56,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.MatchCopy
 import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MoneyFormat
@@ -306,7 +307,7 @@ private fun RegisterList(
                 val line: @Composable (RegisterRow, Boolean, Dp) -> Unit = { row, banded, air ->
                     RegisterLine(
                         row,
-                        page,
+                        page.currency,
                         banded = banded,
                         picked = selection?.let { row.id in it },
                         onPress = { onPress(row.id) },
@@ -349,7 +350,7 @@ private fun RegisterList(
                             day.forEach { row ->
                                 RegisterLine(
                                     row,
-                                    page,
+                                    page.currency,
                                     banded = false,
                                     picked = selection?.let { row.id in it },
                                     onPress = { onPress(row.id) },
@@ -384,7 +385,7 @@ private fun RegisterList(
             items(day, key = { it.id }) { row ->
                 RegisterLine(
                     row,
-                    page,
+                    page.currency,
                     banded = ledgerBanded(position.getValue(row.id)),
                     picked = selection?.let { row.id in it },
                     onPress = { onPress(row.id) },
@@ -486,7 +487,7 @@ private fun RegisterMatch(
                     ).forEach { (row, detail) ->
                         RegisterLine(
                             row,
-                            page,
+                            page.currency,
                             banded = false,
                             picked = null,
                             onPress = { onPress(row.id) },
@@ -520,7 +521,7 @@ internal fun registerDays(rows: List<RegisterRow>): List<List<RegisterRow>> =
 @Composable
 internal fun RegisterLine(
     row: RegisterRow,
-    page: RegisterPage,
+    currency: CurrencySpec,
     banded: Boolean,
     picked: Boolean?,
     onPress: () -> Unit,
@@ -561,8 +562,8 @@ internal fun RegisterLine(
             row.payee,
             transfer = row.transferAccountId != null,
             detail = detail,
-            amount = MoneyFormat.format(row.amountMinor, page.currency, options),
-            parts = row.parts.map { it.categoryName to MoneyFormat.format(it.amountMinor, page.currency, options) },
+            amount = MoneyFormat.format(row.amountMinor, currency, options),
+            parts = row.parts.map { it.categoryName to MoneyFormat.format(it.amountMinor, currency, options) },
         )
     // A relief style marks cleared with a small square key at the row's end instead of the edge bar: standing up
     // and dim when not cleared, pressed in and filled with the accent when cleared.
@@ -678,7 +679,7 @@ internal fun RegisterLine(
                 )
             }
             MetroText(
-                MoneyFormat.format(row.amountMinor, page.currency, formatOptions()),
+                MoneyFormat.format(row.amountMinor, currency, formatOptions()),
                 Metro.typography.body.copy(textAlign = TextAlign.End),
                 Modifier.weight(LEDGER_FIGURE * 2).testTag("register-amount-${row.id}"),
                 color = accent,
@@ -701,7 +702,7 @@ internal fun RegisterLine(
                     maxLines = 2,
                 )
                 MetroText(
-                    MoneyFormat.format(part.amountMinor, page.currency, formatOptions()),
+                    MoneyFormat.format(part.amountMinor, currency, formatOptions()),
                     Metro.typography.caption.copy(textAlign = TextAlign.End),
                     Modifier.weight(LEDGER_FIGURE * 2),
                     color = Metro.colors.foreground,

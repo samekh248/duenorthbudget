@@ -56,6 +56,7 @@ object SectionTitle {
                 ShellRoute.BankSyncReport,
                 -> HomeSections.ACCOUNTS
                 is ShellRoute.CategoryBudget,
+                is ShellRoute.Ledger,
                 is ShellRoute.TemplateKinds,
                 is ShellRoute.TemplateEditor,
                 is ShellRoute.MoveCategory,

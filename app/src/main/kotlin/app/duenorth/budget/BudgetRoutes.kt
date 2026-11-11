@@ -72,7 +72,7 @@ internal fun CategoryBudgetRoute(
                 onOpenTemplate = model.templates::openTemplate,
                 onMoveTemplate = model.templates::move,
                 recent = state.categoryMonth,
-                onSeeAll = { model.openReviewCategory(route.categoryId) },
+                onSeeAll = { model.openLedger(route.categoryId) },
                 onOpenTransaction = { row -> model.register.openTransaction(row.accountId, row.registerId) },
             )
             LaunchedEffect(state.templates.note, state.templates.automations, shell.month) { model.templates.refreshAmounts() }
@@ -80,6 +80,30 @@ internal fun CategoryBudgetRoute(
             LaunchedEffect(route.categoryId, shell) { model.loadCategoryMonth(route.categoryId) }
         }
     }
+}
+
+/** A category's "see all": the ledger, filtered to it until the chip clears the filter. */
+@Composable
+internal fun LedgerRoute(
+    route: ShellRoute.Ledger,
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val page = state.ledger?.takeIf { it.categoryId == route.categoryId }
+    if (page == null) {
+        Placeholder()
+    } else {
+        LedgerScreen(
+            page = page,
+            onGesture = model::setGesture,
+            onOpen = { entry -> model.register.openTransaction(entry.accountId, entry.registerId) },
+            onClearFilter = model::clearLedgerFilter,
+            modifier = modifier,
+        )
+    }
+    // Read again whenever the budget's figures change, so a transaction edited from here shows as saved.
+    LaunchedEffect(route.categoryId, state.shell) { model.loadLedger(route.categoryId) }
 }
 
 @Composable

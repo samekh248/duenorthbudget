@@ -527,9 +527,10 @@ class ShellViewModel(
         }
         if (current.route.isRegisterFlow() || current.route.isHomeFlow()) {
             val previous = if (history.isEmpty()) ShellRoute.Home else history.removeLast()
+            // The ledger opens from a category page, so it keeps that page's month for the way back.
             val leavePin =
                 previous == ShellRoute.Home ||
-                    !previous.pinsMonth()
+                    !(previous.pinsMonth() || previous is ShellRoute.Ledger)
             _state.update {
                 it.copy(
                     route = previous,
@@ -616,6 +617,31 @@ class ShellViewModel(
 
     override fun onCleared() {
         if (library.onLocalChange === localChange) library.onLocalChange = null
+    }
+
+    /** A category page's "see all": the ledger, filtered to [categoryId]. Back returns to the category. */
+    fun openLedger(categoryId: String) {
+        push(ShellRoute.Ledger(categoryId))
+        _state.update { it.copy(ledger = null) }
+        loadLedger(categoryId)
+    }
+
+    /** Clears the ledger's category filter in place, so back still returns to the page that opened it. */
+    fun clearLedgerFilter() {
+        if (_state.value.route !is ShellRoute.Ledger) return
+        _state.update { it.copy(route = ShellRoute.Ledger(null), ledger = null) }
+        loadLedger(null)
+    }
+
+    /** Reads the ledger, filtered to [categoryId] when set. A read for a filter since changed is dropped. */
+    fun loadLedger(categoryId: String?) {
+        val budgetId = _state.value.settings.openBudgetId ?: return
+        viewModelScope.launch {
+            val page = withContext(io) { library.readLedger(budgetId, categoryId) }
+            _state.update {
+                if ((it.route as? ShellRoute.Ledger)?.categoryId != categoryId) it else it.copy(ledger = page)
+            }
+        }
     }
 
     fun openReviewCategory(categoryId: String) {

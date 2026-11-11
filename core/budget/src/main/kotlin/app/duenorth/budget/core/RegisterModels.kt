@@ -118,6 +118,35 @@ data class RegisterPage(
     fun searched(search: RegisterSearch): List<RegisterRow> = RegisterSearch.filter(rows, search, currency.decimals)
 }
 
+/** A row of the all-accounts ledger: a register row, the account it sits in, and the register row a tap opens. */
+data class LedgerRow(
+    val row: RegisterRow,
+    val accountId: String,
+    val accountName: String,
+    /** A split's part opens as its parent, the row its register lists. */
+    val registerId: String = row.id,
+)
+
+/** Every account's transactions, newest first; with [categoryId] only that category's, across all dates. */
+data class LedgerPage(
+    val currency: CurrencySpec,
+    /** The category the ledger is filtered to; null when it shows everything. */
+    val categoryId: String?,
+    val categoryName: String?,
+    val rows: List<LedgerRow>,
+) {
+    val totalMinor: Long get() = rows.sumOf { it.row.amountMinor }
+}
+
+object LedgerCopy {
+    const val TITLE = "transactions"
+    const val CATEGORY = "category"
+    const val ALL_ACCOUNTS = "all accounts"
+    const val TOTAL = "total"
+    const val CLEAR_FILTER = "clear category filter"
+    const val NO_TRANSACTIONS = "no transactions in this category"
+}
+
 /** Which rows the register's search keeps besides the typed text. */
 enum class RegisterShow(
     val label: String,

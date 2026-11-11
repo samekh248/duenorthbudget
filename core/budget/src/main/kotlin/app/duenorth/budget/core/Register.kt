@@ -235,48 +235,7 @@ class RegisterBook(
                     ORDER BY t.date DESC, t.sort_order DESC, t.id DESC
                     """.trimIndent(),
                     listOf(accountId),
-                ).map { row ->
-                    val id = row.str("id").orEmpty()
-                    val parent = row.bool("isParent")
-                    val categoryId = row.str("category")
-                    val categoryName = row.str("category_name").orEmpty()
-                    val transferId = row.str("transferred_id")
-                    val label =
-                        when {
-                            parent -> RegisterCopy.SPLIT
-                            categoryName.isNotBlank() -> categoryName
-                            transferId != null -> RegisterCopy.TRANSFER
-                            else -> RegisterCopy.NO_CATEGORY
-                        }
-                    val transferAccount = row.str("transfer_acct")
-                    val amount = row.long("amount")
-                    RegisterRow(
-                        id = id,
-                        date = row.long("date").toInt(),
-                        payee =
-                            if (transferAccount != null) {
-                                RegisterEntry.transferLabel(
-                                    amount,
-                                    row.str("transfer_name").orEmpty().ifBlank { row.str("payee").orEmpty() },
-                                )
-                            } else {
-                                row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE }
-                            },
-                        categoryId = categoryId,
-                        categoryLabel = label,
-                        amountMinor = row.long("amount"),
-                        note = row.str("notes").orEmpty(),
-                        reconciled = row.bool("reconciled"),
-                        transferId = transferId,
-                        partnerOffBudget = row.optionalBool("partner_off"),
-                        partnerCategoryId = row.str("partner_category"),
-                        parent = parent,
-                        parts = parts[id].orEmpty(),
-                        cleared = row.bool("cleared"),
-                        transferAccountId = transferAccount,
-                        pending = BankPending.isPending(row.str("raw_synced_data"), row.bool("cleared"), row.bool("reconciled")),
-                    )
-                }
+                ).map { registerRow(it, parts) }
         return RegisterPage(
             account =
                 RegisterAccount(
@@ -293,6 +252,141 @@ class RegisterBook(
             accounts = accounts(),
             matches = MatchFinder.find(session, accountId),
             suggestions = CategorySuggester(session).index(),
+        )
+    }
+
+    /**
+     * Every account's transactions, newest first, each with the account it sits in. With [categoryId] it keeps only
+     * what is filed under that category, all dates: a split shows as its matching parts, each opening its parent.
+     * Null when [categoryId] names no live category.
+     */
+    fun ledger(categoryId: String?): LedgerPage? {
+        val categoryName =
+            categoryId?.let { id ->
+                session
+                    .query("SELECT name FROM categories WHERE id = ? AND IFNULL(tombstone, 0) = 0", listOf(id))
+                    .firstOrNull()
+                    ?.str("name")
+                    ?: return null
+            }
+        val parts = if (categoryId == null) loadParts(null) else emptyMap()
+        val which =
+            if (categoryId == null) {
+                "IFNULL(t.isChild, 0) = 0"
+            } else {
+                // A part whose parent is gone is gone with it.
+                """
+                IFNULL(t.isParent, 0) = 0
+                AND t.category = ?
+                AND (IFNULL(t.isChild, 0) = 0 OR (par.id IS NOT NULL AND IFNULL(par.tombstone, 0) = 0))
+                """.trimIndent()
+            }
+        val rows =
+            session
+                .query(
+                    """
+                    SELECT
+                        t.id AS id,
+                        t.date AS date,
+                        t.amount AS amount,
+                        t.notes AS notes,
+                        t.category AS category,
+                        t.isParent AS isParent,
+                        COALESCE(par.reconciled, t.reconciled) AS reconciled,
+                        COALESCE(par.cleared, t.cleared) AS cleared,
+                        COALESCE(par.raw_synced_data, t.raw_synced_data) AS raw_synced_data,
+                        t.transferred_id AS transferred_id,
+                        COALESCE(p.name, pp.name, '') AS payee,
+                        p.transfer_acct AS transfer_acct,
+                        COALESCE(target.name, '') AS transfer_name,
+                        COALESCE(c.name, '') AS category_name,
+                        other.category AS partner_category,
+                        partner.offbudget AS partner_off,
+                        t.acct AS acct,
+                        a.name AS account_name,
+                        COALESCE(par.id, t.id) AS register_id
+                    FROM transactions t
+                    JOIN accounts a
+                        ON a.id = t.acct AND IFNULL(a.tombstone, 0) = 0
+                    LEFT JOIN transactions par
+                        ON IFNULL(t.isChild, 0) = 1 AND par.id = t.parent_id
+                    LEFT JOIN payees p
+                        ON p.id = t.description AND IFNULL(p.tombstone, 0) = 0
+                    LEFT JOIN payees pp
+                        ON pp.id = par.description AND IFNULL(pp.tombstone, 0) = 0
+                    LEFT JOIN accounts target
+                        ON target.id = p.transfer_acct
+                    LEFT JOIN categories c
+                        ON c.id = t.category AND IFNULL(c.tombstone, 0) = 0
+                    LEFT JOIN transactions other
+                        ON other.id = t.transferred_id AND IFNULL(other.tombstone, 0) = 0
+                    LEFT JOIN accounts partner
+                        ON partner.id = other.acct
+                    WHERE IFNULL(t.tombstone, 0) = 0
+                        AND $which
+                    ORDER BY t.date DESC, COALESCE(par.sort_order, t.sort_order) DESC, t.id DESC
+                    """.trimIndent(),
+                    listOfNotNull(categoryId),
+                ).map { row ->
+                    LedgerRow(
+                        row = registerRow(row, parts),
+                        accountId = row.str("acct").orEmpty(),
+                        accountName = row.str("account_name").orEmpty(),
+                        registerId = row.str("register_id") ?: row.str("id").orEmpty(),
+                    )
+                }
+        return LedgerPage(
+            currency = currency(),
+            categoryId = categoryId,
+            categoryName = categoryName,
+            rows = rows,
+        )
+    }
+
+    /** One register row from a transaction query's columns, with a split parent's [parts]. */
+    private fun registerRow(
+        row: SqlRow,
+        parts: Map<String, List<RegisterPart>>,
+    ): RegisterRow {
+        val id = row.str("id").orEmpty()
+        val parent = row.bool("isParent")
+        val categoryId = row.str("category")
+        val categoryName = row.str("category_name").orEmpty()
+        val transferId = row.str("transferred_id")
+        val label =
+            when {
+                parent -> RegisterCopy.SPLIT
+                categoryName.isNotBlank() -> categoryName
+                transferId != null -> RegisterCopy.TRANSFER
+                else -> RegisterCopy.NO_CATEGORY
+            }
+        val transferAccount = row.str("transfer_acct")
+        val amount = row.long("amount")
+        return RegisterRow(
+            id = id,
+            date = row.long("date").toInt(),
+            payee =
+                if (transferAccount != null) {
+                    RegisterEntry.transferLabel(
+                        amount,
+                        row.str("transfer_name").orEmpty().ifBlank { row.str("payee").orEmpty() },
+                    )
+                } else {
+                    row.str("payee").orEmpty().ifBlank { ShellCopy.NO_PAYEE }
+                },
+            categoryId = categoryId,
+            categoryLabel = label,
+            amountMinor = row.long("amount"),
+            note = row.str("notes").orEmpty(),
+            reconciled = row.bool("reconciled"),
+            transferId = transferId,
+            partnerOffBudget = row.optionalBool("partner_off"),
+            partnerCategoryId = row.str("partner_category"),
+            parent = parent,
+            parts = parts[id].orEmpty(),
+            cleared = row.bool("cleared"),
+            transferAccountId = transferAccount,
+            pending = BankPending.isPending(row.str("raw_synced_data"), row.bool("cleared"), row.bool("reconciled")),
         )
     }
 
@@ -870,7 +964,8 @@ class RegisterBook(
         return box[0]
     }
 
-    private fun loadParts(accountId: String): Map<String, List<RegisterPart>> {
+    /** Split parts by parent id: [accountId]'s, or every account's when null. */
+    private fun loadParts(accountId: String?): Map<String, List<RegisterPart>> {
         val grouped = linkedMapOf<String, MutableList<RegisterPart>>()
         session
             .query(
@@ -883,12 +978,12 @@ class RegisterBook(
                 LEFT JOIN categories c ON c.id = t.category AND IFNULL(c.tombstone, 0) = 0
                 LEFT JOIN transactions p ON p.id = t.parent_id
                 LEFT JOIN payees lp ON lp.id = t.description
-                WHERE t.acct = ?
+                WHERE (? IS NULL OR t.acct = ?)
                     AND IFNULL(t.tombstone, 0) = 0
                     AND IFNULL(t.isChild, 0) = 1
                 ORDER BY t.sort_order, t.id
                 """.trimIndent(),
-                listOf(accountId),
+                listOf(accountId, accountId),
             ).forEach { row ->
                 val parentId = row.str("parent_id").orEmpty()
                 val part =
