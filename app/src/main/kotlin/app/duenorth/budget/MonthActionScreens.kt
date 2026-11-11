@@ -123,7 +123,7 @@ fun ToBudgetScreen(
             Modifier.testTag("to-budget-header"),
             color = Metro.colors.secondary,
         )
-        MetroField(amount, { amount = it }, "amount", Modifier.testTag("to-budget-amount"))
+        AmountField(amount, { amount = it }, "amount", Modifier.testTag("to-budget-amount"), decimals = shell.currency.decimals)
         if (error != null) WarningText(error, Modifier.testTag("to-budget-error"))
         RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
         if (!formSaveOnBar()) {

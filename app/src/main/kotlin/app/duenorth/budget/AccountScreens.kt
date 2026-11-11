@@ -88,7 +88,7 @@ fun AddAccountScreen(
     ) {
         MetroText(AccountScreenCopy.ADD, Metro.typography.header)
         MetroField(name, { name = it }, AccountScreenCopy.NAME, Modifier.testTag("account-add-name"))
-        MetroField(balance, { balance = it }, AccountScreenCopy.BALANCE, Modifier.testTag("account-add-balance"))
+        AmountField(balance, { balance = it }, AccountScreenCopy.BALANCE, Modifier.testTag("account-add-balance"))
         Row {
             Choice(AccountScreenCopy.ON_BUDGET, !offBudget, "account-add-on") { offBudget = false }
             Choice(AccountScreenCopy.OFF_BUDGET, offBudget, "account-add-off") { offBudget = true }
@@ -133,11 +133,12 @@ fun EditAccountScreen(
         MetroField(note, { note = it }, AccountScreenCopy.NOTE, Modifier.testTag("account-edit-note"), lines = 2..6)
         if (account.linked) {
             Column {
-                MetroField(
+                AmountField(
                     minimum,
                     { minimum = it },
                     AccountScreenCopy.BANK_MINIMUM,
                     Modifier.testTag("account-edit-bank-minimum"),
+                    decimals = decimals,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 )
                 MetroText(

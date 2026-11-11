@@ -5,6 +5,7 @@ import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.MoneyFormat
+import app.duenorth.budget.core.MoneyInput
 import app.duenorth.budget.core.MoneyMath
 import app.duenorth.budget.core.MonthFillCopy
 import app.duenorth.budget.core.MonthFillKind
@@ -158,7 +159,15 @@ class BudgetEditHolder internal constructor(
                     // A negative result would read back as "take this off", so it stays as typed.
                     if (minor == null || minor < 0) edit.text else prefs.editAmount(minor, decimals)
                 }
-                else -> edit.text + key
+                else ->
+                    MoneyInput.filter(
+                        edit.text,
+                        edit.text + key,
+                        state.formatPrefs.numberFormat,
+                        state.shell
+                            ?.currency
+                            ?.decimals ?: 2,
+                    )
             }
         host.mutate { it.copy(budgetEdit = edit.copy(text = text), editError = null) }
     }

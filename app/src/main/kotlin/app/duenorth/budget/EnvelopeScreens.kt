@@ -328,7 +328,7 @@ private fun BudgetedField(
     Column(Modifier.fillMaxWidth()) {
         MetroText(label, Metro.typography.caption, Modifier.padding(bottom = MetroDimens.FieldLabelGap), color = Metro.colors.secondary)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            MetroField(amount, onAmount, "budgeted", Modifier.weight(1f).testTag("category-budget-amount"))
+            AmountField(amount, onAmount, "budgeted", Modifier.weight(1f).testTag("category-budget-amount"), decimals = currency.decimals)
             if (template != null) {
                 val filled = amount.trim() == template
                 Box(
@@ -423,7 +423,13 @@ fun MoveCategoryScreen(
             Modifier.padding(top = 4.dp).testTag("move-from-available"),
             color = Metro.colors.secondary,
         )
-        MetroField(amount, { amount = it }, "amount", Modifier.padding(top = MetroDimens.Gutter).testTag("move-amount"))
+        AmountField(
+            amount,
+            { amount = it },
+            "amount",
+            Modifier.padding(top = MetroDimens.Gutter).testTag("move-amount"),
+            decimals = money.decimals,
+        )
         // Quick picks: everything the category has, or what the picked category is overspent by.
         val target = shell.groups.flatMap { it.categories }.firstOrNull { it.id == toId }
         val cover =
@@ -595,7 +601,7 @@ fun CoverCategoryScreen(
             Modifier.padding(top = 4.dp).testTag("cover-available"),
             color = if (to.availableMinor + moved < 0) Metro.colors.error else Metro.colors.secondary,
         )
-        MetroField(
+        AmountField(
             amount,
             {
                 amount = it
@@ -603,6 +609,7 @@ fun CoverCategoryScreen(
             },
             "amount",
             Modifier.padding(top = MetroDimens.Gutter).testTag("cover-amount"),
+            decimals = money.decimals,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Grid)) {
             if (short > 0) {
@@ -696,7 +703,7 @@ fun HoldMonthScreen(
                 color = Metro.colors.secondary,
             )
         }
-        MetroField(amount, { amount = it }, "amount for next month")
+        AmountField(amount, { amount = it }, "amount for next month", decimals = shell.currency.decimals)
         if (error != null) WarningText(error)
         RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
         MetroButtonGrid {

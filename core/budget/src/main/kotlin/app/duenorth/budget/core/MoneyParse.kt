@@ -44,6 +44,7 @@ object MoneyParse {
     /**
      * An amount as it starts out in a box: the format's separators, no symbol, no sign. With hide decimals on,
      * the fraction is left off only when it is zero, so saving never drops cents the person cannot see.
+     * A box takes no whitespace ([MoneyInput]), so a format that groups with spaces is written ungrouped.
      */
     fun editText(
         minor: Long,
@@ -53,7 +54,7 @@ object MoneyParse {
         val absolute = if (minor == Long.MIN_VALUE) Long.MAX_VALUE else kotlin.math.abs(minor)
         val (groupSep, decimalSep) = MoneyFormat.separators(options.numberFormat)
         val scale = scale(decimals)
-        val whole = MoneyFormat.group(absolute / scale, groupSep)
+        val whole = MoneyFormat.group(absolute / scale, groupSep.takeUnless { it.isBlank() }.orEmpty())
         val fraction = absolute % scale
         if (decimals == 0 || (options.hideFraction && fraction == 0L)) return whole
         return whole + decimalSep + fraction.toString().padStart(decimals, '0')

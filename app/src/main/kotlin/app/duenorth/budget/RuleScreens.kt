@@ -513,6 +513,9 @@ internal fun PartPage(
                 // A rule names saved payees only, so the list offers no new one.
                 val payees = remember(names) { names.payees.values.sortedBy { it.lowercase() } }
                 PayeeField(text, { text = it }, payees, hint, "$tag-value", offerNew = false)
+            } else if (RuleFields.type(field) == "number" && op != "isbetween") {
+                // "between" takes two amounts in words, such as "10 and 50", so only a single amount is held to one.
+                AmountField(text, { text = it }, hint, Modifier.testTag("$tag-value"), decimals)
             } else {
                 MetroField(text, { text = it }, hint, Modifier.testTag("$tag-value"))
             }
