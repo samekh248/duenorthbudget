@@ -118,7 +118,7 @@ class ImportBook(
         currency: CurrencySpec,
         candidates: List<ParsedImportRow>,
     ): ImportPreview {
-        val held = matchHeld(accountId, candidates)
+        val held = matchHeld(accountId, candidates, bankSince = null).held
         val rows =
             candidates.mapIndexed { index, row ->
                 val dup = held[index]
@@ -136,28 +136,38 @@ class ImportBook(
         return ImportPreview(accountId, currency, rows, adding, rows.size - adding)
     }
 
-    /** Adds the rows that are not duplicates; [review] keeps them as the batch the review page shows. */
+    /**
+     * Adds the rows that are not duplicates; [review] keeps them as the batch the review page shows. A bank sync passes
+     * [bankSince], the first day it asked the bank for: a pending row from then on that nothing the bank sent stands
+     * for any more was dropped by the bank (a hold released, or posted at another amount and cleared here), so it goes.
+     */
     fun confirm(
         accountId: String,
         candidates: List<ParsedImportRow>,
         review: Boolean = true,
+        bankSince: Int? = null,
     ): ImportConfirmResult {
         val batchId = ids()
         val added = mutableListOf<String>()
         var skipped = 0
         session.transaction {
             // Matched before anything is added, so a row added now is never taken for the next one's copy.
-            val matches = matchHeld(accountId, candidates)
+            val matches = matchHeld(accountId, candidates, bankSince)
             candidates.forEachIndexed { index, row ->
-                val held = matches[index]
+                val held = matches.held[index]
                 if (held != null) {
                     // A row the bank has posted since clears the pending copy, as Actual's sync does.
-                    if (!row.pending) settlePending(held, row)
+                    if (!row.pending) settlePending(held, row, takeAmount = index in matches.newAmount)
                     skipped++
                     return@forEachIndexed
                 }
                 val id = insertImported(accountId, row)
                 added += id
+            }
+            if (bankSince != null &&
+                candidates.isNotEmpty()
+            ) {
+                dropVanishedPending(accountId, bankSince, matches.held.filterNotNull().toSet())
             }
             if (review && added.isNotEmpty()) {
                 ImportBatch.write(
@@ -290,36 +300,157 @@ class ImportBook(
 
     /**
      * The one pending row a newly posted bank row stands for: banks give the posted row a new id, so it is found by
-     * its amount within a few days, as Actual matches it. With two to choose from, neither is taken.
+     * its amount within a few days, as Actual matches it. With two to choose from, neither is taken. A pending row that
+     * a pending copy still sent by the bank holds is taken too when the payee is the same: the first sync after the
+     * bank posts a charge often carries both copies.
      */
     private fun postedPending(
         accountId: String,
         row: ParsedImportRow,
         taken: Set<String>,
+        heldByPending: Set<String>,
     ): String? {
         if (row.pending) return null
-        val found =
-            session
-                .query(
-                    """
-                    SELECT id, date, raw_synced_data FROM transactions
-                    WHERE acct = ? AND amount = ? AND IFNULL(tombstone, 0) = 0
-                        AND IFNULL(cleared, 0) = 0 AND IFNULL(reconciled, 0) = 0
-                        AND IFNULL(isChild, 0) = 0 AND raw_synced_data IS NOT NULL
-                    """.trimIndent(),
-                    listOf(accountId, row.amountMinor),
-                ).filter {
-                    it.str("id") !in taken &&
-                        BankPending.unbooked(it.str("raw_synced_data")) &&
-                        MatchFinder.daysBetween(it.long("date").toInt(), row.date) <= BankPending.POSTED_WITHIN_DAYS
-                }
-        return found.singleOrNull()?.str("id")
+        val near =
+            pendingRows(accountId).filter {
+                it.amount == row.amountMinor && MatchFinder.daysBetween(it.date, row.date) <= BankPending.POSTED_WITHIN_DAYS
+            }
+        val free = near.filter { it.id !in taken }
+        if (free.isNotEmpty()) return free.singleOrNull()?.id
+        return near.filter { it.id in heldByPending && samePayee(it, row) }.singleOrNull()?.id
     }
 
-    /** Clears a pending row the bank has now posted, and takes the posted row's id so the next sync knows it. */
+    /**
+     * A tip or a fuel hold: the bank posts another amount under a new id and stops sending the pending copy. The one
+     * pending row of the same payee within a few days that nothing in this fetch still holds is that charge.
+     */
+    private fun postedAtAnotherAmount(
+        accountId: String,
+        row: ParsedImportRow,
+        since: Int,
+        taken: Set<String>,
+    ): String? {
+        if (row.pending || row.amountMinor == 0L) return null
+        return pendingRows(accountId)
+            .filter {
+                it.id !in taken &&
+                    it.date >= since &&
+                    it.amount != row.amountMinor &&
+                    (it.amount < 0) == (row.amountMinor < 0) &&
+                    MatchFinder.daysBetween(it.date, row.date) <= BankPending.POSTED_WITHIN_DAYS &&
+                    samePayee(it, row)
+            }.singleOrNull()
+            ?.id
+    }
+
+    /**
+     * The row a pending bank row has already posted as: it took the posted id when it was cleared, and kept the
+     * pending copy (as Actual's sync keeps it) whose bank id is this one.
+     */
+    private fun postedAs(
+        accountId: String,
+        row: ParsedImportRow,
+    ): String? {
+        val financialId = row.financialId?.takeIf { it.isNotBlank() } ?: return null
+        if (!row.pending) return null
+        return session
+            .query(
+                """
+                SELECT id, raw_synced_data FROM transactions
+                WHERE acct = ? AND IFNULL(tombstone, 0) = 0 AND IFNULL(isChild, 0) = 0
+                    AND IFNULL(financial_id, '') <> ? AND instr(raw_synced_data, ?) > 0
+                """.trimIndent(),
+                listOf(accountId, financialId, financialId),
+            ).firstOrNull { BankPending.bankId(it.str("raw_synced_data")) == financialId }
+            ?.str("id")
+    }
+
+    /**
+     * A pending copy of a row this fetch's posted copy already holds, cleared by a build that kept only the posted
+     * copy: the same day, amount and payee as that cleared row.
+     */
+    private fun postedSameDay(
+        accountId: String,
+        row: ParsedImportRow,
+        heldByPosted: Set<String>,
+    ): String? {
+        if (!row.pending || heldByPosted.isEmpty()) return null
+        val payeeId = payeeIdForName(row.payee) ?: return null
+        return session
+            .query(
+                """
+                SELECT id FROM transactions
+                WHERE acct = ? AND IFNULL(tombstone, 0) = 0 AND IFNULL(cleared, 0) = 1
+                    AND date = ? AND amount = ? AND description = ?
+                ORDER BY id
+                """.trimIndent(),
+                listOf(accountId, row.date, row.amountMinor, payeeId),
+            ).mapNotNull { it.str("id") }
+            .firstOrNull { it in heldByPosted }
+    }
+
+    /** Live bank rows not posted yet, the kind a bank sync may clear or drop: no splits, transfers or locked rows. */
+    private fun pendingRows(accountId: String): List<PendingRow> =
+        session
+            .query(
+                """
+                SELECT t.id, t.date, t.amount, t.description, t.imported_description, t.raw_synced_data
+                FROM transactions t
+                WHERE t.acct = ? AND ${MatchFinder.candidate("t")}
+                    AND IFNULL(t.cleared, 0) = 0 AND t.raw_synced_data IS NOT NULL
+                """.trimIndent(),
+                listOf(accountId),
+            ).filter { BankPending.unbooked(it.str("raw_synced_data")) }
+            .map {
+                PendingRow(
+                    id = it.str("id").orEmpty(),
+                    date = it.long("date").toInt(),
+                    amount = it.long("amount"),
+                    payeeId = it.str("description"),
+                    importedPayee = it.str("imported_description"),
+                )
+            }
+
+    private data class PendingRow(
+        val id: String,
+        val date: Int,
+        val amount: Long,
+        val payeeId: String?,
+        val importedPayee: String?,
+    )
+
+    private fun samePayee(
+        held: PendingRow,
+        row: ParsedImportRow,
+    ): Boolean {
+        val theirs = listOfNotNull(row.payee, row.importedPayee).map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        val ours =
+            listOfNotNull(held.importedPayee, held.payeeId?.let { payeeName(it) })
+                .map { it.trim().lowercase() }
+                .filter { it.isNotEmpty() }
+        return theirs.any { it in ours }
+    }
+
+    /** Pending rows from [since] on that nothing the bank sent this time stands for: the bank dropped them. */
+    private fun dropVanishedPending(
+        accountId: String,
+        since: Int,
+        held: Set<String>,
+    ) {
+        pendingRows(accountId)
+            .filter { it.date >= since && it.id !in held }
+            .forEach { SyncSchema.writeRow(session, "transactions", it.id, "tombstone" to 1) }
+    }
+
+    /**
+     * Clears a pending row the bank has now posted, and takes the posted row's id so the next sync knows it. The
+     * pending copy stays in `raw_synced_data`, as Actual's sync keeps it, so the pending id still finds the row while
+     * the bank goes on sending it. [takeAmount]: the bank posted another amount (a tip, a fuel hold).
+     */
     private fun settlePending(
         id: String,
         row: ParsedImportRow,
+        takeAmount: Boolean,
     ) {
         val held =
             session
@@ -332,26 +463,58 @@ class ImportBook(
         }
         val values = mutableListOf<Pair<String, Any?>>("cleared" to 1)
         if (!row.financialId.isNullOrBlank()) values += "financial_id" to row.financialId
-        if (row.raw != null) values += "raw_synced_data" to row.raw
+        if (takeAmount) values += "amount" to row.amountMinor
         SyncSchema.writeRow(session, "transactions", id, *values.toTypedArray())
     }
+
+    private class HeldMatches(
+        val held: List<String?>,
+        /** Candidates that clear a pending row posted at another amount. */
+        val newAmount: Set<Int>,
+    )
 
     /**
      * The held row each candidate stands for, null for a new one, matched as Actual's sync does: every candidate's
      * bank id first, then the looser matches (same day, amount and payee; a pending row it posts), each held row taken
      * once at most. So two alike purchases on one day are two rows, and a row the feed still sends under its own bank
-     * id is never taken for another's copy.
+     * id is never taken for another's copy. A pending copy the bank still sends after the row posted finds that row.
      */
     private fun matchHeld(
         accountId: String,
         candidates: List<ParsedImportRow>,
-    ): List<String?> {
-        val byId = candidates.map { byFinancialId(accountId, it) }
+        bankSince: Int?,
+    ): HeldMatches {
+        val byId = candidates.map { byFinancialId(accountId, it) ?: postedAs(accountId, it) }
         val taken = byId.filterNotNull().toMutableSet()
-        return candidates.mapIndexed { index, row ->
-            byId[index]
-                ?: (sameDayCopy(accountId, row, taken) ?: postedPending(accountId, row, taken))?.also { taken += it }
+        val heldByPending =
+            candidates.indices
+                .filter { candidates[it].pending }
+                .mapNotNull { byId[it] }
+                .toSet()
+        val heldByPosted =
+            candidates.indices
+                .filter { !candidates[it].pending }
+                .mapNotNull { byId[it] }
+                .toSet()
+        val newAmount = mutableSetOf<Int>()
+        val held =
+            candidates
+                .mapIndexed { index, row ->
+                    byId[index]
+                        ?: postedSameDay(accountId, row, heldByPosted)
+                        ?: (sameDayCopy(accountId, row, taken) ?: postedPending(accountId, row, taken, heldByPending))?.also { taken += it }
+                }.toMutableList()
+        if (bankSince != null) {
+            candidates.forEachIndexed { index, row ->
+                if (held[index] != null) return@forEachIndexed
+                postedAtAnotherAmount(accountId, row, bankSince, taken + held.filterNotNull())?.let {
+                    held[index] = it
+                    taken += it
+                    newAmount += index
+                }
+            }
         }
+        return HeldMatches(held, newAmount)
     }
 
     private fun byFinancialId(
