@@ -47,7 +47,9 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -1033,7 +1035,8 @@ fun AccountsSection(
 
 /**
  * One account under its group, in the category rows' body type, on a band when [banded]; [handle] adds a grip.
- * [extraAir] lengthens the row below its line, inside the band, when the row closes a panel.
+ * [extraAir] lengthens the row below its line, inside the band, when the row closes a panel. A row is at least a
+ * touch target tall and keeps the same air above and below its name however many lines the name takes.
  */
 @Composable
 private fun AccountLine(
@@ -1078,7 +1081,13 @@ private fun AccountLine(
             MetroText(
                 account.name,
                 Metro.typography.body,
-                Modifier.weight(LEDGER_NAME + LEDGER_FIGURE).padding(end = MetroDimens.Gutter),
+                // The name carries the row's air, so a name that wraps keeps the same space above and below
+                // as one that fits on a line, instead of filling the touch target edge to edge.
+                Modifier
+                    .weight(LEDGER_NAME + LEDGER_FIGURE)
+                    .padding(end = MetroDimens.Gutter)
+                    .padding(vertical = accountRowAir())
+                    .testTag("account-name-${account.id}"),
                 color = if (dim) Metro.colors.secondary else Metro.colors.foreground,
                 maxLines = 2,
             )
@@ -1092,6 +1101,27 @@ private fun AccountLine(
             )
         }
     }
+}
+
+/**
+ * The air above and below an account's name: a row step, or more when one line of body type would leave a one-line
+ * row short of a touch target, so every row, one line or two, gets the same air a one-line row has.
+ */
+@Composable
+private fun accountRowAir(): Dp {
+    val style = Metro.typography.body
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val line =
+        remember(style, density) {
+            with(density) {
+                measurer
+                    .measure("Ag", style, maxLines = 1)
+                    .size.height
+                    .toDp()
+            }
+        }
+    return maxOf(MetroDimens.Row, (MetroDimens.TouchTarget - line) / 2)
 }
 
 @Composable
