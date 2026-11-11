@@ -31,6 +31,25 @@ object BankPending {
         return row["booked"]?.jsonPrimitive?.booleanOrNull == false
     }
 
+    /**
+     * The bank's copy of a pending row the sync deleted because the bank stopped sending it, marked so: a row the bank
+     * dropped is not one the person deleted, and a charge the bank posts later still comes in.
+     */
+    fun markDropped(rawSyncedData: String?): String? {
+        if (rawSyncedData.isNullOrBlank()) return rawSyncedData
+        val row = runCatching { json.parseToJsonElement(rawSyncedData) as? JsonObject }.getOrNull() ?: return rawSyncedData
+        return JsonObject(row + (DROPPED_KEY to JsonPrimitive(true))).toString()
+    }
+
+    /** The sync deleted this pending row because the bank dropped it; see [markDropped]. */
+    fun dropped(rawSyncedData: String?): Boolean {
+        if (rawSyncedData.isNullOrBlank() || !rawSyncedData.contains(DROPPED_KEY)) return false
+        val row = runCatching { json.parseToJsonElement(rawSyncedData) as? JsonObject }.getOrNull() ?: return false
+        return (row[DROPPED_KEY] as? JsonPrimitive)?.booleanOrNull == true
+    }
+
+    private const val DROPPED_KEY = "dueNorthDropped"
+
     /** The bank's own id for the row in its copy: what it sent while the row was pending, for a row cleared since. */
     fun bankId(rawSyncedData: String?): String? {
         if (rawSyncedData.isNullOrBlank()) return null
