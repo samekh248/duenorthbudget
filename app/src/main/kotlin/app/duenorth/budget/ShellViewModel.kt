@@ -10,6 +10,7 @@ import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.ForcedWrite
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.HttpBankSyncTransport
+import app.duenorth.budget.core.LedgerFilter
 import app.duenorth.budget.core.MonthFillKind
 import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
@@ -461,7 +462,14 @@ class ShellViewModel(
             register.endSelecting()
             return true
         }
-        // Back closes the register's search before it leaves the account.
+        // Back drops the filter sheet, then the search, before it leaves the account.
+        if (current.registerUi.filterOpen &&
+            (current.route is ShellRoute.Register || current.route is ShellRoute.Ledger) &&
+            current.confirm == null
+        ) {
+            register.closeFilter()
+            return true
+        }
         if (current.registerUi.search != null && current.route is ShellRoute.Register && current.confirm == null) {
             register.closeSearch()
             return true
@@ -622,15 +630,40 @@ class ShellViewModel(
     /** A category page's "see all": the ledger, filtered to [categoryId]. Back returns to the category. */
     fun openLedger(categoryId: String) {
         push(ShellRoute.Ledger(categoryId))
-        _state.update { it.copy(ledger = null) }
+        // See all asks for the category's every transaction, so filters left from an earlier visit are dropped.
+        _state.update {
+            it.copy(
+                ledger = null,
+                ledgerFilters = it.ledgerFilters - LEDGER_FILTER_KEY,
+                registerUi = it.registerUi.copy(filterOpen = false),
+            )
+        }
         loadLedger(categoryId)
     }
 
     /** Clears the ledger's category filter in place, so back still returns to the page that opened it. */
-    fun clearLedgerFilter() {
-        if (_state.value.route !is ShellRoute.Ledger) return
-        _state.update { it.copy(route = ShellRoute.Ledger(null), ledger = null) }
-        loadLedger(null)
+    fun clearLedgerFilter() = setLedgerCategory(null)
+
+    /** Reads the ledger for [categoryId] in place of its category now, from the filter sheet; null shows them all. */
+    fun setLedgerCategory(categoryId: String?) {
+        val route = _state.value.route as? ShellRoute.Ledger ?: return
+        if (route.categoryId == categoryId) return
+        _state.update { it.copy(route = ShellRoute.Ledger(categoryId), ledger = null) }
+        loadLedger(categoryId)
+    }
+
+    /** The ledger's sheet changed its filters: the category reads the ledger again, the rest only narrow it. */
+    fun setLedgerFilter(filter: LedgerFilter) {
+        register.setFilter(filter.copy(categoryIds = emptySet()))
+        val route = _state.value.route as? ShellRoute.Ledger ?: return
+        val picked = filter.categoryIds.firstOrNull { it != route.categoryId } ?: filter.categoryIds.firstOrNull()
+        setLedgerCategory(picked)
+    }
+
+    /** The ledger's clear: every filter off, its category too. */
+    fun clearLedgerFilters() {
+        register.clearFilter()
+        clearLedgerFilter()
     }
 
     /** Reads the ledger, filtered to [categoryId] when set. A read for a filter since changed is dropped. */

@@ -3,6 +3,7 @@ package app.duenorth.budget
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import app.duenorth.budget.core.LedgerFilter
 import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.core.TemplateLines
 import app.duenorth.budget.core.TemplateNote
@@ -82,7 +83,7 @@ internal fun CategoryBudgetRoute(
     }
 }
 
-/** A category's "see all": the ledger, filtered to it until the chip clears the filter. */
+/** A category's "see all": the ledger, filtered to it until the filter sheet changes or clears the category. */
 @Composable
 internal fun LedgerRoute(
     route: ShellRoute.Ledger,
@@ -98,8 +99,13 @@ internal fun LedgerRoute(
             page = page,
             onGesture = model::setGesture,
             onOpen = { entry -> model.register.openTransaction(entry.accountId, entry.registerId) },
-            onClearFilter = model::clearLedgerFilter,
+            onClearFilter = model::clearLedgerFilters,
             modifier = modifier,
+            filter = (state.ledgerFilters[LEDGER_FILTER_KEY] ?: LedgerFilter.NONE).copy(categoryIds = setOfNotNull(route.categoryId)),
+            onFilter = model::setLedgerFilter,
+            filterOpen = state.registerUi.filterOpen,
+            onEditFilter = model.register::toggleFilter,
+            categories = state.categories,
         )
     }
     // Read again whenever the budget's figures change, so a transaction edited from here shows as saved.

@@ -2,6 +2,8 @@ package app.duenorth.budget
 
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.LedgerFilter
+import app.duenorth.budget.core.LedgerStatus
 import app.duenorth.budget.core.RegisterSearch
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -42,6 +44,26 @@ class RegisterHolderTest {
         )
         register.closeSearch()
         assertEquals(null, host.state.value.registerUi.search)
+    }
+
+    @Test
+    fun filtersStayWithTheirAccount() {
+        val host = host("register-holder-filter")
+        val register = RegisterHolder(host, InboxHolder(host))
+        host.mutate { it.copy(route = ShellRoute.Register("checking")) }
+        register.toggleFilter()
+        assertEquals(true, host.state.value.registerUi.filterOpen)
+        register.setFilter(LedgerFilter(status = LedgerStatus.PENDING))
+        assertEquals(LedgerStatus.PENDING, register.filter().status)
+        // Another account starts unfiltered; coming back finds checking's filter still on.
+        host.mutate { it.copy(route = ShellRoute.Register("visa")) }
+        assertEquals(LedgerFilter.NONE, register.filter())
+        host.mutate { it.copy(route = ShellRoute.Register("checking")) }
+        assertEquals(LedgerStatus.PENDING, register.filter().status)
+        register.clearFilter()
+        assertEquals(emptyMap<String, LedgerFilter>(), host.state.value.ledgerFilters)
+        register.closeFilter()
+        assertEquals(false, host.state.value.registerUi.filterOpen)
     }
 
     @Test

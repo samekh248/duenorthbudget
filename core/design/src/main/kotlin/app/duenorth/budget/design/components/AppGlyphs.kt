@@ -52,6 +52,7 @@ enum class AppGlyph {
     Merge,
     Export,
     Cover,
+    Filter,
 }
 
 object AppGlyphInk {
@@ -86,6 +87,7 @@ object AppGlyphInk {
             AppGlyph.Merge -> 4
             AppGlyph.Export -> 4
             AppGlyph.Cover -> 4
+            AppGlyph.Filter -> 2
         }
 
     fun DrawScope.draw(
@@ -266,6 +268,22 @@ object AppGlyphInk {
                         strokeWidth = 1.6.dp.toPx(),
                     )
                 }
+            }
+            AppGlyph.Filter -> {
+                // A funnel over its spout: the WP "filter" glyph.
+                drawPath(
+                    Path().apply {
+                        moveTo(3.dp.toPx(), 4.dp.toPx())
+                        lineTo(19.dp.toPx(), 4.dp.toPx())
+                        lineTo(13.dp.toPx(), 11.dp.toPx())
+                        lineTo(13.dp.toPx(), 18.dp.toPx())
+                        lineTo(9.dp.toPx(), 16.dp.toPx())
+                        lineTo(9.dp.toPx(), 11.dp.toPx())
+                        close()
+                    },
+                    color,
+                    style = Stroke(width = 1.6.dp.toPx(), join = StrokeJoin.Miter),
+                )
             }
             AppGlyph.Search -> {
                 // A lens with its handle running down to the right: the WP "search" glyph.
@@ -479,6 +497,8 @@ object Mdl2GlyphInk {
             AppGlyph.Cover to "M2 10a8 7 0 0 1 16 0zM10 10v6a1.75 1.75 0 0 1-3.5 0",
             // Merge: two lines running together into one arrow.
             AppGlyph.Merge to "M2 3.5l7 6.5M2 16.5l7-6.5M9 10h9M14.5 6.5L18 10l-3.5 3.5",
+            // Filter: a funnel over its spout.
+            AppGlyph.Filter to "M2 3h16l-6 7v7l-4-2v-5z",
         )
 
     /** Whether this style has its own ink for [glyph]; one it lacks falls back to Metro's rather than failing. */

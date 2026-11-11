@@ -10,6 +10,7 @@ import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
 import app.duenorth.budget.core.InboxRow
+import app.duenorth.budget.core.LedgerFilter
 import app.duenorth.budget.core.LedgerPage
 import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MonthReviewPage
@@ -55,6 +56,8 @@ data class ShellUiState(
     val register: RegisterPage? = null,
     /** The register's own state, kept by [RegisterHolder]. */
     val registerUi: RegisterUi = RegisterUi(),
+    /** Each ledger's filters, by [registerFilterKey], kept while the app runs so a ledger opens as it was left. */
+    val ledgerFilters: Map<String, LedgerFilter> = emptyMap(),
     val categoryTarget: CategoryTarget? = null,
     val createError: String? = null,
     val writeError: String? = null,

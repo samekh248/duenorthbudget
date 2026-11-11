@@ -1,12 +1,9 @@
 package app.duenorth.budget
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,30 +11,29 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.core.AccountChoice
+import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.LedgerCopy
+import app.duenorth.budget.core.LedgerFilter
 import app.duenorth.budget.core.LedgerPage
 import app.duenorth.budget.core.LedgerRow
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterEntry
-import app.duenorth.budget.design.components.AppGlyph
-import app.duenorth.budget.design.components.AppGlyphIcon
+import app.duenorth.budget.core.RegisterSearch
 import app.duenorth.budget.design.components.MetroText
-import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
+import java.time.LocalDate
 
 /**
  * The ledger: every account's transactions under their days, as the register draws them, each naming its account.
- * Filtered to a category, a chip under the title says so and clears it; the total is what the rows come to.
+ * The filter button opens the same sheet as a register's, with an account field as well; while filters are on, the
+ * strip under the total names them. A category page's "see all" opens it filtered to that category. The total is
+ * what the rows shown come to.
  */
 @Composable
 fun LedgerScreen(
@@ -46,8 +42,34 @@ fun LedgerScreen(
     onOpen: (LedgerRow) -> Unit,
     onClearFilter: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Every filter on the ledger, its category (the page's) among them. */
+    filter: LedgerFilter = LedgerFilter(categoryIds = setOfNotNull(page.categoryId)),
+    onFilter: (LedgerFilter) -> Unit = {},
+    filterOpen: Boolean = false,
+    onEditFilter: () -> Unit = {},
+    /** The categories the sheet can add; the page's own is named from the page when missing. */
+    categories: List<CategoryChoice> = emptyList(),
+    today: LocalDate = LocalDate.now(),
 ) {
     val filtered = page.categoryId != null
+    // The page arrives already narrowed to its category, split parts as rows of their own, so only the other
+    // filters are matched here.
+    val rest = filter.copy(categoryIds = emptySet())
+    val rows = page.rows.filter { rest.matches(it.row, today, page.currency.decimals, it.accountId) }
+    val named =
+        categories.let { all ->
+            if (page.categoryId == null || all.any { it.id == page.categoryId }) {
+                all
+            } else {
+                all + CategoryChoice(page.categoryId!!, page.categoryName.orEmpty(), "", income = false)
+            }
+        }
+    val accounts =
+        page.rows
+            .map { it.accountId to it.accountName }
+            .distinct()
+            .sortedBy { it.second.lowercase() }
+            .map { (id, name) -> AccountChoice(id, name, offBudget = false, type = "", closed = false) }
     Column(
         modifier
             .fillMaxSize()
@@ -55,60 +77,48 @@ fun LedgerScreen(
             .padding(horizontal = MetroDimens.Gutter),
     ) {
         MetroText(LedgerCopy.TITLE, Metro.typography.header, maxLines = 1)
-        if (filtered) {
-            LedgerFilterChip(page.categoryName.orEmpty(), onClearFilter, Modifier.padding(top = MetroDimens.Row))
-        }
         BudgetTotal(
-            label = if (filtered) "${LedgerCopy.TOTAL} · ${LedgerCopy.ALL_ACCOUNTS}" else LedgerCopy.ALL_ACCOUNTS,
-            amount = MoneyFormat.format(page.totalMinor, page.currency, formatOptions()),
+            label = if (filter.active) "${LedgerCopy.TOTAL} · ${LedgerCopy.ALL_ACCOUNTS}" else LedgerCopy.ALL_ACCOUNTS,
+            amount = MoneyFormat.format(rows.sumOf { it.row.amountMinor }, page.currency, formatOptions()),
             amountColor = Metro.accent.text,
             amountTag = "ledger-total",
             modifier = Modifier.padding(top = MetroDimens.Gutter),
         )
-        if (page.rows.isEmpty()) {
+        if (filterOpen) {
+            LedgerFilterSheet(
+                filter,
+                onFilter,
+                named,
+                accounts,
+                shown = rows.size,
+                total = page.rows.size,
+                onClear = onClearFilter,
+                modifier = Modifier.weight(1f).padding(top = MetroDimens.Gutter),
+                singleCategory = true,
+            )
+            return@Column
+        }
+        if (filter.active) {
+            LedgerFilterStrip(
+                filter.summary(named, accounts, page.currency, formatOptions()),
+                filter.count,
+                shown = rows.size,
+                total = page.rows.size,
+                onEdit = onEditFilter,
+            )
+        }
+        if (rows.isEmpty()) {
             MetroText(
-                if (filtered) LedgerCopy.NO_TRANSACTIONS else RegisterCopy.NO_TRANSACTIONS,
+                when {
+                    rest.active -> RegisterSearch.NOTHING
+                    filtered -> LedgerCopy.NO_TRANSACTIONS
+                    else -> RegisterCopy.NO_TRANSACTIONS
+                },
                 Metro.typography.body,
                 Modifier.padding(top = MetroDimens.Grid).testTag("ledger-empty"),
             )
         } else {
-            LedgerList(page, onGesture, onOpen, Modifier.weight(1f).padding(top = MetroDimens.Grid))
-        }
-    }
-}
-
-/** "Groceries ✕" in an accent outline: the filter the ledger is under, and a tap that clears it. */
-@Composable
-private fun LedgerFilterChip(
-    categoryName: String,
-    onClear: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val accent = Metro.accent.text
-    Row(
-        modifier
-            .heightIn(min = MetroDimens.TouchTarget)
-            .metroPress(onClear)
-            .semantics(mergeDescendants = true) {
-                role = Role.Button
-                contentDescription = "${LedgerCopy.CATEGORY} $categoryName, ${LedgerCopy.CLEAR_FILTER}"
-            }.testTag("ledger-filter"),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(
-            Modifier
-                .border(1.dp, accent)
-                .padding(start = 10.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            MetroText(
-                LedgerCopy.CATEGORY,
-                Metro.typography.caption,
-                Modifier.padding(end = 6.dp),
-                color = Metro.colors.secondary,
-            )
-            MetroText(categoryName, Metro.typography.body, Modifier.testTag("ledger-filter-name"), color = accent, maxLines = 1)
-            AppGlyphIcon(AppGlyph.Cancel, accent, Modifier.padding(start = 6.dp).testTag("ledger-filter-clear"), size = 18.dp)
+            LedgerList(page, rows, onGesture, onOpen, Modifier.weight(1f).padding(top = MetroDimens.Grid))
         }
     }
 }
@@ -116,6 +126,7 @@ private fun LedgerFilterChip(
 @Composable
 private fun LedgerList(
     page: LedgerPage,
+    rows: List<LedgerRow>,
     onGesture: (Boolean) -> Unit,
     onOpen: (LedgerRow) -> Unit,
     modifier: Modifier = Modifier,
@@ -124,9 +135,9 @@ private fun LedgerList(
     LaunchedEffect(list) {
         snapshotFlow { list.isScrollInProgress }.collect { onGesture(it) }
     }
-    val byId = page.rows.associateBy { it.row.id }
-    val days = registerDays(page.rows.map { it.row })
-    val position = page.rows.withIndex().associate { it.value.row.id to it.index }
+    val byId = rows.associateBy { it.row.id }
+    val days = registerDays(rows.map { it.row })
+    val position = rows.withIndex().associate { it.value.row.id to it.index }
     val filtered = page.categoryId != null
     val cards = ledgerBlocks
     val line: @Composable (LedgerRow, Boolean, Boolean) -> Unit = { entry, banded, last ->

@@ -3,6 +3,7 @@ package app.duenorth.budget
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import app.duenorth.budget.core.LedgerFilter
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.SimpleFinError
@@ -63,6 +64,11 @@ internal fun RegisterRoute(
             onSearch = model.register::setSearch,
             focus = state.registerUi.focus,
             onFocused = model.register::focusShown,
+            filter = state.ledgerFilters[registerFilterKey(route.accountId)] ?: LedgerFilter.NONE,
+            onFilter = model.register::setFilter,
+            filterOpen = state.registerUi.filterOpen,
+            onEditFilter = model.register::toggleFilter,
+            onClearFilter = model.register::clearFilter,
             // Long-press shows the row's menu, select first, as the inbox's does.
             rowMenu = { row ->
                 listOfNotNull(

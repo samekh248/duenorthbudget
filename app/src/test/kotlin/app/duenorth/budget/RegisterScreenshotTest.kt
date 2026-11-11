@@ -10,6 +10,7 @@ import app.duenorth.budget.core.AccountChoice
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryChoice
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.LedgerFilter
 import app.duenorth.budget.core.RegisterAccount
 import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterPage
@@ -30,6 +31,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -226,6 +228,53 @@ class RegisterScreenshotTest {
                         actions =
                             ScreenBar
                                 .specsFor(ShellRoute.Register("visa"), true, BudgetMode.ENVELOPE)
+                                .map { it.action() },
+                        expanded = false,
+                        onExpandedChange = {},
+                    )
+                }
+            }
+        }
+    }
+
+    // Filters on: the strip under the balance says what they keep, and the bar's filter opens the sheet.
+    @Test
+    fun filterLight() = snapFilter("register_filter_light", dark = false, open = false)
+
+    @Test
+    fun filterDark() = snapFilter("register_filter_dark", dark = true, open = false)
+
+    @Test
+    fun filterSheetLight() = snapFilter("register_filter_sheet_light", dark = false, open = true)
+
+    @Test
+    fun filterSheetDark() = snapFilter("register_filter_sheet_dark", dark = true, open = true)
+
+    /** Groceries over $10 keeps the split with a groceries part and the bus fare: 2 of 5. */
+    private fun snapFilter(
+        name: String,
+        dark: Boolean,
+        open: Boolean,
+    ) {
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) {
+                Column(Modifier.width(390.dp).height(780.dp)) {
+                    SectionTitled("ACCOUNTS", Modifier.weight(1f)) {
+                        RegisterScreen(
+                            page = page(),
+                            onGesture = {},
+                            onOpen = {},
+                            onAdd = {},
+                            onReconcile = {},
+                            filter = LedgerFilter(categoryIds = setOf("c-food"), minAmount = "10"),
+                            filterOpen = open,
+                            today = LocalDate.of(2026, 10, 15),
+                        )
+                    }
+                    MetroAppBar(
+                        actions =
+                            ScreenBar
+                                .specsFor(ShellRoute.Register("visa"), true, BudgetMode.ENVELOPE, filterOpen = open)
                                 .map { it.action() },
                         expanded = false,
                         onExpandedChange = {},

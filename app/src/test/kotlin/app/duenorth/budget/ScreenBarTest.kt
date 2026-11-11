@@ -293,13 +293,13 @@ class ScreenBarTest {
     @Test
     fun registerActions() {
         val ids = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
-        assertEquals(listOf("add", "search", "reconcile", "import", "bank-link", "edit-account", "settings", "close"), ids)
+        assertEquals(listOf("add", "search", "filter", "reconcile", "import", "bank-link", "edit-account", "settings", "close"), ids)
     }
 
     @Test
     fun registerImportIsInTheMenu() {
         val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE)
-        assertEquals(listOf("add", "search", "reconcile"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add", "search", "filter", "reconcile"), specs.filter { it.primary }.map { it.id })
         // Reconcile has its own glyph, so it never reads as save's check.
         assertEquals(AppGlyph.Reconcile, specs.single { it.id == "reconcile" }.glyph)
         assertTrue(specs.single { it.id == "close" }.apart)
@@ -309,8 +309,18 @@ class ScreenBarTest {
     @Test
     fun registerHasNoBankSync() {
         val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE)
-        assertEquals(listOf("add", "search", "reconcile"), specs.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add", "search", "filter", "reconcile"), specs.filter { it.primary }.map { it.id })
         assertEquals(listOf("import", "bank-link", "edit-account", "settings", "close"), specs.filterNot { it.primary }.map { it.id })
+    }
+
+    @Test
+    fun registerFilterSheetSwapsTheBarForDoneAndClear() {
+        val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE, filterOpen = true)
+        assertEquals(listOf("filter-done", "filter-clear"), specs.map { it.id })
+        assertEquals(
+            AppGlyph.Filter,
+            ScreenBar.specsFor(ShellRoute.Register("a"), true, BudgetMode.ENVELOPE).single { it.id == "filter" }.glyph,
+        )
     }
 
     @Test
