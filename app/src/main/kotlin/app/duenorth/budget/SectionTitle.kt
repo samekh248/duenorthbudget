@@ -55,8 +55,10 @@ object SectionTitle {
                 ShellRoute.AddAccount,
                 ShellRoute.BankSyncReport,
                 -> HomeSections.ACCOUNTS
+                // The ledger sits under accounts when their total opened it, and under budget from a category.
+                is ShellRoute.Ledger ->
+                    if (state.homeSection == ScreenBar.HOME_ACCOUNTS) HomeSections.ACCOUNTS else HomeSections.BUDGET
                 is ShellRoute.CategoryBudget,
-                is ShellRoute.Ledger,
                 is ShellRoute.TemplateKinds,
                 is ShellRoute.TemplateEditor,
                 is ShellRoute.MoveCategory,

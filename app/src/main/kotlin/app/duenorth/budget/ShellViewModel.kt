@@ -627,10 +627,13 @@ class ShellViewModel(
         if (library.onLocalChange === localChange) library.onLocalChange = null
     }
 
-    /** A category page's "see all": the ledger, filtered to [categoryId]. Back returns to the category. */
-    fun openLedger(categoryId: String) {
+    /**
+     * The ledger: a category page's "see all" opens it filtered to [categoryId], and the accounts total opens it
+     * unfiltered (null), every account's transactions together. Back returns to the page that opened it.
+     */
+    fun openLedger(categoryId: String? = null) {
         push(ShellRoute.Ledger(categoryId))
-        // See all asks for the category's every transaction, so filters left from an earlier visit are dropped.
+        // Each way in asks for a fresh view, so filters left from an earlier visit are dropped.
         _state.update {
             it.copy(
                 ledger = null,

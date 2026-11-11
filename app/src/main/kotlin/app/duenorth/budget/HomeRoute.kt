@@ -23,6 +23,7 @@ internal fun HomeRoute(
         onGesture = model::setGesture,
         onSection = model::selectHomeSection,
         onAccount = model.register::openAccount,
+        onAllAccounts = if (state.shell == null) null else ({ model.openLedger() }),
         accountsReorder = state.accounts.reorder,
         onMoveAccount = model.accounts::move,
         getStarted = state.getStarted(),
