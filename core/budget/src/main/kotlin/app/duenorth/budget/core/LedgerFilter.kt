@@ -17,6 +17,7 @@ object LedgerFilterCopy {
     const val TEXT_HINT = "contains…"
     const val FLAGS = "flags"
     const val ADD = "add"
+    const val CHANGE = "change"
     const val OVER = "over"
     const val UNDER = "under"
     const val TO = "to"

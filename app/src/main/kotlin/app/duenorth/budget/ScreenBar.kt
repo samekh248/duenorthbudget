@@ -242,6 +242,16 @@ object ScreenBar {
                             hidden(showHidden) + categories() + templates(templates) + tail
                 }
             }
+            // The ledger's one command is its filter; the sheet swaps it for done and clear.
+            is ShellRoute.Ledger ->
+                if (filterOpen) {
+                    listOf(
+                        spec("filter-done", AppGlyph.Save, LedgerFilterCopy.DONE),
+                        spec("filter-clear", AppGlyph.Cancel, LedgerFilterCopy.CLEAR_ALL, RegisterCopy.CLEAR),
+                    )
+                } else {
+                    listOf(spec("filter", AppGlyph.Filter, LedgerFilterCopy.FILTER))
+                }
             // Select mode swaps the register's bar for what can be done to the picked transactions.
             is ShellRoute.Register ->
                 if (selecting) {

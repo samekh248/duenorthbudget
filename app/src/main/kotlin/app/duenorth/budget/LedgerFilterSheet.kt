@@ -108,6 +108,8 @@ internal fun LedgerFilterSheet(
     total: Int,
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The ledger is read for one category at a time: picking another replaces it rather than adding. */
+    singleCategory: Boolean = false,
 ) {
     var addingCategory by rememberSaveable { mutableStateOf(false) }
     Column(
@@ -148,11 +150,15 @@ internal fun LedgerFilterSheet(
                         onFilter(filter.withCategory(id, false))
                     }
                 }
-            AddTag(LedgerFilterCopy.ADD, "ledger-filter-category-add") { addingCategory = !addingCategory }
+            val replaces = singleCategory && filter.categoryIds.isNotEmpty()
+            AddTag(if (replaces) LedgerFilterCopy.CHANGE else LedgerFilterCopy.ADD, "ledger-filter-category-add") {
+                addingCategory =
+                    !addingCategory
+            }
         }
         if (addingCategory) {
             CategoryAdder(categories, filter.categoryIds) { id ->
-                onFilter(filter.withCategory(id, true))
+                onFilter(if (singleCategory) filter.copy(categoryIds = setOf(id)) else filter.withCategory(id, true))
                 addingCategory = false
             }
         }

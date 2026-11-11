@@ -61,6 +61,15 @@ sealed interface ShellRoute {
         val categoryId: String,
     ) : ShellRoute
 
+    /**
+     * The ledger: every account's transactions, newest first. A category page's "see all" opens it filtered to
+     * [categoryId]; clearing the filter (null) shows them all.
+     */
+    data class Ledger(
+        val categoryId: String?,
+    ) : ShellRoute,
+        StackRoute
+
     data class MoveCategory(
         val fromCategoryId: String,
     ) : ShellRoute

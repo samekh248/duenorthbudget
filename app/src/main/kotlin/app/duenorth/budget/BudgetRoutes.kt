@@ -3,6 +3,7 @@ package app.duenorth.budget
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import app.duenorth.budget.core.LedgerFilter
 import app.duenorth.budget.core.TemplateKind
 import app.duenorth.budget.core.TemplateLines
 import app.duenorth.budget.core.TemplateNote
@@ -72,7 +73,7 @@ internal fun CategoryBudgetRoute(
                 onOpenTemplate = model.templates::openTemplate,
                 onMoveTemplate = model.templates::move,
                 recent = state.categoryMonth,
-                onSeeAll = { model.openReviewCategory(route.categoryId) },
+                onSeeAll = { model.openLedger(route.categoryId) },
                 onOpenTransaction = { row -> model.register.openTransaction(row.accountId, row.registerId) },
             )
             LaunchedEffect(state.templates.note, state.templates.automations, shell.month) { model.templates.refreshAmounts() }
@@ -80,6 +81,35 @@ internal fun CategoryBudgetRoute(
             LaunchedEffect(route.categoryId, shell) { model.loadCategoryMonth(route.categoryId) }
         }
     }
+}
+
+/** A category's "see all": the ledger, filtered to it until the filter sheet changes or clears the category. */
+@Composable
+internal fun LedgerRoute(
+    route: ShellRoute.Ledger,
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val page = state.ledger?.takeIf { it.categoryId == route.categoryId }
+    if (page == null) {
+        Placeholder()
+    } else {
+        LedgerScreen(
+            page = page,
+            onGesture = model::setGesture,
+            onOpen = { entry -> model.register.openTransaction(entry.accountId, entry.registerId) },
+            onClearFilter = model::clearLedgerFilters,
+            modifier = modifier,
+            filter = (state.ledgerFilters[LEDGER_FILTER_KEY] ?: LedgerFilter.NONE).copy(categoryIds = setOfNotNull(route.categoryId)),
+            onFilter = model::setLedgerFilter,
+            filterOpen = state.registerUi.filterOpen,
+            onEditFilter = model.register::toggleFilter,
+            categories = state.categories,
+        )
+    }
+    // Read again whenever the budget's figures change, so a transaction edited from here shows as saved.
+    LaunchedEffect(route.categoryId, state.shell) { model.loadLedger(route.categoryId) }
 }
 
 @Composable

@@ -292,7 +292,9 @@ fun DueNorthApp(model: ShellViewModel) {
                     onEndSelecting = model.register::endSelecting,
                     onSearch = model.register::toggleSearch,
                     onFilter = model.register::toggleFilter,
-                    onClearFilter = model.register::clearFilter,
+                    onClearFilter = {
+                        if (state.route is ShellRoute.Ledger) model.clearLedgerFilters() else model.register.clearFilter()
+                    },
                     onRemoveTemplate = model.templates::remove,
                     onAddTemplate = { model.templates.openKinds() },
                     onToAutomations = model.templates::switchToAutomations,
@@ -430,6 +432,7 @@ fun DueNorthApp(model: ShellViewModel) {
                         is ShellRoute.Reconcile -> ReconcileRoute(state, model, fill)
                         is ShellRoute.ReviewCategory -> ReviewCategoryRoute(state, model, fill)
                         is ShellRoute.CategoryBudget -> CategoryBudgetRoute(route, state, model, fill)
+                        is ShellRoute.Ledger -> LedgerRoute(route, state, model, fill)
                         is ShellRoute.MoveCategory -> MoveCategoryRoute(route, state, model, fill)
                         is ShellRoute.CoverCategory -> CoverCategoryRoute(route, state, model, fill)
                         ShellRoute.HoldMonth -> HoldMonthRoute(state, model, fill)

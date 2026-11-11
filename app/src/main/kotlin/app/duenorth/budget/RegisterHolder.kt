@@ -23,6 +23,9 @@ data class RegisterUi(
 /** The key a ledger's filters are kept under in [ShellUiState.ledgerFilters]: one per account register. */
 fun registerFilterKey(accountId: String): String = "account:$accountId"
 
+/** The all-accounts ledger's filters, its category aside (that is the route's), in [ShellUiState.ledgerFilters]. */
+const val LEDGER_FILTER_KEY = "ledger:all"
+
 /**
  * The register: an account's transactions, the transaction form, select mode, search and matching. Filing from the
  * category picker goes through [inbox] when the transaction came from it.
@@ -176,7 +179,11 @@ class RegisterHolder internal constructor(
     }
 
     /** The filters on the open register, kept per account for as long as the app runs. */
-    fun filter(): LedgerFilter = state.openAccountId()?.let { state.ledgerFilters[registerFilterKey(it)] } ?: LedgerFilter.NONE
+    fun filter(): LedgerFilter = filterKey()?.let { state.ledgerFilters[it] } ?: LedgerFilter.NONE
+
+    /** Where the page showing keeps its filters: the ledger's, or the open account's. */
+    private fun filterKey(): String? =
+        if (state.route is ShellRoute.Ledger) LEDGER_FILTER_KEY else state.openAccountId()?.let(::registerFilterKey)
 
     /** The register's filter button: opens the filter sheet, or closes it when open. */
     fun toggleFilter() {
@@ -187,10 +194,9 @@ class RegisterHolder internal constructor(
         update { it.copy(filterOpen = false) }
     }
 
-    /** Changes the open register's filters; the rows follow at once. */
+    /** Changes the open register's (or the ledger's) filters; the rows follow at once. */
     fun setFilter(filter: LedgerFilter) {
-        val accountId = state.openAccountId() ?: return
-        val key = registerFilterKey(accountId)
+        val key = filterKey() ?: return
         host.mutate {
             it.copy(ledgerFilters = if (filter.active) it.ledgerFilters + (key to filter) else it.ledgerFilters - key)
         }

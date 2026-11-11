@@ -11,6 +11,7 @@ import app.duenorth.budget.core.ImportPreview
 import app.duenorth.budget.core.ImportReviewPage
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.LedgerFilter
+import app.duenorth.budget.core.LedgerPage
 import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MonthReviewPage
 import app.duenorth.budget.core.MonthShell
@@ -71,6 +72,8 @@ data class ShellUiState(
     val monthReview: MonthReviewPage? = null,
     val netWorth: NetWorthPage? = null,
     val categoryMonth: CategoryMonthPage? = null,
+    /** The ledger [ShellRoute.Ledger] shows; null until read. */
+    val ledger: LedgerPage? = null,
     /** Reconcile's own state, kept by [ReconcileHolder]. */
     val reconcile: ReconcileUi = ReconcileUi(),
     /** Every schedule, ended ones included, by next date. */
