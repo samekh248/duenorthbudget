@@ -1056,7 +1056,8 @@ private fun AccountLine(
             .ledgerFill(
                 when {
                     lifted -> Metro.colors.chrome
-                    banded -> ledgerBand
+                    // Accounts are banded under every style, Windows 10 Mobile included.
+                    banded -> ledgerBandShade
                     else -> Color.Transparent
                 },
             ).rowPress({ onAccount(account.id) }) { account(account.id) }
