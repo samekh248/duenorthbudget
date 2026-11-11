@@ -49,6 +49,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.duenorth.budget.core.AccountRow
@@ -922,13 +923,14 @@ fun AccountsSection(
     val drag = remember { RowDrag() }
     if (!reorder) drag.drop()
     // A row while reorder is on: lifted and shifted by the drag, opened by nothing.
-    val line: @Composable (AccountRow, List<AccountRow>, Boolean) -> Unit = { account, rows, banded ->
+    val line: @Composable (AccountRow, List<AccountRow>, Boolean, Dp) -> Unit = { account, rows, banded, air ->
         AccountLine(
             account,
             money(account.balanceMinor),
             if (reorder) ({}) else onAccount,
             arrivalModifier(account.id, arrivals).then(if (reorder) drag.follow(account.id, rows.map { it.id }) else Modifier),
             banded = banded,
+            extraAir = air,
             lifted = drag.dragging == account.id,
             handle = if (reorder) drag.handle(account.id, rows.map { it.id }, onMove) else null,
         )
@@ -961,12 +963,15 @@ fun AccountsSection(
             if (cards) {
                 groups.forEach { (id, name, rows) ->
                     item(key = "account-group-$id") {
-                        LedgerGroup(heading = {
+                        // The last row holds the panel's bottom air, so its band runs to the panel's edge.
+                        LedgerGroup(bottomAir = false, heading = {
                             GroupHeading(name, "account-group", id) {
                                 MetroText(money(rows.sumOf { a -> a.balanceMinor }), Metro.typography.groupHeader, it)
                             }
                         }) {
-                            rows.forEach { line(it, rows, false) }
+                            rows.forEach {
+                                line(it, rows, ledgerBanded(position.getValue(it.id)), if (it === rows.last()) MetroDimens.Row else 0.dp)
+                            }
                         }
                         GroupGap()
                     }
@@ -979,7 +984,7 @@ fun AccountsSection(
                             MetroText(money(rows.sumOf { a -> a.balanceMinor }), Metro.typography.groupHeader, it)
                         }
                     }
-                    items(rows, key = { it.id }) { line(it, rows, ledgerBanded(position.getValue(it.id))) }
+                    items(rows, key = { it.id }) { line(it, rows, ledgerBanded(position.getValue(it.id)), 0.dp) }
                     item(key = "account-gap-$id") { GroupGap() }
                 }
             }
@@ -1013,7 +1018,10 @@ fun AccountsSection(
     }
 }
 
-/** One account under its group, in the category rows' body type, on a band when [banded]; [handle] adds a grip. */
+/**
+ * One account under its group, in the category rows' body type, on a band when [banded]; [handle] adds a grip.
+ * [extraAir] lengthens the row below its line, inside the band, when the row closes a panel.
+ */
 @Composable
 private fun AccountLine(
     account: AccountRow,
@@ -1024,11 +1032,11 @@ private fun AccountLine(
     banded: Boolean = false,
     lifted: Boolean = false,
     handle: Modifier? = null,
+    extraAir: Dp = 0.dp,
 ) {
     Box(
         modifier
             .fillMaxWidth()
-            .heightIn(min = MetroDimens.TouchTarget)
             .ledgerFill(
                 when {
                     lifted -> Metro.colors.chrome
@@ -1036,6 +1044,8 @@ private fun AccountLine(
                     else -> Color.Transparent
                 },
             ).rowPress({ onAccount(account.id) }) { account(account.id) }
+            .padding(bottom = extraAir)
+            .heightIn(min = MetroDimens.TouchTarget)
             .testTag("account-${account.id}"),
     ) {
         Row(
