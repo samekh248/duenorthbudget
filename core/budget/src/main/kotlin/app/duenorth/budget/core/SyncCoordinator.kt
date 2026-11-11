@@ -510,11 +510,12 @@ class SyncCoordinator(
      * message from there on, until both sides hold the same messages.
      */
     private fun syncNetwork(budgetId: String): SyncResult {
-        val token = syncToken() ?: return fail(budgetId, "auth")
-        val address = activeAddress() ?: return SyncResult("")
+        // A budget kept only on the phone has nothing to sync, so it never records a failed sign-in.
         val cloud = state(budgetId, "cloudFileId").orEmpty()
         val group = state(budgetId, "groupId").orEmpty()
         if (cloud.isBlank() || group.isBlank()) return SyncResult(status(budgetId))
+        val token = syncToken() ?: return fail(budgetId, "auth")
+        val address = activeAddress() ?: return SyncResult("")
         if (state(budgetId, "encrypted") == "1" && !isUnlocked(budgetId)) {
             return SyncResult(SyncCopy.PASSWORD_WRONG)
         }

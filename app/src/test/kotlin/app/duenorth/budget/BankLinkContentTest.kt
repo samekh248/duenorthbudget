@@ -32,7 +32,14 @@ class BankLinkContentTest {
 
     @Test
     fun registerMenuOffersBankLink() {
-        assertTrue("bank-link" in ScreenBar.specsFor(ShellRoute.Register("a"), true, BudgetMode.ENVELOPE).map { it.id })
+        val server = SettingsBar(serverActive = true)
+        assertTrue("bank-link" in ScreenBar.specsFor(ShellRoute.Register("a"), true, BudgetMode.ENVELOPE, settings = server).map { it.id })
+    }
+
+    // Bank sync runs through an Actual server, so a phone that never added one is not offered a link it cannot finish.
+    @Test
+    fun registerMenuHasNoBankLinkWithoutAServer() {
+        assertTrue("bank-link" !in ScreenBar.specsFor(ShellRoute.Register("a"), true, BudgetMode.ENVELOPE).map { it.id })
     }
 
     @Test

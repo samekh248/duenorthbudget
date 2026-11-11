@@ -292,7 +292,14 @@ class ScreenBarTest {
 
     @Test
     fun registerActions() {
-        val ids = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE).map { it.id }
+        val ids =
+            ScreenBar
+                .specsFor(
+                    ShellRoute.Register("a"),
+                    hasBudget = true,
+                    mode = BudgetMode.ENVELOPE,
+                    settings = SettingsBar(serverActive = true),
+                ).map { it.id }
         assertEquals(listOf("add", "search", "filter", "reconcile", "import", "bank-link", "edit-account", "settings", "close"), ids)
     }
 
@@ -310,7 +317,7 @@ class ScreenBarTest {
     fun registerHasNoBankSync() {
         val specs = ScreenBar.specsFor(ShellRoute.Register("a"), hasBudget = true, mode = BudgetMode.ENVELOPE)
         assertEquals(listOf("add", "search", "filter", "reconcile"), specs.filter { it.primary }.map { it.id })
-        assertEquals(listOf("import", "bank-link", "edit-account", "settings", "close"), specs.filterNot { it.primary }.map { it.id })
+        assertEquals(listOf("import", "edit-account", "settings", "close"), specs.filterNot { it.primary }.map { it.id })
     }
 
     @Test
