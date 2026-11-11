@@ -210,6 +210,45 @@ class RegisterBookTest {
         }
     }
 
+    // A category page's "see all": every account's rows in that category, all dates, a split by its matching part.
+    @Test
+    fun ledgerFiltersEveryAccountToOneCategory() {
+        db { _, book ->
+            book.save(draft("old", amount = -100, date = 20260901, payee = "Bus"))
+            book.save(draft("cash", account = "cash", amount = -250, date = 20261002, payee = "Stall"))
+            book.save(draft("house", amount = -900, category = "c-house", date = 20261003, payee = "Hardware"))
+            book.save(draft("market", amount = -3_000, date = 20261005, payee = "Market"))
+            book.split("market", listOf(SplitPart("c-food", -2_000), SplitPart("c-house", -1_000)), false)
+
+            val food = book.ledger("c-food")!!
+            assertEquals("Groceries", food.categoryName)
+            assertEquals(3, food.rows.size)
+            val (part, cash, old) = food.rows
+            // The split shows as its food part, under the market's payee, and opens the market in its register.
+            assertEquals(-2_000L, part.row.amountMinor)
+            assertEquals("Market", part.row.payee)
+            assertEquals("market", part.registerId)
+            assertEquals("checking", part.accountId)
+            assertEquals(listOf("cash", "old"), listOf(cash.row.id, old.row.id))
+            assertEquals("Cash", cash.accountName)
+            assertEquals(-2_350L, food.totalMinor)
+
+            // Unfiltered, it is every account's register rows: the split as one parent with its parts.
+            val all = book.ledger(null)!!
+            assertNull(all.categoryName)
+            assertEquals(listOf("market", "house", "cash", "old"), all.rows.map { it.row.id })
+            assertEquals(
+                2,
+                all.rows
+                    .first()
+                    .row.parts.size,
+            )
+            assertEquals("market", all.rows.first().registerId)
+
+            assertNull(book.ledger("no-such-category"))
+        }
+    }
+
     @Test
     fun splitRefusesABadSumAndUnsplitRestoresOneCategory() {
         db { session, book ->

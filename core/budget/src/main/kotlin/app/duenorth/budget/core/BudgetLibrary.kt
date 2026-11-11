@@ -584,6 +584,12 @@ class BudgetLibrary(
             }
         }
 
+    /** Every account's transactions, or only [categoryId]'s when set (a category page's "see all"). */
+    fun readLedger(
+        budgetId: String,
+        categoryId: String?,
+    ): LedgerPage? = open(budgetId) { RegisterBook(it).ledger(categoryId) }
+
     fun readCategoryTarget(
         budgetId: String,
         transactionId: String,

@@ -513,7 +513,7 @@ private fun LazyListScope.ledgerDays(
             Box(if (row.id in outlined) Modifier.hintOutline().testTag("reconcile-hinted-${row.id}") else Modifier) {
                 RegisterLine(
                     row,
-                    page,
+                    page.currency,
                     banded = ledgerBanded(position.getValue(row.id)),
                     picked = null,
                     onPress = { onPress(row.id) },
