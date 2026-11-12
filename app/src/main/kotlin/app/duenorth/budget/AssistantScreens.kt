@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -309,7 +310,10 @@ internal object FoldMotion {
 /** A card's side padding, shared by its header and the findings an open card holds. */
 private val CARD_PADDING = 16.dp
 
-/** Nothing to look at: says so in the middle of the item. */
+/**
+ * Nothing to look at: the same self-drawing logo as the empty inbox (plays as it appears and again on tap), with the
+ * all-clear words under it, in the middle of the item.
+ */
 @Composable
 private fun AssistantClear(modifier: Modifier) {
     Column(
@@ -317,6 +321,8 @@ private fun AssistantClear(modifier: Modifier) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        BudgetLogo(CLEAR_LOGO_HEIGHT)
+        Spacer(Modifier.height(CLEAR_LOGO_GAP))
         MetroText(AssistantCopy.ALL_CLEAR, Metro.typography.subheader.copy(textAlign = TextAlign.Center))
         MetroText(
             AssistantCopy.ALL_CLEAR_DETAIL,
