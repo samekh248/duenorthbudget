@@ -24,6 +24,24 @@ object EnvelopeCopy {
 
     const val HOLD = "hold"
     const val RELEASE = "release hold"
+
+    // The hold form: it asks only for how much more to hold, and saving adds that to what is already held.
+    const val HOLD_HINT = "set aside more of this month's money for next month"
+    const val HOLD_MORE = "hold more"
+    const val TO_BUDGET_NOW = "to budget"
+    const val TO_BUDGET_AFTER = "to budget after"
+    const val HELD = "held"
+    const val HELD_AFTER = "held after"
+
+    /** The hold form's heading: money held for [next]. */
+    fun holdTitle(next: java.time.YearMonth): String = "hold for ${next.month.name.lowercase()}"
+
+    /** Under the held total while an amount is typed: what was held before it. */
+    fun heldNow(amount: String): String = "$amount held now"
+
+    /** Releases everything held, putting it back in to budget. */
+    fun releaseHeld(amount: String): String = "release $amount held"
+
     const val ROLLOVER = "rollover overspending"
     const val NEXT = "next month"
     const val MANAGE = "categories"

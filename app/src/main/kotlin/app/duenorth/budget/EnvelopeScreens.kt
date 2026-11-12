@@ -674,6 +674,11 @@ fun CoverCategoryScreen(
     }
 }
 
+/**
+ * Holds more of this month's to budget for next month. The box asks only for the extra, starting at everything
+ * to budget, and saving adds it to what is already held. Once an amount reads, the summary shows to budget and
+ * held as they will be after the save.
+ */
 @Composable
 fun HoldMonthScreen(
     shell: MonthShell,
@@ -683,37 +688,84 @@ fun HoldMonthScreen(
     modifier: Modifier = Modifier,
 ) {
     val prefs = LocalFormatPrefs.current
-    var amount by remember { mutableStateOf("") }
+    val options = formatOptions()
+    val money = shell.currency
+    val initial = if (shell.headerMinor > 0L) prefs.editAmount(shell.headerMinor, money.decimals) else ""
+    var amount by remember(shell.month, shell.budgetId) { mutableStateOf(initial) }
+    val more = MoneyMath.evaluate(amount, prefs.numberFormat, money.decimals)?.takeIf { it > 0 } ?: 0L
+    val save = { onSave(prefs.readAmount(amount, money.decimals)) }
     Column(
         modifier
             .fillMaxSize()
             .background(Metro.colors.background)
-            .padding(MetroDimens.Gutter),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(MetroDimens.Gutter)
+            .testTag("hold-screen"),
     ) {
-        MetroText(EnvelopeCopy.HOLD, Metro.typography.header)
-        MetroText(
-            "to budget ${MoneyFormat.format(shell.headerMinor, shell.currency, formatOptions())}",
-            Metro.typography.subheader,
+        MetroText(EnvelopeCopy.holdTitle(shell.month.plusMonths(1)), Metro.typography.subheader, maxLines = 2)
+        MetroText(EnvelopeCopy.HOLD_HINT, Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
+        Spacer(Modifier.height(MetroDimens.Gutter))
+        HoldSummaryLine(
+            if (more > 0L) EnvelopeCopy.TO_BUDGET_AFTER else EnvelopeCopy.TO_BUDGET_NOW,
+            MoneyFormat.format(shell.headerMinor - more, money, options),
+            tag = "hold-to-budget",
+            warn = shell.headerMinor - more < 0L,
         )
-        if (shell.bufferedMinor != 0L) {
+        HoldSummaryLine(
+            if (more > 0L) EnvelopeCopy.HELD_AFTER else EnvelopeCopy.HELD,
+            MoneyFormat.format(shell.bufferedMinor + more, money, options),
+            tag = "hold-held",
+        )
+        if (shell.bufferedMinor != 0L && more > 0L) {
             MetroText(
-                "held ${MoneyFormat.format(shell.bufferedMinor, shell.currency, formatOptions())}",
+                EnvelopeCopy.heldNow(MoneyFormat.format(shell.bufferedMinor, money, options)),
                 Metro.typography.caption,
+                Modifier.testTag("hold-held-now"),
                 color = Metro.colors.secondary,
             )
         }
-        AmountField(amount, { amount = it }, "amount for next month", decimals = shell.currency.decimals)
-        if (error != null) WarningText(error)
-        RememberFormSave { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
-        MetroButtonGrid {
-            if (!formSaveOnBar()) {
-                MetroButton(EnvelopeCopy.HOLD) { onSave(prefs.readAmount(amount, shell.currency.decimals)) }
-            }
-            if (shell.bufferedMinor != 0L) {
-                MetroButton(EnvelopeCopy.RELEASE, onClick = onRelease)
+        Spacer(Modifier.height(MetroDimens.Gutter))
+        MetroText(
+            EnvelopeCopy.HOLD_MORE,
+            Metro.typography.caption,
+            Modifier.padding(bottom = MetroDimens.FieldLabelGap),
+            color = Metro.colors.secondary,
+        )
+        AmountField(
+            amount,
+            { amount = it },
+            EnvelopeCopy.HOLD_MORE,
+            Modifier.fillMaxWidth().testTag("hold-amount"),
+            decimals = money.decimals,
+        )
+        if (error != null) WarningText(error, Modifier.padding(top = 8.dp))
+        RememberFormSave(save)
+        if (!formSaveOnBar()) {
+            MetroButtonGrid(Modifier.padding(top = MetroDimens.Gutter)) {
+                MetroButton(EnvelopeCopy.HOLD, onClick = save)
             }
         }
+        if (shell.bufferedMinor != 0L) {
+            Spacer(Modifier.height(MetroDimens.Gutter))
+            QuickAmount(EnvelopeCopy.releaseHeld(MoneyFormat.format(shell.bufferedMinor, money, options)), "hold-release", onRelease)
+        }
+    }
+}
+
+/** One line of the hold summary: a name on the left and its amount on the right. */
+@Composable
+private fun HoldSummaryLine(
+    label: String,
+    amount: String,
+    tag: String,
+    warn: Boolean = false,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag(tag),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        MetroText(label, Metro.typography.body, Modifier.weight(1f), color = Metro.colors.secondary)
+        MetroText(amount, Metro.typography.body, color = if (warn) Metro.colors.error else Metro.colors.foreground)
     }
 }
 
