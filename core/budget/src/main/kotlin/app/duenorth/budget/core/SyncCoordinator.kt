@@ -693,16 +693,25 @@ class SyncCoordinator(
             }
         } ?: EditResult.Rejected(SyncCopy.LAST_FAILED)
 
+    /**
+     * Holds [amountText] more of [month]'s to budget for next month, on top of what the month already holds.
+     * The extra can be no more than what is left to budget.
+     */
     fun holdForNextMonth(
         budgetId: String,
         month: YearMonth,
         amountText: String,
     ): EditResult {
-        val amount = MoneyFormat.parse(amountText, decimals(budgetId)) ?: return EditResult.Rejected(SyncCopy.ENTER_AMOUNT)
+        val amount =
+            MoneyFormat.parse(amountText, decimals(budgetId))?.takeIf { it > 0L }
+                ?: return EditResult.Rejected(SyncCopy.ENTER_AMOUNT)
         return journaled(budgetId, UndoCopy.HOLD) { session ->
-            val header = ShellReader.loadDetailed(session, month).figures.headerMinor
+            val detailed = ShellReader.loadDetailed(session, month)
+            val held = detailed.bufferedMinor
+            // To budget already has what is held taken out, so the new total may reach to budget plus that.
             when (
-                val outcome = EnvelopeBook(session, syncClock).setHold(month.toActualMonth(), amount, header)
+                val outcome =
+                    EnvelopeBook(session, syncClock).setHold(month.toActualMonth(), held + amount, detailed.figures.headerMinor + held)
             ) {
                 EnvelopeEditResult.Saved -> EditResult.Saved
                 is EnvelopeEditResult.Rejected -> EditResult.Rejected(outcome.reason)
