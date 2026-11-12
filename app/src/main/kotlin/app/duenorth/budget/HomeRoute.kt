@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import app.duenorth.budget.core.FormatOptions
+import app.duenorth.budget.core.PinnedCategories
 
 // The pages of the home pivot, each wired to the view model. DueNorthApp picks one per route.
 
@@ -34,6 +35,7 @@ internal fun HomeRoute(
         onAssistantMore = model.assistant::toggleExpanded,
         closeOut = state.closeOut.summary?.let { CloseOutCard(it, state.closeOut.summaryClosed) },
         onCloseOut = model.closeOut::open,
+        pinnedCategories = PinnedCategories.ids(state.settings, state.settings.openBudgetId),
         onInbox = model.inbox::openPicker,
         onAcceptInbox = model.inbox::accept,
         inboxFiled = state.inbox.filed,

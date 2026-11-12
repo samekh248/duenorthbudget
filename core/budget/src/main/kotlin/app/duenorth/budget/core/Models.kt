@@ -396,6 +396,8 @@ data class PhoneSettings(
     val closeOutDays: Int = CloseOutWindow.DEFAULT_DAYS,
     /** Close out's marks on this phone: months closed and categories kept as they are ([CloseOutMarks]). */
     val closeOutMarks: List<String> = emptyList(),
+    /** Categories pinned across the top of the assistant, by budget id, in the order pinned ([PinnedCategories]). */
+    val pinnedCategories: Map<String, List<String>> = emptyMap(),
 )
 
 /** The background sync's choices (settings → budget). */

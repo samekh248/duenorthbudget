@@ -3,6 +3,7 @@ package app.duenorth.budget
 import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.EnvelopeCopy
+import app.duenorth.budget.core.PinnedCategories
 import app.duenorth.budget.design.components.MetroMenuItem
 
 /**
@@ -14,7 +15,7 @@ internal class AppRowMenus(
 ) : RowMenuItems {
     private val state get() = model.state.value
 
-    /** A month's category: move money, cover it while it is overspent, rename it on its page, hide it from the month. */
+    /** A month's category: move money, cover it while it is overspent, rename it on its page, pin it to the assistant, hide it from the month. */
     override fun category(categoryId: String): List<MetroMenuItem> {
         val shell = state.shell ?: return emptyList()
         val category = shell.groups.flatMap { it.categories }.firstOrNull { it.id == categoryId } ?: return emptyList()
@@ -28,10 +29,21 @@ internal class AppRowMenus(
                 model.envelopes.openBudget(categoryId)
                 model.envelopes.startRenameCategory()
             },
+            pinItem(categoryId),
             MetroMenuItem(if (category.hidden) EnvelopeCopy.SHOW else EnvelopeCopy.HIDE, "category-menu-hide") {
                 model.envelopes.hideCategory(categoryId, !category.hidden)
             },
         )
+    }
+
+    /** Pin the category's balance to the assistant, or unpin it; no pin line once six are pinned. */
+    private fun pinItem(categoryId: String): MetroMenuItem? {
+        val budgetId = state.settings.openBudgetId ?: return null
+        val pinned = categoryId in PinnedCategories.ids(state.settings, budgetId)
+        if (!pinned && !PinnedCategories.hasRoom(state.settings, budgetId)) return null
+        return MetroMenuItem(if (pinned) PinnedCategories.UNPIN else PinnedCategories.PIN, "category-menu-pin") {
+            model.assistant.togglePin(categoryId)
+        }
     }
 
     /** An account: its register's commands without opening the register first. Close is last. */
