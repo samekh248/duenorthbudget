@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import app.duenorth.budget.core.AssistantCopy
 import app.duenorth.budget.core.AssistantReport
 import app.duenorth.budget.core.BudgetMode
+import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.Currencies
 import app.duenorth.budget.core.Finding
 import app.duenorth.budget.core.FindingAction
@@ -19,6 +20,7 @@ import app.duenorth.budget.core.FindingFigure
 import app.duenorth.budget.core.FindingKind
 import app.duenorth.budget.core.FindingSide
 import app.duenorth.budget.core.FindingSure
+import app.duenorth.budget.core.GroupRow
 import app.duenorth.budget.core.MatchSide
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.design.MonthWindow
@@ -175,6 +177,50 @@ class AssistantScreenshotTest {
     @Test
     fun clearDark() = snap("assistant_clear_dark", dark = true, report = AssistantReport.EMPTY)
 
+    @Test
+    fun onePinLight() = snapPins("assistant_pins_1_light", dark = false, count = 1)
+
+    @Test
+    fun onePinDark() = snapPins("assistant_pins_1_dark", dark = true, count = 1)
+
+    @Test
+    fun threePinsLight() = snapPins("assistant_pins_3_light", dark = false, count = 3)
+
+    @Test
+    fun threePinsDark() = snapPins("assistant_pins_3_dark", dark = true, count = 3)
+
+    @Test
+    fun fourPinsLight() = snapPins("assistant_pins_4_light", dark = false, count = 4)
+
+    @Test
+    fun fivePinsLight() = snapPins("assistant_pins_5_light", dark = false, count = 5)
+
+    @Test
+    fun sixPinsLight() = snapPins("assistant_pins_6_light", dark = false, count = 6)
+
+    @Test
+    fun sixPinsDark() = snapPins("assistant_pins_6_dark", dark = true, count = 6)
+
+    @Test
+    fun sixPinsMobile10Dark() = snapPins("assistant_pins_6_mobile10_dark", dark = true, count = 6, style = MetroStyle.Mobile10)
+
+    @Test
+    fun sixPinsAllClearLight() = snapPins("assistant_pins_6_clear_light", dark = false, count = 6, report = AssistantReport.EMPTY)
+
+    /** The first [count] sample pins over the usual findings; each pin shows as one tile and nothing more. */
+    private fun snapPins(
+        name: String,
+        dark: Boolean,
+        count: Int,
+        style: MetroStyle = MetroStyle.Default,
+        report: AssistantReport = sampleAssistant(),
+    ) {
+        val pins = samplePinGroups().flatMap { it.categories }.take(count).map { it.id }
+        snap(name, dark, report, style = style, pinned = pins)
+        compose.onAllNodesWithTag("assistant-pins").assertCountEquals(1)
+        pins.forEach { compose.onNodeWithTag("assistant-pin-$it").assertExists() }
+    }
+
     @OptIn(ExperimentalRoborazziApi::class)
     private fun snap(
         name: String,
@@ -183,6 +229,7 @@ class AssistantScreenshotTest {
         expanded: Set<FindingKind> = emptySet(),
         working: AssistantUi.Working? = null,
         style: MetroStyle = MetroStyle.Default,
+        pinned: List<String> = emptyList(),
     ) {
         val shell =
             MonthShell(
@@ -193,7 +240,7 @@ class AssistantScreenshotTest {
                 month = YearMonth.of(2026, 10),
                 headerLabel = "to budget",
                 headerMinor = 0,
-                groups = emptyList(),
+                groups = if (pinned.isEmpty()) emptyList() else samplePinGroups(),
                 accounts = emptyList(),
                 inbox = emptyList(),
             )
@@ -220,6 +267,7 @@ class AssistantScreenshotTest {
                             onGesture = {},
                             modifier = Modifier.weight(1f),
                             assistant = AssistantUi(report = report, expanded = expanded, working = working),
+                            pinnedCategories = pinned,
                         )
                         MetroAppBar(actions, false, {}, windowInsets = WindowInsets(0))
                     }
@@ -229,6 +277,30 @@ class AssistantScreenshotTest {
         compose.waitForIdle()
         captureScreenRoboImage("src/test/snapshots/$name.png")
     }
+}
+
+/** Six categories to pin, in pin order: a long name, an overspent one, and a four-figure balance among them. */
+internal fun samplePinGroups(): List<GroupRow> {
+    fun row(
+        id: String,
+        name: String,
+        available: Long,
+    ) = CategoryRow(id, name, budgetedMinor = 0, spentMinor = 0, availableMinor = available, carryover = false)
+    return listOf(
+        GroupRow(
+            "everyday",
+            "Everyday",
+            0,
+            listOf(
+                row("groceries", "Groceries", 18240),
+                row("dining", "Dining out", -2315),
+                row("gas", "Gas", 6400),
+                row("rent", "Rent", 145000),
+                row("fun", "Fun money", 4000),
+                row("emergency", "Emergency fund", 1321055),
+            ),
+        ),
+    )
 }
 
 internal fun sampleAssistant(): AssistantReport {

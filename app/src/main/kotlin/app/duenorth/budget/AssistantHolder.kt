@@ -6,6 +6,7 @@ import app.duenorth.budget.core.Finding
 import app.duenorth.budget.core.FindingAction
 import app.duenorth.budget.core.FindingKind
 import app.duenorth.budget.core.PayeeWriteResult
+import app.duenorth.budget.core.PinnedCategories
 import app.duenorth.budget.core.ScheduleWriteResult
 import app.duenorth.budget.core.WriteResult
 import kotlinx.coroutines.launch
@@ -88,6 +89,15 @@ class AssistantHolder internal constructor(
     }
 
     private var reads = 0
+
+    /** Pins [categoryId]'s balance across the top of the assistant, or unpins it; kept on this phone, at most six. */
+    fun togglePin(categoryId: String) {
+        val budgetId = state.settings.openBudgetId ?: return
+        val settings = PinnedCategories.toggle(state.settings, budgetId, categoryId)
+        if (settings == state.settings) return
+        host.mutate { it.copy(settings = settings) }
+        host.scope.launch(host.io) { host.library.save(settings) }
+    }
 
     fun toggleExpanded(kind: FindingKind) {
         update { it.copy(expanded = if (kind in it.expanded) it.expanded - kind else it.expanded + kind) }

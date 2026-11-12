@@ -71,6 +71,7 @@ import app.duenorth.budget.core.MockBudgetDataset
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.NetWorthPage
+import app.duenorth.budget.core.PinnedCategories
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.monthLabel
 import app.duenorth.budget.design.MetroMotion
@@ -148,6 +149,8 @@ fun HomePivot(
     /** The month the assistant offers to close out, while its last days run; null shows no card. */
     closeOut: CloseOutCard? = null,
     onCloseOut: () -> Unit = {},
+    /** Ids of the categories pinned across the top of the assistant, in pin order. */
+    pinnedCategories: List<String> = emptyList(),
     /** The unassigned figure's menu of template runs. */
     distribute: DistributeActions = DistributeActions(),
 ) {
@@ -279,6 +282,8 @@ fun HomePivot(
                             formatOptions = formatOptions,
                             closeOut = closeOut,
                             onCloseOut = onCloseOut,
+                            pinned = remember(pinnedCategories, shell.groups) { PinnedCategories.resolve(pinnedCategories, shell.groups) },
+                            onPinned = { onBudgetCategory?.invoke(it) },
                         )
                     }
                 },

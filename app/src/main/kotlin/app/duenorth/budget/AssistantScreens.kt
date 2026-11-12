@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import app.duenorth.budget.core.AssistantCopy
 import app.duenorth.budget.core.AssistantReport
+import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.Finding
 import app.duenorth.budget.core.FindingAction
@@ -67,10 +68,56 @@ import kotlin.math.roundToInt
 /**
  * The assistant pivot item: a count of what needs a look, then a card for each kind of finding with its count in a
  * circle. The cards start collapsed so every kind shows at once (a lone kind starts open); a tap opens one to its findings, each with its fix
- * and its "that's fine" side by side.
+ * and its "that's fine" side by side. Pinned category balances, if any, sit in small tiles across the top.
  */
 @Composable
 fun AssistantSection(
+    report: AssistantReport?,
+    currency: CurrencySpec,
+    onListGesture: (Boolean) -> Unit,
+    onAct: (Finding, FindingAction) -> Unit,
+    modifier: Modifier = Modifier,
+    expanded: Set<FindingKind> = emptySet(),
+    onToggleExpanded: (FindingKind) -> Unit = {},
+    settling: Set<String> = emptySet(),
+    working: AssistantUi.Working? = null,
+    failed: AssistantUi.Failed? = null,
+    formatOptions: FormatOptions = formatOptions(),
+    closeOut: CloseOutCard? = null,
+    onCloseOut: () -> Unit = {},
+    /** The category balances pinned across the top, in pin order; none takes no room at all. */
+    pinned: List<CategoryRow> = emptyList(),
+    /** A pinned tile's tap: opens its category. */
+    onPinned: (String) -> Unit = {},
+) {
+    Column(modifier.fillMaxSize()) {
+        PinnedBalances(
+            pinned,
+            money = { MoneyFormat.format(it, currency, formatOptions) },
+            onOpen = onPinned,
+            modifier = Modifier.padding(start = MetroDimens.Gutter, end = MetroDimens.Gutter, bottom = 12.dp),
+        )
+        AssistantBody(
+            report = report,
+            currency = currency,
+            onListGesture = onListGesture,
+            onAct = onAct,
+            modifier = Modifier.weight(1f),
+            expanded = expanded,
+            onToggleExpanded = onToggleExpanded,
+            settling = settling,
+            working = working,
+            failed = failed,
+            formatOptions = formatOptions,
+            closeOut = closeOut,
+            onCloseOut = onCloseOut,
+        )
+    }
+}
+
+/** The assistant under its pinned balances: the count, then its cards. */
+@Composable
+private fun AssistantBody(
     report: AssistantReport?,
     currency: CurrencySpec,
     onListGesture: (Boolean) -> Unit,
