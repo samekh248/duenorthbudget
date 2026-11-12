@@ -60,9 +60,17 @@ class BudgetEditScreenshotTest {
     @Test
     fun moveDark() = moveSnap("budget_edit_move_dark", dark = true)
 
+    // Just opened from Gas: the amount holds all 76.40 available, selected so typing replaces it.
+    @Test
+    fun moveOpenLight() = moveSnap("budget_edit_move_open_light", dark = false, amount = "")
+
+    @Test
+    fun moveOpenDark() = moveSnap("budget_edit_move_open_dark", dark = true, amount = "")
+
     private fun moveSnap(
         name: String,
         dark: Boolean,
+        amount: String = "20",
     ) {
         val shell = sample()
         captureRoboImage("src/test/snapshots/$name.png") {
@@ -84,7 +92,7 @@ class BudgetEditScreenshotTest {
                             onSave = { _, _ -> },
                             modifier = modifier,
                             initialTo = "c-groceries",
-                            initialAmount = "20",
+                            initialAmount = amount,
                         )
                     }
                 }

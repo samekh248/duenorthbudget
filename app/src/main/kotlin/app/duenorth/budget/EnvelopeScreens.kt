@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,15 +28,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -47,6 +53,7 @@ import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.core.CurrencySpec
 import app.duenorth.budget.core.EnvelopeCopy
 import app.duenorth.budget.core.FormatOptions
+import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MoneyMath
 import app.duenorth.budget.core.MonthShell
@@ -387,9 +394,10 @@ private fun RolloverSwitch(
 const val MOVE_TO_BUDGET = "to-budget"
 
 /**
- * Moves money from one category: the amount (sums work, and all takes everything available), then where it
- * goes, picked from to budget and every other category with what each has available. Once an amount reads,
- * the source and the picked destination show what they will have after the move.
+ * Moves money from one category: the amount (sums work), then where it goes, picked from to budget and every
+ * other category with what each has available. The amount opens holding everything the category has available,
+ * selected and with the keyboard up, so typing replaces it and saving as it is moves it all. Once an amount
+ * reads, the source and the picked destination show what they will have after the move.
  */
 @Composable
 fun MoveCategoryScreen(
@@ -406,8 +414,17 @@ fun MoveCategoryScreen(
     val options = formatOptions()
     val money = shell.currency
     var toId by remember { mutableStateOf(initialTo) }
-    var amount by remember { mutableStateOf(initialAmount) }
+    var field by remember(fromCategoryId) {
+        mutableStateOf(selectedAmount(initialAmount.ifEmpty { moveAllPrefill(from.availableMinor, money.decimals, prefs) }))
+    }
+    val amount = field.text
     val moved = MoneyMath.evaluate(amount, prefs.numberFormat, money.decimals)?.takeIf { it > 0 } ?: 0L
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(fromCategoryId) {
+        focus.requestFocus()
+        keyboard?.show()
+    }
     val envelope = shell.mode == BudgetMode.ENVELOPE
     Column(
         modifier
@@ -424,13 +441,13 @@ fun MoveCategoryScreen(
             color = Metro.colors.secondary,
         )
         AmountField(
-            amount,
-            { amount = it },
+            field,
+            { field = it },
             "amount",
-            Modifier.padding(top = MetroDimens.Gutter).testTag("move-amount"),
+            Modifier.padding(top = MetroDimens.Gutter).focusRequester(focus).testTag("move-amount"),
             decimals = money.decimals,
         )
-        // Quick picks: everything the category has, or what the picked category is overspent by.
+        // Quick pick: what the picked category is overspent by, selected like the opening amount.
         val target = shell.groups.flatMap { it.categories }.firstOrNull { it.id == toId }
         val cover =
             target
@@ -438,16 +455,10 @@ fun MoveCategoryScreen(
                 ?.takeIf { it < 0 }
                 ?.let { minOf(-it, from.availableMinor) }
                 ?.takeIf { it > 0 }
-        Row(horizontalArrangement = Arrangement.spacedBy(MetroDimens.Grid)) {
-            if (from.availableMinor > 0) {
-                QuickAmount("all ${MoneyFormat.format(from.availableMinor, money, options)}", "move-all") {
-                    amount = prefs.editAmount(from.availableMinor, money.decimals)
-                }
-            }
-            if (cover != null) {
-                QuickAmount("cover ${MoneyFormat.format(cover, money, options)}", "move-cover") {
-                    amount = prefs.editAmount(cover, money.decimals)
-                }
+        if (cover != null) {
+            QuickAmount("cover ${MoneyFormat.format(cover, money, options)}", "move-cover") {
+                field = selectedAmount(prefs.editAmount(cover, money.decimals))
+                focus.requestFocus()
             }
         }
         if (error != null) WarningText(error)
@@ -496,6 +507,16 @@ fun MoveCategoryScreen(
         }
     }
 }
+
+/** What the move screen's amount opens with: everything [availableMinor] holds, or nothing when it holds none. */
+internal fun moveAllPrefill(
+    availableMinor: Long,
+    decimals: Int,
+    prefs: FormatPrefs,
+): String = if (availableMinor > 0) prefs.editAmount(availableMinor, decimals) else ""
+
+/** [text] wholly selected, so the first key typed replaces it. */
+internal fun selectedAmount(text: String): TextFieldValue = TextFieldValue(text, TextRange(0, text.length))
 
 @Composable
 private fun QuickAmount(
