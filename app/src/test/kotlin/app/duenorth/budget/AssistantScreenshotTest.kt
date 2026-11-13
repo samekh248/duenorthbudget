@@ -7,6 +7,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import app.duenorth.budget.core.AssistantCopy
@@ -172,7 +174,11 @@ class AssistantScreenshotTest {
     }
 
     @Test
-    fun clearLight() = snap("assistant_clear_light", dark = false, report = AssistantReport.EMPTY)
+    fun clearLight() {
+        snap("assistant_clear_light", dark = false, report = AssistantReport.EMPTY)
+        // The inbox's self-drawing logo sits over the all-clear words, which stay as they were.
+        compose.onNode(hasTestTag("budget-logo") and hasAnyAncestor(hasTestTag("assistant-clear"))).assertExists()
+    }
 
     @Test
     fun clearDark() = snap("assistant_clear_dark", dark = true, report = AssistantReport.EMPTY)
@@ -206,6 +212,9 @@ class AssistantScreenshotTest {
 
     @Test
     fun sixPinsAllClearLight() = snapPins("assistant_pins_6_clear_light", dark = false, count = 6, report = AssistantReport.EMPTY)
+
+    @Test
+    fun sixPinsAllClearDark() = snapPins("assistant_pins_6_clear_dark", dark = true, count = 6, report = AssistantReport.EMPTY)
 
     /** The first [count] sample pins over the usual findings; each pin shows as one tile and nothing more. */
     private fun snapPins(

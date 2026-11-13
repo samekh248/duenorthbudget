@@ -34,8 +34,8 @@ fun InboxEmpty(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BudgetLogo(LOGO_HEIGHT)
-        Spacer(Modifier.height(30.dp))
+        BudgetLogo(CLEAR_LOGO_HEIGHT)
+        Spacer(Modifier.height(CLEAR_LOGO_GAP))
         MetroText(InboxEmptyCopy.TITLE, Metro.typography.subheader.copy(textAlign = TextAlign.Center))
         MetroText(
             InboxEmptyCopy.BODY,
@@ -46,4 +46,8 @@ fun InboxEmpty(modifier: Modifier = Modifier) {
     }
 }
 
-private val LOGO_HEIGHT = 150.dp
+/** The logo's height on an empty screen: the inbox's and the assistant's all-clear share it. */
+internal val CLEAR_LOGO_HEIGHT = 150.dp
+
+/** The gap between that logo and the words under it. */
+internal val CLEAR_LOGO_GAP = 30.dp
