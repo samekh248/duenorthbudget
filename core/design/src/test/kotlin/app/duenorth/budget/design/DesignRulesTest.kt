@@ -17,7 +17,7 @@ class DesignRulesTest {
     @Test
     fun themeMatchesWindowsPhone81() {
         assertEquals(Color(0xFF000000), MetroColors.Light.foreground)
-        assertEquals(Color(0xFF8C8C8C), MetroColors.Light.secondary)
+        assertEquals(Color(0xFF595959), MetroColors.Light.secondary)
         assertEquals(Color(0xFFDDDDDD), MetroColors.Light.chrome)
         assertEquals(Color(0xFF999999), MetroColors.Dark.secondary)
         assertEquals(Color(0xFF1F1F1F), MetroColors.Dark.chrome)
@@ -43,6 +43,20 @@ class DesignRulesTest {
         assertEquals(57.5.dp, MetroDimens.ButtonMin)
         assertEquals(12.dp, MetroDimens.Gutter)
         assertEquals(48.dp, MetroDimens.TouchTarget)
+    }
+
+    // Owner, 2026-11-13: light-mode text read washed out. The light page sets no semilight type and its grey reads
+    // about as strongly on white as the dark theme's grey does on black.
+    @Test
+    fun lightPageTextIsNotWashedOut() {
+        val light = MetroTypography.Default.forLightPage()
+        listOf(light.sectionHeader, light.header, light.subheader, light.groupHeader, light.caption).forEach {
+            assertEquals(MetroWeights.Regular, it.fontWeight)
+        }
+        assertEquals(MetroWeights.Semibold, light.pageTitle.fontWeight)
+        val lightGrey = Contrast.ratio(MetroColors.Light.secondary, MetroColors.Light.background)
+        val darkGrey = Contrast.ratio(MetroColors.Dark.secondary, MetroColors.Dark.background)
+        assertTrue("light grey $lightGrey vs dark grey $darkGrey", lightGrey >= 7f && lightGrey >= darkGrey - 0.5f)
     }
 
     @Test
