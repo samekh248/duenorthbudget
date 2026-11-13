@@ -126,7 +126,7 @@ internal object StylePalettes {
                 MetroStyle.Mobile10 ->
                     return metro.copy(
                         chrome = Color(if (dark) 0xFF1F1F1F else 0xFFF2F2F2),
-                        secondary = Color(if (dark) 0xFF999999 else 0xFF666666),
+                        secondary = Color(if (dark) 0xFF999999 else 0xFF595959),
                         outline = Color(if (dark) 0xFF666666 else 0xFF999999),
                     )
                 MetroStyle.TileRelief -> if (dark) 0xFF101010 to 0xFF1F1F1F else 0xFFEEEEEE to 0xFFE3E3E3
@@ -140,9 +140,9 @@ internal object StylePalettes {
                 Contrast.ensure(
                     Color(
                         when {
-                            style.layers -> if (dark) 0xFFA9A6B0 else 0xFF5B5862
+                            style.layers -> if (dark) 0xFFA9A6B0 else 0xFF4E4B55
                             dark -> 0xFF9E9E9E
-                            else -> 0xFF636363
+                            else -> 0xFF505050
                         },
                     ),
                     page,

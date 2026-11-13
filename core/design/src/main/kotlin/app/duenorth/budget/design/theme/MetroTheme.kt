@@ -125,6 +125,25 @@ data class MetroTypography(
                 caption = Default.caption.copy(fontWeight = MetroWeights.Regular, fontSize = 14.sp, lineHeight = 18.sp),
             )
     }
+
+    /**
+     * The ramp for a light page. Dark ink on white reads thinner than light ink on black, so Selawik's semilight
+     * looked washed out there (owner, 2026-11-13): on a light page every semilight role is set in regular instead.
+     * A dark page keeps the ramp as it is.
+     */
+    fun forLightPage(): MetroTypography {
+        fun TextStyle.heavier() = if (fontWeight == MetroWeights.Semilight) copy(fontWeight = MetroWeights.Regular) else this
+        return MetroTypography(
+            sectionHeader = sectionHeader.heavier(),
+            pageTitle = pageTitle.heavier(),
+            header = header.heavier(),
+            subheader = subheader.heavier(),
+            groupHeader = groupHeader.heavier(),
+            body = body.heavier(),
+            control = control.heavier(),
+            caption = caption.heavier(),
+        )
+    }
 }
 
 @Immutable
@@ -153,7 +172,8 @@ data class MetroColors(
                 isDark = false,
                 background = Color(0xFFFFFFFF),
                 foreground = Color(0xFF000000),
-                secondary = Color(0xFF8C8C8C),
+                // About 7:1 on white, as the dark theme's grey is on black; the old 8C8C8C was only 3.4:1 and read washed out.
+                secondary = Color(0xFF595959),
                 chrome = Color(0xFFDDDDDD),
                 outline = Color(0xFFBFBFBF),
                 error = Color(0xFFC41100),
@@ -271,7 +291,8 @@ fun MetroTheme(
         LocalAccent provides accentColors.copy(text = Contrast.ensure(accentColors.text, colors.background)),
         LocalMetroSurface provides MetroSurface.of(style, darkTheme),
         LocalAppAccent provides accent,
-        LocalMetroTypography provides if (style.mobile10) MetroTypography.Mobile10 else MetroTypography.Default,
+        LocalMetroTypography provides
+            (if (style.mobile10) MetroTypography.Mobile10 else MetroTypography.Default).let { if (darkTheme) it else it.forLightPage() },
         LocalAnimationsEnabled provides animationsEnabled,
         content = content,
     )
