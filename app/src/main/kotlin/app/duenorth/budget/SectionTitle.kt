@@ -89,6 +89,7 @@ object SectionTitle {
                 ShellRoute.Conflicts,
                 ShellRoute.ConfirmReplace,
                 is ShellRoute.EncryptionPassword,
+                ShellRoute.Licenses,
                 is ShellRoute.ConfirmRemoveInstance,
                 is ShellRoute.ExperimentalOffer,
                 -> return SectionTitleCopy.APP

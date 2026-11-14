@@ -49,6 +49,7 @@ internal fun SettingsRoute(
             launcherIcon = it
         },
         onPayees = model.settingsUi::showPayees,
+        onLicenses = model.settingsUi::showLicenses,
         onDateFormat = model.settingsUi::setDateFormat,
         onNumberFormat = model.settingsUi::setNumberFormat,
         onFirstDay = model.settingsUi::setFirstDay,

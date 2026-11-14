@@ -1,11 +1,13 @@
 package app.duenorth.budget
 
+import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import app.duenorth.budget.core.BudgetSummary
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.RemoteFile
@@ -13,6 +15,7 @@ import app.duenorth.budget.core.SavedInstance
 import app.duenorth.budget.design.components.ScreenAction
 import app.duenorth.budget.design.theme.MetroTheme
 import com.github.takahirom.roborazzi.captureRoboImage
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -84,6 +87,22 @@ class SettingsScreenshotTest {
 
     @Test
     fun encryptionRemoveDark() = page("settings_encryption_remove_dark", dark = true) { EncryptionScreen(EncryptionMode.REMOVE) }
+
+    @Test
+    fun licensesLight() = page("settings_licenses_light", dark = false) { LicensesScreen() }
+
+    @Test
+    fun licensesDark() = page("settings_licenses_dark", dark = true) { LicensesScreen() }
+
+    // Every notice's full text ships in the APK, so a tap never opens an empty license.
+    @Test
+    fun everyLicenseTextShips() {
+        val assets = ApplicationProvider.getApplicationContext<Context>().assets
+        LicensesCopy.notices.forEach { notice ->
+            val text = assets.open(notice.asset).bufferedReader().use { it.readText() }
+            assertTrue(notice.asset, text.length > 500)
+        }
+    }
 
     @Test
     fun removeServerLight() = page("settings_remove_server_light", dark = false) { RemoveScreen() }

@@ -50,4 +50,4 @@ Without a key, `assembleRelease` leaves the APK unsigned. Keep a backup of the k
 
 Debug builds expose **sample budgets** on the budgets screen. Pick one to create a filled Actual file on the phone (household, full tour, or wide month). Release builds hide the entry point.
 
-Selawik is bundled under the SIL Open Font License (`core/design/src/main/assets/licenses/selawik_OFL.txt`).
+Selawik is bundled under the SIL Open Font License (`core/design/src/main/assets/licenses/selawik_OFL.txt`). Budget logic ported from Actual Budget stays under its MIT license. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for everything the app ships.

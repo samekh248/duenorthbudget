@@ -408,6 +408,7 @@ fun DueNorthApp(model: ShellViewModel) {
                         ShellRoute.Settings -> SettingsRoute(state, model, fill)
                         is ShellRoute.ExperimentalOffer -> ExperimentalOfferRoute(route, state, model, fill)
                         is ShellRoute.EncryptionPassword -> EncryptionPasswordRoute(route, state, model, fill)
+                        ShellRoute.Licenses -> LicensesScreen(fill)
                         is ShellRoute.ConfirmRemoveInstance -> ConfirmRemoveInstanceRoute(route, state, model, fill)
                         ShellRoute.ConfirmInstanceSwitch -> ConfirmInstanceSwitchRoute(state, model, fill)
                         ShellRoute.SampleBudgets -> SampleBudgetsRoute(state, model, fill)
