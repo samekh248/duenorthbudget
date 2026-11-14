@@ -1,3 +1,6 @@
+// Portions ported from Actual Budget (https://github.com/actualbudget/actual), Copyright James Long,
+// under the MIT License. See THIRD_PARTY_NOTICES.md.
+
 package app.duenorth.budget.core
 
 import kotlinx.serialization.json.Json

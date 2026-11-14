@@ -32,8 +32,10 @@ enum class MetroStyle(
 ) {
     Metro("metro", "metro"),
     TileRelief("tile-relief", "tile relief", panels = true, heroTiles = true, filledAdd = true),
-    Mica("mica", "mica", panels = true, filledAdd = true, layers = true),
-    Mobile10("windows-10-mobile", "windows 10 mobile", mobile10 = true),
+
+    // The ids stay as saved on phones; the labels avoid other companies' product names and trademarks.
+    Mica("mica", "glass", panels = true, filledAdd = true, layers = true),
+    Mobile10("windows-10-mobile", "compact", mobile10 = true),
     ;
 
     /** Whether surfaces are drawn by [MetroSurface] (relief or layers) rather than Metro's outlines. */
