@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.boundsInWindow
@@ -52,12 +53,19 @@ class PayeeActions(
     val onDelete: (List<String>) -> Unit = {},
     /** "Not the same": the suggestion goes, here and in the assistant. */
     val onNotTheSame: (PayeeLookalike) -> Unit = {},
+    /**
+     * Merges only the checked names of a suggestion under the name, and keeps the unchecked ones apart from them, so
+     * the same suggestion does not come back.
+     */
+    val onMergePicked: (PayeeLookalike, List<String>, String, Boolean) -> Unit = { _, ids, name, rule -> onMergeAll(ids, name, rule) },
 )
 
 /** The names going into one payee on the merge page, the one kept first, and the name it starts with. */
 internal data class PayeeMergeDraft(
     val names: List<PayeeRow>,
     val name: String,
+    /** The suggestion these names were picked from, when only some of its names were; the rest are kept apart. */
+    val from: PayeeLookalike? = null,
 )
 
 /**
@@ -80,6 +88,8 @@ fun PayeesScreen(
     initialSelection: Set<String>? = null,
     /** Opens on the merge page for these payees, the first kept; for previews and snapshots. */
     initialMerge: List<String>? = null,
+    /** The lead suggestion's checked names to start with, instead of all of them; for previews and snapshots. */
+    initialPicked: Set<String>? = null,
 ) {
     var editing by remember { mutableStateOf<PayeeRow?>(null) }
     var name by remember(editing?.id) { mutableStateOf(editing?.name.orEmpty()) }
@@ -103,7 +113,12 @@ fun PayeesScreen(
             PayeeMergePage(
                 draft = draft,
                 onMerge = { kept, rule ->
-                    actions.onMergeAll(draft.names.map { it.id }, kept, rule)
+                    val from = draft.from
+                    if (from != null) {
+                        actions.onMergePicked(from, draft.names.map { it.id }, kept, rule)
+                    } else {
+                        actions.onMergeAll(draft.names.map { it.id }, kept, rule)
+                    }
                     merging = null
                     selection = null
                 },
@@ -149,6 +164,7 @@ fun PayeesScreen(
                 },
                 onMergeDraft = { merging = it },
                 actions = actions,
+                initialPicked = initialPicked,
             )
         }
     }
@@ -165,6 +181,7 @@ private fun PayeeList(
     onEdit: (PayeeRow) -> Unit,
     onMergeDraft: (PayeeMergeDraft) -> Unit,
     actions: PayeeActions,
+    initialPicked: Set<String>? = null,
 ) {
     val own = payees.filter { !it.transfer }
     val (used, unused) = own.partition { it.transactionCount > 0 }
@@ -209,11 +226,34 @@ private fun PayeeList(
             if (selection == null) {
                 lookalikes.firstOrNull()?.let { lead ->
                     item(key = "lookalike-panel-${lead.id}") {
+                        // Three or more names: each has a check box, all checked to start, and merge takes the checked.
+                        var picked by remember(lead) { mutableStateOf(initialPicked ?: lead.names.map { it.id }.toSet()) }
+                        val chosen = lead.names.filter { it.id in picked }
+                        val all = chosen.size == lead.names.size
                         LookalikePanel(
                             group = lead,
-                            onMerge = { actions.onMergeAll(lead.names.map { it.id }, lead.keep.name, true) },
+                            picked = picked,
+                            onToggle =
+                                if (lead.names.size > 2) {
+                                    { id -> picked = if (id in picked) picked - id else picked + id }
+                                } else {
+                                    null
+                                },
+                            onMerge = {
+                                when {
+                                    chosen.size < 2 -> Unit
+                                    all -> actions.onMergeAll(lead.names.map { it.id }, lead.keep.name, true)
+                                    else -> actions.onMergePicked(lead, chosen.map { it.id }, chosen.first().name, true)
+                                }
+                            },
                             onNotTheSame = { actions.onNotTheSame(lead) },
-                            onRename = { onMergeDraft(mergeOf(lead)) },
+                            onRename = {
+                                if (all || chosen.size < 2) {
+                                    onMergeDraft(mergeOf(lead))
+                                } else {
+                                    onMergeDraft(PayeeMergeDraft(chosen, chosen.first().name, lead))
+                                }
+                            },
                             onMenu = { groupMenu(lead, it) },
                             modifier = Modifier.padding(top = FEATURED_AIR_ABOVE),
                         )
@@ -321,6 +361,9 @@ internal fun payeeLetter(name: String): String {
 @Composable
 private fun LookalikePanel(
     group: PayeeLookalike,
+    picked: Set<String>,
+    /** Toggles a name's check box; null for a pair, which has none. */
+    onToggle: ((String) -> Unit)?,
     onMerge: () -> Unit,
     onNotTheSame: () -> Unit,
     onRename: () -> Unit,
@@ -340,32 +383,57 @@ private fun LookalikePanel(
         MetroText(PayeeScreenCopy.POSSIBLE_DUPLICATE, Metro.typography.groupHeader, color = Metro.accent.text)
         group.names.forEachIndexed { i, payee ->
             if (i == 1) LookalikeLink()
-            Column(Modifier.fillMaxWidth().padding(top = if (i == 0) 10.dp else 6.dp)) {
-                MetroText(
-                    if (i == 0) PayeeScreenCopy.USED_MOST else PayeeScreenCopy.ALSO_AS,
-                    Metro.typography.caption,
-                    color = Metro.accent.text,
-                )
-                Row(verticalAlignment = Alignment.Bottom) {
+            val checked = onToggle == null || payee.id in picked
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = if (i == 0) 10.dp else 6.dp)
+                    .then(
+                        if (onToggle != null) {
+                            Modifier.metroPress { onToggle(payee.id) }.testTag(
+                                if (checked) "payee-lookalike-checked-${payee.id}" else "payee-lookalike-unchecked-${payee.id}",
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (onToggle != null) CheckSquare(checked, Modifier.padding(end = MetroDimens.Gutter))
+                Column(Modifier.weight(1f)) {
                     MetroText(
-                        payee.name,
-                        Metro.typography.body.copy(fontWeight = MetroWeights.Semibold),
-                        Modifier.weight(1f).padding(end = 12.dp),
-                        maxLines = 1,
-                    )
-                    MetroText(
-                        PayeeScreenCopy.transactions(payee.transactionCount),
+                        if (i == 0) PayeeScreenCopy.USED_MOST else PayeeScreenCopy.ALSO_AS,
                         Metro.typography.caption,
-                        color = Metro.colors.secondary,
-                        maxLines = 1,
+                        color = if (checked) Metro.accent.text else Metro.colors.secondary,
                     )
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        MetroText(
+                            payee.name,
+                            Metro.typography.body.copy(fontWeight = MetroWeights.Semibold),
+                            Modifier.weight(1f).padding(end = 12.dp),
+                            color = if (checked) Metro.colors.foreground else Metro.colors.secondary,
+                            maxLines = 1,
+                        )
+                        MetroText(
+                            PayeeScreenCopy.transactions(payee.transactionCount),
+                            Metro.typography.caption,
+                            color = Metro.colors.secondary,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }
+        val chosen = group.names.filter { onToggle == null || it.id in picked }
+        val ready = chosen.size >= 2
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            MetroText("${PayeeScreenCopy.MERGES_AS} ", Metro.typography.caption, color = Metro.colors.secondary)
             MetroText(
-                group.keep.name,
+                if (ready) "${PayeeScreenCopy.MERGES_AS} " else PayeeScreenCopy.PICK_TWO,
+                Metro.typography.caption,
+                color = Metro.colors.secondary,
+            )
+            MetroText(
+                if (ready) chosen.first().name else "",
                 Metro.typography.body.copy(fontWeight = MetroWeights.Semibold),
                 Modifier.weight(1f),
                 maxLines = 1,
@@ -382,7 +450,11 @@ private fun LookalikePanel(
             )
         }
         MetroButtonGrid(Modifier.padding(top = 8.dp)) {
-            AccentButton(PayeeScreenCopy.MERGE, Modifier.testTag("payee-lookalike-merge-${group.id}"), onMerge)
+            AccentButton(
+                if (ready && chosen.size < group.names.size) PayeeScreenCopy.mergeCount(chosen.size) else PayeeScreenCopy.MERGE,
+                Modifier.alpha(if (ready) 1f else DISABLED_ALPHA).testTag("payee-lookalike-merge-${group.id}"),
+                onMerge,
+            )
             MetroButton(PayeeScreenCopy.NOT_THE_SAME, Modifier.testTag("payee-lookalike-dismiss-${group.id}"), onClick = onNotTheSame)
         }
     }
@@ -592,6 +664,7 @@ private fun RowChoice(
 }
 
 private val PAYEE_ROW_AIR = 15.dp
+private const val DISABLED_ALPHA = 0.4f
 private val FEATURED_AIR_ABOVE = 20.dp
 private val GROUP_AIR_ABOVE = 24.dp
 
@@ -605,7 +678,7 @@ object PayeeScreenCopy {
     const val POSSIBLE_DUPLICATE = "possible duplicate"
     const val USED_MOST = "used most"
     const val ALSO_AS = "also as"
-    const val WHY_ALIKE = "names that read alike once case, numbers and endings go"
+    const val WHY_ALIKE = "these names read as one payee"
     const val MERGES_AS = "merges as"
     const val RENAME = "rename"
     const val RENAME_TITLE = "rename payee"
@@ -622,6 +695,9 @@ object PayeeScreenCopy {
     const val NEW_NAME = "or type a new name"
     const val NAME = "name"
     const val REMEMBER = "remember as rule"
+    const val PICK_TWO = "check two or more names to merge"
+
+    fun mergeCount(count: Int): String = "merge $count"
 
     fun transactions(count: Int): String =
         when (count) {
