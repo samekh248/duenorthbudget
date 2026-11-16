@@ -1,0 +1,83 @@
+package app.duenorth.budget
+
+import androidx.compose.runtime.Composable
+import app.duenorth.budget.core.PayeeLookalikes
+import app.duenorth.budget.core.PayeeRow
+import app.duenorth.budget.design.theme.MetroTheme
+import com.github.takahirom.roborazzi.captureRoboImage
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+/** The payees page laid out as the inbox: a look-alike panel, the other suggestions, then the payees in groups. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [33], qualifiers = "w411dp-h891dp-xxhdpi")
+class PayeesScreenshotTest {
+    private val rows =
+        listOf(
+            PayeeRow("acme", "Acme Payroll", false, 6),
+            PayeeRow("amz", "Amazon", false, 14),
+            PayeeRow("amzc", "AMAZON.COM", false, 3),
+            PayeeRow("amzm", "Amazon Marketplace", false, 2),
+            PayeeRow("cafe", "Corner Coffee", false, 9),
+            PayeeRow("costco", "Costco", false, 5),
+            PayeeRow("costco2", "COSTCO #1123", false, 2),
+            PayeeRow("gym", "Old Gym", false, 0),
+            PayeeRow("rent", "Riverside Property Management", false, 4),
+            PayeeRow("shell", "Shell", false, 7),
+            PayeeRow("shell2", "SHELL OIL 5123", false, 1),
+            PayeeRow("savings", "Transfer: Savings", true, 3),
+            PayeeRow("video", "Video Rental", false, 0),
+        )
+
+    @Test
+    fun payeesLight() = snap("payees_light", dark = false) { Page() }
+
+    @Test
+    fun payeesDark() = snap("payees_dark", dark = true) { Page() }
+
+    // Batch mode: a check box on every payee; two checked offers merge, cancel.
+    @Test
+    fun payeesBatchLight() = snap("payees_batch_light", dark = false) { Page(selection = setOf("costco", "costco2")) }
+
+    @Test
+    fun payeesBatchDark() = snap("payees_batch_dark", dark = true) { Page(selection = setOf("costco", "costco2")) }
+
+    // The merge page: pick the name to keep, or type a new one.
+    @Test
+    fun payeesMergeLight() = snap("payees_merge_light", dark = false) { Page(merge = listOf("amz", "amzc", "amzm")) }
+
+    @Test
+    fun payeesMergeDark() = snap("payees_merge_dark", dark = true) { Page(merge = listOf("amz", "amzc", "amzm")) }
+
+    @Composable
+    private fun Page(
+        selection: Set<String>? = null,
+        merge: List<String>? = null,
+    ) {
+        PayeesScreen(
+            payees = rows,
+            error = null,
+            mergeTarget = null,
+            onRename = { _, _, _, _ -> },
+            onConfirmMerge = { _, _ -> },
+            onCancelMerge = {},
+            lookalikes = PayeeLookalikes.find(rows),
+            initialSelection = selection,
+            initialMerge = merge,
+        )
+    }
+
+    private fun snap(
+        name: String,
+        dark: Boolean,
+        content: @Composable () -> Unit,
+    ) {
+        captureRoboImage("src/test/snapshots/$name.png") {
+            MetroTheme(darkTheme = dark) { HostedPage { content() } }
+        }
+    }
+}

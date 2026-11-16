@@ -143,6 +143,11 @@ object ToastCopy {
 
     const val PAYEE_SAVED = "payee saved"
     const val PAYEE_SAVE_FAILED = "couldn't save payee"
+    const val PAYEES_MERGED = "payees merged"
+    const val PAYEES_MERGE_FAILED = "couldn't merge payees"
+    const val PAYEES_DELETED = "payees deleted"
+    const val PAYEES_DELETE_FAILED = "couldn't delete payees"
+    const val LOOKALIKE_DISMISSED = "kept apart"
 
     const val MONTH_FILLED = "budget filled"
     const val MONTH_FILL_FAILED = "couldn't fill the budget"
