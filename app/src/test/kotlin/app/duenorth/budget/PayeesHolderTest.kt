@@ -44,6 +44,20 @@ class PayeesHolderTest {
         assertEquals(null, host.state.value.payees.mergeTarget)
     }
 
+    @Test
+    fun mergeAllLeavesOnePayeeUnderTheNewName() {
+        val host = host("payees-holder-merge-all")
+        val payees = PayeesHolder(host)
+        payees.load()
+        val before = host.state.value.payees.rows.filter { !it.transfer }
+        val (first, second) = before.take(2)
+        payees.mergeAll(listOf(first.id, second.id), "Merged Payee", rememberRule = false)
+        val after = host.state.value.payees.rows.filter { !it.transfer }
+        assertEquals(before.size - 1, after.size)
+        val merged = after.single { it.name == "Merged Payee" }
+        assertEquals(first.transactionCount + second.transactionCount, merged.transactionCount)
+    }
+
     private fun host(name: String): FakeShellHost {
         val root =
             File(RuntimeEnvironment.getApplication().filesDir, name).apply {

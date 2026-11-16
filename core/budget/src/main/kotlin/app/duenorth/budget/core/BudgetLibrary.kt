@@ -1181,6 +1181,39 @@ class BudgetLibrary(
 
     fun listPayees(budgetId: String): List<PayeeRow> = open(budgetId) { PayeeBook(it).list() } ?: emptyList()
 
+    /** The payees page: every payee, and the look-alikes nobody has called different here or in the assistant. */
+    fun readPayees(budgetId: String): PayeesPage =
+        open(budgetId) { PayeeBook(it).page(AssistantBook.dismissed(it)) } ?: PayeesPage(emptyList(), emptyList())
+
+    /** Makes [payeeIds] one payee called [name], as one undo step. */
+    fun mergePayees(
+        budgetId: String,
+        payeeIds: List<String>,
+        name: String,
+        rememberRule: Boolean,
+    ): PayeeWriteResult =
+        edit(budgetId, UndoCopy.MERGE_PAYEES) { PayeeBook(it).mergeAll(payeeIds, name, rememberRule) }
+            ?: PayeeWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** Deletes unused payees, as one undo step. */
+    fun deletePayees(
+        budgetId: String,
+        payeeIds: List<String>,
+    ): PayeeWriteResult =
+        edit(budgetId, UndoCopy.DELETE_PAYEES) { PayeeBook(it).deleteAll(payeeIds) }
+            ?: PayeeWriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** "Not the same": the payees page and the assistant both stop offering these look-alikes. */
+    fun dismissLookalikes(
+        budgetId: String,
+        keys: List<String>,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.DISMISS) { session ->
+            val book = AssistantBook(session, clock.today())
+            keys.forEach { book.dismiss(it) }
+            WriteResult.Saved
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     fun renamePayee(
         budgetId: String,
         payeeId: String,
