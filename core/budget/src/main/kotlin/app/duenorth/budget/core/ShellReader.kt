@@ -79,7 +79,8 @@ object ShellReader {
                             AND s.id <> t.id
                         ORDER BY s.date DESC, s.sort_order DESC, s.id DESC
                         LIMIT 1
-                    ) AS suggestion_id
+                    ) AS suggestion_id,
+                    ta.id AS transfer_account
                 FROM transactions t
                 JOIN accounts a
                     ON a.id = t.acct
@@ -88,9 +89,19 @@ object ShellReader {
                 LEFT JOIN payees p
                     ON p.id = t.description
                     AND IFNULL(p.tombstone, 0) = 0
+                LEFT JOIN accounts ta
+                    ON ta.id = COALESCE(
+                        p.transfer_acct,
+                        (SELECT o.acct FROM transactions o WHERE o.id = t.transferred_id)
+                    )
                 WHERE $alive
                     AND t.category IS NULL
-                    AND t.transferred_id IS NULL
+                    -- As in Actual: a transfer between on-budget accounts needs no category, but one
+                    -- to or from an off-budget account moves money in or out of the budget and does.
+                    AND (
+                        (t.transferred_id IS NULL AND p.transfer_acct IS NULL)
+                        OR IFNULL(ta.offbudget, 0) = 1
+                    )
                     AND NOT ${BankPending.pendingSql("t")}
                 ORDER BY t.date DESC, t.sort_order DESC, t.id DESC
                 """.trimIndent(),
@@ -181,7 +192,9 @@ object ShellReader {
                             suggestionName = suggestion?.let { categoryNames[it] }.orEmpty(),
                         )
                     }.let { rows ->
-                        val guesses = TransferGuesser.guess(session, rows, today)
+                        // A row that is already a transfer (to an off-budget account) isn't guessed as one.
+                        val transfers = inbox.filter { it.str("transfer_account") != null }.map { it.str("id") }.toSet()
+                        val guesses = TransferGuesser.guess(session, rows.filter { it.id !in transfers }, today)
                         rows.map { row -> guesses[row.id]?.let { row.copy(transfer = it) } ?: row }
                     },
             matches = MatchFinder.find(session).filter { it.bank.accountId in onBudget },
