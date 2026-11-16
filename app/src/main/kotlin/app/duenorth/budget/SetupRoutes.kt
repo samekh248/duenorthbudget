@@ -319,6 +319,7 @@ internal fun PayeesRoute(
                 onMergeAll = model.payees::mergeAll,
                 onDelete = model.payees::deleteAll,
                 onNotTheSame = model.payees::notTheSame,
+                onMergePicked = model.payees::mergePicked,
             ),
     )
 }

@@ -75,6 +75,31 @@ class PayeesHolder internal constructor(
         }
     }
 
+    /**
+     * Merges only [picked] of [group]'s names under [name]. The names left out are kept apart from the picked ones, so
+     * the merged payee and the names left out are not offered as one again.
+     */
+    fun mergePicked(
+        group: PayeeLookalike,
+        picked: List<String>,
+        name: String,
+        rememberRule: Boolean,
+    ) {
+        val budgetId = state.settings.openBudgetId ?: return
+        val left = group.names.map { it.id }.filter { it !in picked }
+        val keys = left.flatMap { out -> picked.flatMap { kept -> listOf(PayeeLookalike.key(out, kept), PayeeLookalike.key(kept, out)) } }
+        host.scope.launch {
+            if (keys.isNotEmpty()) withContext(host.io) { host.library.dismissLookalikes(budgetId, keys) }
+            val result = withContext(host.io) { host.library.mergePayees(budgetId, picked, name, rememberRule) }
+            when (result) {
+                is PayeeWriteResult.Saved -> host.toastSuccess(ToastCopy.PAYEES_MERGED, name.trim())
+                is PayeeWriteResult.Rejected -> host.toastFailure(ToastCopy.PAYEES_MERGE_FAILED, result.reason)
+                is PayeeWriteResult.ConfirmMerge -> Unit
+            }
+            reload(budgetId)
+        }
+    }
+
     /** "Not the same": the suggestion goes, here and in the assistant. */
     fun notTheSame(group: PayeeLookalike) {
         val budgetId = state.settings.openBudgetId ?: return

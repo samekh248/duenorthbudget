@@ -39,6 +39,13 @@ class PayeesScreenshotTest {
     @Test
     fun payeesDark() = snap("payees_dark", dark = true) { Page() }
 
+    // Three names in the lead suggestion: each has a check box; with one left out, merge takes the other two.
+    @Test
+    fun payeesPickedLight() = snap("payees_picked_light", dark = false) { Page(picked = setOf("amz", "amzc")) }
+
+    @Test
+    fun payeesPickedDark() = snap("payees_picked_dark", dark = true) { Page(picked = setOf("amz", "amzc")) }
+
     // Batch mode: a check box on every payee; two checked offers merge, cancel.
     @Test
     fun payeesBatchLight() = snap("payees_batch_light", dark = false) { Page(selection = setOf("costco", "costco2")) }
@@ -57,6 +64,7 @@ class PayeesScreenshotTest {
     private fun Page(
         selection: Set<String>? = null,
         merge: List<String>? = null,
+        picked: Set<String>? = null,
     ) {
         PayeesScreen(
             payees = rows,
@@ -68,6 +76,7 @@ class PayeesScreenshotTest {
             lookalikes = PayeeLookalikes.find(rows),
             initialSelection = selection,
             initialMerge = merge,
+            initialPicked = picked,
         )
     }
 
