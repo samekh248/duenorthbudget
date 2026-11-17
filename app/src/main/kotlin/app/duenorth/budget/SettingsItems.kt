@@ -151,6 +151,7 @@ internal fun GeneralItem(
     manage: SettingsManage = SettingsManage(),
     closeOutDays: Int = CloseOutWindow.DEFAULT_DAYS,
     onCloseOutDays: (Int) -> Unit = {},
+    onLicenses: () -> Unit = {},
 ) {
     if (budgetOpen) {
         // Every tool the budget has, in one list; each also has a home next to related work.
@@ -189,6 +190,8 @@ internal fun GeneralItem(
         onCloseOutDays,
     )
     MetroText(SettingsCopy.CLOSE_OUT_HINT, Metro.typography.caption, Modifier.padding(top = 4.dp), color = Metro.colors.secondary)
+    SettingsHeading(LicensesCopy.ABOUT_HEADING, tag = "settings-about")
+    SettingsLinkRow(LicensesCopy.LINK, LicensesCopy.LINK_HINT, "settings-licenses", onLicenses)
 }
 
 @Composable

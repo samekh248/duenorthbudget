@@ -22,6 +22,9 @@ sealed interface ShellRoute {
 
     data object BudgetPassword : ShellRoute
 
+    /** Settings, general: the open source licenses of what the app ships. */
+    data object Licenses : ShellRoute
+
     data object Conflicts : ShellRoute
 
     data object ConfirmReplace : ShellRoute

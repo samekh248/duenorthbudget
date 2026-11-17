@@ -170,6 +170,7 @@ fun SettingsScreen(
     phoneSettings: PhoneSettings = PhoneSettings(),
     onBackgroundSyncHours: (Int) -> Unit = {},
     onCloseOutDays: (Int) -> Unit = {},
+    onLicenses: () -> Unit = {},
     scroll: Map<SettingsPage, Int> = emptyMap(),
     onScroll: (SettingsPage, Int) -> Unit = { _, _ -> },
     remoteFiles: List<RemoteFile> = emptyList(),
@@ -219,6 +220,7 @@ fun SettingsScreen(
                                 manage = manage,
                                 closeOutDays = phoneSettings.closeOutDays,
                                 onCloseOutDays = onCloseOutDays,
+                                onLicenses = onLicenses,
                             )
                         SettingsPage.FORMAT ->
                             FormatItem(

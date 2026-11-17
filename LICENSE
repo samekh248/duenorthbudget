@@ -1,0 +1,10 @@
+Copyright (c) 2026 samekh248. All rights reserved.
+
+This repository and the Due North Budget app are proprietary. No license is
+granted to copy, modify, distribute, or use this code or the app, in whole or
+in part, except as GitHub's Terms of Service allow for viewing and forking
+this repository on GitHub, or with the copyright holder's written permission.
+
+Third-party parts keep their own licenses, listed in THIRD_PARTY_NOTICES.md:
+the code ported from Actual Budget (MIT), the Selawik font (SIL Open Font
+License 1.1), and the libraries the app is built with (Apache License 2.0).
