@@ -42,6 +42,20 @@ class PayeeLookalikesTest {
     }
 
     @Test
+    fun aCardProcessorTagInFrontIsIgnored() {
+        assertEquals("cornercafe", PayeeLookalikes.tidy("TST* Corner Cafe"))
+        assertEquals("joescoffee", PayeeLookalikes.tidy("SQ *JOES COFFEE"))
+        assertEquals("cornercafe", PayeeLookalikes.tidy("tst*corner cafe 0042"))
+        val group =
+            PayeeLookalikes
+                .find(listOf(row("tst", "TST* Corner Cafe", 9), row("cafe", "Corner Cafe", 3), row("tst2", "TST*CORNER CAFE", 1)))
+                .single()
+        // The shop's own name is kept, even when the tagged one is used more.
+        assertEquals("cafe", group.keep.id)
+        assertEquals(listOf("tst", "tst2"), group.others.map { it.id })
+    }
+
+    @Test
     fun shortNamesAndTransfersAreLeftAlone() {
         val groups =
             PayeeLookalikes.find(
