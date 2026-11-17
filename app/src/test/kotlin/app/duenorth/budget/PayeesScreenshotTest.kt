@@ -55,6 +55,16 @@ class PayeesScreenshotTest {
     fun payeesMergeNewDark() =
         snap("payees_merge_new_dark", dark = true) { Page(merge = listOf("amz", "amzc", "amzm"), mergeName = "Amazon Shopping") }
 
+    // Two payees spelled the same, case aside, are one choice on the merge page, with their counts added.
+    @Test
+    fun payeesMergeUniqueLight() = snap("payees_merge_unique_light", dark = false) { Page(merge = sameSpelling, payees = withTwins) }
+
+    @Test
+    fun payeesMergeUniqueDark() = snap("payees_merge_unique_dark", dark = true) { Page(merge = sameSpelling, payees = withTwins) }
+
+    private val withTwins get() = rows + PayeeRow("amz2", "AMAZON", false, 4) + PayeeRow("amzc2", "amazon.com", false, 1)
+    private val sameSpelling = listOf("amz", "amz2", "amzc", "amzc2")
+
     // Batch mode: a check box on every payee; two checked offers merge, cancel.
     @Test
     fun payeesBatchLight() = snap("payees_batch_light", dark = false) { Page(selection = setOf("costco", "costco2")) }
@@ -75,15 +85,16 @@ class PayeesScreenshotTest {
         merge: List<String>? = null,
         picked: Set<String>? = null,
         mergeName: String? = null,
+        payees: List<PayeeRow> = rows,
     ) {
         PayeesScreen(
-            payees = rows,
+            payees = payees,
             error = null,
             mergeTarget = null,
             onRename = { _, _, _, _ -> },
             onConfirmMerge = { _, _ -> },
             onCancelMerge = {},
-            lookalikes = PayeeLookalikes.find(rows),
+            lookalikes = PayeeLookalikes.find(payees),
             initialSelection = selection,
             initialMerge = merge,
             initialPicked = picked,
