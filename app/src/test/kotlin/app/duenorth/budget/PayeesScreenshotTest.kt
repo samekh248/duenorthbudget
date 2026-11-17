@@ -23,6 +23,7 @@ class PayeesScreenshotTest {
             PayeeRow("amzc", "AMAZON.COM", false, 3),
             PayeeRow("amzm", "Amazon Marketplace", false, 2),
             PayeeRow("cafe", "Corner Coffee", false, 9),
+            PayeeRow("tstcafe", "TST* Corner Coffee", false, 4),
             PayeeRow("costco", "Costco", false, 5),
             PayeeRow("costco2", "COSTCO #1123", false, 2),
             PayeeRow("gym", "Old Gym", false, 0),

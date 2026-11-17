@@ -43,6 +43,21 @@ object PayeeLookalikes {
     /** Endings a bank or a store adds that do not change who was paid. */
     private val ENDINGS = setOf("com", "inc", "llc", "ltd", "co", "corp", "net", "org")
 
+    /**
+     * A card processor's tag before the shop's own name: "TST* " (Toast), "SQ *" (Square), "SP " (Shopify), "PY *",
+     * "PAYPAL *" and the like. Up to eight letters, then an asterisk.
+     */
+    private val PROCESSOR = Regex("^\\s*[A-Za-z]{1,8}\\s*\\*\\s*")
+
+    /** The name without a card processor's tag in front: "TST* Corner Cafe" is "Corner Cafe". */
+    fun withoutProcessor(name: String): String {
+        val rest = name.replaceFirst(PROCESSOR, "")
+        return if (rest.isBlank()) name else rest
+    }
+
+    /** True when the name starts with a card processor's tag, such as "TST* ". */
+    fun hasProcessor(name: String): Boolean = withoutProcessor(name) != name
+
     fun find(
         rows: List<PayeeRow>,
         dismissed: Set<String> = emptySet(),
@@ -90,7 +105,14 @@ object PayeeLookalikes {
             .mapNotNull { members ->
                 val group = members.map { named[it].first }
                 // The name used most stays; the others merge into it.
-                val keep = group.sortedWith(compareByDescending<PayeeRow> { it.transactionCount }.thenBy { it.name }).first()
+                // The shop's own name stays over one with a card processor's tag; then the name used most.
+                val keep =
+                    group
+                        .sortedWith(
+                            compareBy<PayeeRow> { hasProcessor(it.name) }
+                                .thenByDescending { it.transactionCount }
+                                .thenBy { it.name },
+                        ).first()
                 val others =
                     group
                         .filter { it != keep && PayeeLookalike.key(it.id, keep.id) !in dismissed }
@@ -105,7 +127,7 @@ object PayeeLookalikes {
     /** A name's words, lowercase, without store numbers, punctuation, endings like ".com", or trailing digits. */
     internal fun words(name: String): List<String> {
         val words =
-            name
+            withoutProcessor(name)
                 .lowercase()
                 .replace(Regex("#\\s*\\d+"), " ")
                 .split(Regex("[^\\p{L}\\p{N}]+"))
