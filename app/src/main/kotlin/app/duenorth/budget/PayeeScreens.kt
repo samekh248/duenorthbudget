@@ -1,5 +1,6 @@
 package app.duenorth.budget
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -23,11 +25,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.duenorth.budget.core.PayeeLookalike
 import app.duenorth.budget.core.PayeeRow
@@ -90,6 +98,8 @@ fun PayeesScreen(
     initialMerge: List<String>? = null,
     /** The lead suggestion's checked names to start with, instead of all of them; for previews and snapshots. */
     initialPicked: Set<String>? = null,
+    /** The merge page's name to start with; one not among the names starts on "a new name". For snapshots. */
+    initialMergeName: String? = null,
 ) {
     var editing by remember { mutableStateOf<PayeeRow?>(null) }
     var name by remember(editing?.id) { mutableStateOf(editing?.name.orEmpty()) }
@@ -99,7 +109,7 @@ fun PayeesScreen(
         mutableStateOf(
             initialMerge?.let { ids ->
                 val names = ids.mapNotNull { id -> payees.firstOrNull { it.id == id } }
-                PayeeMergeDraft(names, names.firstOrNull()?.name.orEmpty())
+                PayeeMergeDraft(names, initialMergeName ?: names.firstOrNull()?.name.orEmpty())
             },
         )
     }
@@ -184,7 +194,9 @@ private fun PayeeList(
     initialPicked: Set<String>? = null,
 ) {
     val own = payees.filter { !it.transfer }
-    val (used, unused) = own.partition { it.transactionCount > 0 }
+    // Outside batch mode a payee shows once: names already up top in a suggestion leave the lists below.
+    val suggested = if (selection == null) lookalikes.flatMap { group -> group.names.map { it.id } }.toSet() else emptySet()
+    val (used, unused) = own.filter { it.id !in suggested }.partition { it.transactionCount > 0 }
     var menu by remember { mutableStateOf<Pair<List<MetroMenuItem>, Rect>?>(null) }
     val mergeOf = { group: PayeeLookalike -> PayeeMergeDraft(group.names, group.keep.name) }
     val payeeMenu = { payee: PayeeRow, bounds: Rect ->
@@ -208,7 +220,7 @@ private fun PayeeList(
         menu =
             listOf(
                 MetroMenuItem(PayeeScreenCopy.MERGE) { actions.onMergeAll(group.names.map { it.id }, group.keep.name, true) },
-                MetroMenuItem(PayeeScreenCopy.MERGE_AS) { onMergeDraft(mergeOf(group)) },
+                MetroMenuItem(PayeeScreenCopy.USE_ANOTHER_NAME) { onMergeDraft(mergeOf(group)) },
                 MetroMenuItem(PayeeScreenCopy.NOT_THE_SAME) { actions.onNotTheSame(group) },
             ) to bounds
     }
@@ -439,7 +451,7 @@ private fun LookalikePanel(
                 maxLines = 1,
             )
             MetroText(
-                PayeeScreenCopy.RENAME,
+                PayeeScreenCopy.USE_ANOTHER_NAME,
                 Metro.typography.body,
                 Modifier
                     .metroPress(
@@ -578,8 +590,9 @@ private fun PayeeLetterHeading(letter: String) {
 }
 
 /**
- * Merge payees: the names going into one, a name for it (the most used, or any of them with a tap, or a new one),
- * and whether to remember each old name as a rule so the bank's spelling lands here next time.
+ * Merge payees. A panel up top shows what the merge makes: one name, and every transaction from the names going in.
+ * Under it, "call it" is a single choice: one of the names going in, or a new name, whose box shows only once picked.
+ * Last, whether to remember the old names as rules, saying which names would turn into which.
  */
 @Composable
 private fun PayeeMergePage(
@@ -587,53 +600,82 @@ private fun PayeeMergePage(
     onMerge: (String, Boolean) -> Unit,
     onCancel: () -> Unit,
 ) {
-    var name by remember(draft) { mutableStateOf(draft.name) }
+    // Each spelling once: payees that share a name, case and spacing aside, are one choice with their counts added.
+    val options = remember(draft) { mergeNameOptions(draft.names) }
+    val start = options.indexOfFirst { sameName(it.name, draft.name) }
+    // An index into the names going in, or NEW_NAME for one typed in.
+    var choice by remember(draft) { mutableStateOf(if (start >= 0) start else NEW_NAME) }
+    var typed by remember(draft) { mutableStateOf(if (start >= 0) "" else draft.name) }
     var rememberRule by remember(draft) { mutableStateOf(true) }
+    val name = if (choice == NEW_NAME) typed.trim() else options[choice].name
+    val total = draft.names.sumOf { it.transactionCount }
     Column(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(MetroDimens.Gutter)
+            .padding(horizontal = MetroDimens.Gutter)
             .testTag("payee-merge-page"),
     ) {
-        MetroText(PayeeScreenCopy.MERGE_PAGE_TITLE, Metro.typography.header)
-        MetroText(
-            PayeeScreenCopy.mergeBody(draft.names.size, draft.names.sumOf { it.transactionCount }),
-            Metro.typography.body,
-            Modifier.padding(top = 4.dp),
-            color = Metro.colors.secondary,
-        )
-        MetroText(
-            PayeeScreenCopy.KEEP_WHICH,
-            Metro.typography.caption,
-            Modifier.padding(top = MetroDimens.Gutter),
-            color = Metro.accent.text,
-        )
-        draft.names.forEach { payee ->
-            val chosen = payee.name.trim().equals(name.trim(), ignoreCase = true)
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = MetroDimens.TouchTarget)
-                    .metroPress { name = payee.name }
-                    .padding(vertical = 8.dp)
-                    .testTag("payee-merge-name-${payee.id}"),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CheckSquare(chosen)
-                Column(Modifier.weight(1f).padding(start = MetroDimens.Gutter)) {
-                    MetroText(payee.name, Metro.typography.body, maxLines = 2)
-                    MetroText(
-                        PayeeScreenCopy.transactions(payee.transactionCount),
-                        Metro.typography.caption,
-                        color = Metro.colors.secondary,
-                    )
-                }
-            }
+        MetroText(PayeeScreenCopy.MERGE_PAGE_TITLE, Metro.typography.header, Modifier.padding(top = MetroDimens.Gutter))
+        // What the merge makes, before anything else: the name, and how much moves to it.
+        Column(
+            Modifier
+                .padding(top = 12.dp)
+                .fillMaxWidth()
+                .ledgerFill(Metro.colors.chrome)
+                .padding(vertical = FEATURED_PAD)
+                .testTag("payee-merge-result"),
+        ) {
+            MetroText(PayeeScreenCopy.BECOMES, Metro.typography.caption, color = Metro.accent.text)
+            MetroText(
+                name.ifEmpty { PayeeScreenCopy.TYPE_BELOW },
+                Metro.typography.groupHeader,
+                color = if (name.isEmpty()) Metro.colors.secondary else Metro.colors.foreground,
+                maxLines = 2,
+            )
+            MetroText(
+                PayeeScreenCopy.resultDetail(total, options.size),
+                Metro.typography.caption,
+                color = Metro.colors.secondary,
+            )
         }
-        MetroText(PayeeScreenCopy.NEW_NAME, Metro.typography.caption, Modifier.padding(top = MetroDimens.Gutter), color = Metro.accent.text)
-        MetroField(name, { name = it }, PayeeScreenCopy.NAME, Modifier.padding(top = 4.dp).testTag("payee-merge-field"))
+        MetroText(PayeeScreenCopy.CALL_IT, Metro.typography.subheader, Modifier.padding(top = 20.dp), color = Metro.accent.text)
+        options.forEachIndexed { i, option ->
+            NameChoice(
+                title = option.name,
+                detail = PayeeScreenCopy.transactions(option.transactionCount),
+                selected = choice == i,
+                tag = "payee-merge-name-${option.id}",
+            ) { choice = i }
+        }
+        NameChoice(
+            title = PayeeScreenCopy.A_NEW_NAME,
+            detail = null,
+            selected = choice == NEW_NAME,
+            tag = "payee-merge-new",
+        ) { choice = NEW_NAME }
+        if (choice == NEW_NAME) {
+            MetroField(
+                typed,
+                { typed = it },
+                PayeeScreenCopy.NAME,
+                Modifier.padding(start = RADIO_INDENT, top = 4.dp).testTag("payee-merge-field"),
+            )
+        }
         RowChoice(PayeeScreenCopy.REMEMBER, rememberRule, "payee-merge-remember-rule") { rememberRule = !rememberRule }
+        val renamed = options.filter { !sameName(it.name, name) }
+        if (name.isNotEmpty() && renamed.isNotEmpty()) {
+            MetroText(
+                if (rememberRule) {
+                    PayeeScreenCopy.ruleOn(renamed.map { it.name }, name)
+                } else {
+                    PayeeScreenCopy.RULE_OFF
+                },
+                Metro.typography.caption,
+                Modifier.padding(top = 6.dp, bottom = MetroDimens.Gutter).testTag("payee-merge-rule-detail"),
+                color = Metro.colors.secondary,
+            )
+        }
         PageBar(
             listOf(
                 ScreenAction("payee-merge-save", AppGlyph.Merge, PayeeScreenCopy.MERGE) { onMerge(name, rememberRule) },
@@ -642,6 +684,66 @@ private fun PayeeMergePage(
         )
     }
 }
+
+/**
+ * The names a merge can be called, each spelling once: payees whose names match once case and spacing go are one
+ * option, under the most used spelling, with every transaction they hold. In the order given (most used first).
+ */
+internal fun mergeNameOptions(names: List<PayeeRow>): List<PayeeRow> =
+    names
+        .groupBy { nameKey(it.name) }
+        .values
+        .map { same ->
+            val lead = same.maxWith(compareBy<PayeeRow> { it.transactionCount }.thenByDescending { names.indexOf(it) })
+            lead.copy(transactionCount = same.sumOf { it.transactionCount })
+        }.sortedBy { option -> names.indexOfFirst { nameKey(it.name) == nameKey(option.name) } }
+
+private fun nameKey(name: String): String = name.trim().replace(Regex("\\s+"), " ").lowercase()
+
+private fun sameName(
+    a: String,
+    b: String,
+): Boolean = nameKey(a) == nameKey(b)
+
+/** One answer to "call it": a round radio, so it reads as pick one, with the name and its count beside it. */
+@Composable
+private fun NameChoice(
+    title: String,
+    detail: String?,
+    selected: Boolean,
+    tag: String,
+    onSelect: () -> Unit,
+) {
+    val accent = Metro.accent.fill
+    val ink = Metro.colors.foreground
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = MetroDimens.TouchTarget)
+            .metroPress(onSelect)
+            .semantics {
+                this.selected = selected
+                role = Role.RadioButton
+            }.padding(vertical = 8.dp)
+            .testTag(if (selected) "$tag-selected" else tag),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Canvas(Modifier.size(RADIO_SIZE)) {
+            val r = size.minDimension / 2
+            drawCircle(if (selected) accent else ink, r - 1.dp.toPx(), style = Stroke(2.dp.toPx()))
+            if (selected) drawCircle(accent, r - 6.dp.toPx(), Offset(r, r))
+        }
+        Column(Modifier.weight(1f).padding(start = RADIO_GAP)) {
+            MetroText(title, Metro.typography.body, maxLines = 2)
+            if (detail != null) MetroText(detail, Metro.typography.caption, color = Metro.colors.secondary)
+        }
+    }
+}
+
+private const val NEW_NAME = -1
+private val RADIO_SIZE = 24.dp
+private val RADIO_GAP = 16.dp
+private val RADIO_INDENT = RADIO_SIZE + RADIO_GAP
 
 /** Remember as rule as the off/on pair every setting in the app uses. */
 @Composable
@@ -688,11 +790,14 @@ object PayeeScreenCopy {
     const val IN_USE = "in use"
     const val NOT_USED = "not used"
     const val DELETE = "delete"
-    const val MERGE_AS = "merge as…"
+    const val USE_ANOTHER_NAME = "use another name"
     const val MERGE_LOOKALIKES = "merge look-alikes"
     const val MERGE_PAGE_TITLE = "merge payees"
-    const val KEEP_WHICH = "keep which name?"
-    const val NEW_NAME = "or type a new name"
+    const val BECOMES = "becomes"
+    const val TYPE_BELOW = "type a name below"
+    const val CALL_IT = "call it"
+    const val A_NEW_NAME = "a new name\u2026"
+    const val RULE_OFF = "old spellings from the bank stay as they come in"
     const val NAME = "name"
     const val REMEMBER = "remember as rule"
     const val PICK_TWO = "check two or more names to merge"
@@ -706,8 +811,17 @@ object PayeeScreenCopy {
             else -> "$count transactions"
         }
 
-    fun mergeBody(
-        names: Int,
+    fun resultDetail(
         transactions: Int,
-    ): String = "these $names names become one payee, with all ${transactions(transactions)}"
+        names: Int,
+    ): String = "${transactions(transactions)} from $names names"
+
+    /** What remembering does, in the payee's own names: "AMAZON.COM and Amazon Marketplace become Amazon next time". */
+    fun ruleOn(
+        from: List<String>,
+        to: String,
+    ): String {
+        val names = if (from.size <= 2) from.joinToString(" and ") else from.dropLast(1).joinToString(", ") + " and " + from.last()
+        return "$names from the bank ${if (from.size == 1) "becomes" else "become"} $to next time"
+    }
 }
