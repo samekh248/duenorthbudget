@@ -218,7 +218,7 @@ private fun PayeeList(
         menu =
             listOf(
                 MetroMenuItem(PayeeScreenCopy.MERGE) { actions.onMergeAll(group.names.map { it.id }, group.keep.name, true) },
-                MetroMenuItem(PayeeScreenCopy.MERGE_AS) { onMergeDraft(mergeOf(group)) },
+                MetroMenuItem(PayeeScreenCopy.USE_ANOTHER_NAME) { onMergeDraft(mergeOf(group)) },
                 MetroMenuItem(PayeeScreenCopy.NOT_THE_SAME) { actions.onNotTheSame(group) },
             ) to bounds
     }
@@ -449,7 +449,7 @@ private fun LookalikePanel(
                 maxLines = 1,
             )
             MetroText(
-                PayeeScreenCopy.RENAME,
+                PayeeScreenCopy.USE_ANOTHER_NAME,
                 Metro.typography.body,
                 Modifier
                     .metroPress(
@@ -766,7 +766,7 @@ object PayeeScreenCopy {
     const val IN_USE = "in use"
     const val NOT_USED = "not used"
     const val DELETE = "delete"
-    const val MERGE_AS = "merge as…"
+    const val USE_ANOTHER_NAME = "use another name"
     const val MERGE_LOOKALIKES = "merge look-alikes"
     const val MERGE_PAGE_TITLE = "merge payees"
     const val BECOMES = "becomes"
