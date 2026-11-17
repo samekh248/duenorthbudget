@@ -194,7 +194,9 @@ private fun PayeeList(
     initialPicked: Set<String>? = null,
 ) {
     val own = payees.filter { !it.transfer }
-    val (used, unused) = own.partition { it.transactionCount > 0 }
+    // Outside batch mode a payee shows once: names already up top in a suggestion leave the lists below.
+    val suggested = if (selection == null) lookalikes.flatMap { group -> group.names.map { it.id } }.toSet() else emptySet()
+    val (used, unused) = own.filter { it.id !in suggested }.partition { it.transactionCount > 0 }
     var menu by remember { mutableStateOf<Pair<List<MetroMenuItem>, Rect>?>(null) }
     val mergeOf = { group: PayeeLookalike -> PayeeMergeDraft(group.names, group.keep.name) }
     val payeeMenu = { payee: PayeeRow, bounds: Rect ->
