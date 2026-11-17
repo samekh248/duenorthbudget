@@ -46,6 +46,15 @@ class PayeesScreenshotTest {
     @Test
     fun payeesPickedDark() = snap("payees_picked_dark", dark = true) { Page(picked = setOf("amz", "amzc")) }
 
+    // The merge page with a new name typed: the box shows under "a new name", and the panel up top follows it.
+    @Test
+    fun payeesMergeNewLight() =
+        snap("payees_merge_new_light", dark = false) { Page(merge = listOf("amz", "amzc", "amzm"), mergeName = "Amazon Shopping") }
+
+    @Test
+    fun payeesMergeNewDark() =
+        snap("payees_merge_new_dark", dark = true) { Page(merge = listOf("amz", "amzc", "amzm"), mergeName = "Amazon Shopping") }
+
     // Batch mode: a check box on every payee; two checked offers merge, cancel.
     @Test
     fun payeesBatchLight() = snap("payees_batch_light", dark = false) { Page(selection = setOf("costco", "costco2")) }
@@ -65,6 +74,7 @@ class PayeesScreenshotTest {
         selection: Set<String>? = null,
         merge: List<String>? = null,
         picked: Set<String>? = null,
+        mergeName: String? = null,
     ) {
         PayeesScreen(
             payees = rows,
@@ -77,6 +87,7 @@ class PayeesScreenshotTest {
             initialSelection = selection,
             initialMerge = merge,
             initialPicked = picked,
+            initialMergeName = mergeName,
         )
     }
 
