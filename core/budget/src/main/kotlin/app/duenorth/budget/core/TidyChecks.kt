@@ -16,9 +16,6 @@ internal object TidyChecks {
     /** A rule is worth it once a payee has this many transactions, all in one category. */
     const val RULE_MIN = 4
 
-    /** Names shorter than this, once tidied, are too short to call alike. */
-    const val LOOKALIKE_MIN_LENGTH = 4
-
     fun read(
         session: SqlSession,
         today: LocalDate,
@@ -89,40 +86,29 @@ internal object TidyChecks {
                     WHERE IFNULL(p.tombstone, 0) = 0 AND p.transfer_acct IS NULL AND IFNULL(p.name, '') != ''
                     GROUP BY p.id
                     """.trimIndent(),
-                ).map { Payee(it.str("id").orEmpty(), it.str("name").orEmpty(), it.long("n").toInt()) }
-        return payees
-            .groupBy { tidy(it.name) }
-            .filter { (name, group) -> name.length >= LOOKALIKE_MIN_LENGTH && group.size > 1 }
-            .values
-            .flatMap { group ->
-                // The name used most stays; the others merge into it.
-                val keep = group.sortedWith(compareByDescending<Payee> { it.count }.thenBy { it.name }).first()
-                group.filter { it != keep }.map { other ->
-                    Finding(
-                        key = AssistantBook.key(LOOKALIKE_KEY, other.id, keep.id),
-                        kind = FindingKind.LOOKALIKE_PAYEE,
-                        sure = FindingSure.MAYBE,
-                        headline = AssistantCopy.lookalike(other.name, keep.name),
-                        sides = emptyList(),
-                        reasons = listOf(AssistantCopy.usedTimes(other.name, other.count), AssistantCopy.usedTimes(keep.name, keep.count)),
-                        actions = listOf(FindingAction.MergePayees(other.id, keep.name), FindingAction.Dismiss(AssistantCopy.NOT_THE_SAME)),
-                        accountId = "",
-                    )
-                }
+                ).map { PayeeRow(it.str("id").orEmpty(), it.str("name").orEmpty(), transfer = false, it.long("n").toInt()) }
+        // The payees page finds the same groups, so a merge or a "not the same" in either place clears both.
+        return PayeeLookalikes.find(payees).flatMap { group ->
+            val keep = group.keep
+            group.others.map { other ->
+                Finding(
+                    key = PayeeLookalike.key(other.id, keep.id),
+                    kind = FindingKind.LOOKALIKE_PAYEE,
+                    sure = FindingSure.MAYBE,
+                    headline = AssistantCopy.lookalike(other.name, keep.name),
+                    sides = emptyList(),
+                    reasons =
+                        listOf(
+                            AssistantCopy.usedTimes(other.name, other.transactionCount),
+                            AssistantCopy.usedTimes(keep.name, keep.transactionCount),
+                        ),
+                    actions = listOf(FindingAction.MergePayees(other.id, keep.name), FindingAction.Dismiss(AssistantCopy.NOT_THE_SAME)),
+                    accountId = "",
+                )
             }
+        }
     }
 
     /** A name with case, store numbers, punctuation and trailing digits taken away: "COSTCO #1123" is "costco". */
-    internal fun tidy(name: String): String =
-        name
-            .lowercase()
-            .replace(Regex("#\\s*\\d+"), "")
-            .replace(Regex("[^\\p{L}\\p{N}]"), "")
-            .trimEnd { it.isDigit() }
-
-    private data class Payee(
-        val id: String,
-        val name: String,
-        val count: Int,
-    )
+    internal fun tidy(name: String): String = PayeeLookalikes.tidy(name)
 }

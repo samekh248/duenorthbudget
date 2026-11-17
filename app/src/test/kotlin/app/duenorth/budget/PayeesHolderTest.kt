@@ -4,6 +4,7 @@ import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.MockBudgets
+import app.duenorth.budget.core.PayeeLookalike
 import app.duenorth.budget.core.createFromMock
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -42,6 +43,47 @@ class PayeesHolderTest {
         assertEquals(second.id, host.state.value.payees.mergeTarget)
         payees.cancelMerge()
         assertEquals(null, host.state.value.payees.mergeTarget)
+    }
+
+    @Test
+    fun mergeAllLeavesOnePayeeUnderTheNewName() {
+        val host = host("payees-holder-merge-all")
+        val payees = PayeesHolder(host)
+        payees.load()
+        val before =
+            host.state.value.payees.rows
+                .filter { !it.transfer }
+        val (first, second) = before.take(2)
+        payees.mergeAll(listOf(first.id, second.id), "Merged Payee", rememberRule = false)
+        val after =
+            host.state.value.payees.rows
+                .filter { !it.transfer }
+        assertEquals(before.size - 1, after.size)
+        val merged = after.single { it.name == "Merged Payee" }
+        assertEquals(first.transactionCount + second.transactionCount, merged.transactionCount)
+    }
+
+    @Test
+    fun mergePickedKeepsTheLeftOutNameApart() {
+        val host = host("payees-holder-merge-picked")
+        val payees = PayeesHolder(host)
+        payees.load()
+        val (a, b, c) =
+            host.state.value.payees.rows
+                .filter { !it.transfer }
+                .take(3)
+        val group = PayeeLookalike(a, listOf(b, c))
+        payees.mergePicked(group, listOf(a.id, b.id), a.name, rememberRule = false)
+        val rows = host.state.value.payees.rows
+        assertTrue(rows.none { it.id == b.id })
+        assertTrue(rows.any { it.id == c.id })
+        val budgetId = host.state.value.settings.openBudgetId!!
+        val names =
+            host.library
+                .readPayees(budgetId)
+                .lookalikes
+                .flatMap { it.names.map { row -> row.id } }
+        assertTrue("the left-out name is not offered with the merged one", !(a.id in names && c.id in names))
     }
 
     private fun host(name: String): FakeShellHost {

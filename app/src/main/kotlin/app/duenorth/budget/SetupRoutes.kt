@@ -314,6 +314,14 @@ internal fun PayeesRoute(
         onConfirmMerge = model.payees::confirmMerge,
         onCancelMerge = model.payees::cancelMerge,
         modifier = modifier,
+        lookalikes = state.payees.lookalikes,
+        actions =
+            PayeeActions(
+                onMergeAll = model.payees::mergeAll,
+                onDelete = model.payees::deleteAll,
+                onNotTheSame = model.payees::notTheSame,
+                onMergePicked = model.payees::mergePicked,
+            ),
     )
 }
 

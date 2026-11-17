@@ -21,6 +21,8 @@ object UndoCopy {
     const val SAVE_SCHEDULE = "schedule"
     const val DELETE_SCHEDULE = "delete schedule"
     const val RENAME_PAYEE = "rename payee"
+    const val MERGE_PAYEES = "merge payees"
+    const val DELETE_PAYEES = "delete payees"
     const val IMPORT = "import"
     const val AUTO_POST = "auto-post"
     const val TEMPLATES = "templates"

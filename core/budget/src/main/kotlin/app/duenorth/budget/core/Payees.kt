@@ -7,7 +7,14 @@ object PayeeCopy {
     const val IN_USE = "payee still has transactions"
     const val NOT_FOUND = "no payee"
     const val ENTER_NAME = "enter a name"
+    const val PICK_TWO = "pick two or more payees"
 }
+
+/** The payees page as read: every payee, and the names that look like one payee. */
+data class PayeesPage(
+    val rows: List<PayeeRow>,
+    val lookalikes: List<PayeeLookalike>,
+)
 
 sealed interface PayeeWriteResult {
     data object Saved : PayeeWriteResult
@@ -103,6 +110,69 @@ class PayeeBook(
         if (rememberRule) {
             rules.insertPayeeRenameRule(payeeId, payeeId)
         }
+        return PayeeWriteResult.Saved
+    }
+
+    /** The payees page: every payee, and look-alikes the person has not called different. */
+    fun page(dismissed: Set<String>): PayeesPage {
+        val rows = list()
+        return PayeesPage(rows, PayeeLookalikes.find(rows, dismissed))
+    }
+
+    /**
+     * Makes [payeeIds] one payee called [name]. A payee already called that, in the list or not, takes the rest;
+     * otherwise the first id is renamed and takes them. [rememberRule] adds a rule for each merged name, so the bank's
+     * spelling lands on the kept payee next time.
+     */
+    fun mergeAll(
+        payeeIds: List<String>,
+        name: String,
+        rememberRule: Boolean,
+    ): PayeeWriteResult {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return PayeeWriteResult.Rejected(PayeeCopy.ENTER_NAME)
+        val ids = payeeIds.distinct()
+        if (ids.size < 2) return PayeeWriteResult.Rejected(PayeeCopy.PICK_TWO)
+        val live =
+            ids.filter { id ->
+                session
+                    .query(
+                        "SELECT id FROM payees WHERE id = ? AND transfer_acct IS NULL AND IFNULL(tombstone, 0) = 0",
+                        listOf(id),
+                    ).isNotEmpty()
+            }
+        if (live.size != ids.size) return PayeeWriteResult.Rejected(PayeeCopy.NOT_FOUND)
+        val named =
+            session
+                .query(
+                    """
+                    SELECT id FROM payees
+                    WHERE LOWER(name) = LOWER(?) AND transfer_acct IS NULL AND IFNULL(tombstone, 0) = 0
+                    ORDER BY id
+                    """.trimIndent(),
+                    listOf(trimmed),
+                ).mapNotNull { it.str("id") }
+        val target = named.firstOrNull { it in ids } ?: named.firstOrNull() ?: ids.first()
+        session.transaction {
+            SyncSchema.write(session, "payees", target, "name", trimmed)
+            ids.filter { it != target }.forEach { merge(it, target, rememberRule) }
+        }
+        return PayeeWriteResult.Saved
+    }
+
+    /** Deletes [payeeIds], every one unused; none goes if any still has transactions. */
+    fun deleteAll(payeeIds: List<String>): PayeeWriteResult {
+        val used =
+            payeeIds.any { id ->
+                session
+                    .query(
+                        "SELECT COUNT(*) AS n FROM transactions WHERE description = ? AND IFNULL(tombstone, 0) = 0",
+                        listOf(id),
+                    ).first()
+                    .long("n") > 0
+            }
+        if (used) return PayeeWriteResult.Rejected(PayeeCopy.IN_USE)
+        session.transaction { payeeIds.forEach { SyncSchema.write(session, "payees", it, "tombstone", 1) } }
         return PayeeWriteResult.Saved
     }
 

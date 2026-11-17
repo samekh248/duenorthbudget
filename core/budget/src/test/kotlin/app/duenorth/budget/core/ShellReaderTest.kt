@@ -89,6 +89,37 @@ class ShellReaderTest {
         }
     }
 
+    // As in Actual's uncategorized view: a transfer between on-budget accounts needs no category,
+    // but one to or from an off-budget account does, so it waits in the inbox.
+    @Test
+    fun offBudgetTransfersWaitInTheInboxLikeActual() {
+        val file = File.createTempFile("shell", ".sqlite")
+        file.delete()
+        JdbcSessionOpener().use(file) { session ->
+            ActualSchema.create(session)
+            ActualSchema.ensure(session)
+            session.exec("INSERT INTO preferences (id, value) VALUES (?, ?)", listOf("budgetType", "envelope"))
+            session.exec("INSERT INTO accounts (id, name, offbudget, sort_order) VALUES ('checking', 'Checking', 0, 0)")
+            session.exec("INSERT INTO accounts (id, name, offbudget, sort_order) VALUES ('savings', 'Savings', 0, 1)")
+            session.exec("INSERT INTO accounts (id, name, offbudget, sort_order) VALUES ('brokerage', 'Brokerage', 1, 2)")
+            session.exec("INSERT INTO payees (id, name, transfer_acct) VALUES ('p-sav', '', 'savings')")
+            session.exec("INSERT INTO payees (id, name, transfer_acct) VALUES ('p-chk', '', 'checking')")
+            session.exec("INSERT INTO payees (id, name, transfer_acct) VALUES ('p-brk', '', 'brokerage')")
+            session.exec("INSERT INTO payees (id, name) VALUES ('p-shop', 'Shop')")
+            insertTxn(session, "to-savings", "checking", null, -1_000, "p-sav", 20261010, 1.0, transfer = "from-checking")
+            insertTxn(session, "from-checking", "savings", null, 1_000, "p-chk", 20261010, 1.0, transfer = "to-savings")
+            insertTxn(session, "to-brokerage", "checking", null, -5_000, "p-brk", 20261011, 2.0, transfer = "into-brokerage")
+            insertTxn(session, "into-brokerage", "brokerage", null, 5_000, "p-chk", 20261011, 1.0, transfer = "to-brokerage")
+            // A transfer payee without the linked row yet is still a transfer.
+            insertTxn(session, "half-transfer", "checking", null, -700, "p-sav", 20261012, 3.0)
+            insertTxn(session, "shop", "checking", null, -300, "p-shop", 20261013, 4.0)
+            val shell = ShellReader.read(session, BudgetMetadata("home", "Home"), LocalDate.of(2026, 10, 15))
+            assertEquals(listOf("shop", "to-brokerage"), shell.inbox.map { it.id })
+            // Already a transfer, so it is not offered as a guessed one.
+            assertEquals(null, shell.inbox.last().transfer)
+        }
+    }
+
     // Pending rows count in the budget like any other, as in Actual, but an uncategorized one waits outside the
     // inbox until the bank posts it. A row cleared by hand is no longer pending.
     @Test

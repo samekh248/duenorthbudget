@@ -1,7 +1,9 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.PayeeLookalike
 import app.duenorth.budget.core.PayeeRow
 import app.duenorth.budget.core.PayeeWriteResult
+import app.duenorth.budget.core.WriteResult
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -9,6 +11,8 @@ import kotlinx.coroutines.withContext
 data class PayeesState(
     /** The saved payees, which the payees page lists and every payee box offers as you type. */
     val rows: List<PayeeRow> = emptyList(),
+    /** Names that look like one payee, the payees page's suggestions, most used first. */
+    val lookalikes: List<PayeeLookalike> = emptyList(),
     /** The payee a rename would merge into, while the page asks; null otherwise. */
     val mergeTarget: String? = null,
 )
@@ -31,9 +35,86 @@ class PayeesHolder internal constructor(
     fun load() {
         host.scope.launch {
             val budgetId = state.settings.openBudgetId ?: return@launch
-            val rows = withContext(host.io) { host.library.listPayees(budgetId) }
-            update { it.copy(rows = rows) }
+            val page = withContext(host.io) { host.library.readPayees(budgetId) }
+            update { it.copy(rows = page.rows, lookalikes = page.lookalikes) }
         }
+    }
+
+    /** Makes [payeeIds] one payee called [name]: a suggestion's merge, or the checked payees in batch mode. */
+    fun mergeAll(
+        payeeIds: List<String>,
+        name: String,
+        rememberRule: Boolean,
+    ) {
+        val budgetId = state.settings.openBudgetId ?: return
+        host.scope.launch {
+            val result = withContext(host.io) { host.library.mergePayees(budgetId, payeeIds, name, rememberRule) }
+            when (result) {
+                is PayeeWriteResult.Saved -> {
+                    host.toastSuccess(ToastCopy.PAYEES_MERGED, name.trim())
+                    reload(budgetId)
+                }
+                is PayeeWriteResult.Rejected -> host.toastFailure(ToastCopy.PAYEES_MERGE_FAILED, result.reason)
+                is PayeeWriteResult.ConfirmMerge -> Unit
+            }
+        }
+    }
+
+    /** Deletes payees no transaction uses. */
+    fun deleteAll(payeeIds: List<String>) {
+        val budgetId = state.settings.openBudgetId ?: return
+        host.scope.launch {
+            when (val result = withContext(host.io) { host.library.deletePayees(budgetId, payeeIds) }) {
+                is PayeeWriteResult.Saved -> {
+                    host.toastSuccess(ToastCopy.PAYEES_DELETED, "${payeeIds.size}")
+                    reload(budgetId)
+                }
+                is PayeeWriteResult.Rejected -> host.toastFailure(ToastCopy.PAYEES_DELETE_FAILED, result.reason)
+                is PayeeWriteResult.ConfirmMerge -> Unit
+            }
+        }
+    }
+
+    /**
+     * Merges only [picked] of [group]'s names under [name]. The names left out are kept apart from the picked ones, so
+     * the merged payee and the names left out are not offered as one again.
+     */
+    fun mergePicked(
+        group: PayeeLookalike,
+        picked: List<String>,
+        name: String,
+        rememberRule: Boolean,
+    ) {
+        val budgetId = state.settings.openBudgetId ?: return
+        val left = group.names.map { it.id }.filter { it !in picked }
+        val keys = left.flatMap { out -> picked.flatMap { kept -> listOf(PayeeLookalike.key(out, kept), PayeeLookalike.key(kept, out)) } }
+        host.scope.launch {
+            if (keys.isNotEmpty()) withContext(host.io) { host.library.dismissLookalikes(budgetId, keys) }
+            val result = withContext(host.io) { host.library.mergePayees(budgetId, picked, name, rememberRule) }
+            when (result) {
+                is PayeeWriteResult.Saved -> host.toastSuccess(ToastCopy.PAYEES_MERGED, name.trim())
+                is PayeeWriteResult.Rejected -> host.toastFailure(ToastCopy.PAYEES_MERGE_FAILED, result.reason)
+                is PayeeWriteResult.ConfirmMerge -> Unit
+            }
+            reload(budgetId)
+        }
+    }
+
+    /** "Not the same": the suggestion goes, here and in the assistant. */
+    fun notTheSame(group: PayeeLookalike) {
+        val budgetId = state.settings.openBudgetId ?: return
+        // Gone at once, so the next suggestion rises while the write runs.
+        update { it.copy(lookalikes = it.lookalikes.filter { other -> other.id != group.id }) }
+        host.scope.launch {
+            val result = withContext(host.io) { host.library.dismissLookalikes(budgetId, group.keys) }
+            if (result is WriteResult.Saved) host.toastSuccess(ToastCopy.LOOKALIKE_DISMISSED, group.keep.name)
+            reload(budgetId)
+        }
+    }
+
+    private suspend fun reload(budgetId: String) {
+        val page = withContext(host.io) { host.library.readPayees(budgetId) }
+        host.mutate { it.copy(payees = PayeesState(rows = page.rows, lookalikes = page.lookalikes), writeError = null) }
     }
 
     fun rename(
@@ -52,8 +133,7 @@ class PayeesHolder internal constructor(
             ) {
                 is PayeeWriteResult.Saved -> {
                     host.toastSuccess(ToastCopy.PAYEE_SAVED, name.trim())
-                    val rows = withContext(host.io) { host.library.listPayees(budgetId) }
-                    host.mutate { it.copy(payees = PayeesState(rows = rows), writeError = null) }
+                    reload(budgetId)
                 }
                 is PayeeWriteResult.Rejected -> {
                     host.toastFailure(ToastCopy.PAYEE_SAVE_FAILED, result.reason)
