@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -142,6 +143,9 @@ class InboxActions(
  * the rest wait below it as a ledger. Once the top one is filed, its confirmation fills the panel
  * and the next one rises into its place. Every row's long press opens a menu of all its actions,
  * and the bar's select ([selection] not null) gives every row a check box instead.
+ *
+ * It sits at the top of the assistant: [below] carries on in the same list under the queue, and [empty]
+ * takes the page while nothing waits to be filed.
  */
 @Composable
 fun InboxSection(
@@ -159,6 +163,10 @@ fun InboxSection(
     lead: String? = null,
     /** How the menu's sync went; one line under the totals. */
     notice: String? = null,
+    /** What follows the waiting rows in the same list, outside select mode. */
+    below: LazyListScope.() -> Unit = {},
+    /** The page while nothing waits to be filed. */
+    empty: @Composable (Modifier) -> Unit = { InboxEmpty(it) },
 ) {
     val pair = shell.matches.firstOrNull()?.takeIf { selection == null }
     val inbox = inboxQueue(shell, lead)
@@ -169,7 +177,7 @@ fun InboxSection(
     if (entries.isEmpty() && pair == null) {
         Column(modifier.fillMaxSize()) {
             if (notice != null) MonthNotice(notice, Modifier.padding(horizontal = MetroDimens.Gutter))
-            InboxEmpty(Modifier.weight(1f))
+            empty(Modifier.weight(1f))
         }
         return
     }
@@ -270,6 +278,7 @@ fun InboxSection(
                     actions = actions,
                     onMenu = { row, bounds -> menu = row to bounds },
                     arrivals = arrivals,
+                    below = below,
                 )
             }
         }
@@ -292,35 +301,39 @@ private fun InboxQueue(
     actions: InboxActions,
     onMenu: (InboxRow, Rect) -> Unit,
     arrivals: Arrivals? = null,
+    below: LazyListScope.() -> Unit = {},
 ) {
     // A possible match leads the inbox: it takes the panel and every waiting row stays in the queue.
     if (pair != null) {
         // The queue's own record, so a row that moves down out of the panel arrives in the queue as well.
         val listed = rememberArrivals(entries.map { it.row.id }, key = "match")
         list.keepTopFor(listed)
-        Column(Modifier.fillMaxSize()) {
-            MatchPanel(
-                pair = pair,
-                money = money,
-                onMatch = { actions.onMatch(pair) },
-                onNotAMatch = { actions.onNotAMatch(pair) },
-                modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
-            )
-            LazyColumn(Modifier.weight(1f), state = list) {
-                inboxDayItems(entries, arrivals = listed) { i, entry ->
-                    InboxLine(
-                        entry = entry,
-                        amount = money(entry.row.amountMinor),
-                        banded = ledgerBanded(i),
-                        onFiledShown = onFiledShown,
-                        onTap = { actions.onDetails(entry.row.id) },
-                        onMenu = { bounds -> onMenu(entry.row, bounds) },
-                        onAccept = onAccept,
-                        onCategorize = onInbox,
-                        modifier = Modifier.arriving(listed, entry.row.id),
-                    )
-                }
+        // The panel scrolls with the queue, so what the assistant found below can be reached.
+        LazyColumn(Modifier.fillMaxSize().testTag("inbox-list"), state = list) {
+            item(key = "match-panel") {
+                MatchPanel(
+                    pair = pair,
+                    money = money,
+                    onMatch = { actions.onMatch(pair) },
+                    onNotAMatch = { actions.onNotAMatch(pair) },
+                    modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
+                )
             }
+            inboxDayItems(entries, arrivals = listed) { i, entry ->
+                InboxLine(
+                    entry = entry,
+                    amount = money(entry.row.amountMinor),
+                    banded = ledgerBanded(i),
+                    onFiledShown = onFiledShown,
+                    onTap = { actions.onDetails(entry.row.id) },
+                    onMenu = { bounds -> onMenu(entry.row, bounds) },
+                    onAccept = onAccept,
+                    onCategorize = onInbox,
+                    modifier = Modifier.arriving(listed, entry.row.id),
+                )
+            }
+            inboxEnd()
+            below()
         }
         return
     }
@@ -369,38 +382,49 @@ private fun InboxQueue(
     val featured = if (head.filedTo == null || !swappedIn) head.row else next?.row
     val listed = rememberArrivals(entries.drop(1).map { it.row.id }, key = "queue")
     list.keepTopFor(listed)
-    Column(Modifier.fillMaxSize()) {
-        FeaturedPanel(
-            row = featured,
-            amount = featured?.let { money(it.amountMinor) }.orEmpty(),
-            filed = head.takeIf { it.filedTo != null },
-            leave = leaves,
-            arrive = arrived,
-            onAccept = onAccept,
-            onCategorize = onInbox,
-            onDetails = actions.onDetails,
-            onMenu = onMenu,
-            onTransfer = actions.onTransfer,
-            modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
-        )
-        LazyColumn(Modifier.weight(1f), state = list) {
-            inboxDayItems(entries.drop(1), leaving = next?.let { it to risen }, arrivals = listed) { i, entry ->
-                InboxLine(
-                    entry = entry,
-                    amount = money(entry.row.amountMinor),
-                    banded = ledgerBanded(i),
-                    onFiledShown = onFiledShown,
-                    onTap = { actions.onDetails(entry.row.id) },
-                    onMenu = { bounds -> onMenu(entry.row, bounds) },
-                    onAccept = onAccept,
-                    onCategorize = onInbox,
-                    // The row rising into the panel leaves the queue as it goes.
-                    leaving = if (entry == next) risen else NOT_LEAVING,
-                    modifier = Modifier.arriving(listed, entry.row.id),
-                )
-            }
+    // The panel scrolls with the queue, so what the assistant found below can be reached.
+    LazyColumn(Modifier.fillMaxSize().testTag("inbox-list"), state = list) {
+        item(key = "featured-panel") {
+            FeaturedPanel(
+                row = featured,
+                amount = featured?.let { money(it.amountMinor) }.orEmpty(),
+                filed = head.takeIf { it.filedTo != null },
+                leave = leaves,
+                arrive = arrived,
+                onAccept = onAccept,
+                onCategorize = onInbox,
+                onDetails = actions.onDetails,
+                onMenu = onMenu,
+                onTransfer = actions.onTransfer,
+                modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
+            )
         }
+        inboxDayItems(entries.drop(1), leaving = next?.let { it to risen }, arrivals = listed) { i, entry ->
+            InboxLine(
+                entry = entry,
+                amount = money(entry.row.amountMinor),
+                banded = ledgerBanded(i),
+                onFiledShown = onFiledShown,
+                onTap = { actions.onDetails(entry.row.id) },
+                onMenu = { bounds -> onMenu(entry.row, bounds) },
+                onAccept = onAccept,
+                onCategorize = onInbox,
+                // The row rising into the panel leaves the queue as it goes.
+                leaving = if (entry == next) risen else NOT_LEAVING,
+                modifier = Modifier.arriving(listed, entry.row.id),
+            )
+        }
+        inboxEnd()
+        below()
     }
+}
+
+/**
+ * Ends the inbox's dates: a heading with no height, so the last date is pushed off the top as the assistant's
+ * cards scroll up under it rather than sticking over them.
+ */
+private fun LazyListScope.inboxEnd() {
+    stickyHeader(key = "inbox-end") { Box(Modifier.fillMaxWidth().height(0.dp)) }
 }
 
 /** The select-mode change: the old view fades out, then the new one fades in, so the two never overlap. */

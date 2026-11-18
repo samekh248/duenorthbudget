@@ -93,7 +93,7 @@ class ShellContentTest {
                 }
             }
         }
-        compose.onNodeWithTag("pivot-header-0").assertTextEquals(HomeSections.INBOX).assertIsSelected()
+        compose.onNodeWithTag("pivot-header-0").assertTextEquals(HomeSections.ASSISTANT).assertIsSelected()
         compose.onNodeWithTag("pivot-header-1").assertTextEquals(HomeSections.BUDGET).assertIsNotSelected()
     }
 

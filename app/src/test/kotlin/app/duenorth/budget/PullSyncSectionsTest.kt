@@ -59,10 +59,10 @@ class PullSyncSectionsTest {
     }
 
     @Test
-    fun anEmptyInboxPulls() = pullOn(HomeSections.INBOX)
+    fun anEmptyInboxPulls() = pullOn(HomeSections.ASSISTANT)
 
     @Test
-    fun anInboxWithOnlyItsFeaturedRowPulls() = pullOn(HomeSections.INBOX, PullSyncSections.accounts, PullSyncSections.inbox.take(1))
+    fun anInboxWithOnlyItsFeaturedRowPulls() = pullOn(HomeSections.ASSISTANT, PullSyncSections.accounts, PullSyncSections.inbox.take(1))
 
     @Test
     fun theBudgetPulls() = pullOn(HomeSections.BUDGET)
@@ -90,7 +90,7 @@ class PullSyncSectionsTest {
                         loading = false,
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),
-                        initialSection = HomeSections.headers.indexOf(HomeSections.ASSISTANT) - 1,
+                        initialSection = HomeSections.headers.indexOf(HomeSections.REPORTS) - 1,
                         onGesture = {},
                         onSection = { selected = it },
                         assistant = AssistantUi(report = AssistantReport(emptyList())),
@@ -102,6 +102,6 @@ class PullSyncSectionsTest {
         compose.waitForIdle()
         compose.onNodeWithTag("home").performTouchInput { swipeLeft() }
         compose.waitForIdle()
-        assertEquals(HomeSections.headers.indexOf(HomeSections.ASSISTANT), selected)
+        assertEquals(HomeSections.headers.indexOf(HomeSections.REPORTS), selected)
     }
 }

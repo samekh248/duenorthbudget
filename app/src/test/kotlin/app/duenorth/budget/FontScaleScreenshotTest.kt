@@ -57,10 +57,10 @@ class FontScaleScreenshotTest {
     fun accountsLight() = snap("font2x_accounts_light", dark = false) { Home(HomeSections.ACCOUNTS) }
 
     @Test
-    fun inboxLight() = snap("font2x_inbox_light", dark = false) { Home(HomeSections.INBOX) }
+    fun inboxLight() = snap("font2x_inbox_light", dark = false) { Home(HomeSections.ASSISTANT) }
 
     @Test
-    fun inboxDark() = snap("font2x_inbox_dark", dark = true) { Home(HomeSections.INBOX) }
+    fun inboxDark() = snap("font2x_inbox_dark", dark = true) { Home(HomeSections.ASSISTANT) }
 
     @Test
     fun registerLight() =

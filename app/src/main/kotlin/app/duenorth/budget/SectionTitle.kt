@@ -18,12 +18,11 @@ import app.duenorth.budget.design.theme.MetroDimens
 object HomeSections {
     const val BUDGET = "budget"
     const val ACCOUNTS = "accounts"
-    const val INBOX = "inbox"
     const val REPORTS = ReportsCopy.TITLE
     const val ASSISTANT = AssistantCopy.TITLE
 
-    // The inbox leads, so the app opens on what needs filing; the assistant follows reports.
-    val headers = listOf(INBOX, BUDGET, ACCOUNTS, REPORTS, ASSISTANT)
+    // The assistant leads, with the inbox at its top, so the app opens on what needs filing.
+    val headers = listOf(ASSISTANT, BUDGET, ACCOUNTS, REPORTS)
 }
 
 object SectionTitleCopy {

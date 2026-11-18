@@ -391,7 +391,7 @@ class ShellViewModel(
         _state.update {
             it.copy(
                 homeSection = index,
-                inbox = it.inbox.copy(syncNotice = it.inbox.syncNotice.takeIf { index == ScreenBar.HOME_INBOX }),
+                inbox = it.inbox.copy(syncNotice = it.inbox.syncNotice.takeIf { index == ScreenBar.HOME_ASSISTANT }),
                 accounts = it.accounts.copy(reorder = it.accounts.reorder && index == ScreenBar.HOME_ACCOUNTS),
             )
         }

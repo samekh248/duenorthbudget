@@ -145,7 +145,7 @@ class MatchScreenshotTest {
                     loading = false,
                     openMonth = YearMonth.of(2026, 10),
                     monthWindow = MonthWindow.around(YearMonth.of(2026, 10)),
-                    initialSection = HomeSections.headers.indexOf(HomeSections.INBOX),
+                    initialSection = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
                     onGesture = {},
                     modifier = Modifier.weight(1f),
                 )

@@ -106,7 +106,7 @@ class InboxTransferScreenshotTest {
                     loading = false,
                     openMonth = YearMonth.of(2026, 11),
                     monthWindow = MonthWindow.around(YearMonth.of(2026, 11)),
-                    initialSection = HomeSections.headers.indexOf(HomeSections.INBOX),
+                    initialSection = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
                     onGesture = {},
                     modifier = Modifier.weight(1f),
                 )

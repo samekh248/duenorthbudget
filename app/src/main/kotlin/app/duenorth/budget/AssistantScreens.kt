@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -150,57 +151,107 @@ private fun AssistantBody(
     }
     val list = rememberLazyListState()
     LaunchedEffect(list) { snapshotFlow { list.isScrollInProgress }.collect { onListGesture(it) } }
-    val byKind = AssistantReport(findings).byKind()
     LazyColumn(
         modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter).testTag("assistant-list"),
         state = list,
     ) {
-        item(key = "count") {
-            BudgetTotal(
-                AssistantCopy.TO_LOOK_AT,
-                "${findings.size}",
-                Metro.accent.text,
-                "assistant-count",
-            )
+        assistantCards(findings, money, onAct, expanded, onToggleExpanded, working, failed, closeOut, onCloseOut)
+        item(key = "end") { Box(Modifier.height(MetroDimens.Row)) }
+    }
+}
+
+/**
+ * The assistant under the inbox, in the inbox's own list: its pinned balances, then its count and cards. Nothing
+ * found and no close out shows only the pins, since the inbox above already fills the page.
+ */
+internal fun LazyListScope.assistantItems(
+    report: AssistantReport?,
+    money: (Long) -> String,
+    onAct: (Finding, FindingAction) -> Unit,
+    expanded: Set<FindingKind> = emptySet(),
+    onToggleExpanded: (FindingKind) -> Unit = {},
+    settling: Set<String> = emptySet(),
+    working: AssistantUi.Working? = null,
+    failed: AssistantUi.Failed? = null,
+    closeOut: CloseOutCard? = null,
+    onCloseOut: () -> Unit = {},
+    pinned: List<CategoryRow> = emptyList(),
+    onPinned: (String) -> Unit = {},
+) {
+    if (pinned.isNotEmpty()) {
+        item(key = "assistant-pins") {
+            PinnedBalances(pinned, money, onPinned, Modifier.padding(top = ASSISTANT_UNDER_INBOX))
         }
-        if (closeOut != null) {
-            item(key = "close-out") { CloseOutAssistantCard(closeOut, money, onCloseOut, Modifier.padding(top = 12.dp)) }
-        }
-        // With one kind there is nothing to scan past, so it starts open; a tap still closes it.
-        val alone = byKind.size == 1
-        byKind.forEach { (kind, all) ->
-            val open = (kind in expanded) != alone
-            // The card and its findings are one row, so opening it grows that row and the cards below ease down with it.
-            item(key = "kind-${kind.name}") {
-                Column(Modifier.padding(top = 12.dp)) {
-                    KindCard(kind, all.size, open) { onToggleExpanded(kind) }
-                    CardFold(open, Modifier.testTag("assistant-fold-${kind.name}")) {
-                        // An open card grows downward: its findings carry on in the card itself, each under a thin rule of the page's own colour.
-                        all.forEach { finding ->
-                            key(finding.key) {
-                                Column(Modifier.fillMaxWidth().background(Metro.colors.chrome)) {
-                                    Box(
-                                        Modifier
-                                            .padding(horizontal = CARD_PADDING)
-                                            .fillMaxWidth()
-                                            .height(2.dp)
-                                            .background(Metro.colors.background),
-                                    )
-                                    FindingPanel(
-                                        finding,
-                                        money,
-                                        onAct,
-                                        working = working?.takeIf { it.key == finding.key }?.label,
-                                        failed = failed?.takeIf { it.key == finding.key }?.reason,
-                                    )
-                                }
+    }
+    val findings = report?.findings?.filter { it.key !in settling || it.key == working?.key }.orEmpty()
+    if (findings.isNotEmpty() || closeOut != null) {
+        // Under pins it keeps the pins' own gap, as on the assistant alone; under the inbox it stands well clear.
+        item(key = "assistant-gap") { Box(Modifier.height(if (pinned.isEmpty()) ASSISTANT_UNDER_INBOX else 12.dp)) }
+        assistantCards(findings, money, onAct, expanded, onToggleExpanded, working, failed, closeOut, onCloseOut)
+    }
+    item(key = "end") { Box(Modifier.height(MetroDimens.Row)) }
+}
+
+/** The air between the inbox's last row and the assistant under it. */
+private val ASSISTANT_UNDER_INBOX = 28.dp
+
+/** The count of what the assistant found, the close out card, and a card for each kind of finding. */
+private fun LazyListScope.assistantCards(
+    findings: List<Finding>,
+    money: (Long) -> String,
+    onAct: (Finding, FindingAction) -> Unit,
+    expanded: Set<FindingKind>,
+    onToggleExpanded: (FindingKind) -> Unit,
+    working: AssistantUi.Working?,
+    failed: AssistantUi.Failed?,
+    closeOut: CloseOutCard?,
+    onCloseOut: () -> Unit,
+) {
+    val byKind = AssistantReport(findings).byKind()
+    item(key = "count") {
+        BudgetTotal(
+            AssistantCopy.TO_LOOK_AT,
+            "${findings.size}",
+            Metro.accent.text,
+            "assistant-count",
+        )
+    }
+    if (closeOut != null) {
+        item(key = "close-out") { CloseOutAssistantCard(closeOut, money, onCloseOut, Modifier.padding(top = 12.dp)) }
+    }
+    // With one kind there is nothing to scan past, so it starts open; a tap still closes it.
+    val alone = byKind.size == 1
+    byKind.forEach { (kind, all) ->
+        val open = (kind in expanded) != alone
+        // The card and its findings are one row, so opening it grows that row and the cards below ease down with it.
+        item(key = "kind-${kind.name}") {
+            Column(Modifier.padding(top = 12.dp)) {
+                KindCard(kind, all.size, open) { onToggleExpanded(kind) }
+                CardFold(open, Modifier.testTag("assistant-fold-${kind.name}")) {
+                    // An open card grows downward: its findings carry on in the card itself, each under a thin rule of the page's own colour.
+                    all.forEach { finding ->
+                        key(finding.key) {
+                            Column(Modifier.fillMaxWidth().background(Metro.colors.chrome)) {
+                                Box(
+                                    Modifier
+                                        .padding(horizontal = CARD_PADDING)
+                                        .fillMaxWidth()
+                                        .height(2.dp)
+                                        .background(Metro.colors.background),
+                                )
+                                FindingPanel(
+                                    finding,
+                                    money,
+                                    onAct,
+                                    working = working?.takeIf { it.key == finding.key }?.label,
+                                    failed = failed?.takeIf { it.key == finding.key }?.reason,
+                                )
                             }
                         }
                     }
                 }
             }
         }
-        item(key = "end") { Box(Modifier.height(MetroDimens.Row)) }
     }
 }
 

@@ -61,7 +61,7 @@ class InboxMenuScreenshotTest {
                         loading = false,
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),
-                        initialSection = HomeSections.headers.indexOf(HomeSections.INBOX),
+                        initialSection = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
                         onGesture = {},
                         modifier = Modifier.weight(1f),
                     )

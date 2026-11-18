@@ -67,7 +67,7 @@ class InboxSyncScreenshotTest {
                     ShellRoute.Home,
                     hasBudget = true,
                     mode = BudgetMode.ENVELOPE,
-                    homeSection = ScreenBar.HOME_INBOX,
+                    homeSection = ScreenBar.HOME_ASSISTANT,
                 ).map { it.action() }
         compose.setContent {
             MetroTheme(darkTheme = dark) {
@@ -77,7 +77,7 @@ class InboxSyncScreenshotTest {
                         loading = false,
                         openMonth = shell.month,
                         monthWindow = MonthWindow.around(shell.month),
-                        initialSection = HomeSections.headers.indexOf(HomeSections.INBOX),
+                        initialSection = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
                         onGesture = {},
                         modifier = Modifier.weight(1f),
                         inboxNotice = notice,
