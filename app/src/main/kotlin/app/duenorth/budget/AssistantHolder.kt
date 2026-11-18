@@ -27,6 +27,9 @@ data class AssistantUi(
     /** The finding whose last fix was turned down, and why, so the tap does not look like it did nothing. */
     val failed: Failed? = null,
 ) {
+    /** The findings the assistant shows: all but those just acted on, though the one saving now stays. */
+    val shown: List<Finding> get() = shownFindings(report, settling, working)
+
     data class Working(
         val key: String,
         val label: String,
@@ -37,6 +40,13 @@ data class AssistantUi(
         val reason: String,
     )
 }
+
+/** [report]'s findings less those [settling], keeping the [working] one: what the assistant's list and total show. */
+internal fun shownFindings(
+    report: AssistantReport?,
+    settling: Set<String>,
+    working: AssistantUi.Working?,
+): List<Finding> = report?.findings.orEmpty().filter { it.key !in settling || it.key == working?.key }
 
 /**
  * The assistant: reads what the checks found after every reload, and carries out the button the person taps. It

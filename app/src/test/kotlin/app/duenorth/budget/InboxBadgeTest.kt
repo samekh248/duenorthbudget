@@ -4,14 +4,19 @@ import android.Manifest
 import android.app.Application
 import android.app.NotificationManager
 import androidx.test.core.app.ApplicationProvider
+import app.duenorth.budget.core.AssistantReport
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.Finding
+import app.duenorth.budget.core.FindingKind
+import app.duenorth.budget.core.FindingSure
 import app.duenorth.budget.core.InboxRow
 import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MatchSide
 import app.duenorth.budget.core.MonthShell
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,7 +25,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.YearMonth
 
-/** The app icon's count: the same number as the inbox header, carried by one quiet notification. */
+/** The app icon's count: the same number as the assistant's total, carried by one quiet notification. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class InboxBadgeTest {
@@ -28,7 +33,7 @@ class InboxBadgeTest {
     private val manager = app.getSystemService(NotificationManager::class.java)
 
     @Test
-    fun theCountIsTheInboxHeadersRowsToCategorizePlusPossibleMatches() {
+    fun theInboxCountIsRowsToCategorizePlusPossibleMatches() {
         val bank = MatchSide("bank", "CORNER COFFEE #42", 20261015, -575, "visa", "Visa", null, "", "")
         val mine = MatchSide("mine", "Corner Coffee", 20261014, -575, "visa", "Visa", "c-dining", "Dining", "")
         val inbox =
@@ -38,8 +43,24 @@ class InboxBadgeTest {
                 InboxRow("atm", "(no payee)", -2_000, 20261011, "checking", "Checking"),
             )
         // The bank row sits in the match, not the queue: two rows to categorize and one match.
-        assertEquals(3, InboxBadge.count(shell(inbox, listOf(MatchPair(bank, mine)))))
-        assertEquals(0, InboxBadge.count(shell(emptyList(), emptyList())))
+        assertEquals(3, InboxBadge.inboxCount(shell(inbox, listOf(MatchPair(bank, mine)))))
+        assertEquals(0, InboxBadge.inboxCount(shell(emptyList(), emptyList())))
+    }
+
+    @Test
+    fun theCountIsTheAssistantTotalTheInboxPlusEveryFindingShown() {
+        val shell = shell(listOf(InboxRow("shell", "Shell", -4_210, 20261014, "checking", "Checking")), emptyList())
+        val report = AssistantReport(listOf(finding("a"), finding("b"), finding("c")))
+        assertEquals(4, InboxBadge.count(shell, AssistantUi(report = report)))
+        // A finding just acted on leaves the list at once, and the count with it; the one saving now still shows.
+        assertEquals(3, InboxBadge.count(shell, AssistantUi(report = report, settling = setOf("a"))))
+        assertEquals(
+            4,
+            InboxBadge.count(shell, AssistantUi(report = report, settling = setOf("a"), working = AssistantUi.Working("a", "saving"))),
+        )
+        // Before the checks are read there is no total yet, so the icon keeps what it had.
+        assertNull(InboxBadge.count(shell, AssistantUi()))
+        assertEquals(0, InboxBadge.count(shell(emptyList(), emptyList()), AssistantUi(report = AssistantReport.EMPTY)))
     }
 
     @Test
@@ -69,6 +90,18 @@ class InboxBadgeTest {
         InboxBadge.markAsked(app)
         assertFalse(InboxBadge.shouldAsk(app))
     }
+
+    private fun finding(key: String) =
+        Finding(
+            key = key,
+            kind = FindingKind.DUPLICATE,
+            sure = FindingSure.HIGH,
+            headline = key,
+            sides = emptyList(),
+            reasons = emptyList(),
+            actions = emptyList(),
+            accountId = "checking",
+        )
 
     private fun shell(
         inbox: List<InboxRow>,
