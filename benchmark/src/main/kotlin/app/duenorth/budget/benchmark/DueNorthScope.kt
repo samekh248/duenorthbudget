@@ -16,7 +16,7 @@ private const val WAIT_MS = 10_000L
 /** The pivot items of home, in the order of HomeSections.headers. */
 private const val BUDGET_ITEM = 1
 
-private val INBOX_CONTENT = Pattern.compile("inbox-(empty|featured|group-.*)")
+private val ASSISTANT_CONTENT = Pattern.compile("inbox-(featured|group-.*)|assistant-(list|clear)")
 
 /**
  * Writes the "wide month" sample budget (many groups, a long register) and opens it, once per install.
@@ -30,8 +30,9 @@ fun MacrobenchmarkScope.seedBudget() {
 /** Waits until the open budget is on screen: the pivot is up and home has read the month. */
 fun MacrobenchmarkScope.waitForBudget() {
     check(device.wait(Until.hasObject(By.res("pivot")), WAIT_MS)) { "home never appeared" }
-    // Home's first item is the inbox, which shows its rows or its empty state only once the month is read.
-    check(device.wait(Until.hasObject(By.res(INBOX_CONTENT)), WAIT_MS)) { "the open budget never loaded" }
+    // Home's first item is the assistant, which shows the inbox's card, its cards or its all-clear only once the
+    // month is read.
+    check(device.wait(Until.hasObject(By.res(ASSISTANT_CONTENT)), WAIT_MS)) { "the open budget never loaded" }
 }
 
 /** Taps the budget header and waits for its category list. */
@@ -68,4 +69,4 @@ fun MacrobenchmarkScope.swipeThroughPivot() {
 }
 
 private const val FLINGS = 3
-private const val PIVOT_ITEMS = 5
+private const val PIVOT_ITEMS = 4
