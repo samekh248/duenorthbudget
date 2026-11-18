@@ -114,6 +114,8 @@ class SettingsHolder internal constructor(
 
     fun showLicenses() = openFrom(ShellRoute.Licenses, SettingsPage.GENERAL)
 
+    fun showSavedSplits() = openFrom(ShellRoute.SavedSplits, SettingsPage.GENERAL)
+
     fun showEncryption(mode: EncryptionMode) = openFrom(ShellRoute.EncryptionPassword(mode), SettingsPage.ADVANCED)
 
     fun setDateFormat(value: String) = setOpenBudgetPreference("dateFormat", value)

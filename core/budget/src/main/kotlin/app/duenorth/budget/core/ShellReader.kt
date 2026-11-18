@@ -37,6 +37,7 @@ object ShellReader {
                 BudgetMode.ENVELOPE
             }
         val currency = BudgetCurrency.read(preferences)
+        val savedSplits = SavedSplits.decode(preferences[SavedSplits.PREF])
         val month = viewMonth
         // Hidden groups and categories stay out of the screen unless asked for, as in Actual.
         val groups = detailed.groups.filter { showHidden || !it.bool("hidden") }
@@ -195,8 +196,20 @@ object ShellReader {
                         // A row that is already a transfer (to an off-budget account) isn't guessed as one.
                         val transfers = inbox.filter { it.str("transfer_account") != null }.map { it.str("id") }.toSet()
                         val guesses = TransferGuesser.guess(session, rows.filter { it.id !in transfers }, today)
-                        rows.map { row -> guesses[row.id]?.let { row.copy(transfer = it) } ?: row }
+                        val withTransfers = rows.map { row -> guesses[row.id]?.let { row.copy(transfer = it) } ?: row }
+                        // A saved split is guessed for what doesn't look like a transfer.
+                        val splitGuesses =
+                            SavedSplitMatcher.guess(
+                                withTransfers.filter { it.transfer == null && it.id !in transfers },
+                                savedSplits,
+                            )
+                        withTransfers.map { row ->
+                            splitGuesses[row.id]?.let { guess ->
+                                row.copy(split = guess.copy(categoryNames = guess.parts.map { categoryNames[it.categoryId].orEmpty() }))
+                            } ?: row
+                        }
                     },
+            savedSplits = savedSplits,
             matches = MatchFinder.find(session).filter { it.bank.accountId in onBudget },
         )
     }

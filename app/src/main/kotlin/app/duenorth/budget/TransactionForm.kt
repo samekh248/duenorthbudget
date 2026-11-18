@@ -58,6 +58,9 @@ import app.duenorth.budget.core.RegisterCopy
 import app.duenorth.budget.core.RegisterEntry
 import app.duenorth.budget.core.RegisterPage
 import app.duenorth.budget.core.RegisterRow
+import app.duenorth.budget.core.SavedSplit
+import app.duenorth.budget.core.SavedSplitCopy
+import app.duenorth.budget.core.SavedSplits
 import app.duenorth.budget.core.ShellCopy
 import app.duenorth.budget.core.SplitPart
 import app.duenorth.budget.core.TransactionDraft
@@ -91,6 +94,10 @@ fun TransactionForm(
     initialAmountMinor: Long? = null,
     /** A new transaction from home: no account until one is picked, rather than the first in the list. */
     chooseAccount: Boolean = false,
+    /** Splits kept to use again: "use a saved split" fills the split lines with one. */
+    savedSplits: List<SavedSplit> = emptyList(),
+    /** Keeps the split as it stands to use again; null leaves "save this split" off the form. */
+    onSaveSplit: ((SavedSplit) -> Unit)? = null,
 ) {
     val draftId = remember(row?.id, page.account.id) { row?.id ?: UUID.randomUUID().toString() }
     var date by remember(row?.id) {
@@ -181,6 +188,32 @@ fun TransactionForm(
                 }
             }
         splits = pinned + SplitLine(null, "")
+    }
+
+    // The saved splits' names and what each line takes, for the list that picks one.
+    val categoryNames = remember(page.categories) { page.categories.namesById() }
+    val summary = { split: SavedSplit ->
+        savedSplitSummary(split, categoryNames, page.currency, FormatOptions(hideFraction, numberFormat))
+    }
+
+    /**
+     * Fills the split lines with [split]: for the amount typed, each line's share; with none typed yet, the fixed
+     * amounts only. The last line is left blank, so it takes the rest as a typed split's does.
+     */
+    fun useSavedSplit(split: SavedSplit) {
+        val parts = total.takeIf { it != 0L }?.let(split::partsFor)
+        splits =
+            split.lines.mapIndexed { index, line ->
+                val text =
+                    when {
+                        index == split.lines.lastIndex -> ""
+                        parts != null -> editText(parts[index].amountMinor)
+                        else -> line.amountMinor?.let(::editText).orEmpty()
+                    }
+                SplitLine(line.categoryId, text, line.payee.orEmpty(), line.note.orEmpty())
+            }
+        lineError = null
+        if (fieldError?.first == TransactionField.CATEGORY) fieldError = null
     }
 
     fun splitParts(): Pair<List<SplitPart>?, Pair<Int?, String>?> {
@@ -345,6 +378,9 @@ fun TransactionForm(
                     // A transfer has no split, even one across the budget's edge that keeps a category.
                     if (transferTo == null) {
                         FormLink(TransactionFormCopy.SPLIT_START, "transaction-split-start", ::startSplit)
+                        if (savedSplits.isNotEmpty()) {
+                            FormLink(SavedSplitCopy.USE, "transaction-split-use") { overlay = FormOverlay.SavedSplitList }
+                        }
                     }
                 }
             }
@@ -388,6 +424,19 @@ fun TransactionForm(
                         onAdd = ::addLine,
                         onOpenFull = { overlay = FormOverlay.CategoryList(it) },
                     )
+                    if (savedSplits.isNotEmpty()) {
+                        FormLink(SavedSplitCopy.USE, "transaction-split-use") { overlay = FormOverlay.SavedSplitList }
+                    }
+                    if (onSaveSplit != null) {
+                        FormLink(SavedSplitCopy.SAVE, "transaction-split-save") {
+                            // Only a split that adds up can be kept; one that doesn't says why where it does on save.
+                            val (parts, refused) = splitParts()
+                            val (line, reason) = refused ?: (null to null)
+                            fieldError = if (reason != null && line == null) TransactionField.CATEGORY to reason else null
+                            lineError = if (reason != null && line != null) line to reason else null
+                            if (parts != null && refused == null) overlay = FormOverlay.SaveSplit
+                        }
+                    }
                 }
             }
             LabeledField(TransactionFormCopy.CLEARED, null, Modifier.padding(top = MetroDimens.FieldGroupGap)) {
@@ -446,6 +495,40 @@ fun TransactionForm(
                     },
                     onBack = { overlay = FormOverlay.None },
                     currency = page.currency,
+                )
+            FormOverlay.SavedSplitList ->
+                SavedSplitListPage(
+                    splits = savedSplits,
+                    summary = summary,
+                    onPick = { picked ->
+                        useSavedSplit(picked)
+                        overlay = FormOverlay.None
+                    },
+                    onBack = { overlay = FormOverlay.None },
+                )
+            FormOverlay.SaveSplit ->
+                SaveSplitPage(
+                    initialName =
+                        savedSplits.firstOrNull { it.payees.any { p -> p.equals(payee.trim(), ignoreCase = true) } }?.name
+                            ?: payee.trim(),
+                    onSave = { name, shares ->
+                        val parts = splitParts().first
+                        if (parts != null && onSaveSplit != null) {
+                            onSaveSplit(
+                                SavedSplits.fromParts(
+                                    id = UUID.randomUUID().toString(),
+                                    name = name,
+                                    parts = parts,
+                                    totalMinor = total,
+                                    shares = shares,
+                                    payee = payee,
+                                    restIndex = restIndex,
+                                ),
+                            )
+                        }
+                        overlay = FormOverlay.None
+                    },
+                    onCancel = { overlay = FormOverlay.None },
                 )
             is FormOverlay.DatePicker ->
                 DatePickerPage(
@@ -756,6 +839,12 @@ sealed interface FormOverlay {
     data class DatePicker(
         val draft: Int,
     ) : FormOverlay
+
+    /** The saved splits, to fill the split lines with one. */
+    data object SavedSplitList : FormOverlay
+
+    /** Save this split: its name, and amounts or shares. */
+    data object SaveSplit : FormOverlay
 }
 
 /**
@@ -845,7 +934,7 @@ private val FIELD_PADDING = 10.dp
 
 /** A label over its control, a quarter grid step apart, and the field's error under it (FR-002, FR-020, FR-022). */
 @Composable
-private fun LabeledField(
+internal fun LabeledField(
     label: String,
     error: String?,
     modifier: Modifier = Modifier,

@@ -114,6 +114,9 @@ object ToastCopy {
     const val MERGE_FAILED = "couldn't merge"
     const val MATCHED = "transactions matched"
     const val MATCH_FAILED = "couldn't match"
+    const val SPLIT_SAVED = "split saved"
+    const val SPLIT_SAVE_FAILED = "couldn't save split"
+    const val SPLIT_DELETED = "saved split deleted"
 
     const val ACCOUNT_ADDED = "account added"
     const val ACCOUNT_SAVED = "account saved"

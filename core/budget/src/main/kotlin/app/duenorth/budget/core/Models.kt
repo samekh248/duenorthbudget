@@ -503,6 +503,8 @@ data class InboxRow(
     val suggestionName: String = "",
     /** The account this looks like a transfer to or from, offered ahead of the category; null when it doesn't. */
     val transfer: TransferGuess? = null,
+    /** The saved split this looks like, offered ahead of the category; null when none fits. */
+    val split: SavedSplitGuess? = null,
 )
 
 data class MonthShell(
@@ -523,6 +525,8 @@ data class MonthShell(
     val incomeGroups: List<IncomeGroupRow> = emptyList(),
     /** Possible matches in on-budget accounts, waiting in the inbox for match or not a match. */
     val matches: List<MatchPair> = emptyList(),
+    /** The splits kept to use again, from the budget's synced preference. */
+    val savedSplits: List<SavedSplit> = emptyList(),
 )
 
 object ShellCopy {

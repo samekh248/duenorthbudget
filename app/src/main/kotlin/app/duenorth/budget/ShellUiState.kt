@@ -42,6 +42,8 @@ data class InboxFiled(
     val categoryName: String,
     /** Made a transfer: [categoryName] is "transfer to" the other account. */
     val transfer: Boolean = false,
+    /** Split as a saved split: [categoryName] is the saved split's name. */
+    val split: Boolean = false,
 )
 
 data class ShellUiState(

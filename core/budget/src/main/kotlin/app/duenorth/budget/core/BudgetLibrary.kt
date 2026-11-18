@@ -789,6 +789,53 @@ class BudgetLibrary(
         edit(budgetId, UndoCopy.SPLIT) { RegisterBook(it).split(transactionId, parts, force) }
             ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
 
+    /**
+     * Splits [transactionId] the way the saved split [splitId] does, for its amount, and remembers [payee] on the saved
+     * split so the next transaction from it is matched. One undo step.
+     */
+    fun applySavedSplit(
+        budgetId: String,
+        transactionId: String,
+        splitId: String,
+        payee: String?,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.SPLIT) { session ->
+            val splits = SavedSplits.read(session)
+            val split = splits.firstOrNull { it.id == splitId } ?: return@edit WriteResult.Rejected(SavedSplitCopy.DOESNT_FIT)
+            val amount =
+                session
+                    .query("SELECT amount FROM transactions WHERE id = ? AND IFNULL(tombstone, 0) = 0", listOf(transactionId))
+                    .firstOrNull()
+                    ?.long("amount") ?: return@edit WriteResult.Rejected(MatchCopy.GONE)
+            val parts = split.partsFor(amount) ?: return@edit WriteResult.Rejected(SavedSplitCopy.DOESNT_FIT)
+            RegisterBook(session).split(transactionId, parts, false).also { result ->
+                if (result is WriteResult.Saved) {
+                    val learned = SavedSplits.learn(splits, splitId, payee)
+                    if (learned != splits) SavedSplits.write(session, learned)
+                }
+            }
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    /** Keeps [split] to use again; one of the same name is replaced. */
+    fun saveSplit(
+        budgetId: String,
+        split: SavedSplit,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.SAVE_SPLIT) { session ->
+            if (split.name.isBlank()) return@edit WriteResult.Rejected(SavedSplitCopy.NAME_FIRST)
+            SavedSplits.write(session, SavedSplits.put(SavedSplits.read(session), split))
+            WriteResult.Saved
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
+    fun deleteSavedSplit(
+        budgetId: String,
+        splitId: String,
+    ): WriteResult =
+        edit(budgetId, UndoCopy.DELETE_SPLIT) { session ->
+            SavedSplits.write(session, SavedSplits.read(session).filterNot { it.id == splitId })
+            WriteResult.Saved
+        } ?: WriteResult.Rejected(ShellCopy.NO_ACCOUNTS)
+
     fun unsplitTransaction(
         budgetId: String,
         transactionId: String,

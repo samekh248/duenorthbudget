@@ -93,6 +93,7 @@ object SettingsCopy {
     const val MANAGE_RULES_HINT = "file new transactions by payee, amount and more"
     const val MANAGE_SCHEDULES = "schedules"
     const val MANAGE_SCHEDULES_HINT = "bills and paychecks that repeat"
+    const val SAVED_SPLITS_HINT = "splits you use again, suggested when one comes in"
     const val MANAGE_TEMPLATES = "templates"
     const val MANAGE_TEMPLATES_HINT = "fill the month from each category's targets"
     const val RENAME_PAYEES = "payees"

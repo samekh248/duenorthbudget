@@ -3,6 +3,7 @@ package app.duenorth.budget
 import app.duenorth.budget.core.LedgerFilter
 import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.RegisterSearch
+import app.duenorth.budget.core.SavedSplit
 import app.duenorth.budget.core.TransactionDraft
 import app.duenorth.budget.core.WriteResult
 import kotlinx.coroutines.launch
@@ -268,6 +269,26 @@ class RegisterHolder internal constructor(
             host.toastFor(result, ToastCopy.MATCHED, ToastCopy.MATCH_FAILED)
             if (result is WriteResult.Saved) host.mutate { it.copy(inbox = it.inbox.copy(lead = pair.bank.id)) }
             host.publish(result, pair.bank.accountId, stayOnRegister)
+        }
+    }
+
+    /** Keeps [split] to use again, while the form that saved it stays open. */
+    fun saveSplit(split: SavedSplit) {
+        val budgetId = state.settings.openBudgetId ?: return
+        host.scope.launch {
+            val result = withContext(host.io) { host.library.saveSplit(budgetId, split) }
+            host.toastFor(result, ToastCopy.SPLIT_SAVED, ToastCopy.SPLIT_SAVE_FAILED)
+            if (result is WriteResult.Saved) host.reload()
+        }
+    }
+
+    /** Settings' saved splits: deletes one. Undo brings it back. */
+    fun deleteSavedSplit(splitId: String) {
+        val budgetId = state.settings.openBudgetId ?: return
+        host.scope.launch {
+            val result = withContext(host.io) { host.library.deleteSavedSplit(budgetId, splitId) }
+            host.toastFor(result, ToastCopy.SPLIT_DELETED, ToastCopy.SPLIT_SAVE_FAILED)
+            if (result is WriteResult.Saved) host.reload()
         }
     }
 
