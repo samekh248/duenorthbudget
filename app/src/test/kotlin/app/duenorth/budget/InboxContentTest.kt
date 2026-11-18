@@ -42,7 +42,6 @@ class InboxContentTest {
     @Test
     fun theTopRowIsFeaturedAndTheRestWaitWithTheirDetails() {
         show(sampleInbox())
-        compose.onNodeWithTag("inbox-count").assertTextEquals("3")
         compose.onNodeWithTag("inbox-featured-coffee").assertIsDisplayed()
         compose.onNodeWithTag("inbox-featured-amount", useUnmergedTree = true).assertTextEquals("-$5.75")
         compose.onNodeWithText("Dining", useUnmergedTree = true).assertIsDisplayed()
@@ -188,7 +187,6 @@ class InboxContentTest {
         show(rows.drop(1), filed = listOf(InboxFiled(rows.first(), 0, "Dining")), onFiledShown = { shown += it })
         compose.mainClock.advanceTimeByFrame()
         compose.onNodeWithText("filed to dining", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNodeWithTag("inbox-count").assertTextEquals("2")
         // The next row waits in the queue until it rises.
         compose.onNodeWithTag("inbox-row-shell").assertExists()
         compose.mainClock.advanceTimeBy(FILED_HOLD_MS + 1_000)

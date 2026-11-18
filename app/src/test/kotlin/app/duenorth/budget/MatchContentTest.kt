@@ -44,8 +44,6 @@ class MatchContentTest {
     fun aPairTakesTheInboxPanelAndLeavesTheQueue() {
         showInbox()
         compose.onNodeWithTag("match-panel-bank|mine").assertIsDisplayed()
-        compose.onNodeWithTag("inbox-to-match").assertTextEquals("1")
-        compose.onNodeWithTag("inbox-count").assertTextEquals("1")
         compose.onNodeWithTag("inbox-row-bank").assertDoesNotExist()
         compose.onNodeWithTag("inbox-row-shell").assertIsDisplayed()
     }

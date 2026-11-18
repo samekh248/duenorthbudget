@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -91,6 +92,10 @@ fun AssistantSection(
     pinned: List<CategoryRow> = emptyList(),
     /** A pinned tile's tap: opens its category. */
     onPinned: (String) -> Unit = {},
+    /** The inbox, as the first card; null while nothing waits to be filed. */
+    inbox: InboxCard? = null,
+    inboxOpen: Boolean = true,
+    onToggleInbox: () -> Unit = {},
 ) {
     Column(modifier.fillMaxSize()) {
         PinnedBalances(
@@ -113,6 +118,9 @@ fun AssistantSection(
             formatOptions = formatOptions,
             closeOut = closeOut,
             onCloseOut = onCloseOut,
+            inbox = inbox,
+            inboxOpen = inboxOpen,
+            onToggleInbox = onToggleInbox,
         )
     }
 }
@@ -133,14 +141,17 @@ private fun AssistantBody(
     formatOptions: FormatOptions = formatOptions(),
     closeOut: CloseOutCard? = null,
     onCloseOut: () -> Unit = {},
+    inbox: InboxCard? = null,
+    inboxOpen: Boolean = true,
+    onToggleInbox: () -> Unit = {},
 ) {
-    if (report == null) {
+    if (report == null && inbox == null) {
         Box(modifier.fillMaxSize()) { Placeholder() }
         return
     }
     val money = { minor: Long -> MoneyFormat.format(minor, currency, formatOptions) }
-    val findings = report.findings.filter { it.key !in settling || it.key == working?.key }
-    if (findings.isEmpty()) {
+    val findings = report?.findings.orEmpty().filter { it.key !in settling || it.key == working?.key }
+    if (findings.isEmpty() && inbox == null) {
         Column(modifier.fillMaxSize()) {
             if (closeOut != null) {
                 CloseOutAssistantCard(closeOut, money, onCloseOut, Modifier.padding(MetroDimens.Gutter))
@@ -155,45 +166,23 @@ private fun AssistantBody(
         modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter).testTag("assistant-list"),
         state = list,
     ) {
-        assistantCards(findings, money, onAct, expanded, onToggleExpanded, working, failed, closeOut, onCloseOut)
+        assistantCards(
+            findings,
+            money,
+            onAct,
+            expanded,
+            onToggleExpanded,
+            working,
+            failed,
+            closeOut,
+            onCloseOut,
+            inbox,
+            inboxOpen,
+            onToggleInbox,
+        )
         item(key = "end") { Box(Modifier.height(MetroDimens.Row)) }
     }
 }
-
-/**
- * The assistant under the inbox, in the inbox's own list: its pinned balances, then its count and cards. Nothing
- * found and no close out shows only the pins, since the inbox above already fills the page.
- */
-internal fun LazyListScope.assistantItems(
-    report: AssistantReport?,
-    money: (Long) -> String,
-    onAct: (Finding, FindingAction) -> Unit,
-    expanded: Set<FindingKind> = emptySet(),
-    onToggleExpanded: (FindingKind) -> Unit = {},
-    settling: Set<String> = emptySet(),
-    working: AssistantUi.Working? = null,
-    failed: AssistantUi.Failed? = null,
-    closeOut: CloseOutCard? = null,
-    onCloseOut: () -> Unit = {},
-    pinned: List<CategoryRow> = emptyList(),
-    onPinned: (String) -> Unit = {},
-) {
-    if (pinned.isNotEmpty()) {
-        item(key = "assistant-pins") {
-            PinnedBalances(pinned, money, onPinned, Modifier.padding(top = ASSISTANT_UNDER_INBOX))
-        }
-    }
-    val findings = report?.findings?.filter { it.key !in settling || it.key == working?.key }.orEmpty()
-    if (findings.isNotEmpty() || closeOut != null) {
-        // Under pins it keeps the pins' own gap, as on the assistant alone; under the inbox it stands well clear.
-        item(key = "assistant-gap") { Box(Modifier.height(if (pinned.isEmpty()) ASSISTANT_UNDER_INBOX else 12.dp)) }
-        assistantCards(findings, money, onAct, expanded, onToggleExpanded, working, failed, closeOut, onCloseOut)
-    }
-    item(key = "end") { Box(Modifier.height(MetroDimens.Row)) }
-}
-
-/** The air between the inbox's last row and the assistant under it. */
-private val ASSISTANT_UNDER_INBOX = 28.dp
 
 /** The count of what the assistant found, the close out card, and a card for each kind of finding. */
 private fun LazyListScope.assistantCards(
@@ -206,21 +195,46 @@ private fun LazyListScope.assistantCards(
     failed: AssistantUi.Failed?,
     closeOut: CloseOutCard?,
     onCloseOut: () -> Unit,
+    inbox: InboxCard?,
+    inboxOpen: Boolean,
+    onToggleInbox: () -> Unit,
 ) {
     val byKind = AssistantReport(findings).byKind()
     item(key = "count") {
         BudgetTotal(
             AssistantCopy.TO_LOOK_AT,
-            "${findings.size}",
+            "${findings.size + (inbox?.count ?: 0)}",
             Metro.accent.text,
             "assistant-count",
         )
+    }
+    // The inbox leads the cards, and opens onto its featured transaction and the queue under it.
+    if (inbox != null) {
+        item(key = "kind-inbox") {
+            Column(Modifier.padding(top = 12.dp)) {
+                AssistantCard(InboxCopy.CARD_TITLE, InboxCopy.CARD_BLURB, inbox.count, inboxOpen, "INBOX", onToggle = onToggleInbox)
+                // Clipped to the card's width, so the panel and banded rows stay inside the box above them.
+                CardFold(inboxOpen, Modifier.testTag("assistant-fold-INBOX")) {
+                    Column(Modifier.fillMaxWidth().clipToBounds()) {
+                        Box(
+                            Modifier
+                                .padding(horizontal = CARD_PADDING)
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(Metro.colors.background),
+                        )
+                        // Inset by the gutter, so the panel's and rows' fills, which reach out by one, meet the card's edges.
+                        Box(Modifier.background(Metro.colors.chrome).padding(horizontal = MetroDimens.Gutter)) { inbox.body() }
+                    }
+                }
+            }
+        }
     }
     if (closeOut != null) {
         item(key = "close-out") { CloseOutAssistantCard(closeOut, money, onCloseOut, Modifier.padding(top = 12.dp)) }
     }
     // With one kind there is nothing to scan past, so it starts open; a tap still closes it.
-    val alone = byKind.size == 1
+    val alone = byKind.size == 1 && inbox == null
     byKind.forEach { (kind, all) ->
         val open = (kind in expanded) != alone
         // The card and its findings are one row, so opening it grows that row and the cards below ease down with it.
@@ -263,6 +277,18 @@ private fun KindCard(
     open: Boolean,
     modifier: Modifier = Modifier,
     onToggle: () -> Unit,
+) = AssistantCard(kind.title, kind.blurb, count, open, kind.name, modifier, onToggle)
+
+/** A card's header: its title and what it means, with how many wait in a circle on the right; a tap opens it. */
+@Composable
+private fun AssistantCard(
+    title: String,
+    blurb: String,
+    count: Int,
+    open: Boolean,
+    tag: String,
+    modifier: Modifier = Modifier,
+    onToggle: () -> Unit,
 ) {
     Row(
         modifier
@@ -271,19 +297,19 @@ private fun KindCard(
             .metroPress(onToggle)
             .semantics { stateDescription = if (open) "open" else "closed" }
             .padding(horizontal = CARD_PADDING, vertical = 14.dp)
-            .testTag("assistant-kind-${kind.name}"),
+            .testTag("assistant-kind-$tag"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
-            MetroText(kind.title, Metro.typography.groupHeader, maxLines = 1)
-            MetroText(kind.blurb, Metro.typography.caption, color = Metro.colors.secondary, maxLines = 2)
+            MetroText(title, Metro.typography.groupHeader, maxLines = 1)
+            MetroText(blurb, Metro.typography.caption, color = Metro.colors.secondary, maxLines = 2)
         }
         Box(
             Modifier
                 .size(40.dp)
                 .clip(CircleShape)
                 .background(Metro.accent.fill)
-                .testTag("assistant-kind-count-${kind.name}"),
+                .testTag("assistant-kind-count-$tag"),
             contentAlignment = Alignment.Center,
         ) {
             MetroText(

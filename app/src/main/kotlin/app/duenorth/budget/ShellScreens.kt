@@ -156,6 +156,8 @@ fun HomePivot(
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
+    // The assistant's inbox card starts open, since filing is what the page is mostly for; a tap folds it.
+    var inboxOpen by rememberSaveable { mutableStateOf(true) }
     LaunchedEffect(pagerGesture, listGesture) { onGesture(pagerGesture || listGesture) }
     // Leaving Home mid-scroll (say, to move money from edit mode) must not leave the shell's repaints held back.
     DisposableEffect(Unit) { onDispose { onGesture(false) } }
@@ -163,7 +165,7 @@ fun HomePivot(
         title = SectionTitleCopy.APP,
         items =
             listOf(
-                // The assistant leads, with the inbox at its top: its header counts the rows to categorize, the
+                // The assistant leads, with the inbox as its first card: its header counts the rows to categorize, the
                 // possible matches and what the checks found.
                 PivotItem(
                     HomeSections.ASSISTANT,
@@ -178,7 +180,6 @@ fun HomePivot(
                         if (loading) Placeholder()
                     } else {
                         val pinned = remember(pinnedCategories, shell.groups) { PinnedCategories.resolve(pinnedCategories, shell.groups) }
-                        val money = { minor: Long -> MoneyFormat.format(minor, shell.currency, formatOptions) }
                         InboxSection(
                             shell,
                             onListGesture = { listGesture = it },
@@ -192,25 +193,8 @@ fun HomePivot(
                             onToggle = onInboxToggle,
                             lead = inboxLead,
                             notice = inboxNotice,
-                            // Under the inbox, the assistant carries on in the same list: pins, then its cards.
-                            below = {
-                                assistantItems(
-                                    report = assistant.report,
-                                    money = money,
-                                    onAct = onAssistant,
-                                    expanded = assistant.expanded,
-                                    onToggleExpanded = onAssistantMore,
-                                    settling = assistant.settling,
-                                    working = assistant.working,
-                                    failed = assistant.failed,
-                                    closeOut = closeOut,
-                                    onCloseOut = onCloseOut,
-                                    pinned = pinned,
-                                    onPinned = { onBudgetCategory?.invoke(it) },
-                                )
-                            },
-                            // With nothing to file, the page is the assistant alone, as it was before it held the inbox.
-                            empty = { modifier ->
+                            // The page is the assistant's, with the inbox as its first card while anything waits.
+                            page = { modifier, card ->
                                 AssistantSection(
                                     report = assistant.report,
                                     currency = shell.currency,
@@ -227,6 +211,9 @@ fun HomePivot(
                                     onCloseOut = onCloseOut,
                                     pinned = pinned,
                                     onPinned = { onBudgetCategory?.invoke(it) },
+                                    inbox = card,
+                                    inboxOpen = inboxOpen,
+                                    onToggleInbox = { inboxOpen = !inboxOpen },
                                 )
                             },
                         )

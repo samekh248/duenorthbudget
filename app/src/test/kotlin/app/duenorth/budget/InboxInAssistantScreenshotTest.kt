@@ -4,9 +4,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.onChild
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performScrollToKey
+import androidx.compose.ui.test.performClick
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.design.MonthWindow
 import app.duenorth.budget.design.components.MetroAppBar
@@ -33,18 +34,18 @@ class InboxInAssistantScreenshotTest {
     @Test
     fun assistantDark() = snap("inbox_in_assistant_dark", HomeSections.ASSISTANT, dark = true)
 
-    // Scrolled past the inbox: the assistant's cards carry on under it, and the last date has gone off the top.
+    // The inbox card folded shut, like the assistant's other cards: its count in the circle.
     @Test
-    fun scrolledLight() = snap("inbox_in_assistant_scrolled_light", HomeSections.ASSISTANT, dark = false, scrolled = true)
+    fun collapsedLight() = snap("inbox_in_assistant_collapsed_light", HomeSections.ASSISTANT, dark = false, collapse = true)
 
     @Test
-    fun scrolledDark() = snap("inbox_in_assistant_scrolled_dark", HomeSections.ASSISTANT, dark = true, scrolled = true)
+    fun collapsedDark() = snap("inbox_in_assistant_collapsed_dark", HomeSections.ASSISTANT, dark = true, collapse = true)
 
     private fun snap(
         name: String,
         section: String,
         dark: Boolean,
-        scrolled: Boolean = false,
+        collapse: Boolean = false,
     ) {
         val shell = shellSample()
         val index = HomeSections.headers.indexOf(section)
@@ -70,10 +71,10 @@ class InboxInAssistantScreenshotTest {
             }
         }
         compose.waitForIdle()
-        if (scrolled) {
-            compose.onNodeWithTag("inbox-list").performScrollToKey("count")
+        compose.onNodeWithTag("assistant-kind-count-INBOX", useUnmergedTree = true).onChild().assertTextEquals("6")
+        if (collapse) {
+            compose.onNodeWithTag("assistant-kind-INBOX").performClick()
             compose.waitForIdle()
-            compose.onNodeWithTag("assistant-count").assertIsDisplayed()
         }
         captureScreenRoboImage("src/test/snapshots/$name.png")
     }

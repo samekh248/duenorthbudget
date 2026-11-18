@@ -31,10 +31,13 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -122,7 +125,15 @@ object InboxCopy {
     const val SYNC = "sync"
     const val READY = "ready to accept"
     const val NEEDS_CATEGORY = "needs a category"
+    const val CARD_TITLE = "inbox"
+    const val CARD_BLURB = "new transactions to give a category"
 }
+
+/** The inbox as the assistant shows it: a card like its others, [count] waiting, and [body] opening under it. */
+class InboxCard(
+    val count: Int,
+    val body: @Composable () -> Unit,
+)
 
 /** What a row's tap and long-press menu can do, beyond accept and categorize. */
 class InboxActions(
@@ -144,8 +155,8 @@ class InboxActions(
  * and the next one rises into its place. Every row's long press opens a menu of all its actions,
  * and the bar's select ([selection] not null) gives every row a check box instead.
  *
- * It sits at the top of the assistant: [below] carries on in the same list under the queue, and [empty]
- * takes the page while nothing waits to be filed.
+ * It lives in the assistant: outside select mode [page] draws the page, given the inbox as a card to put first
+ * (null while nothing waits to be filed). Select mode takes the whole page for the checked list.
  */
 @Composable
 fun InboxSection(
@@ -163,10 +174,8 @@ fun InboxSection(
     lead: String? = null,
     /** How the menu's sync went; one line under the totals. */
     notice: String? = null,
-    /** What follows the waiting rows in the same list, outside select mode. */
-    below: LazyListScope.() -> Unit = {},
-    /** The page while nothing waits to be filed. */
-    empty: @Composable (Modifier) -> Unit = { InboxEmpty(it) },
+    /** The page outside select mode, given the inbox's card; null while nothing waits to be filed. */
+    page: @Composable (Modifier, InboxCard?) -> Unit = { m, card -> InboxAlone(m, card) },
 ) {
     val pair = shell.matches.firstOrNull()?.takeIf { selection == null }
     val inbox = inboxQueue(shell, lead)
@@ -174,103 +183,19 @@ fun InboxSection(
     // Noted even while the inbox is empty, so its first transaction arrives into the panel.
     val arrivals = rememberArrivals(inbox.map { it.id })
     var menu by remember { mutableStateOf<Pair<InboxRow, Rect>?>(null) }
-    if (entries.isEmpty() && pair == null) {
-        Column(modifier.fillMaxSize()) {
-            if (notice != null) MonthNotice(notice, Modifier.padding(horizontal = MetroDimens.Gutter))
-            empty(Modifier.weight(1f))
-        }
-        return
-    }
-    val list = rememberLazyListState()
     val selectList = rememberLazyListState()
-    LaunchedEffect(list, selectList) {
-        snapshotFlow { list.isScrollInProgress || selectList.isScrollInProgress }.collect { onListGesture(it) }
-    }
+    LaunchedEffect(selectList) { snapshotFlow { selectList.isScrollInProgress }.collect { onListGesture(it) } }
     val waiting = inbox.filter { row -> filed.none { it.row.id == row.id } }
     val money = { minor: Long -> MoneyFormat.format(minor, shell.currency, formatOptions) }
     val animations = Metro.animations
-    Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
-        Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
-            BudgetTotal(
-                InboxCopy.TO_CATEGORIZE,
-                "${waiting.size}",
-                Metro.accent.text,
-                "inbox-count",
-                modifier = Modifier.weight(1f),
-            )
-            // Keyed on whether select mode is on, so a new count updates in place and only the mode change fades.
-            AnimatedContent(
-                selection,
-                Modifier.weight(1f),
-                transitionSpec = { modeFade(animations) },
-                contentAlignment = Alignment.TopEnd,
-                label = "inbox-total",
-                contentKey = { it != null },
-            ) { picked ->
-                if (picked != null) {
-                    BudgetTotal(
-                        InboxCopy.SELECTED,
-                        "${picked.size}",
-                        Metro.colors.foreground,
-                        "inbox-selected",
-                        alignEnd = true,
-                    )
-                } else if (shell.matches.isNotEmpty()) {
-                    BudgetTotal(
-                        MatchCopy.TO_MATCH,
-                        "${shell.matches.size}",
-                        Metro.colors.foreground,
-                        "inbox-to-match",
-                        alignEnd = true,
-                    )
-                } else {
-                    BudgetTotal(
-                        InboxCopy.SPENDING,
-                        money(waiting.filter { it.amountMinor < 0 }.sumOf { it.amountMinor }),
-                        Metro.colors.foreground,
-                        "inbox-spending",
-                        alignEnd = true,
-                    )
-                }
-            }
-        }
-        if (notice != null) MonthNotice(notice, Modifier.padding(bottom = 4.dp))
-        // Select mode fades through: the panel and queue fade out, then the checked list fades in.
-        AnimatedContent(
-            selection,
-            Modifier.weight(1f),
-            transitionSpec = { modeFade(animations) },
-            label = "inbox-mode",
-            contentKey = { it != null },
-        ) { picked ->
-            if (picked != null) {
-                // Its own record, begun as select mode opens, so only rows that turn up during it arrive.
-                val listed = rememberArrivals(entries.map { it.row.id })
-                selectList.keepTopFor(listed)
-                LazyColumn(Modifier.fillMaxSize(), state = selectList) {
-                    // Two groups: rows with a category to accept, then rows that still need one.
-                    // Rows just filed stay in the list until their confirmation has played.
-                    inboxSelectGroups(entries).forEach { (title, group) ->
-                        item(key = "group-$title") { InboxGroupHeading(title, group.size) }
-                        inboxDayItems(group, arrivals = listed) { i, entry ->
-                            InboxLine(
-                                entry = entry,
-                                amount = money(entry.row.amountMinor),
-                                banded = ledgerBanded(i),
-                                onFiledShown = onFiledShown,
-                                onTap = { onToggle(entry.row.id) },
-                                onMenu = null,
-                                checked = entry.row.id in picked,
-                                modifier = Modifier.arriving(listed, entry.row.id),
-                            )
-                        }
-                    }
-                }
-            } else {
+    val card =
+        if (entries.isEmpty() && pair == null) {
+            null
+        } else {
+            InboxCard(waiting.size + shell.matches.size) {
                 InboxQueue(
                     pair = pair,
                     entries = entries,
-                    list = list,
                     money = money,
                     onAccept = onAccept,
                     onInbox = onInbox,
@@ -278,8 +203,64 @@ fun InboxSection(
                     actions = actions,
                     onMenu = { row, bounds -> menu = row to bounds },
                     arrivals = arrivals,
-                    below = below,
                 )
+            }
+        }
+    // Select mode fades through: the page fades out, then the checked list fades in.
+    AnimatedContent(
+        selection.takeIf { entries.isNotEmpty() },
+        modifier.fillMaxSize(),
+        transitionSpec = { modeFade(animations) },
+        label = "inbox-mode",
+        contentKey = { it != null },
+    ) { picked ->
+        if (picked == null) {
+            Column(Modifier.fillMaxSize()) {
+                if (notice != null) MonthNotice(notice, Modifier.padding(horizontal = MetroDimens.Gutter))
+                page(Modifier.weight(1f), card)
+            }
+            return@AnimatedContent
+        }
+        Column(Modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
+            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+                BudgetTotal(
+                    InboxCopy.TO_CATEGORIZE,
+                    "${waiting.size}",
+                    Metro.accent.text,
+                    "inbox-count",
+                    modifier = Modifier.weight(1f),
+                )
+                BudgetTotal(
+                    InboxCopy.SELECTED,
+                    "${picked.size}",
+                    Metro.colors.foreground,
+                    "inbox-selected",
+                    modifier = Modifier.weight(1f),
+                    alignEnd = true,
+                )
+            }
+            if (notice != null) MonthNotice(notice, Modifier.padding(bottom = 4.dp))
+            // Its own record, begun as select mode opens, so only rows that turn up during it arrive.
+            val listed = rememberArrivals(entries.map { it.row.id })
+            selectList.keepTopFor(listed)
+            LazyColumn(Modifier.fillMaxSize(), state = selectList) {
+                // Two groups: rows with a category to accept, then rows that still need one.
+                // Rows just filed stay in the list until their confirmation has played.
+                inboxSelectGroups(entries).forEach { (title, group) ->
+                    item(key = "group-$title") { InboxGroupHeading(title, group.size) }
+                    inboxDayItems(group, arrivals = listed) { i, entry ->
+                        InboxLine(
+                            entry = entry,
+                            amount = money(entry.row.amountMinor),
+                            banded = ledgerBanded(i),
+                            onFiledShown = onFiledShown,
+                            onTap = { onToggle(entry.row.id) },
+                            onMenu = null,
+                            checked = entry.row.id in picked,
+                            modifier = Modifier.arriving(listed, entry.row.id),
+                        )
+                    }
+                }
             }
         }
     }
@@ -293,7 +274,6 @@ fun InboxSection(
 private fun InboxQueue(
     pair: MatchPair?,
     entries: List<InboxEntry>,
-    list: LazyListState,
     money: (Long) -> String,
     onAccept: (String) -> Unit,
     onInbox: (String) -> Unit,
@@ -301,25 +281,19 @@ private fun InboxQueue(
     actions: InboxActions,
     onMenu: (InboxRow, Rect) -> Unit,
     arrivals: Arrivals? = null,
-    below: LazyListScope.() -> Unit = {},
 ) {
     // A possible match leads the inbox: it takes the panel and every waiting row stays in the queue.
     if (pair != null) {
         // The queue's own record, so a row that moves down out of the panel arrives in the queue as well.
         val listed = rememberArrivals(entries.map { it.row.id }, key = "match")
-        list.keepTopFor(listed)
-        // The panel scrolls with the queue, so what the assistant found below can be reached.
-        LazyColumn(Modifier.fillMaxSize().testTag("inbox-list"), state = list) {
-            item(key = "match-panel") {
-                MatchPanel(
-                    pair = pair,
-                    money = money,
-                    onMatch = { actions.onMatch(pair) },
-                    onNotAMatch = { actions.onNotAMatch(pair) },
-                    modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
-                )
-            }
-            inboxDayItems(entries, arrivals = listed) { i, entry ->
+        Column(Modifier.fillMaxWidth().testTag("inbox-queue")) {
+            MatchPanel(
+                pair = pair,
+                money = money,
+                onMatch = { actions.onMatch(pair) },
+                onNotAMatch = { actions.onNotAMatch(pair) },
+            )
+            InboxDays(entries, arrivals = listed) { i, entry ->
                 InboxLine(
                     entry = entry,
                     amount = money(entry.row.amountMinor),
@@ -332,8 +306,6 @@ private fun InboxQueue(
                     modifier = Modifier.arriving(listed, entry.row.id),
                 )
             }
-            inboxEnd()
-            below()
         }
         return
     }
@@ -381,25 +353,20 @@ private fun InboxQueue(
     val swappedIn by remember(rise) { derivedStateOf { FeaturedMotion.inn(rise.value) > 0f } }
     val featured = if (head.filedTo == null || !swappedIn) head.row else next?.row
     val listed = rememberArrivals(entries.drop(1).map { it.row.id }, key = "queue")
-    list.keepTopFor(listed)
-    // The panel scrolls with the queue, so what the assistant found below can be reached.
-    LazyColumn(Modifier.fillMaxSize().testTag("inbox-list"), state = list) {
-        item(key = "featured-panel") {
-            FeaturedPanel(
-                row = featured,
-                amount = featured?.let { money(it.amountMinor) }.orEmpty(),
-                filed = head.takeIf { it.filedTo != null },
-                leave = leaves,
-                arrive = arrived,
-                onAccept = onAccept,
-                onCategorize = onInbox,
-                onDetails = actions.onDetails,
-                onMenu = onMenu,
-                onTransfer = actions.onTransfer,
-                modifier = Modifier.padding(top = FEATURED_AIR_ABOVE, bottom = FEATURED_AIR_BELOW),
-            )
-        }
-        inboxDayItems(entries.drop(1), leaving = next?.let { it to risen }, arrivals = listed) { i, entry ->
+    Column(Modifier.fillMaxWidth().testTag("inbox-queue")) {
+        FeaturedPanel(
+            row = featured,
+            amount = featured?.let { money(it.amountMinor) }.orEmpty(),
+            filed = head.takeIf { it.filedTo != null },
+            leave = leaves,
+            arrive = arrived,
+            onAccept = onAccept,
+            onCategorize = onInbox,
+            onDetails = actions.onDetails,
+            onMenu = onMenu,
+            onTransfer = actions.onTransfer,
+        )
+        InboxDays(entries.drop(1), leaving = next?.let { it to risen }, arrivals = listed) { i, entry ->
             InboxLine(
                 entry = entry,
                 amount = money(entry.row.amountMinor),
@@ -414,17 +381,50 @@ private fun InboxQueue(
                 modifier = Modifier.arriving(listed, entry.row.id),
             )
         }
-        inboxEnd()
-        below()
     }
 }
 
-/**
- * Ends the inbox's dates: a heading with no height, so the last date is pushed off the top as the assistant's
- * cards scroll up under it rather than sticking over them.
- */
-private fun LazyListScope.inboxEnd() {
-    stickyHeader(key = "inbox-end") { Box(Modifier.fillMaxWidth().height(0.dp)) }
+/** The inbox outside the assistant: its card's queue on its own, or the all-caught-up page while it is empty. */
+@Composable
+private fun InboxAlone(
+    modifier: Modifier,
+    card: InboxCard?,
+) {
+    if (card == null) {
+        InboxEmpty(modifier)
+    } else {
+        Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = MetroDimens.Gutter)) {
+            card.body()
+        }
+    }
+}
+
+/** [entries] under their date headings, in a plain column: the inbox inside its card, where nothing sticks. */
+@Composable
+private fun InboxDays(
+    entries: List<InboxEntry>,
+    leaving: Pair<InboxEntry, () -> Float>? = null,
+    arrivals: Arrivals? = null,
+    line: @Composable (Int, InboxEntry) -> Unit,
+) {
+    var start = 0
+    inboxDays(entries).forEach { day ->
+        val waiting = day.filter { it.filedTo == null }
+        val first = day.first()
+        val offset = start
+        key("day-${first.row.date}-${first.row.id}") {
+            val dayIds = day.map { it.row.id }
+            InboxDayHeading(
+                first.row.date,
+                filed = waiting.isEmpty(),
+                leaving = leaving?.takeIf { (entry, _) -> waiting == listOf(entry) }?.second ?: NOT_LEAVING,
+                modifier = Modifier.arriving(arrivals, "day-${first.row.date}") { it.allNew(dayIds) },
+                ground = false,
+            )
+        }
+        day.forEachIndexed { i, entry -> key(entry.row.id) { line(offset + i, entry) } }
+        start += day.size
+    }
 }
 
 /** The select-mode change: the old view fades out, then the new one fades in, so the two never overlap. */
@@ -822,6 +822,8 @@ private fun InboxDayHeading(
     filed: Boolean,
     leaving: () -> Float,
     modifier: Modifier = Modifier,
+    /** Paints the page behind it, so rows scroll under it while it sticks; a heading that never sticks needs none. */
+    ground: Boolean = true,
 ) {
     val height = remember { Animatable(1f) }
     val animations = Metro.animations
@@ -840,7 +842,7 @@ private fun InboxDayHeading(
             .collapse { height.value * (1f - leaving()) }
             .graphicsLayer { alpha = 1f - leaving() }
             .fillMaxWidth()
-            .stickyGround(Metro.colors.background)
+            .then(if (ground) Modifier.stickyGround(Metro.colors.background) else Modifier)
             .padding(top = DAY_AIR_ABOVE, bottom = 4.dp)
             .testTag("inbox-day-$date"),
         color = Metro.accent.text,
@@ -1034,8 +1036,6 @@ private val NOT_LEAVING = { 0f }
 private val collapseSpec = tween<Float>(MetroMotion.SHORT_MS, easing = MetroMotion.Standard)
 
 private val INBOX_ROW_AIR = 15.dp
-private val FEATURED_AIR_ABOVE = 24.dp
-private val FEATURED_AIR_BELOW = 28.dp
 internal val FEATURED_PAD = 20.dp
 private val FEATURED_EMPTY = 96.dp
 private val CHECK_SIZE = 26.dp
