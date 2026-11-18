@@ -11,11 +11,14 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import app.duenorth.budget.core.AssistantReport
 import app.duenorth.budget.core.BudgetLibrary
+import app.duenorth.budget.core.Finding
 import app.duenorth.budget.core.MonthShell
 
 /**
- * The inbox count on the app icon. Android has no call that sets an icon's number: launchers
+ * The assistant's count on the app icon: the same number as the "to look at" total at the top of the
+ * assistant, so the inbox's rows and matches plus every other finding. Android has no call that sets an icon's number: launchers
  * badge an app from its notifications, and the ones that show a number read it from the
  * notification's own count. So while the inbox holds anything, one quiet notification says how
  * many, and it goes away when the inbox is empty. Launchers that only draw a dot (Pixel) show the
@@ -26,13 +29,27 @@ object InboxBadge {
     private const val ID = 1
     private const val ASKED = "inbox-badge-asked"
 
-    /** What the inbox header counts: rows to categorize and possible matches. Pending rows are never in the inbox. */
-    fun count(shell: MonthShell): Int = inboxQueue(shell, null).size + shell.matches.size
+    /** What the inbox card counts: rows to categorize and possible matches. Pending rows are never in the inbox. */
+    fun inboxCount(shell: MonthShell): Int = inboxQueue(shell, null).size + shell.matches.size
+
+    /** What the assistant's total counts: the inbox card's count plus the findings it shows. */
+    fun count(
+        shell: MonthShell,
+        findings: List<Finding>,
+    ): Int = inboxCount(shell) + findings.size
+
+    /** The assistant's total on screen; null until its checks have been read, so the icon never shows the inbox alone. */
+    fun count(
+        shell: MonthShell,
+        assistant: AssistantUi,
+    ): Int? = assistant.report?.let { count(shell, assistant.shown) }
 
     /** The open budget's count, read from disk, for the background sync; null when no budget can be read. */
     fun count(library: BudgetLibrary): Int? {
         val id = library.settings().openBudgetId ?: return 0
-        return library.readShell(id)?.let(::count)
+        val shell = library.readShell(id) ?: return null
+        val report = runCatching { library.readAssistant(id) }.getOrNull() ?: AssistantReport.EMPTY
+        return count(shell, report.findings)
     }
 
     fun canPost(context: Context): Boolean =
@@ -63,8 +80,8 @@ object InboxBadge {
         }
         if (!canPost(context)) return
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Inbox count", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "The number of transactions waiting in the inbox, shown on the app icon."
+            NotificationChannel(CHANNEL, "Assistant count", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "The number of things the assistant has for you to look at, shown on the app icon."
                 setShowBadge(true)
             },
         )
@@ -79,8 +96,8 @@ object InboxBadge {
             NotificationCompat
                 .Builder(context, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("Inbox")
-                .setContentText("$count waiting in the inbox")
+                .setContentTitle("Assistant")
+                .setContentText("$count to look at")
                 .setNumber(count)
                 .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)

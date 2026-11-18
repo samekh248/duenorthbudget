@@ -150,7 +150,7 @@ private fun AssistantBody(
         return
     }
     val money = { minor: Long -> MoneyFormat.format(minor, currency, formatOptions) }
-    val findings = report?.findings.orEmpty().filter { it.key !in settling || it.key == working?.key }
+    val findings = shownFindings(report, settling, working)
     if (findings.isEmpty() && inbox == null) {
         Column(modifier.fillMaxSize()) {
             if (closeOut != null) {

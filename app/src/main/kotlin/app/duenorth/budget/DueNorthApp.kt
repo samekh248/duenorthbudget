@@ -196,9 +196,9 @@ fun DueNorthApp(model: ShellViewModel) {
         context.startActivity(Intent.createChooser(share, export.fileName))
         model.settingsUi.clearPendingExport()
     }
-    // The app icon's badge follows the inbox's count; it is cleared when no budget is open.
+    // The app icon's badge follows the assistant's total; it is cleared when no budget is open.
     val badge =
-        state.shell?.let { InboxBadge.count(it) } ?: if (state.settings.openBudgetId == null) 0 else null
+        state.shell?.let { InboxBadge.count(it, state.assistant) } ?: if (state.settings.openBudgetId == null) 0 else null
     val notificationAsk =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) InboxBadge.show(context, badge ?: 0)
