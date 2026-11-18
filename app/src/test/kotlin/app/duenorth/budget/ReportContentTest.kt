@@ -37,7 +37,7 @@ class ReportContentTest {
 
     @Test
     fun reportsIsAHomePivotItemNotAMenuLink() {
-        assertEquals(listOf("inbox", "budget", "accounts", "reports", "assistant"), HomeSections.headers)
+        assertEquals(listOf("assistant", "budget", "accounts", "reports"), HomeSections.headers)
         for (mode in listOf(BudgetMode.ENVELOPE, BudgetMode.TRACKING)) {
             val ids = ScreenBar.specsFor(ShellRoute.Home, true, mode).map { it.id }
             assertTrue("reports" !in ids)

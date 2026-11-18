@@ -48,7 +48,7 @@ class SectionTitleTest {
     @Test
     fun sharedPagesFollowTheHomeSectionShowing() {
         assertEquals("ACCOUNTS", title(ShellRoute.EditTransaction("a1", "t1"), homeSection = section(HomeSections.ACCOUNTS)))
-        assertEquals("INBOX", title(ShellRoute.EditTransaction("a1", "t1"), homeSection = section(HomeSections.INBOX)))
+        assertEquals("ASSISTANT", title(ShellRoute.EditTransaction("a1", "t1"), homeSection = section(HomeSections.ASSISTANT)))
     }
 
     @Test

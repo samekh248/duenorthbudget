@@ -113,7 +113,6 @@ object ScreenBar {
     /** Home pivot item indexes the bar changes for. */
     val HOME_BUDGET = HomeSections.headers.indexOf(HomeSections.BUDGET)
     val HOME_ACCOUNTS = HomeSections.headers.indexOf(HomeSections.ACCOUNTS)
-    val HOME_INBOX = HomeSections.headers.indexOf(HomeSections.INBOX)
     val HOME_ASSISTANT = HomeSections.headers.indexOf(HomeSections.ASSISTANT)
     val HOME_REPORTS = HomeSections.headers.indexOf(HomeSections.REPORTS)
 
@@ -200,9 +199,9 @@ object ScreenBar {
                             spec("end-budget-edit", AppGlyph.Save, ScreenBarCopy.SAVE, ScreenBarCopy.BUDGET),
                             spec("cancel-budget-edit", AppGlyph.Cancel, BudgetEditCopy.CANCEL),
                         ) + fills() + templates(templates)
-                    // Select mode swaps the inbox's bar for what can be done to the checked rows: accept only while
-                    // every checked row has a category, cancel last, and delete always last in the menu.
-                    homeSection == HOME_INBOX && inboxSelecting ->
+                    // Select mode swaps the assistant's bar for what can be done to the inbox's checked rows: accept
+                    // only while every checked row has a category, cancel last, and delete always last in the menu.
+                    homeSection == HOME_ASSISTANT && inboxSelecting ->
                         buildList {
                             if (inboxPick == InboxPick.READY) add(spec("accept-selected", AppGlyph.Save, InboxCopy.ACCEPT))
                             if (inboxPick != InboxPick.NONE) add(spec("categorize-selected", AppGlyph.Categories, InboxCopy.CATEGORIZE))
@@ -210,12 +209,6 @@ object ScreenBar {
                             add(spec("end-inbox-selecting", AppGlyph.Cancel, InboxCopy.CANCEL))
                             if (inboxPick != InboxPick.NONE) add(destructive("delete-selected", AppGlyph.Delete, InboxCopy.DELETE))
                         }
-                    // Rules and payees live in settings › budget › manage, with the budget's other lists.
-                    homeSection == HOME_INBOX ->
-                        buildList {
-                            add(addTransaction())
-                            if (!inboxEmpty) add(spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT, InboxCopy.BATCH))
-                        } + tail
                     // Reorder happens in place on the accounts list; done is the only way on.
                     homeSection == HOME_ACCOUNTS && accountsReorder ->
                         listOf(spec("reorder", AppGlyph.Save, AccountScreenCopy.DONE))
@@ -233,9 +226,14 @@ object ScreenBar {
                         ) + tail
                     // Reports has no tools of its own on the bar; it keeps add and the tail.
                     homeSection == HOME_REPORTS -> listOf(addTransaction()) + tail
-                    // The assistant fixes things from its own panels; its bar refreshes the checks.
+                    // The assistant fixes things from its own panels; its bar selects the inbox at its top and
+                    // refreshes the checks. Rules and payees live in settings › budget › manage.
                     homeSection == HOME_ASSISTANT ->
-                        listOf(addTransaction(), spec("refresh-assistant", AppGlyph.Sync, AssistantCopy.REFRESH)) + tail
+                        buildList {
+                            add(addTransaction())
+                            if (!inboxEmpty) add(spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT, InboxCopy.BATCH))
+                            add(spec("refresh-assistant", AppGlyph.Sync, AssistantCopy.REFRESH))
+                        } + tail
                     // Add a transaction and edit budget are the budget's buttons; hold heads the menu.
                     else ->
                         listOf(addTransaction()) + editBudget() + (if (mode == BudgetMode.TRACKING) emptyList() else hold()) +

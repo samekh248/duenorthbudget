@@ -156,6 +156,8 @@ fun HomePivot(
 ) {
     var pagerGesture by remember { mutableStateOf(false) }
     var listGesture by remember { mutableStateOf(false) }
+    // The assistant's inbox card starts open, since filing is what the page is mostly for; a tap folds it.
+    var inboxOpen by rememberSaveable { mutableStateOf(true) }
     LaunchedEffect(pagerGesture, listGesture) { onGesture(pagerGesture || listGesture) }
     // Leaving Home mid-scroll (say, to move money from edit mode) must not leave the shell's repaints held back.
     DisposableEffect(Unit) { onDispose { onGesture(false) } }
@@ -163,17 +165,21 @@ fun HomePivot(
         title = SectionTitleCopy.APP,
         items =
             listOf(
-                // Like the assistant's, the inbox header counts what waits: rows to categorize and possible matches.
+                // The assistant leads, with the inbox as its first card: its header counts the rows to categorize, the
+                // possible matches and what the checks found.
                 PivotItem(
-                    HomeSections.INBOX,
+                    HomeSections.ASSISTANT,
                     count =
-                        shell?.let { s ->
-                            inboxQueue(s, inboxLead).count { row -> inboxFiled.none { it.row.id == row.id } } + s.matches.size
-                        } ?: 0,
+                        (
+                            shell?.let { s ->
+                                inboxQueue(s, inboxLead).count { row -> inboxFiled.none { it.row.id == row.id } } + s.matches.size
+                            } ?: 0
+                        ) + (assistant.report?.findings?.count { it.key !in assistant.settling } ?: 0),
                 ) {
                     if (shell == null) {
                         if (loading) Placeholder()
                     } else {
+                        val pinned = remember(pinnedCategories, shell.groups) { PinnedCategories.resolve(pinnedCategories, shell.groups) }
                         InboxSection(
                             shell,
                             onListGesture = { listGesture = it },
@@ -187,6 +193,29 @@ fun HomePivot(
                             onToggle = onInboxToggle,
                             lead = inboxLead,
                             notice = inboxNotice,
+                            // The page is the assistant's, with the inbox as its first card while anything waits.
+                            page = { modifier, card ->
+                                AssistantSection(
+                                    report = assistant.report,
+                                    currency = shell.currency,
+                                    onListGesture = { listGesture = it },
+                                    onAct = onAssistant,
+                                    modifier = modifier,
+                                    expanded = assistant.expanded,
+                                    onToggleExpanded = onAssistantMore,
+                                    settling = assistant.settling,
+                                    working = assistant.working,
+                                    failed = assistant.failed,
+                                    formatOptions = formatOptions,
+                                    closeOut = closeOut,
+                                    onCloseOut = onCloseOut,
+                                    pinned = pinned,
+                                    onPinned = { onBudgetCategory?.invoke(it) },
+                                    inbox = card,
+                                    inboxOpen = inboxOpen,
+                                    onToggleInbox = { inboxOpen = !inboxOpen },
+                                )
+                            },
                         )
                     }
                 },
@@ -261,31 +290,6 @@ fun HomePivot(
                         onMonthReview = onMonthReview,
                         onReport = onReport,
                     )
-                },
-                PivotItem(
-                    HomeSections.ASSISTANT,
-                    count = assistant.report?.findings?.count { it.key !in assistant.settling } ?: 0,
-                ) {
-                    if (shell == null) {
-                        if (loading) Placeholder()
-                    } else {
-                        AssistantSection(
-                            report = assistant.report,
-                            currency = shell.currency,
-                            onListGesture = { listGesture = it },
-                            onAct = onAssistant,
-                            expanded = assistant.expanded,
-                            onToggleExpanded = onAssistantMore,
-                            settling = assistant.settling,
-                            working = assistant.working,
-                            failed = assistant.failed,
-                            formatOptions = formatOptions,
-                            closeOut = closeOut,
-                            onCloseOut = onCloseOut,
-                            pinned = remember(pinnedCategories, shell.groups) { PinnedCategories.resolve(pinnedCategories, shell.groups) },
-                            onPinned = { onBudgetCategory?.invoke(it) },
-                        )
-                    }
                 },
             ),
         modifier = modifier,

@@ -44,8 +44,6 @@ class MatchContentTest {
     fun aPairTakesTheInboxPanelAndLeavesTheQueue() {
         showInbox()
         compose.onNodeWithTag("match-panel-bank|mine").assertIsDisplayed()
-        compose.onNodeWithTag("inbox-to-match").assertTextEquals("1")
-        compose.onNodeWithTag("inbox-count").assertTextEquals("1")
         compose.onNodeWithTag("inbox-row-bank").assertDoesNotExist()
         compose.onNodeWithTag("inbox-row-shell").assertIsDisplayed()
     }
@@ -145,7 +143,7 @@ class MatchScreenshotTest {
                     loading = false,
                     openMonth = YearMonth.of(2026, 10),
                     monthWindow = MonthWindow.around(YearMonth.of(2026, 10)),
-                    initialSection = HomeSections.headers.indexOf(HomeSections.INBOX),
+                    initialSection = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
                     onGesture = {},
                     modifier = Modifier.weight(1f),
                 )

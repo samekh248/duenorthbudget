@@ -92,16 +92,18 @@ class PullSyncSectionsScreenshotTest {
     val compose = createHostComposeRule()
 
     @Test
-    fun inboxEmptyLight() = snap("pull_sync_inbox_empty_light", HomeSections.INBOX, ScreenBar.HOME_INBOX, dark = false, inbox = emptyList())
+    fun inboxEmptyLight() =
+        snap("pull_sync_inbox_empty_light", HomeSections.ASSISTANT, ScreenBar.HOME_ASSISTANT, dark = false, inbox = emptyList())
 
     @Test
-    fun inboxEmptyDark() = snap("pull_sync_inbox_empty_dark", HomeSections.INBOX, ScreenBar.HOME_INBOX, dark = true, inbox = emptyList())
+    fun inboxEmptyDark() =
+        snap("pull_sync_inbox_empty_dark", HomeSections.ASSISTANT, ScreenBar.HOME_ASSISTANT, dark = true, inbox = emptyList())
 
     @Test
-    fun inboxLight() = snap("pull_sync_inbox_light", HomeSections.INBOX, ScreenBar.HOME_INBOX, dark = false)
+    fun inboxLight() = snap("pull_sync_inbox_light", HomeSections.ASSISTANT, ScreenBar.HOME_ASSISTANT, dark = false)
 
     @Test
-    fun inboxDark() = snap("pull_sync_inbox_dark", HomeSections.INBOX, ScreenBar.HOME_INBOX, dark = true)
+    fun inboxDark() = snap("pull_sync_inbox_dark", HomeSections.ASSISTANT, ScreenBar.HOME_ASSISTANT, dark = true)
 
     @Test
     fun accountsLight() = snap("pull_sync_accounts_light", HomeSections.ACCOUNTS, ScreenBar.HOME_ACCOUNTS, dark = false)

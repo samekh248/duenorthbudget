@@ -47,7 +47,7 @@ class RuleContentTest {
         val home = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE).map { it.id }
         assertTrue("add-schedule" !in home && "rules" !in home)
         // Rules and payees open from settings › budget › manage, not from a home menu.
-        val inbox = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX).map { it.id }
+        val inbox = ScreenBar.specsFor(ShellRoute.Home, true, BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_ASSISTANT).map { it.id }
         assertTrue("rules" !in inbox && "payees" !in inbox)
         assertTrue("add-schedule" in ScreenBar.specsFor(ShellRoute.Schedules, true, BudgetMode.ENVELOPE).map { it.id })
         assertEquals(listOf("add-rule", "settings"), ScreenBar.specsFor(ShellRoute.Rules, true, BudgetMode.ENVELOPE).map { it.id })

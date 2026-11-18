@@ -66,7 +66,7 @@ class AccessibilityAuditTest {
     fun accounts() = audit { Home(HomeSections.headers.indexOf(HomeSections.ACCOUNTS)) }
 
     @Test
-    fun inbox() = audit { Home(HomeSections.headers.indexOf(HomeSections.INBOX)) }
+    fun inbox() = audit { Home(HomeSections.headers.indexOf(HomeSections.ASSISTANT)) }
 
     @Test
     fun register() =
@@ -94,7 +94,7 @@ class AccessibilityAuditTest {
     fun accountsInEveryStyle() = audit(MetroStyle.entries) { Home(HomeSections.headers.indexOf(HomeSections.ACCOUNTS)) }
 
     @Test
-    fun inboxInEveryStyle() = audit(MetroStyle.entries) { Home(HomeSections.headers.indexOf(HomeSections.INBOX)) }
+    fun inboxInEveryStyle() = audit(MetroStyle.entries) { Home(HomeSections.headers.indexOf(HomeSections.ASSISTANT)) }
 
     @Test
     fun budgetInEveryStyle() = audit(MetroStyle.entries) { Home(HomeSections.headers.indexOf(HomeSections.BUDGET)) }

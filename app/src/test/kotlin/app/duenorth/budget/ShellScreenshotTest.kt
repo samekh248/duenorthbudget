@@ -177,7 +177,7 @@ class ShellScreenshotTest {
                     "style_${style.id}_inbox_$theme",
                     dark,
                     sample(),
-                    section = HomeSections.headers.indexOf(HomeSections.INBOX),
+                    section = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
                     style = style,
                 )
             }
@@ -193,7 +193,7 @@ class ShellScreenshotTest {
                     "${name}_${if (dark) "dark" else "light"}",
                     dark,
                     sample().copy(inbox = emptyList()),
-                    section = HomeSections.headers.indexOf(HomeSections.INBOX),
+                    section = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
                     style = style,
                 )
             }
@@ -322,10 +322,10 @@ class ShellScreenshotTest {
         )
 
     @Test
-    fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX))
+    fun inboxDark() = snap("inbox_dark", dark = true, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.ASSISTANT))
 
     @Test
-    fun inboxLight() = snap("inbox_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX))
+    fun inboxLight() = snap("inbox_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.ASSISTANT))
 
     // Select mode: a check box on every row, grouped into ready to accept and needs a category, and
     // the bar acts on the checked ones. Only cancel until a row is checked.
@@ -375,7 +375,7 @@ class ShellScreenshotTest {
                 val bank = coffee.copy(id = "coffee-bank", payee = "CORNER COFFEE #42", date = 20261016)
                 it.copy(inbox = listOf(bank, coffee) + it.inbox.filter { row -> row.id in setOf("shell", "atm") })
             },
-        section = HomeSections.headers.indexOf(HomeSections.INBOX),
+        section = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
         selection = setOf("coffee", "coffee-bank"),
     )
 
@@ -389,7 +389,7 @@ class ShellScreenshotTest {
         dark = dark,
         // Four rows, so both groups fit on the screen.
         shell = sample().let { it.copy(inbox = it.inbox.filter { row -> row.id in setOf("coffee", "shell", "rent", "atm") }) },
-        section = HomeSections.headers.indexOf(HomeSections.INBOX),
+        section = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
         selection = selection,
         style = style,
     )
@@ -397,11 +397,23 @@ class ShellScreenshotTest {
     // Corner Coffee just filed: the confirmation fills the featured panel before the next one rises in.
     @Test
     fun inboxFiledLight() =
-        snap("inbox_filed_light", dark = false, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX), filed = true)
+        snap(
+            "inbox_filed_light",
+            dark = false,
+            shell = sample(),
+            section = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
+            filed = true,
+        )
 
     @Test
     fun inboxFiledDark() =
-        snap("inbox_filed_dark", dark = true, shell = sample(), section = HomeSections.headers.indexOf(HomeSections.INBOX), filed = true)
+        snap(
+            "inbox_filed_dark",
+            dark = true,
+            shell = sample(),
+            section = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
+            filed = true,
+        )
 
     // Reports on the home pivot: the reporting hub, with today's net worth on its line.
     @Test
@@ -438,7 +450,7 @@ class ShellScreenshotTest {
         accountsReorder: Boolean = false,
         bankSync: BankSyncUi? = null,
     ) {
-        val inbox = section == HomeSections.headers.indexOf(HomeSections.INBOX)
+        val inbox = section == HomeSections.headers.indexOf(HomeSections.ASSISTANT)
         val accounts = section == ScreenBar.HOME_ACCOUNTS
         val shown = if (filed) shell.copy(inbox = shell.inbox.drop(1)) else shell
         val justFiled = if (filed) listOf(InboxFiled(shell.inbox.first(), 0, "Dining")) else emptyList()
@@ -492,7 +504,7 @@ class ShellScreenshotTest {
                                                 ShellRoute.Home,
                                                 hasBudget = true,
                                                 mode = BudgetMode.ENVELOPE,
-                                                homeSection = ScreenBar.HOME_INBOX,
+                                                homeSection = ScreenBar.HOME_ASSISTANT,
                                                 inboxSelecting = true,
                                                 inboxPick = InboxPick.of(selection, shown.inbox),
                                                 inboxMerge =
@@ -580,7 +592,7 @@ class ShellScreenshotTest {
                             loading = false,
                             openMonth = shell.month,
                             monthWindow = MonthWindow.around(shell.month),
-                            initialSection = HomeSections.headers.indexOf(HomeSections.INBOX),
+                            initialSection = HomeSections.headers.indexOf(HomeSections.ASSISTANT),
                             onGesture = {},
                             modifier = modifier,
                         )

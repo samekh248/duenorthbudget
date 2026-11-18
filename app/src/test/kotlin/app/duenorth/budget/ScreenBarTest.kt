@@ -28,7 +28,7 @@ class ScreenBarTest {
     @Test
     fun everyHubStartsWithAddAndEndsWithTheSameTail() {
         val hubs =
-            listOf(ScreenBar.HOME_INBOX, ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS, ScreenBar.HOME_REPORTS, ScreenBar.HOME_ASSISTANT)
+            listOf(ScreenBar.HOME_ASSISTANT, ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS, ScreenBar.HOME_REPORTS)
         hubs.forEach { section ->
             val specs =
                 ScreenBar.specsFor(
@@ -67,7 +67,7 @@ class ScreenBarTest {
     @Test
     fun noHubOffersSync() {
         val hubs =
-            listOf(ScreenBar.HOME_INBOX, ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS, ScreenBar.HOME_REPORTS, ScreenBar.HOME_ASSISTANT)
+            listOf(ScreenBar.HOME_ASSISTANT, ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS, ScreenBar.HOME_REPORTS)
         hubs.forEach { section ->
             val specs = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = section)
             assertFalse(section.toString(), specs.any { it.id in setOf("sync-all", "sync", "bank-sync", "sync-server") })
@@ -183,26 +183,32 @@ class ScreenBarTest {
     }
 
     @Test
-    fun homeInboxSectionOffersSelectAndSelectModeActsOnTheCheckedRows() {
-        val inbox = ScreenBar.specsFor(ShellRoute.Home, hasBudget = true, mode = BudgetMode.ENVELOPE, homeSection = ScreenBar.HOME_INBOX)
-        assertEquals(listOf("add", "select-inbox"), inbox.filter { it.primary }.map { it.id })
-        // Rules and payees live in settings, so the inbox menu is just the hub tail.
+    fun homeAssistantSectionOffersInboxSelectAndSelectModeActsOnTheCheckedRows() {
+        val inbox =
+            ScreenBar.specsFor(
+                ShellRoute.Home,
+                hasBudget = true,
+                mode = BudgetMode.ENVELOPE,
+                homeSection = ScreenBar.HOME_ASSISTANT,
+            )
+        assertEquals(listOf("add", "select-inbox", "refresh-assistant"), inbox.filter { it.primary }.map { it.id })
+        // Rules and payees live in settings, so the assistant's menu is just the hub tail.
         assertEquals(listOf("settings"), inbox.filter { !it.primary }.map { it.id })
         val empty =
             ScreenBar.specsFor(
                 ShellRoute.Home,
                 hasBudget = true,
                 mode = BudgetMode.ENVELOPE,
-                homeSection = ScreenBar.HOME_INBOX,
+                homeSection = ScreenBar.HOME_ASSISTANT,
                 inboxEmpty = true,
             )
-        assertEquals(listOf("add"), empty.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add", "refresh-assistant"), empty.filter { it.primary }.map { it.id })
         val selecting =
             ScreenBar.specsFor(
                 ShellRoute.Home,
                 hasBudget = true,
                 mode = BudgetMode.ENVELOPE,
-                homeSection = ScreenBar.HOME_INBOX,
+                homeSection = ScreenBar.HOME_ASSISTANT,
                 inboxSelecting = true,
             )
         assertEquals(listOf("end-inbox-selecting"), selecting.map { it.id })
@@ -216,7 +222,7 @@ class ScreenBarTest {
                     ShellRoute.Home,
                     hasBudget = true,
                     mode = BudgetMode.ENVELOPE,
-                    homeSection = ScreenBar.HOME_INBOX,
+                    homeSection = ScreenBar.HOME_ASSISTANT,
                     inboxSelecting = true,
                     inboxPick = pick,
                 ).map { it.id }
@@ -233,7 +239,7 @@ class ScreenBarTest {
                     ShellRoute.Home,
                     hasBudget = true,
                     mode = BudgetMode.ENVELOPE,
-                    homeSection = ScreenBar.HOME_INBOX,
+                    homeSection = ScreenBar.HOME_ASSISTANT,
                     inboxSelecting = true,
                     inboxPick = InboxPick.READY,
                 ).single { it.id == "delete-selected" }
@@ -258,7 +264,7 @@ class ScreenBarTest {
                 hasBudget = true,
                 mode = BudgetMode.ENVELOPE,
                 undoLabel = "accept",
-                homeSection = ScreenBar.HOME_INBOX,
+                homeSection = ScreenBar.HOME_ASSISTANT,
             )
         assertEquals(listOf("undo", "settings"), specs.filter { !it.primary }.map { it.id }.takeLast(2))
     }
@@ -282,7 +288,7 @@ class ScreenBarTest {
     @Test
     fun settingsIsTheLastMenuItemOnHome() {
         listOf(BudgetMode.ENVELOPE, BudgetMode.TRACKING).forEach { mode ->
-            listOf(ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS, ScreenBar.HOME_INBOX).forEach { section ->
+            listOf(ScreenBar.HOME_BUDGET, ScreenBar.HOME_ACCOUNTS, ScreenBar.HOME_ASSISTANT).forEach { section ->
                 val specs = ScreenBar.specsFor(ShellRoute.Home, true, mode, undoLabel = "assign", homeSection = section)
                 assertEquals("settings", specs.last().id)
                 assertFalse(specs.last().primary)
@@ -356,7 +362,7 @@ class ScreenBarTest {
                     ShellRoute.Home,
                     hasBudget = true,
                     mode = BudgetMode.ENVELOPE,
-                    homeSection = ScreenBar.HOME_INBOX,
+                    homeSection = ScreenBar.HOME_ASSISTANT,
                     inboxSelecting = true,
                     inboxPick = InboxPick.READY,
                     inboxMerge = true,
@@ -371,7 +377,7 @@ class ScreenBarTest {
                     ShellRoute.Home,
                     hasBudget = true,
                     mode = BudgetMode.ENVELOPE,
-                    homeSection = ScreenBar.HOME_INBOX,
+                    homeSection = ScreenBar.HOME_ASSISTANT,
                     inboxSelecting = true,
                     inboxPick = InboxPick.READY,
                     inboxMerge = true,
