@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -47,19 +48,29 @@ internal fun Modifier.ledgerFill(fill: Color): Modifier =
     }
 
 /**
- * Flags a row that needs attention, such as an overspent category: [tint] behind it as [ledgerFill] paints a band,
- * and a [stripe] down the screen's (or the panel's) left edge.
+ * Flags a row that needs attention, such as an overspent category: [tint] on a softly rounded panel that reaches
+ * [LEDGER_FLAG_MARGIN] past the row's text on each side. A goal bar inside keeps the same margin below it, so the
+ * bar lines up with the text and with every other row's bar, framed evenly by the tint.
  */
-internal fun Modifier.ledgerFlag(
-    tint: Color,
-    stripe: Color,
-): Modifier =
-    ledgerFill(tint).drawBehind {
-        val gutter = MetroDimens.Gutter.toPx()
-        drawRect(stripe, Offset(-gutter, 0f), Size(LEDGER_FLAG_STRIPE.toPx(), size.height))
+internal fun Modifier.ledgerFlag(tint: Color): Modifier =
+    drawBehind {
+        val margin = LEDGER_FLAG_MARGIN.toPx()
+        val inset = LEDGER_FLAG_INSET.toPx()
+        drawRoundRect(
+            tint,
+            Offset(-margin, inset),
+            Size(size.width + 2 * margin, size.height - 2 * inset),
+            CornerRadius(LEDGER_FLAG_CORNER.toPx()),
+        )
     }
 
-internal val LEDGER_FLAG_STRIPE = 4.dp
+/** How far a flagged row's panel reaches past its text, and the air left under its goal bar. */
+internal val LEDGER_FLAG_MARGIN = 6.dp
+
+/** The gap above and below a flagged row's panel, so it reads as a panel against a banded neighbour. */
+internal val LEDGER_FLAG_INSET = 2.dp
+
+private val LEDGER_FLAG_CORNER = 4.dp
 
 /** Whether the row at [index] in a ledger list sits on a band: every second row, counting from the first. */
 internal fun ledgerBanded(index: Int): Boolean = index % 2 == 1

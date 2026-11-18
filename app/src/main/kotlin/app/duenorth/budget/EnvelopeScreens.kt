@@ -808,7 +808,7 @@ fun CategoryLine(
     // While a month loads, the bar keeps its place as an empty track.
     val progress = if (showGoal) (if (figuresLoading()) 0f else category.goalProgress ?: 0f) else null
     val nameAir = ledgerNameAir(Metro.typography.body)
-    // Overspent, the row is flagged: a red tint and stripe, the figure in red, and how far over under the name.
+    // Overspent, the row is flagged: a red tinted panel, the figure in red, and how far over under the name.
     // While a month loads, last month's figures would flag the wrong rows.
     val over = category.availableMinor < 0 && !figuresLoading()
     val budgeted = MoneyFormat.format(category.budgetedMinor, money, formatOptions)
@@ -830,7 +830,7 @@ fun CategoryLine(
             .semantics(mergeDescendants = true) { contentDescription = spoken }
             .then(
                 if (over) {
-                    Modifier.ledgerFlag(overspentTint, Metro.colors.errorFill)
+                    Modifier.ledgerFlag(overspentTint)
                 } else {
                     Modifier.ledgerFill(if (banded) ledgerBand else Color.Transparent)
                 },
@@ -868,7 +868,11 @@ fun CategoryLine(
                 color = Metro.colors.error,
             )
         }
-        if (progress != null) GoalBar(progress, Modifier.padding(bottom = GOAL_BAR_GAP).testTag("category-goal-${category.id}"))
+        if (progress != null) {
+            // On a flagged panel, the bar keeps the panel's side margin below it too.
+            val gap = if (over) LEDGER_FLAG_MARGIN + LEDGER_FLAG_INSET else GOAL_BAR_GAP
+            GoalBar(progress, Modifier.padding(bottom = gap).testTag("category-goal-${category.id}"))
+        }
     }
 }
 
