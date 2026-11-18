@@ -67,6 +67,8 @@ object PullSyncCopy {
     const val SYNC_NOW = "sync now"
     const val BANK_SYNC = "bank sync"
     const val CLOSE_HINT = "swipe up to close"
+    const val SYNC_HINT = "pull down to sync"
+    const val RELEASE_HINT = "release to sync"
 
     /** The server sync's "synced 3:42 pm" reads "last synced 3:42 pm" here; a failure's own words stay as they are. */
     fun lastSynced(status: String) = if (status.startsWith(SYNCED)) "last $status" else status
@@ -102,6 +104,12 @@ private const val PULL_RESISTANCE = 0.5f
 /** How far past the panel's own height a pull can stretch it before it stops. */
 private const val OVERSTRETCH = 1.25f
 
+/** With the panel already open, a pull that stretches it this far past its own height syncs on release. */
+private const val SYNC_SHARE = 1.3f
+
+/** How far a second pull, on an open panel, can stretch it. */
+private const val SYNC_STRETCH = 1.5f
+
 /** A sync asked for that never starts (one was already running) gives up waiting after this long. */
 private const val START_WAIT_MS = 1_500L
 
@@ -110,7 +118,8 @@ private const val START_WAIT_MS = 1_500L
  * no list at all), pulling further down
  * draws a panel out from above the page: the last sync's time, and sync now (and bank sync when
  * accounts are linked). Pulling never syncs by itself, so a stray swipe costs nothing: a short
- * pull springs back, a longer one leaves the panel open, and only a tap on its buttons syncs.
+ * pull springs back, a longer one leaves the panel open, and only a second pull or a tap on its buttons syncs:
+ * with the panel already open, pulling down again past [SYNC_SHARE] of its height and letting go runs sync now.
  * Pushing back up, a tap on the page, or back closes it; after a sync it closes on its own.
  */
 @Composable
@@ -137,8 +146,12 @@ fun PullSyncPanel(
     var open by remember { mutableStateOf(false) }
     var requested by remember { mutableStateOf(Requested.NONE) }
     val current by rememberUpdatedState(ui)
+    val sync by rememberUpdatedState(onSync)
 
     fun height() = if (panelHeight > 0f) panelHeight else fallbackHeight
+
+    // A second pull only counts on a panel that was open before it and has a server to sync.
+    fun canPullToSync() = open && current.canSync && !current.syncing
 
     fun settle(toOpen: Boolean) {
         open = toOpen
@@ -202,8 +215,10 @@ fun PullSyncPanel(
                 ): Offset {
                     if (!current.enabled || available.y <= 0f || source != NestedScrollSource.UserInput) return Offset.Zero
                     val before = revealed.value
-                    val next = (before + available.y * PULL_RESISTANCE).coerceAtMost(height() * OVERSTRETCH)
-                    val threshold = height() * OPEN_SHARE
+                    val second = canPullToSync()
+                    val stretch = if (second) SYNC_STRETCH else OVERSTRETCH
+                    val next = (before + available.y * PULL_RESISTANCE).coerceAtMost(height() * stretch)
+                    val threshold = height() * if (second) SYNC_SHARE else OPEN_SHARE
                     if (before < threshold && next >= threshold) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     scope.launch { revealed.snapTo(next) }
                     return Offset(0f, available.y)
@@ -214,6 +229,13 @@ fun PullSyncPanel(
                     if (shown <= 0f) {
                         if (open) open = false
                         return Velocity.Zero
+                    }
+                    // Pulled down again on an open panel far enough: let go and it syncs, folding up as a tap would.
+                    if (canPullToSync() && shown >= height() * SYNC_SHARE && available.y > -FLICK_SHUT) {
+                        requested = Requested.ASKED
+                        settle(false)
+                        sync()
+                        return available
                     }
                     // A flick upward shuts it whatever the distance; otherwise it is how far it came.
                     val toOpen = available.y > -FLICK_SHUT && shown >= height() * OPEN_SHARE
@@ -245,6 +267,7 @@ fun PullSyncPanel(
             // Whichever button is pressed, the panel folds back up.
             PullSyncSheet(
                 ui = ui,
+                armed = canPullToSync() && revealed.value >= height() * SYNC_SHARE,
                 onSync = {
                     requested = Requested.ASKED
                     settle(false)
@@ -341,6 +364,8 @@ internal fun PullSyncSheet(
     modifier: Modifier = Modifier,
     onDetails: () -> Unit = {},
     onDismissFailure: () -> Unit = {},
+    /** A second pull has stretched the panel far enough that letting go syncs. */
+    armed: Boolean = false,
 ) {
     Column(
         modifier
@@ -387,11 +412,21 @@ internal fun PullSyncSheet(
                     .height(4.dp)
                     .background(Metro.colors.secondary, RoundedCornerShape(2.dp)),
             )
+            // How to sync with a pull sits beside how to close, while there is a server to sync.
+            val hint =
+                when {
+                    armed -> PullSyncCopy.RELEASE_HINT
+                    ui.canSync && !ui.syncing -> "${PullSyncCopy.SYNC_HINT}  ·  ${PullSyncCopy.CLOSE_HINT}"
+                    else -> PullSyncCopy.CLOSE_HINT
+                }
             MetroText(
-                PullSyncCopy.CLOSE_HINT,
+                hint,
                 Metro.typography.caption,
-                Modifier.padding(top = 4.dp),
-                color = Metro.colors.secondary,
+                Modifier
+                    .padding(top = 4.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite }
+                    .testTag("pull-sync-hint"),
+                color = if (armed) Metro.colors.foreground else Metro.colors.secondary,
             )
         }
     }

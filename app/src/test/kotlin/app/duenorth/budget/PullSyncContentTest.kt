@@ -118,6 +118,46 @@ class PullSyncContentTest {
         assertEquals(1, bankSynced)
     }
 
+    // With the panel open, pulling down again and letting go syncs, and the panel folds up as a tap would.
+    @Test
+    fun aSecondPullSyncs() {
+        show()
+        pull()
+        assertEquals(0, synced)
+        pull()
+        assertEquals(1, synced)
+        compose.onNodeWithTag("pull-sync-now").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun aShortSecondPullOnlyStretches() {
+        show()
+        pull()
+        compose.onNodeWithTag("page").performTouchInput { swipeDown(startY = top + 20f, endY = top + 60f, durationMillis = 300) }
+        compose.waitForIdle()
+        assertEquals(0, synced)
+        compose.onNodeWithTag("pull-sync-now").assertIsDisplayed()
+    }
+
+    @Test
+    fun aSecondPullWithNoServerDoesNothing() {
+        ui = ui.copy(canSync = false, failure = failed)
+        show()
+        pull()
+        pull()
+        assertEquals(0, synced)
+        compose.onNodeWithTag("pull-sync-hint", useUnmergedTree = true).assertTextEquals(PullSyncCopy.CLOSE_HINT)
+    }
+
+    @Test
+    fun theSyncHintSitsBesideTheCloseHint() {
+        show()
+        pull()
+        compose
+            .onNodeWithTag("pull-sync-hint", useUnmergedTree = true)
+            .assertTextEquals("${PullSyncCopy.SYNC_HINT}  ·  ${PullSyncCopy.CLOSE_HINT}")
+    }
+
     @Test
     fun pushingBackUpShutsIt() {
         show()
