@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import app.duenorth.budget.core.Currencies
+import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.OnboardingOrigin
 import app.duenorth.budget.core.ServerAddress
 import java.util.Locale
@@ -76,6 +77,7 @@ internal fun SettingsRoute(
                 onRules = model.rules::open,
                 onSchedules = model.schedules::open,
                 onTemplates = if (state.formatPrefs.templatesOn) model.templates::open else null,
+                onSavedSplits = model.settingsUi::showSavedSplits,
             ),
         modifier = modifier,
     )
@@ -390,6 +392,31 @@ internal fun ConfirmReplaceRoute(
         phoneName = state.openBudgetName(),
         onReplace = model.budgetFiles::confirmReplace,
         onKeep = model.budgetFiles::cancelReplace,
+        modifier = modifier,
+    )
+}
+
+@Composable
+internal fun SavedSplitsRoute(
+    state: ShellUiState,
+    model: ShellViewModel,
+    modifier: Modifier,
+) {
+    val shell = state.shell
+    val names =
+        remember(shell) {
+            shell
+                ?.let { s ->
+                    s.groups.flatMap { it.categories }.map { it.id to it.name } +
+                        s.incomeGroups.flatMap { it.categories }.map { it.id to it.name }
+                }.orEmpty()
+                .toMap()
+        }
+    val format = FormatOptions(state.formatPrefs.hideFraction, state.formatPrefs.numberFormat)
+    SavedSplitsScreen(
+        splits = shell?.savedSplits.orEmpty(),
+        summary = { split -> shell?.let { savedSplitSummary(split, names, it.currency, format) }.orEmpty() },
+        onDelete = model.register::deleteSavedSplit,
         modifier = modifier,
     )
 }

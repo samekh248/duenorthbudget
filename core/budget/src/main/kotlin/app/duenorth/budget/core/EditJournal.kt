@@ -44,6 +44,8 @@ object UndoCopy {
     const val LINK_TRANSFER = "link transfer"
     const val MAKE_TRANSFER = "make transfer"
     const val MAKE_RULE = "make rule"
+    const val SAVE_SPLIT = "save split"
+    const val DELETE_SPLIT = "delete saved split"
 }
 
 /** One person-level action, as the cells it wrote. */

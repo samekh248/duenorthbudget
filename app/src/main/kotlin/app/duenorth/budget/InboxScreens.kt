@@ -81,6 +81,8 @@ import app.duenorth.budget.core.MatchPair
 import app.duenorth.budget.core.MoneyFormat
 import app.duenorth.budget.core.MonthShell
 import app.duenorth.budget.core.RegisterEntry
+import app.duenorth.budget.core.SavedSplitCopy
+import app.duenorth.budget.core.SavedSplitGuess
 import app.duenorth.budget.core.TransferCopy
 import app.duenorth.budget.core.TransferGuess
 import app.duenorth.budget.design.MetroMotion
@@ -145,6 +147,8 @@ class InboxActions(
     val onNotAMatch: (MatchPair) -> Unit = {},
     /** Makes the row the transfer it was guessed to be. */
     val onTransfer: (String) -> Unit = {},
+    /** Splits the row the way the saved split it looks like does. */
+    val onSplit: (String) -> Unit = {},
     /** The row menu's select: select mode with this row already checked. Null leaves select off the menu. */
     val onSelect: ((String) -> Unit)? = null,
 )
@@ -365,6 +369,8 @@ private fun InboxQueue(
             onDetails = actions.onDetails,
             onMenu = onMenu,
             onTransfer = actions.onTransfer,
+            onSplit = actions.onSplit,
+            money = money,
         )
         InboxDays(entries.drop(1), leaving = next?.let { it to risen }, arrivals = listed) { i, entry ->
             InboxLine(
@@ -447,6 +453,7 @@ internal fun inboxMenuItems(
     listOfNotNull(
         actions.onSelect?.let { select -> RowMenuCopy.SELECT to { select(row.id) } },
         row.transfer?.let { it.label(row.amountMinor).lowercase() to { actions.onTransfer(row.id) } },
+        row.split?.let { "${SavedSplitCopy.SPLIT_AS} ${it.name.lowercase()}" to { actions.onSplit(row.id) } },
         row.suggestionId?.let { InboxCopy.ACCEPT to { onAccept(row.id) } },
         InboxCopy.CATEGORIZE to { onCategorize(row.id) },
         InboxCopy.EDIT to { actions.onDetails(row.id) },
@@ -489,11 +496,15 @@ internal data class InboxEntry(
     val filedTo: String? = null,
     /** Made a transfer: [filedTo] is "transfer to" the account, and the confirmation says "filed as" it. */
     val transfer: Boolean = false,
+    /** Split as a saved split: [filedTo] is the saved split's name. */
+    val split: Boolean = false,
 )
 
 /** "filed to groceries", or "filed as transfer to ally savings" for a row made a transfer. */
 internal fun filedLine(entry: InboxEntry): String =
-    if (entry.transfer) {
+    if (entry.split) {
+        "${SavedSplitCopy.SPLIT_AS} ${entry.filedTo.orEmpty().lowercase()}"
+    } else if (entry.transfer) {
         "${TransferCopy.FILED_AS} ${entry.filedTo.orEmpty().lowercase()}"
     } else {
         "${InboxCopy.FILED_TO} ${entry.filedTo.orEmpty().lowercase()}"
@@ -520,11 +531,14 @@ internal fun inboxEntries(
     filed: List<InboxFiled>,
 ): List<InboxEntry> {
     val byId = filed.associateBy { it.row.id }
-    val out = inbox.map { InboxEntry(it, byId[it.id]?.categoryName, byId[it.id]?.transfer == true) }.toMutableList()
+    val out =
+        inbox
+            .map { InboxEntry(it, byId[it.id]?.categoryName, byId[it.id]?.transfer == true, byId[it.id]?.split == true) }
+            .toMutableList()
     filed
         .filter { f -> inbox.none { it.id == f.row.id } }
         .sortedBy { it.index }
-        .forEach { f -> out.add(f.index.coerceIn(0, out.size), InboxEntry(f.row, f.categoryName, f.transfer)) }
+        .forEach { f -> out.add(f.index.coerceIn(0, out.size), InboxEntry(f.row, f.categoryName, f.transfer, f.split)) }
     return out
 }
 
@@ -545,6 +559,8 @@ private fun FeaturedPanel(
     onDetails: (String) -> Unit,
     onMenu: (InboxRow, Rect) -> Unit,
     onTransfer: (String) -> Unit = {},
+    onSplit: (String) -> Unit = {},
+    money: (Long) -> String = { it.toString() },
     modifier: Modifier = Modifier,
     /**
      * The transaction coming in, a new arrival or the next after a filing: the whole panel, fill and all, fades and
@@ -607,8 +623,12 @@ private fun FeaturedPanel(
                     )
                 }
                 val transfer = row.transfer
+                // A saved split it looks like leads, unless it looks like a transfer.
+                val split = row.split.takeIf { transfer == null }
                 if (transfer != null) {
                     TransferGuessLines(row, transfer)
+                } else if (split != null) {
+                    SplitGuessLines(split, money)
                 } else {
                     Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (row.suggestionId != null) {
@@ -623,6 +643,8 @@ private fun FeaturedPanel(
                     // A guessed transfer leads; the category suggestion stays in the row's menu.
                     if (transfer != null) {
                         AccentButton(TransferCopy.MAKE_TRANSFER, Modifier.testTag("inbox-featured-transfer")) { onTransfer(row.id) }
+                    } else if (split != null) {
+                        AccentButton(SavedSplitCopy.SPLIT, Modifier.testTag("inbox-featured-split")) { onSplit(row.id) }
                     } else if (row.suggestionId != null) {
                         AcceptButton { onAccept(row.id) }
                     }
@@ -670,6 +692,49 @@ private fun TransferGuessLines(
                 guess.reasons.joinToString(" \u00b7 "),
                 Metro.typography.caption,
                 Modifier.testTag("inbox-featured-reasons"),
+                color = Metro.colors.secondary,
+                maxLines = 2,
+            )
+        }
+    }
+}
+
+/** The saved split the featured transaction looks like: its name, each line it would make, then why it looks like it. */
+@Composable
+private fun SplitGuessLines(
+    guess: SavedSplitGuess,
+    money: (Long) -> String,
+) {
+    Column(Modifier.padding(top = 10.dp).testTag("inbox-featured-split-guess")) {
+        MetroText(SavedSplitCopy.LOOKS_LIKE, Metro.typography.caption, color = Metro.colors.secondary)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AppGlyphIcon(AppGlyph.Breakdown, Metro.accent.text)
+            MetroText(
+                guess.name,
+                Metro.typography.body.copy(fontWeight = MetroWeights.Semibold),
+                Modifier.padding(start = 6.dp),
+                maxLines = 1,
+            )
+        }
+        guess.parts.forEachIndexed { index, part ->
+            Row(Modifier.fillMaxWidth().testTag("inbox-featured-split-$index")) {
+                MetroText(
+                    guess.categoryNames
+                        .getOrNull(index)
+                        .orEmpty()
+                        .ifBlank { InboxCopy.NO_CATEGORY },
+                    Metro.typography.caption,
+                    Modifier.weight(1f),
+                    maxLines = 1,
+                )
+                MetroText(money(part.amountMinor), Metro.typography.caption, maxLines = 1, softWrap = false)
+            }
+        }
+        if (guess.reasons.isNotEmpty()) {
+            MetroText(
+                guess.reasons.joinToString(" \u00b7 "),
+                Metro.typography.caption,
+                Modifier.testTag("inbox-featured-split-reasons"),
                 color = Metro.colors.secondary,
                 maxLines = 2,
             )
@@ -852,7 +917,9 @@ private fun InboxDayHeading(
 /** The quieter line under a payee: the suggested category, the account, then the note. The date is the row's heading. */
 internal fun inboxDetail(row: InboxRow): String =
     listOfNotNull(
-        row.transfer?.let { "${it.label(row.amountMinor).lowercase()}?" } ?: row.suggestionName.ifBlank { InboxCopy.NO_CATEGORY },
+        row.transfer?.let { "${it.label(row.amountMinor).lowercase()}?" }
+            ?: row.split?.let { "${SavedSplitCopy.SPLIT_AS} ${it.name.lowercase()}?" }
+            ?: row.suggestionName.ifBlank { InboxCopy.NO_CATEGORY },
         row.accountName.ifBlank { null },
         row.note.ifBlank { null },
     ).joinToString(" · ")

@@ -101,6 +101,9 @@ sealed interface ShellRoute {
 
     data object Payees : ShellRoute
 
+    /** Settings › general › saved splits: every split kept to use again. */
+    data object SavedSplits : ShellRoute
+
     /** The bank sync tile's full page: how each linked account went, with retry. */
     data object BankSyncReport : ShellRoute
 

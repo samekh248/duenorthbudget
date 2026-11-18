@@ -69,6 +69,20 @@ class InboxHolder internal constructor(
         }
     }
 
+    /**
+     * Splits the row the way the saved split it looks like does, and teaches that split the row's payee. The row plays
+     * its confirmation in place, as filing it does.
+     */
+    fun applySplit(transactionId: String) {
+        val inbox = shown() ?: return
+        val index = inbox.indexOfFirst { it.id == transactionId }
+        val row = inbox.getOrNull(index) ?: return
+        val guess = row.split ?: return
+        write(listOf(InboxFiled(row, index, guess.name, split = true)), fromPicker = false) { id ->
+            host.library.applySavedSplit(id, row.id, guess.splitId, row.payee)
+        }
+    }
+
     /** A tap on an inbox row opens its transaction, as the register does. */
     fun openDetails(transactionId: String) {
         openFromInbox(transactionId) { accountId -> ShellRoute.EditTransaction(accountId, transactionId) }

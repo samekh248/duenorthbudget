@@ -36,6 +36,7 @@ import app.duenorth.budget.core.FormatOptions
 import app.duenorth.budget.core.FormatPrefs
 import app.duenorth.budget.core.RemoteFile
 import app.duenorth.budget.core.SavedInstance
+import app.duenorth.budget.core.SavedSplitCopy
 import app.duenorth.budget.core.SyncCopy
 import app.duenorth.budget.core.ThemeMode
 import app.duenorth.budget.design.components.AppGlyph
@@ -83,6 +84,7 @@ data class SettingsManage(
     val onSchedules: () -> Unit = {},
     /** Null while budget templates are off, so the list leaves them out. */
     val onTemplates: (() -> Unit)? = null,
+    val onSavedSplits: () -> Unit = {},
 )
 
 @Composable
@@ -165,6 +167,7 @@ internal fun GeneralItem(
         SettingsLinkRow(SettingsCopy.RENAME_PAYEES, SettingsCopy.RENAME_PAYEES_HINT, "settings-payees", onPayees)
         SettingsLinkRow(SettingsCopy.MANAGE_RULES, SettingsCopy.MANAGE_RULES_HINT, "settings-manage-rules", manage.onRules)
         SettingsLinkRow(SettingsCopy.MANAGE_SCHEDULES, SettingsCopy.MANAGE_SCHEDULES_HINT, "settings-manage-schedules", manage.onSchedules)
+        SettingsLinkRow(SavedSplitCopy.TITLE, SettingsCopy.SAVED_SPLITS_HINT, "settings-saved-splits", manage.onSavedSplits)
         manage.onTemplates?.let { onTemplates ->
             SettingsLinkRow(SettingsCopy.MANAGE_TEMPLATES, SettingsCopy.MANAGE_TEMPLATES_HINT, "settings-manage-templates", onTemplates)
         }

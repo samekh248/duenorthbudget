@@ -421,6 +421,7 @@ fun DueNorthApp(model: ShellViewModel) {
                         ShellRoute.ConfirmSwitch -> ConfirmSwitchRoute(state, model, fill)
                         ShellRoute.BankSyncReport -> BankSyncReportRoute(state, model, fill)
                         ShellRoute.Payees -> PayeesRoute(state, model, fill)
+                        ShellRoute.SavedSplits -> SavedSplitsRoute(state, model, fill)
                         ShellRoute.Server -> ServerRoute(state, model, fill)
                         ShellRoute.BudgetPassword -> BudgetPasswordRoute(state, model, fill)
                         ShellRoute.Conflicts -> ConflictsRoute(state, model, fill)

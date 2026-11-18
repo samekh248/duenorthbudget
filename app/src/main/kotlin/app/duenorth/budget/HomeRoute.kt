@@ -55,6 +55,7 @@ internal fun HomeRoute(
                     onNotAMatch = { model.register.notAMatch(it, stayOnRegister = false) },
                     onSelect = model.inbox::startSelectingWith,
                     onTransfer = model.inbox::makeTransfer,
+                    onSplit = model.inbox::applySplit,
                 )
             },
         netWorth = state.netWorth,

@@ -156,6 +156,8 @@ internal fun EditTransactionRoute(
             numberFormat = state.formatPrefs.numberFormat,
             hideFraction = state.formatPrefs.hideFraction,
             payees = PayeeTypeAhead.names(state.payees.rows),
+            savedSplits = state.shell?.savedSplits.orEmpty(),
+            onSaveSplit = model.register::saveSplit,
         )
     }
 }
