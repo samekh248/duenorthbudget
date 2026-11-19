@@ -15,6 +15,9 @@ import androidx.compose.ui.unit.dp
  * Windows 10 Mobile follows the Windows 10 Mobile guidelines, chosen on 2026-10-28 from the pivot mockup: a compact
  * pivot, sentence case, a flat 48dp command bar of bare glyphs, grey filled buttons, outlined text boxes and plain
  * unbanded lists on pure white or black.
+ * Tonal is half Metro and half Material 3, chosen on 2026-11-19 from the "B+" category widget mockup: Metro's
+ * Selawik type and lowercase labels with small-caps headings, on rounded tonal cards tinted with the accent, with
+ * pill buttons, chips and progress bars, and an overspent figure as a red pill.
  */
 enum class MetroStyle(
     val id: String,
@@ -29,6 +32,8 @@ enum class MetroStyle(
     val layers: Boolean = false,
     /** Windows 10 Mobile: compact type in sentence case, a flat command bar, filled buttons, no bands (mobile 10). */
     val mobile10: Boolean = false,
+    /** Tonal: mica's layer cards, but tinted with the accent, larger corners, no hairline, and pills (tonal). */
+    val tonal: Boolean = false,
 ) {
     Metro("metro", "metro"),
     TileRelief("tile-relief", "tile relief", panels = true, heroTiles = true, filledAdd = true),
@@ -36,6 +41,7 @@ enum class MetroStyle(
     // The ids stay as saved on phones; the labels avoid other companies' product names and trademarks.
     Mica("mica", "glass", panels = true, filledAdd = true, layers = true),
     Mobile10("windows-10-mobile", "compact", mobile10 = true),
+    Tonal("tonal", "tonal", panels = true, filledAdd = true, layers = true, tonal = true),
     ;
 
     /** Whether surfaces are drawn by [MetroSurface] (relief or layers) rather than Metro's outlines. */
@@ -82,9 +88,25 @@ data class MetroSurface(
         fun of(
             style: MetroStyle,
             dark: Boolean,
+            accent: Accent = Accent.Default,
         ): MetroSurface =
             if (!style.relief) {
                 Flat.copy(style = style)
+            } else if (style.tonal) {
+                val page = StylePalettes.colors(style, dark, accent).background
+                MetroSurface(
+                    style,
+                    highlight = Color.Transparent,
+                    shade = if (dark) Color.Black.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.12f),
+                    depth = 6.dp,
+                    blur = 20.dp,
+                    page = page,
+                    // Rows group on a tonal card a step deeper into the accent than the page, with no edge.
+                    layer = TonalTones.layer(accent, dark),
+                    stroke = Color.Transparent,
+                    acrylic = TonalTones.bar(accent, dark),
+                    underline = Color.Transparent,
+                )
             } else if (style.layers) {
                 MetroSurface(
                     style,
@@ -119,8 +141,24 @@ internal object StylePalettes {
     fun colors(
         style: MetroStyle,
         dark: Boolean,
+        accent: Accent = Accent.Default,
     ): MetroColors {
         val metro = if (dark) MetroColors.Dark else MetroColors.Light
+        if (style.tonal) {
+            val page = TonalTones.page(accent, dark)
+            return metro.copy(
+                background = page,
+                chrome = TonalTones.bar(accent, dark),
+                // Grey ink pulled a little toward the accent, as a tonal palette's variant ink.
+                secondary =
+                    Contrast.ensure(
+                        lerp(Color(if (dark) 0xFFA29A9F else 0xFF57505A), accent.fill(dark), 0.12f),
+                        TonalTones.layer(accent, dark),
+                    ),
+                outline = lerp(metro.outline, accent.fill(dark), 0.2f),
+                error = Contrast.ensure(metro.error, TonalTones.layer(accent, dark)),
+            )
+        }
         val (background, chrome) =
             when (style) {
                 MetroStyle.Metro -> return metro
@@ -132,6 +170,7 @@ internal object StylePalettes {
                         outline = Color(if (dark) 0xFF666666 else 0xFF999999),
                     )
                 MetroStyle.TileRelief -> if (dark) 0xFF101010 to 0xFF1F1F1F else 0xFFEEEEEE to 0xFFE3E3E3
+                MetroStyle.Tonal -> error("tonal is tinted by the accent, above")
                 MetroStyle.Mica -> if (dark) 0xFF1E1D22 to 0xFF2C2C30 else 0xFFF1EFF3 to 0xFFF9F9F9
             }
         val page = Color(background)
@@ -152,6 +191,27 @@ internal object StylePalettes {
             error = Contrast.ensure(metro.error, page),
         )
     }
+}
+
+/**
+ * The tonal style's grounds, each a neutral moved toward the accent's swatch: the page, the deeper card rows group
+ * on, and the floating app bar. On a light page the card is the deeper tone; on a dark one, the lighter.
+ */
+internal object TonalTones {
+    fun page(
+        accent: Accent,
+        dark: Boolean,
+    ): Color = lerp(Color(if (dark) 0xFF121013 else 0xFFFFFBFC), accent.fill(dark), if (dark) 0.05f else 0.035f)
+
+    fun layer(
+        accent: Accent,
+        dark: Boolean,
+    ): Color = lerp(Color(if (dark) 0xFF201B1E else 0xFFFFFFFF), accent.fill(dark), if (dark) 0.11f else 0.09f)
+
+    fun bar(
+        accent: Accent,
+        dark: Boolean,
+    ): Color = lerp(Color(if (dark) 0xFF262024 else 0xFFFFFFFF), accent.fill(dark), if (dark) 0.16f else 0.14f)
 }
 
 /** A Windows 10 Mobile button or block that acts: the ink at a fifth, as a W10M button's face. */

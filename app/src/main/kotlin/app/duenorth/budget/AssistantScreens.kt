@@ -60,6 +60,7 @@ import app.duenorth.budget.design.MetroMotion
 import app.duenorth.budget.design.components.MetroButton
 import app.duenorth.budget.design.components.MetroButtonGrid
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.layerClip
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -184,6 +185,10 @@ private fun AssistantBody(
     }
 }
 
+/** Tonal rounds a card and what folds open under it as one card; every other style keeps them square. */
+@Composable
+private fun Modifier.tonalCardClip(): Modifier = if (Metro.style.tonal) layerClip() else this
+
 /** The inbox card, the close out card, and a card for each kind of finding. */
 private fun LazyListScope.assistantCards(
     findings: List<Finding>,
@@ -203,7 +208,7 @@ private fun LazyListScope.assistantCards(
     // The inbox leads the cards, and opens onto its featured transaction and the queue under it.
     if (inbox != null) {
         item(key = "kind-inbox") {
-            Column(Modifier.padding(top = 12.dp)) {
+            Column(Modifier.padding(top = 12.dp).tonalCardClip()) {
                 AssistantCard(InboxCopy.CARD_TITLE, InboxCopy.CARD_BLURB, inbox.count, inboxOpen, "INBOX", onToggle = onToggleInbox)
                 // Clipped to the card's width, so the panel and banded rows stay inside the box above them.
                 CardFold(inboxOpen, Modifier.testTag("assistant-fold-INBOX")) {
@@ -231,7 +236,7 @@ private fun LazyListScope.assistantCards(
         val open = (kind in expanded) != alone
         // The card and its findings are one row, so opening it grows that row and the cards below ease down with it.
         item(key = "kind-${kind.name}") {
-            Column(Modifier.padding(top = 12.dp)) {
+            Column(Modifier.padding(top = 12.dp).tonalCardClip()) {
                 KindCard(kind, all.size, open) { onToggleExpanded(kind) }
                 CardFold(open, Modifier.testTag("assistant-fold-${kind.name}")) {
                     // An open card grows downward: its findings carry on in the card itself, each under a thin rule of the page's own colour.

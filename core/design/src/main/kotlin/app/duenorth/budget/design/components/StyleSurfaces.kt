@@ -23,12 +23,14 @@ import app.duenorth.budget.design.theme.mobile10Card
  */
 @Composable
 @ReadOnlyComposable
-fun layerShape(corner: Dp = LayerCorner.Card): Shape = if (Metro.style.layers) RoundedCornerShape(corner) else RectangleShape
+fun layerShape(corner: Dp = LayerCorner.Card): Shape =
+    if (Metro.style.layers) RoundedCornerShape(Metro.surface.corner(corner)) else RectangleShape
 
 /** Clips to [layerShape] under mica, so a tint or a fill follows the rounded corners; nothing under other styles. */
 @Composable
 @ReadOnlyComposable
-fun Modifier.layerClip(corner: Dp = LayerCorner.Card): Modifier = if (Metro.style.layers) clip(RoundedCornerShape(corner)) else this
+fun Modifier.layerClip(corner: Dp = LayerCorner.Card): Modifier =
+    if (Metro.style.layers) clip(RoundedCornerShape(Metro.surface.corner(corner))) else this
 
 /**
  * A card that groups or holds something (a template tile, a template chip, a note to fix) in the current style:
