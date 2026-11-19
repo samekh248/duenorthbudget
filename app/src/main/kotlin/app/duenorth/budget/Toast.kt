@@ -69,8 +69,8 @@ internal fun ShellHost.toastFor(
 }
 
 /**
- * A toast for a templates run. [written] is a run on the month itself, which undo can take back; in budget edit mode
- * templates only fill the boxes, which done then saves.
+ * A toast for a templates run, with no undo: a run on the month itself ([written]) can't be taken back, and in budget
+ * edit mode templates only fill the boxes, which done then saves.
  */
 internal fun ShellHost.toastTemplates(
     result: TemplateResult,
@@ -81,7 +81,7 @@ internal fun ShellHost.toastTemplates(
             toastSuccess(
                 if (written) ToastCopy.TEMPLATES_APPLIED else ToastCopy.TEMPLATES_FILLED,
                 ToastCopy.categories(result.categories),
-                undo = written,
+                undo = false,
             )
         is TemplateResult.Invalid -> toastFailure(ToastCopy.TEMPLATES_FAILED, DistributeCopy.unreadable(result.errors.size))
         is TemplateResult.Rejected -> toastFailure(ToastCopy.TEMPLATES_FAILED, result.reason)

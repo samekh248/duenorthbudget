@@ -1,6 +1,5 @@
 package app.duenorth.budget
 
-import app.duenorth.budget.core.AssistantCopy
 import app.duenorth.budget.core.AutoHoldChoice
 import app.duenorth.budget.core.BankLinkCopy
 import app.duenorth.budget.core.BudgetMode
@@ -226,13 +225,12 @@ object ScreenBar {
                         ) + tail
                     // Reports has no tools of its own on the bar; it keeps add and the tail.
                     homeSection == HOME_REPORTS -> listOf(addTransaction()) + tail
-                    // The assistant fixes things from its own panels; its bar selects the inbox at its top and
-                    // refreshes the checks. Rules and payees live in settings › budget › manage.
+                    // The assistant fixes things from its own panels; its bar selects the inbox at its top. A pull
+                    // down syncs, as on every home section. Rules and payees live in settings › budget › manage.
                     homeSection == HOME_ASSISTANT ->
                         buildList {
                             add(addTransaction())
                             if (!inboxEmpty) add(spec("select-inbox", AppGlyph.Select, InboxCopy.SELECT, InboxCopy.BATCH))
-                            add(spec("refresh-assistant", AppGlyph.Sync, AssistantCopy.REFRESH))
                         } + tail
                     // Add a transaction and edit budget are the budget's buttons; hold heads the menu.
                     else ->
@@ -519,7 +517,6 @@ object ScreenBar {
     ): Boolean =
         when (id) {
             "refresh" -> state.remoteRefreshing
-            "refresh-assistant" -> state.assistant.refreshing || state.syncing
             else -> false
         }
 
@@ -668,7 +665,6 @@ class ScreenBarHandlers(
     val onMergeSelected: () -> Unit = {},
     val onMergeInboxSelected: () -> Unit = {},
     val onSyncServer: () -> Unit = {},
-    val onRefreshAssistant: () -> Unit = {},
     val onScheduleTransaction: () -> Unit = {},
     val onDeleteTransaction: () -> Unit = {},
     val onEditBudget: () -> Unit = {},
@@ -740,7 +736,6 @@ class ScreenBarHandlers(
             "end-selecting" -> onEndSelecting
             "select-inbox" -> onSelectInbox
             "sync-server" -> onSyncServer
-            "refresh-assistant" -> onRefreshAssistant
             "accept-selected" -> onAcceptSelected
             "categorize-selected" -> onCategorizeSelected
             "end-inbox-selecting" -> onEndInboxSelecting

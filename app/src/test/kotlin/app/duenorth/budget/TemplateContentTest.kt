@@ -31,6 +31,7 @@ import app.duenorth.budget.core.monthlyFixed
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -208,7 +209,7 @@ class TemplateContentTest {
         assertEquals(TemplateResult.Applied(1), model.state.value.templates.result)
         // Applied: back to the budget page templates were opened from.
         assertEquals(budgetPage, model.state.value.route)
-        assertEquals(UndoCopy.TEMPLATES, library.undoLabel(model.state.value.settings.openBudgetId!!))
+        assertNull(library.undoLabel(model.state.value.settings.openBudgetId!!))
     }
 
     @Test
@@ -235,7 +236,7 @@ class TemplateContentTest {
                 ?.category("c-gas")
                 ?.budgetedMinor == before + 10_000L
         }
-        assertEquals(UndoCopy.TEMPLATES, library.undoLabel(model.state.value.settings.openBudgetId!!))
+        assertNull(library.undoLabel(model.state.value.settings.openBudgetId!!))
     }
 
     @Test

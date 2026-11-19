@@ -241,7 +241,7 @@ class ShellViewModel(
     val schedules: SchedulesHolder = SchedulesHolder(host, rules)
 
     /** The assistant: what the checks found, and their fixes. */
-    val assistant: AssistantHolder = AssistantHolder(host, register, reconcile, bankSync, envelopes, schedules, budgetFiles)
+    val assistant: AssistantHolder = AssistantHolder(host, register, reconcile, bankSync, envelopes, schedules)
 
     /** End-of-month close out: the assistant's card and the page that settles every category. */
     val closeOut: CloseOutHolder = CloseOutHolder(host)

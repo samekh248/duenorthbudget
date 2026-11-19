@@ -195,11 +195,6 @@ class UndoEveryEditTest {
                 c.reset()
                 c.library.unmigrateCategoryAutomations(c.id, "c-food")
             },
-            "templates" to { c ->
-                c.library.saveCategoryNote(c.id, "c-food", "#template 50")
-                c.reset()
-                c.library.applyTemplates(c.id, october, overwrite = true, confirmed = true)
-            },
             "cleanup" to { c ->
                 c.library.saveCategoryNote(c.id, "c-food", "#cleanup source")
                 c.reset()
