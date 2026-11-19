@@ -925,30 +925,33 @@ fun AccountsSection(
     }
     val arrivals = remember { RowArrivals() }
     arrivals.prime(accounts.map { it.id })
+    val drag = remember { RowDrag() }
+    if (!reorder) drag.drop()
     val open = accounts.filter { !it.closed }
+    // A drop shows its new order at once, ahead of the accounts handed in (see RowDrag.ordered).
     val groups =
         listOf(
-            Triple("on-budget", ShellCopy.ON_BUDGET, open.filter { !it.offBudget }),
-            Triple("off-budget", ShellCopy.OFF_BUDGET, open.filter { it.offBudget }),
+            Triple("on-budget", ShellCopy.ON_BUDGET, drag.ordered(open.filter { !it.offBudget }, reorder) { it.id }),
+            Triple("off-budget", ShellCopy.OFF_BUDGET, drag.ordered(open.filter { it.offBudget }, reorder) { it.id }),
         ).filter { it.third.isNotEmpty() }
     val closed = accounts.filter { it.closed }
     // Bands alternate down the whole list, carrying on across group headings.
     val position = (groups.flatMap { it.third } + closed).withIndex().associate { it.value.id to it.index }
     var showClosed by rememberSaveable { mutableStateOf(false) }
     val money = { minor: Long -> MoneyFormat.format(minor, shell.currency, formatOptions) }
-    val drag = remember { RowDrag() }
-    if (!reorder) drag.drop()
     // A row while reorder is on: lifted and shifted by the drag, opened by nothing.
-    val line: @Composable (AccountRow, List<AccountRow>, Boolean, Dp) -> Unit = { account, rows, banded, air ->
+    // Its band goes by the place it shows in, so bands keep alternating while rows slide out of a drag's way.
+    val line: @Composable (AccountRow, List<AccountRow>, Dp) -> Unit = { account, rows, air ->
+        val ids = rows.map { it.id }
         AccountLine(
             account,
             money(account.balanceMinor),
             if (reorder) ({}) else onAccount,
-            arrivalModifier(account.id, arrivals).then(if (reorder) drag.follow(account.id, rows.map { it.id }) else Modifier),
-            banded = banded,
+            arrivalModifier(account.id, arrivals).then(if (reorder) drag.follow(account.id, ids) else Modifier),
+            banded = ledgerBanded(position.getValue(rows.first().id) + drag.slot(account.id, ids)),
             extraAir = air,
             lifted = drag.dragging == account.id,
-            handle = if (reorder) drag.handle(account.id, rows.map { it.id }, onMove) else null,
+            handle = if (reorder) drag.handle(account.id, ids, onMove) else null,
         )
     }
     Column(modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
@@ -994,7 +997,7 @@ fun AccountsSection(
                             }
                         }) {
                             rows.forEach {
-                                line(it, rows, ledgerBanded(position.getValue(it.id)), if (it === rows.last()) MetroDimens.Row else 0.dp)
+                                line(it, rows, if (it === rows.last()) MetroDimens.Row else 0.dp)
                             }
                         }
                         GroupGap()
@@ -1008,7 +1011,7 @@ fun AccountsSection(
                             MetroText(money(rows.sumOf { a -> a.balanceMinor }), Metro.typography.groupHeader, it)
                         }
                     }
-                    items(rows, key = { it.id }) { line(it, rows, ledgerBanded(position.getValue(it.id)), 0.dp) }
+                    items(rows, key = { it.id }) { line(it, rows, 0.dp) }
                     item(key = "account-gap-$id") { GroupGap() }
                 }
             }

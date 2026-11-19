@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
@@ -131,7 +132,66 @@ class AccountContentTest {
             up()
         }
         compose.waitForIdle()
-        assertEquals("a3" to "a1", moved)
+        // The first drop already shows a2, a3, a1, though the rows handed in never changed, so a3 goes before a2.
+        assertEquals("a3" to "a2", moved)
+    }
+
+    @Test
+    fun aDropShowsAtOnceAndAStaleListCannotUndoIt() {
+        val a1 = AccountRow("a1", "Checking", false, false, 120_000)
+        val a2 = AccountRow("a2", "Savings", false, false, 50_000)
+        val a3 = AccountRow("a3", "Visa", false, false, -2_500)
+        val shell =
+            MonthShell(
+                "b",
+                "Home",
+                BudgetMode.ENVELOPE,
+                USD,
+                YearMonth.of(2026, 10),
+                "to budget",
+                0,
+                groups = emptyList(),
+                accounts = listOf(a1, a2, a3),
+                inbox = emptyList(),
+            )
+        val rows = mutableStateOf(listOf(a1, a2, a3))
+        val reorder = mutableStateOf(true)
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(900.dp)) {
+                    AccountsSection(rows.value, shell, onListGesture = {}, reorder = reorder.value)
+                }
+            }
+        }
+
+        fun order() =
+            listOf("a1", "a2", "a3").sortedBy {
+                compose
+                    .onNodeWithTag("account-$it")
+                    .getBoundsInRoot()
+                    .top.value
+            }
+        compose.onNodeWithTag("account-handle-a1", useUnmergedTree = true).performTouchInput {
+            down(center)
+            moveBy(Offset(0f, 30f))
+            moveBy(Offset(0f, height * 2.4f))
+            up()
+        }
+        compose.waitForIdle()
+        // Nothing has reached the list yet, and the row stays where it was dropped.
+        assertEquals(listOf("a2", "a3", "a1"), order())
+        // A reload read before the write lands with the old order: the drop holds.
+        rows.value = listOf(a1, a2, a3)
+        compose.waitForIdle()
+        assertEquals(listOf("a2", "a3", "a1"), order())
+        // Done, then the saved order arrives; after that the list's own order rules again.
+        reorder.value = false
+        rows.value = listOf(a2, a3, a1)
+        compose.waitForIdle()
+        assertEquals(listOf("a2", "a3", "a1"), order())
+        rows.value = listOf(a3, a1, a2)
+        compose.waitForIdle()
+        assertEquals(listOf("a3", "a1", "a2"), order())
     }
 
     @Test
