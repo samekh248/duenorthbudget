@@ -86,8 +86,7 @@ class ScreenBarTest {
     @Test
     fun syncButtonsSpinOnlyWhileSyncing() {
         val idle = ShellUiState()
-        listOf("refresh", "refresh-assistant").forEach { assertFalse(ScreenBar.syncRunning(it, idle)) }
-        assertTrue(ScreenBar.syncRunning("refresh-assistant", idle.copy(syncing = true)))
+        assertFalse(ScreenBar.syncRunning("refresh", idle))
         assertTrue(ScreenBar.syncRunning("refresh", idle.copy(remoteRefreshing = true)))
         assertFalse(ScreenBar.syncRunning("add", idle.copy(bankSync = BankSyncState(syncing = true))))
     }
@@ -191,7 +190,7 @@ class ScreenBarTest {
                 mode = BudgetMode.ENVELOPE,
                 homeSection = ScreenBar.HOME_ASSISTANT,
             )
-        assertEquals(listOf("add", "select-inbox", "refresh-assistant"), inbox.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add", "select-inbox"), inbox.filter { it.primary }.map { it.id })
         // Rules and payees live in settings, so the assistant's menu is just the hub tail.
         assertEquals(listOf("settings"), inbox.filter { !it.primary }.map { it.id })
         val empty =
@@ -202,7 +201,7 @@ class ScreenBarTest {
                 homeSection = ScreenBar.HOME_ASSISTANT,
                 inboxEmpty = true,
             )
-        assertEquals(listOf("add", "refresh-assistant"), empty.filter { it.primary }.map { it.id })
+        assertEquals(listOf("add"), empty.filter { it.primary }.map { it.id })
         val selecting =
             ScreenBar.specsFor(
                 ShellRoute.Home,
