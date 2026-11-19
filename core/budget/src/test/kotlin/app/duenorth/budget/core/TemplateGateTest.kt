@@ -2,6 +2,7 @@ package app.duenorth.budget.core
 
 import app.duenorth.budget.core.parity.ParityFixture
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.YearMonth
@@ -38,15 +39,21 @@ class TemplateGateTest {
     }
 
     @Test
-    fun bothFlagsOnAppliesAsOneUndoStep() {
+    fun bothFlagsOnAppliesPastUndo() {
         fixture.open().use { opened ->
             opened.library.setPreference(opened.budgetId, "flags.experimental", "true")
             assertTrue(opened.library.readFormatPrefs(opened.budgetId).templatesOn)
+            // An earlier step is gone too: undoing it under the run would fight over the cells the run wrote.
+            val fixed = fixture.id("categories", "Fixed")
+            assertTrue(opened.library.saveCategoryNote(opened.budgetId, fixed, "rent"))
+            assertTrue(opened.library.canUndo(opened.budgetId))
             val before = budgets(opened)
             val result = opened.library.applyTemplates(opened.budgetId, october, overwrite = false)
             assertTrue("$result", result is TemplateResult.Applied)
             assertTrue(budgets(opened) != before)
-            assertEquals(UndoCopy.TEMPLATES, opened.library.journal.newestLabel(opened.budgetId))
+            assertNull(opened.library.undoLabel(opened.budgetId))
+            assertEquals(UndoResult.Empty, opened.library.undo(opened.budgetId))
+            assertTrue(budgets(opened) != before)
         }
     }
 

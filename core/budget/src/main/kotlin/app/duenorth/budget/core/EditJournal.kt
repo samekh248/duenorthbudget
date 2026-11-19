@@ -25,7 +25,6 @@ object UndoCopy {
     const val DELETE_PAYEES = "delete payees"
     const val IMPORT = "import"
     const val AUTO_POST = "auto-post"
-    const val TEMPLATES = "templates"
     const val CLEANUP = "end-of-month cleanup"
     const val CATEGORY_NOTE = "note"
     const val AUTOMATIONS = "automations"
@@ -88,12 +87,32 @@ class EditJournal(
         budgetId: String,
         label: String,
         block: () -> T,
+    ): T = capture(session, budgetId, label, block)
+
+    /**
+     * Runs [block] as a write undo can't take back. One that writes anything empties the stack: an older step
+     * undone under it would fight over the cells it wrote and land in conflicts.
+     */
+    fun <T> oneWay(
+        session: SqlSession,
+        budgetId: String,
+        block: () -> T,
+    ): T = capture(session, budgetId, null, block)
+
+    /** [step] with a [label], or [oneWay] without one. */
+    private fun <T> capture(
+        session: SqlSession,
+        budgetId: String,
+        label: String?,
+        block: () -> T,
     ): T {
         val cells = SyncSchema.beginCapture(session) ?: return block()
         try {
             val box = arrayOfNulls<Any?>(1)
             session.transaction { box[0] = block() }
-            if (cells.isNotEmpty()) push(JournalStep(budgetId, label, collapse(cells)))
+            if (cells.isNotEmpty()) {
+                if (label == null) forget(budgetId) else push(JournalStep(budgetId, label, collapse(cells)))
+            }
             @Suppress("UNCHECKED_CAST")
             return box[0] as T
         } finally {
@@ -173,6 +192,12 @@ class EditJournal(
         }
         steps.addFirst(step)
         while (steps.size > cap) steps.removeLast()
+    }
+
+    @Synchronized
+    private fun forget(budgetId: String) {
+        steps.clear()
+        this.budgetId = budgetId
     }
 
     @Synchronized

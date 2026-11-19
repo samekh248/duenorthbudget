@@ -1032,7 +1032,7 @@ class BudgetLibrary(
             else -> open(budgetId) { TemplateEngine(it, clock.today()).check() } ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
         }
 
-    /** Apply or overwrite [month]'s budgets from templates as one undo step; both flags must be on. */
+    /** Apply or overwrite [month]'s budgets from templates, which undo can't take back; both flags must be on. */
     fun applyTemplates(
         budgetId: String,
         month: YearMonth,
@@ -1040,28 +1040,28 @@ class BudgetLibrary(
         confirmed: Boolean = false,
     ): TemplateResult {
         if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF)
-        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).run(month, overwrite, confirmed) }
+        return oneWay(budgetId) { TemplateEngine(it, clock.today()).run(month, overwrite, confirmed) }
             ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
     }
 
-    /** The templates page's apply: raises every short target from what [month] has to budget, as one undo step ([TemplateEngine.fill]). */
+    /** The templates page's apply: raises every short target from what [month] has to budget, past undo ([TemplateEngine.fill]). */
     fun fillTemplates(
         budgetId: String,
         month: YearMonth,
     ): TemplateResult {
         if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF)
-        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).fill(month) }
+        return oneWay(budgetId) { TemplateEngine(it, clock.today()).fill(month) }
             ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
     }
 
-    /** Tops this month's targets up from at most [cap], priority first, as one undo step ([TemplateEngine.topUp]). */
+    /** Tops this month's targets up from at most [cap], priority first, past undo ([TemplateEngine.topUp]). */
     fun topUpTemplates(
         budgetId: String,
         month: YearMonth,
         cap: Long,
     ): TemplateResult {
         if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF)
-        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).runTopUp(month, cap) }
+        return oneWay(budgetId) { TemplateEngine(it, clock.today()).runTopUp(month, cap) }
             ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
     }
 
@@ -1419,6 +1419,12 @@ class BudgetLibrary(
         // One step at a time: a capture belongs to the session, and auto-post runs from sync on
         // another thread while the person edits.
         serial { open(id) { session -> journal.step(session, id, label) { block(session) } } }
+
+    /** [open] as a write undo can't take back; see [EditJournal.oneWay]. */
+    private fun <T> oneWay(
+        id: String,
+        block: (SqlSession) -> T,
+    ): T? = serial { open(id) { session -> journal.oneWay(session, id) { block(session) } } }
 
     /** Journaled writes and undo run one at a time. */
     internal fun <T> serial(block: () -> T): T = synchronized(editLock) { block() }
