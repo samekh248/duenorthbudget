@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -20,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.duenorth.budget.core.CategoryRow
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.PillCorner
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroWeights
 
@@ -38,12 +42,13 @@ internal fun PinnedBalances(
 ) {
     if (pinned.isEmpty()) return
     val columns = PinnedLayout.columns(pinned.size)
+    val gap = if (Metro.style.tonal) PinnedLayout.TonalGap else PinnedLayout.Gap
     BoxWithConstraints(modifier.fillMaxWidth().testTag("assistant-pins")) {
-        val tileWidth = (maxWidth - PinnedLayout.Gap * (columns - 1)) / columns
+        val tileWidth = (maxWidth - gap * (columns - 1)) / columns
         val oneLine = tileWidth >= PinnedLayout.OneLineMin
-        Column(verticalArrangement = Arrangement.spacedBy(PinnedLayout.Gap)) {
+        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
             pinned.chunked(columns).forEach { row ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(PinnedLayout.Gap)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(gap)) {
                     row.forEach { category ->
                         PinnedTile(category, money, oneLine, Modifier.weight(1f)) { onOpen(category.id) }
                     }
@@ -61,6 +66,10 @@ private fun PinnedTile(
     modifier: Modifier,
     onOpen: () -> Unit,
 ) {
+    if (Metro.style.tonal) {
+        TonalPinnedTile(pin, money, modifier, onOpen)
+        return
+    }
     val tile =
         modifier
             .background(Metro.colors.chrome)
@@ -78,6 +87,52 @@ private fun PinnedTile(
             PinName(pin.name, Modifier.fillMaxWidth())
             PinBalance(pin.availableMinor, money)
         }
+    }
+}
+
+/**
+ * Tonal's pinned tile, as the category widget draws one: a rounded tonal card, the name in small grey type over
+ * the balance set large, and an overspent balance on a red pill. Always stacked, as the widget's cells are.
+ */
+@Composable
+private fun TonalPinnedTile(
+    pin: CategoryRow,
+    money: (Long) -> String,
+    modifier: Modifier,
+    onOpen: () -> Unit,
+) {
+    val over = pin.availableMinor < 0
+    Column(
+        modifier
+            .clip(RoundedCornerShape(PinnedLayout.TonalCorner))
+            .background(Metro.surface.layer)
+            .rowPress(onOpen) { category(pin.id) }
+            .semantics(mergeDescendants = true) {}
+            .padding(start = 14.dp, end = 10.dp, top = 10.dp, bottom = 10.dp)
+            .testTag("assistant-pin-${pin.id}"),
+    ) {
+        PinName(pin.name, Modifier.fillMaxWidth())
+        val style = Metro.typography.subheader.copy(fontSize = 22.sp, lineHeight = 26.sp)
+        BasicText(
+            money(pin.availableMinor),
+            modifier =
+                if (over) {
+                    Modifier
+                        .padding(top = 2.dp)
+                        .offset(x = (-6).dp)
+                        .background(Metro.colors.errorContainer, RoundedCornerShape(PillCorner))
+                        .padding(horizontal = 6.dp)
+                } else {
+                    Modifier.padding(top = 2.dp)
+                },
+            style =
+                (if (over) style.copy(fontWeight = MetroWeights.Semibold) else style)
+                    .copy(color = if (over) Metro.colors.onErrorContainer else Metro.colors.foreground),
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = style.fontSize, stepSize = 0.5.sp),
+        )
     }
 }
 
@@ -108,6 +163,12 @@ private fun PinBalance(
 internal object PinnedLayout {
     /** Space between tiles, the same both ways. */
     val Gap: Dp = 4.dp
+
+    /** Tonal's tiles stand further apart, as rounded cards. */
+    val TonalGap: Dp = 8.dp
+
+    /** Tonal's tile corner, as the category widget's cells. */
+    val TonalCorner: Dp = 16.dp
 
     /** A tile at least this wide sets its name and balance on one line. */
     val OneLineMin: Dp = 150.dp

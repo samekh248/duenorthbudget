@@ -216,6 +216,19 @@ class AssistantScreenshotTest {
     @Test
     fun sixPinsAllClearDark() = snapPins("assistant_pins_6_clear_dark", dark = true, count = 6, report = AssistantReport.EMPTY)
 
+    // Tonal's pins are rounded tonal cards, an overspent balance on a red pill.
+    @Test
+    fun threePinsTonalLight() = snapPins("style_tonal_assistant_pins_3_light", dark = false, count = 3, style = MetroStyle.Tonal)
+
+    @Test
+    fun threePinsTonalDark() = snapPins("style_tonal_assistant_pins_3_dark", dark = true, count = 3, style = MetroStyle.Tonal)
+
+    @Test
+    fun fivePinsTonalLight() = snapPins("style_tonal_assistant_pins_5_light", dark = false, count = 5, style = MetroStyle.Tonal)
+
+    @Test
+    fun fivePinsTonalDark() = snapPins("style_tonal_assistant_pins_5_dark", dark = true, count = 5, style = MetroStyle.Tonal)
+
     /** The first [count] sample pins over the usual findings; each pin shows as one tile and nothing more. */
     private fun snapPins(
         name: String,
