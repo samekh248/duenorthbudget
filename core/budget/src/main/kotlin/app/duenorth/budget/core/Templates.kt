@@ -27,6 +27,8 @@ object TemplateCopy {
     const val OFF = "turn on budget templates in settings first"
     const val NOTE = "note"
     const val APPLIED = "templates applied"
+    const val ALL_MET = "every target is already met"
+    const val NOTHING_TO_BUDGET = "nothing to budget this month"
 }
 
 data class TemplateError(
@@ -255,11 +257,35 @@ class TemplateEngine(
         cap: Long,
     ): TemplateResult {
         val changes = topUp(month, cap)
+        writeTopUp(month, changes)
+        return TemplateResult.Applied(changes.size)
+    }
+
+    /**
+     * App-only (the templates page's apply): every category short of what its templates ask this month is raised
+     * toward it, lowest priority number first, from what [month] has to budget. A category that already has some
+     * money is topped up rather than skipped, as Actual's apply would, and nothing is ever lowered. Says why when
+     * nothing changes.
+     */
+    fun fill(month: YearMonth): TemplateResult {
+        val errors = categories().flatMap { category -> category.errors.map { TemplateError(category.name, it) } }
+        if (errors.isNotEmpty()) return TemplateResult.Invalid(errors)
+        val cap = TemplateSheet(session, today).month(month).figures.headerMinor
+        if (cap <= 0L) return TemplateResult.Rejected(TemplateCopy.NOTHING_TO_BUDGET)
+        val changes = topUp(month, cap)
+        if (changes.isEmpty()) return TemplateResult.Rejected(TemplateCopy.ALL_MET)
+        writeTopUp(month, changes)
+        return TemplateResult.Applied(changes.size)
+    }
+
+    private fun writeTopUp(
+        month: YearMonth,
+        changes: Map<String, Pair<Long, Long>>,
+    ) {
         val table = if (TemplateSheet(session, today).tracking) "reflect_budgets" else "zero_budgets"
         session.transaction {
             changes.forEach { (id, amounts) -> setBudget(table, month, id, amounts.second) }
         }
-        return TemplateResult.Applied(changes.size)
     }
 
     /**

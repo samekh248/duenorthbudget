@@ -109,7 +109,7 @@ class BudgetEditHolder internal constructor(
         host.mutate { it.copy(templates = it.templates.copy(busy = true, confirm = null)) }
         host.scope.launch {
             val (result, amounts) =
-                withContext(host.io) { host.library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
+                withContext(host.io) { host.library.previewTemplates(budgetId, month, overwrite, edit.budgeted, fill = !overwrite) }
             host.toastTemplates(result, written = false)
             var filled = false
             host.mutate { current ->
@@ -119,7 +119,8 @@ class BudgetEditHolder internal constructor(
                     current.copy(templates = current.templates.copy(result = result, busy = false))
                 } else {
                     current.copy(
-                        budgetEdit = open.copy(budgeted = open.budgeted + amounts, templates = (open.templates ?: false) || overwrite),
+                        // A top-up's amounts are the whole of it: done saves them as they are, with no template run first.
+                        budgetEdit = open.copy(budgeted = open.budgeted + amounts, templates = if (overwrite) true else open.templates),
                         templates = current.templates.copy(result = result, busy = false),
                     )
                 }
