@@ -43,10 +43,19 @@ class BudgetOverspentScreenshotTest {
     @Test
     fun overspentGoalsDark() = snap(dark = true, name = "budget_overspent_goals_dark", goals = true)
 
+    // Tonal marks the overspent figure as a red pill instead of tinting the row.
+    @Test
+    fun overspentTonalLight() =
+        snap(dark = false, name = "style_tonal_budget_overspent_goals_light", goals = true, style = MetroStyle.Tonal)
+
+    @Test
+    fun overspentTonalDark() = snap(dark = true, name = "style_tonal_budget_overspent_goals_dark", goals = true, style = MetroStyle.Tonal)
+
     private fun snap(
         dark: Boolean,
         name: String,
         goals: Boolean = false,
+        style: MetroStyle = MetroStyle.Metro,
     ) {
         val shell =
             MonthShell(
@@ -63,7 +72,7 @@ class BudgetOverspentScreenshotTest {
             )
         compose.setContent {
             CompositionLocalProvider(LocalFormatPrefs provides FormatPrefs(experimental = goals, goalTemplates = goals)) {
-                MetroTheme(darkTheme = dark, style = MetroStyle.Metro) {
+                MetroTheme(darkTheme = dark, style = style) {
                     Column(Modifier.fillMaxSize()) {
                         HomePivot(
                             shell = shell,

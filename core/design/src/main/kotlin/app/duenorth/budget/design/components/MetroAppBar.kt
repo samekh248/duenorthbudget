@@ -41,8 +41,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -134,7 +139,11 @@ fun MetroAppBar(
         return
     }
     val chrome =
-        if (style.layers) {
+        if (style.tonal) {
+            // Tonal: a bottom sheet across the full width, its top corners rounded, with the page fading into it
+            // above, so rows scrolling under it dissolve rather than end at a hard cut.
+            Modifier.tonalBar(colors.background, colors.chrome).windowInsetsPadding(windowInsets).padding(bottom = 4.dp)
+        } else if (style.layers) {
             // Mica: an acrylic sheet floating a gutter in from the screen's edges, over the page's content.
             Modifier
                 .background(colors.background)
@@ -525,3 +534,40 @@ internal fun fitCaption(
         }
     }
 }
+
+/** How far above the tonal bar the page fades out. */
+private val TonalFade = 20.dp
+
+/**
+ * The tonal bar: [bar] filling the bounds with the top corners rounded by [TonalCorner.Floating], and above it a
+ * [TonalFade] tall gradient from clear to [page] over the content's last rows.
+ */
+private fun Modifier.tonalBar(
+    page: Color,
+    bar: Color,
+): Modifier =
+    drawBehind {
+        val fade = TonalFade.toPx()
+        drawRect(
+            Brush.verticalGradient(listOf(page.copy(alpha = 0f), page), startY = -fade, endY = 0f),
+            topLeft = Offset(0f, -fade),
+            size = Size(size.width, fade),
+        )
+        val r = TonalCorner.Floating.toPx()
+        val shape =
+            Path().apply {
+                addRoundRect(
+                    RoundRect(
+                        0f,
+                        0f,
+                        size.width,
+                        size.height,
+                        topLeftCornerRadius = CornerRadius(r),
+                        topRightCornerRadius = CornerRadius(r),
+                    ),
+                )
+            }
+        // The page shows in the corners, so the bar reads as a sheet laid on it.
+        drawRect(page)
+        drawPath(shape, bar)
+    }

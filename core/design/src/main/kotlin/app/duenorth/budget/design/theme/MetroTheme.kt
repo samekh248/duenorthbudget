@@ -159,6 +159,9 @@ data class MetroColors(
     /** A block behind a figure in the red: the Windows Phone red swatch, with white on it. */
     val errorFill: Color = Color(0xFFE51400),
     val onErrorFill: Color = Color(0xFFFFFFFF),
+    /** The tonal style's softer red: a pill behind an overspent figure, with [onErrorContainer] on it. */
+    val errorContainer: Color = Color(0xFFFFDAD6),
+    val onErrorContainer: Color = Color(0xFF93000A),
     /** A text box while it is being typed in: white on either theme, as on Windows Phone. */
     val fieldActive: Color = Color(0xFFFFFFFF),
     /** Text in a box being typed in. */
@@ -188,6 +191,8 @@ data class MetroColors(
                 chrome = Color(0xFF1F1F1F),
                 outline = Color(0xFFFFFFFF),
                 error = Color(0xFFFF5C4D),
+                errorContainer = Color(0xFF93000A),
+                onErrorContainer = Color(0xFFFFDAD6),
             )
     }
 }
@@ -283,13 +288,13 @@ fun MetroTheme(
     style: MetroStyle = MetroStyle.Default,
     content: @Composable () -> Unit,
 ) {
-    val colors = StylePalettes.colors(style, darkTheme)
+    val colors = StylePalettes.colors(style, darkTheme, accent)
     val accentColors = accent.colors(darkTheme)
     CompositionLocalProvider(
         LocalMetroColors provides colors,
         // A tinted page can pull an accent's text under 4.5:1, so it moves just far enough to read again.
         LocalAccent provides accentColors.copy(text = Contrast.ensure(accentColors.text, colors.background)),
-        LocalMetroSurface provides MetroSurface.of(style, darkTheme),
+        LocalMetroSurface provides MetroSurface.of(style, darkTheme, accent),
         LocalAppAccent provides accent,
         LocalMetroTypography provides
             (if (style.mobile10) MetroTypography.Mobile10 else MetroTypography.Default).let { if (darkTheme) it else it.forLightPage() },

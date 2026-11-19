@@ -55,7 +55,9 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.duenorth.budget.design.components.LayerCorner
 import app.duenorth.budget.design.components.MetroText
+import app.duenorth.budget.design.components.corner
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
 import app.duenorth.budget.design.theme.MetroDimens
@@ -124,7 +126,8 @@ fun ToastHost(
             when (style) {
                 MetroStyle.Metro -> MetroToast(current, dismiss, act, body)
                 MetroStyle.TileRelief -> TileToast(current, dismiss, act, body)
-                MetroStyle.Mica -> MicaToast(current, dismiss, act, body)
+                // Tonal floats mica's toast, with its own rounder corners.
+                MetroStyle.Mica, MetroStyle.Tonal -> MicaToast(current, dismiss, act, body)
                 MetroStyle.Mobile10 -> Mobile10Toast(current, dismiss, act, body)
             }
         }
@@ -271,7 +274,7 @@ private fun MicaToast(
 ) {
     val dark = Metro.colors.isDark
     val failed = toast.kind.failed
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(Metro.surface.corner(LayerCorner.Card))
     val hue = MicaToastColors.hue(failed)
     Row(
         modifier

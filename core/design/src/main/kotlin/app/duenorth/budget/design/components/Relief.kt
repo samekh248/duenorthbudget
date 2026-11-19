@@ -46,6 +46,29 @@ object LayerCorner {
     val Badge = 12.dp
 }
 
+/** The tonal style's corners, a step rounder than mica's: a card, a control, and a floating sheet or badge. */
+object TonalCorner {
+    val Card = 20.dp
+    val Control = 14.dp
+    val Floating = 24.dp
+}
+
+/**
+ * [corner], one of mica's [LayerCorner]s, as this surface's style draws it: the same under mica, the matching
+ * [TonalCorner] under tonal. A pill stays a pill.
+ */
+fun MetroSurface.corner(corner: Dp): Dp =
+    if (!style.tonal) {
+        corner
+    } else {
+        when (corner) {
+            LayerCorner.Card -> TonalCorner.Card
+            LayerCorner.Control -> TonalCorner.Control
+            LayerCorner.Floating -> TonalCorner.Floating
+            else -> corner
+        }
+    }
+
 /**
  * Draws a relief surface behind the content: a panel ([small] false) or a control ([small] true), in the style's
  * light and shade, filled with [fill] or [brush]. Corners are square, as in Metro, unless [corner] is given (the
@@ -63,9 +86,11 @@ fun Modifier.relief(
     if (!surface.style.relief) return this
     val radius =
         when {
+            // Tonal keeps a pill a pill: round app-bar buttons, chips and the chosen segment.
+            surface.style.tonal && corner == PillCorner -> PillCorner
             // Mica rounds everything a little, and turns the app bar's round buttons into rounded squares too.
             surface.style.layers && (corner == null || corner == PillCorner) ->
-                if (small) LayerCorner.Control else LayerCorner.Card
+                surface.corner(if (small) LayerCorner.Control else LayerCorner.Card)
             else -> corner ?: 0.dp
         }
     return drawBehind { drawRelief(surface, relief, Offset.Zero, size, radius.toPx(), fill, brush, small) }
@@ -273,7 +298,7 @@ fun Modifier.layerSlice(
     val surface = Metro.surface
     if (!surface.style.layers) return this
     return drawBehind {
-        val r = LayerCorner.Card.toPx()
+        val r = surface.corner(LayerCorner.Card).toPx()
         val above = if (top) 0f else 2 * r
         val below = if (bottom) 0f else 2 * r
         clipRect {
@@ -296,7 +321,7 @@ fun Modifier.layerSlice(
  */
 fun Modifier.acrylicSheet(surface: MetroSurface): Modifier =
     drawBehind {
-        val r = LayerCorner.Floating.toPx()
+        val r = surface.corner(LayerCorner.Floating).toPx()
         val blur = surface.blur.toPx()
         drawIntoCanvas { canvas ->
             val rect = RectF(0f, surface.depth.toPx(), size.width, size.height + surface.depth.toPx())

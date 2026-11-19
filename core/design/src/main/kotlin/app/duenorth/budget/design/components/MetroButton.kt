@@ -132,7 +132,12 @@ private fun MetroActionButton(
             .then(
                 if (relief) {
                     // Relief: the button stands off the page and presses in under the finger.
-                    Modifier.relief(if (pressed) Relief.Inset else Relief.Raised, small = true)
+                    // Tonal draws it as a pill, as a Material button.
+                    Modifier.relief(
+                        if (pressed) Relief.Inset else Relief.Raised,
+                        small = true,
+                        corner = if (Metro.style.tonal) PillCorner else null,
+                    )
                 } else {
                     Modifier
                         .border(MetroDimens.Stroke, colors.foreground)
