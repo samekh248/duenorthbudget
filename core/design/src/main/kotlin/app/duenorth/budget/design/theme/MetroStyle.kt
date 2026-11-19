@@ -26,8 +26,6 @@ enum class MetroStyle(
     val panels: Boolean = false,
     /** To budget is a flat accent tile, held a raised neutral one (tile relief). */
     val heroTiles: Boolean = false,
-    /** Add is the one accent button on the app bar (tile relief). */
-    val filledAdd: Boolean = false,
     /** Surfaces are rounded layer cards with a hairline edge instead of light and shade; bars float (mica). */
     val layers: Boolean = false,
     /** Windows 10 Mobile: compact type in sentence case, a flat command bar, filled buttons, no bands (mobile 10). */
@@ -36,12 +34,12 @@ enum class MetroStyle(
     val tonal: Boolean = false,
 ) {
     Metro("metro", "metro"),
-    TileRelief("tile-relief", "tile relief", panels = true, heroTiles = true, filledAdd = true),
+    TileRelief("tile-relief", "tile relief", panels = true, heroTiles = true),
 
     // The ids stay as saved on phones; the labels avoid other companies' product names and trademarks.
-    Mica("mica", "glass", panels = true, filledAdd = true, layers = true),
+    Mica("mica", "glass", panels = true, layers = true),
     Mobile10("windows-10-mobile", "compact", mobile10 = true),
-    Tonal("tonal", "tonal", panels = true, filledAdd = true, layers = true, tonal = true),
+    Tonal("tonal", "tonal", panels = true, layers = true, tonal = true),
     ;
 
     /** Whether surfaces are drawn by [MetroSurface] (relief or layers) rather than Metro's outlines. */

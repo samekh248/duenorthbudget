@@ -40,6 +40,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -415,19 +416,17 @@ private fun AppBarIcon(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val style = Metro.style
-        // Tile relief fills add with the accent, so the day's main action leads the bar.
-        val filled = style.filledAdd && action.glyph == AppGlyph.Add
+        // Every button on the bar looks alike in each style (owner, 2026-11-19): none is singled out in the accent.
         // The button's own face is the ground it stands on: the bar's chrome.
         val ground = colors.chrome
-        val accent = Metro.accent
         Box(
             Modifier
                 .size(MetroDimens.AppBarIcon)
                 .then(
                     when {
-                        filled ->
-                            Modifier.relief(Relief.Raised, small = true, corner = PillCorner, fill = accent.fill)
-                        // Mica's other buttons are bare glyphs on the acrylic.
+                        // Tonal: a round tonal container behind each glyph, as Material's filled tonal icon button.
+                        style.tonal -> Modifier.clip(CircleShape).background(Metro.accent.fill.copy(alpha = 0.14f))
+                        // Mica: bare glyphs on the acrylic.
                         style.layers -> Modifier
                         style.relief -> Modifier.relief(Relief.Raised, small = true, corner = PillCorner, fill = ground)
                         else -> Modifier.border(MetroDimens.AppBarStroke, colors.foreground, CircleShape)
@@ -435,7 +434,7 @@ private fun AppBarIcon(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            AppGlyphIcon(action.glyph, if (filled) accent.onFill else colors.foreground, Modifier.syncSpin(action.spinning))
+            AppGlyphIcon(action.glyph, colors.foreground, Modifier.syncSpin(action.spinning))
         }
         if (showLabel) {
             // One line: the glyph says what it does, the caption says to what.
