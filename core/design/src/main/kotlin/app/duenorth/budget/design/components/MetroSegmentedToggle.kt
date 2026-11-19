@@ -55,7 +55,9 @@ fun MetroSegmentedToggle(
 ) {
     // Mica: the options share a track on a layer card. Tile relief stands them up side by side, Windows 10 Mobile just apart.
     val style = Metro.style
-    val track = if (style.layers) Modifier.relief(Relief.Raised).padding(3.dp) else Modifier
+    // Tonal rounds the track and the chosen option into pills, as Material's segmented button.
+    val pill = if (style.tonal) PillCorner else null
+    val track = if (style.layers) Modifier.relief(Relief.Raised, corner = pill).padding(3.dp) else Modifier
     Row(
         modifier.height(IntrinsicSize.Min).then(track).testTag(tag),
         horizontalArrangement =
@@ -93,7 +95,8 @@ private fun Segment(
             .then(
                 when {
                     // The chosen option stands out in the accent.
-                    relief && selected -> Modifier.relief(Relief.Raised, small = true, fill = accent.fill)
+                    relief && selected ->
+                        Modifier.relief(Relief.Raised, small = true, corner = if (style.tonal) PillCorner else null, fill = accent.fill)
                     style.layers -> Modifier
                     relief -> Modifier.relief(Relief.Raised, small = true)
                     // Windows 10 Mobile: flat blocks, grey until chosen, one gutter apart.

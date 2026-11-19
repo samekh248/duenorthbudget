@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -812,6 +814,8 @@ fun CategoryLine(
     // Overspent, the row is flagged: a red tinted panel, the figure in red, and how far over under the name.
     // While a month loads, last month's figures would flag the wrong rows.
     val over = category.availableMinor < 0 && !figuresLoading()
+    // Tonal marks an overspent row by its figure alone, a red pill, rather than tinting the whole row.
+    val overPill = over && Metro.style.tonal
     val budgeted = MoneyFormat.format(category.budgetedMinor, money, formatOptions)
     val spent = MoneyFormat.format(category.spentMinor, money, formatOptions)
     val available = MoneyFormat.format(category.availableMinor, money, formatOptions)
@@ -830,7 +834,7 @@ fun CategoryLine(
             .fillMaxWidth()
             .semantics(mergeDescendants = true) { contentDescription = spoken }
             .then(
-                if (over) {
+                if (over && !overPill) {
                     Modifier.ledgerFlag(overspentTint)
                 } else {
                     Modifier.ledgerFill(if (banded) ledgerBand else Color.Transparent)
@@ -854,12 +858,16 @@ fun CategoryLine(
             )
             LedgerFigure(budgeted, Metro.typography.body, Metro.colors.foreground, "category-budgeted-${category.id}")
             LedgerFigure(spent, Metro.typography.body, Metro.colors.foreground, "category-spent-${category.id}")
-            LedgerFigure(
-                available,
-                if (over) Metro.typography.body.copy(fontWeight = FontWeight.SemiBold) else Metro.typography.body,
-                if (over) Metro.colors.error else Metro.accent.text,
-                "category-available-${category.id}",
-            )
+            if (overPill) {
+                OverPillFigure(available, "category-available-${category.id}")
+            } else {
+                LedgerFigure(
+                    available,
+                    if (over) Metro.typography.body.copy(fontWeight = FontWeight.SemiBold) else Metro.typography.body,
+                    if (over) Metro.colors.error else Metro.accent.text,
+                    "category-available-${category.id}",
+                )
+            }
         }
         if (overLine != null) {
             MetroText(
@@ -872,7 +880,7 @@ fun CategoryLine(
         if (progress != null) {
             // On a flagged panel, the bar keeps the panel's side margin below it too.
             val gap = if (over) LEDGER_FLAG_MARGIN + LEDGER_FLAG_INSET else GOAL_BAR_GAP
-            GoalBar(progress, Modifier.padding(bottom = gap).testTag("category-goal-${category.id}"))
+            GoalBar(progress, Modifier.padding(bottom = gap).testTag("category-goal-${category.id}"), over = overPill)
         }
     }
 }
@@ -885,23 +893,57 @@ internal val overspentTint: Color
 
 private val OVER_LINE_GAP = 8.dp
 
+/** Tonal's overspent figure: semibold on a red pill, hugging the figure at the column's end. */
+@Composable
+private fun RowScope.OverPillFigure(
+    text: String,
+    tag: String,
+) {
+    Box(Modifier.weight(LEDGER_FIGURE), contentAlignment = Alignment.CenterEnd) {
+        FigureText(
+            text,
+            Metro.typography.body.copy(fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End),
+            Modifier
+                .offset(x = OVER_PILL_PAD)
+                .background(Metro.colors.errorContainer, RoundedCornerShape(PillCorner))
+                .padding(horizontal = OVER_PILL_PAD, vertical = 2.dp)
+                .testTag(tag),
+            color = Metro.colors.onErrorContainer,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+/** The pill's air either side of the figure; the pill reaches that far past the column so the figures still align. */
+private val OVER_PILL_PAD = 8.dp
+
 /** A thin bar across the row: the accent fills as much of the goal as is funded, the rest is a faint track. */
 @Composable
 private fun GoalBar(
     progress: Float,
     modifier: Modifier = Modifier,
+    /** Tonal fills an overspent category's bar in red, beside its red pill. */
+    over: Boolean = false,
 ) {
-    // Mica rounds the bar's ends, as Windows 11 draws a progress bar.
-    val layers = Metro.style.layers
+    // Mica rounds the bar's ends, as Windows 11 draws a progress bar; tonal draws a thicker pill on a tinted track.
+    val style = Metro.style
     Row(
         modifier
             .fillMaxWidth()
-            .height(if (layers) GOAL_BAR_HEIGHT + 1.dp else GOAL_BAR_HEIGHT)
-            .layerClip(PillCorner)
+            .height(
+                when {
+                    style.tonal -> GOAL_BAR_HEIGHT + 3.dp
+                    style.layers -> GOAL_BAR_HEIGHT + 1.dp
+                    else -> GOAL_BAR_HEIGHT
+                },
+            ).layerClip(PillCorner)
             .semantics { progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f) },
     ) {
-        if (progress > 0f) Box(Modifier.weight(progress).fillMaxHeight().background(Metro.accent.fill))
-        if (progress < 1f) Box(Modifier.weight(1f - progress).fillMaxHeight().background(Metro.colors.secondary.copy(alpha = 0.25f)))
+        val fill = if (over) Metro.colors.errorFill else Metro.accent.fill
+        if (progress > 0f) Box(Modifier.weight(progress).fillMaxHeight().background(fill))
+        val track = if (style.tonal) Metro.accent.fill.copy(alpha = 0.16f) else Metro.colors.secondary.copy(alpha = 0.25f)
+        if (progress < 1f) Box(Modifier.weight(1f - progress).fillMaxHeight().background(track))
     }
 }
 

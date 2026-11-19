@@ -67,6 +67,12 @@ class StyleSurfacesScreenshotTest {
     @Test
     fun mobile10Dark() = snap(MetroStyle.Mobile10, dark = true)
 
+    @Test
+    fun tonalLight() = snap(MetroStyle.Tonal, dark = false)
+
+    @Test
+    fun tonalDark() = snap(MetroStyle.Tonal, dark = true)
+
     private fun snap(
         style: MetroStyle,
         dark: Boolean,

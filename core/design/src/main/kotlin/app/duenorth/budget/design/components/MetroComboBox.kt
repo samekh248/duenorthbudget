@@ -67,7 +67,7 @@ fun <T> MetroComboBox(
             ).then(
                 if (Metro.style.layers) {
                     // Mica: presses stay inside the rounded field, and the open box is underlined in the accent.
-                    Modifier.layerFocusLine(open).clip(RoundedCornerShape(LayerCorner.Control))
+                    Modifier.layerFocusLine(open).clip(RoundedCornerShape(Metro.surface.corner(LayerCorner.Control)))
                 } else {
                     Modifier
                 },

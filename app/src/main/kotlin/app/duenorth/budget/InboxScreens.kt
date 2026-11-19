@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +48,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -96,6 +98,7 @@ import app.duenorth.budget.design.components.MetroContextMenuPanel
 import app.duenorth.budget.design.components.MetroMenuItem
 import app.duenorth.budget.design.components.MetroText
 import app.duenorth.budget.design.components.Mobile10Dimens
+import app.duenorth.budget.design.components.PillCorner
 import app.duenorth.budget.design.components.controlFrame
 import app.duenorth.budget.design.components.metroPress
 import app.duenorth.budget.design.theme.Metro
@@ -759,6 +762,8 @@ internal fun AccentButton(
         modifier
             .fillMaxWidth()
             .heightIn(min = if (mobile10) Mobile10Dimens.Button else MetroDimens.ButtonMin)
+            // Tonal draws it as a pill, as its other buttons.
+            .then(if (Metro.style.tonal) Modifier.clip(RoundedCornerShape(PillCorner)) else Modifier)
             .border(MetroDimens.Stroke, Metro.accent.fill)
             .background(Metro.accent.fill)
             .metroPress(onClick)
