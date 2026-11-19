@@ -697,8 +697,8 @@ fun CoverCategoryScreen(
 
 /**
  * Holds more of this month's to budget for next month. The box asks only for the extra, starting at everything
- * to budget, and saving adds it to what is already held. Once an amount reads, the summary shows to budget and
- * held as they will be after the save.
+ * to budget, and saving adds it to what is already held, then fills the box with what is left. Once an amount
+ * reads, the summary shows to budget and held as they will be after the save.
  */
 @Composable
 fun HoldMonthScreen(
@@ -712,7 +712,8 @@ fun HoldMonthScreen(
     val options = formatOptions()
     val money = shell.currency
     val initial = if (shell.headerMinor > 0L) prefs.editAmount(shell.headerMinor, money.decimals) else ""
-    var amount by remember(shell.month, shell.budgetId) { mutableStateOf(initial) }
+    // A save or a release changes what is held, so the box starts over at everything still left to hold.
+    var amount by remember(shell.month, shell.budgetId, shell.bufferedMinor) { mutableStateOf(initial) }
     val more = MoneyMath.evaluate(amount, prefs.numberFormat, money.decimals)?.takeIf { it > 0 } ?: 0L
     val save = { onSave(prefs.readAmount(amount, money.decimals)) }
     Column(

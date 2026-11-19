@@ -1,5 +1,8 @@
 package app.duenorth.budget
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -9,6 +12,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
+import app.duenorth.budget.core.withHold
+import app.duenorth.budget.core.withReleaseHold
 import app.duenorth.budget.design.theme.MetroTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -56,6 +61,36 @@ class HoldMonthScreenTest {
         compose.onNodeWithText("$300.00").assertExists()
         compose.onNodeWithText(app.duenorth.budget.core.EnvelopeCopy.HOLD).performClick()
         assertEquals(listOf("100"), saved)
+    }
+
+    @Test
+    fun afterASaveTheBoxShowsWhatIsLeftToHold() {
+        var shell by mutableStateOf(TemplateSamples.shell.copy(bufferedMinor = 20_000))
+        compose.setContent {
+            MetroTheme(darkTheme = false) {
+                HoldMonthScreen(shell, null, { saved += it }, { released++ })
+            }
+        }
+        field().performTextReplacement("100")
+        compose.onNodeWithText(app.duenorth.budget.core.EnvelopeCopy.HOLD).performClick()
+        // The save lands: $100 more held, $100 less to budget.
+        shell = shell.withHold(10_000)
+        compose.waitForIdle()
+        field().assertTextEquals("452.00", includeEditableText = true)
+    }
+
+    @Test
+    fun afterAReleaseTheBoxShowsEverythingToBudget() {
+        var shell by mutableStateOf(TemplateSamples.shell.copy(bufferedMinor = 20_000))
+        compose.setContent {
+            MetroTheme(darkTheme = false) {
+                HoldMonthScreen(shell, null, { saved += it }, { released++ })
+            }
+        }
+        field().performTextReplacement("100")
+        shell = shell.withReleaseHold()
+        compose.waitForIdle()
+        field().assertTextEquals("752.00", includeEditableText = true)
     }
 
     @Test
