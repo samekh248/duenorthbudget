@@ -157,12 +157,12 @@ class ToastContentTest {
         assertEquals(ToastKind.Failure, empty.kind)
         assertEquals(TemplateCopy.NO_TEMPLATES, empty.message)
 
-        // Overwrite, once confirmed, writes and offers undo.
+        // Overwrite, once confirmed, writes; a templates run can't be undone, so the toast offers no undo.
         TemplatesHolder(host).apply(overwrite = true, confirmed = true)
         val applied = host.state.value.toast!!
         assertEquals(ToastKind.Success, applied.kind)
         assertEquals(ToastCopy.TEMPLATES_APPLIED, applied.title)
-        assertEquals(ToastAction.Undo, applied.action)
+        assertNull(applied.action)
     }
 
     @Test
