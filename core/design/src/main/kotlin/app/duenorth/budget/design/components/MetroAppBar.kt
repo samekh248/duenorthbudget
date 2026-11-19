@@ -41,10 +41,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -137,7 +140,7 @@ fun MetroAppBar(
     }
     val chrome =
         if (style.tonal) {
-            // Tonal: a flat bottom bar across the full width, with the page fading into it
+            // Tonal: a bottom sheet across the full width, its top corners rounded, with the page fading into it
             // above, so rows scrolling under it dissolve rather than end at a hard cut.
             Modifier.tonalBar(colors.background, colors.chrome).windowInsetsPadding(windowInsets).padding(bottom = 4.dp)
         } else if (style.layers) {
@@ -536,9 +539,8 @@ internal fun fitCaption(
 private val TonalFade = 20.dp
 
 /**
- * The tonal bar: [bar] filling the bounds edge to edge and down behind the navigation bar, square as Material's
- * bottom app bar (rounded corners met the screen's own and read as cut off), and above it a [TonalFade] tall
- * gradient from clear to [page] over the content's last rows.
+ * The tonal bar: [bar] filling the bounds with the top corners rounded by [TonalCorner.Floating], and above it a
+ * [TonalFade] tall gradient from clear to [page] over the content's last rows.
  */
 private fun Modifier.tonalBar(
     page: Color,
@@ -551,5 +553,21 @@ private fun Modifier.tonalBar(
             topLeft = Offset(0f, -fade),
             size = Size(size.width, fade),
         )
-        drawRect(bar)
+        val r = TonalCorner.Floating.toPx()
+        val shape =
+            Path().apply {
+                addRoundRect(
+                    RoundRect(
+                        0f,
+                        0f,
+                        size.width,
+                        size.height,
+                        topLeftCornerRadius = CornerRadius(r),
+                        topRightCornerRadius = CornerRadius(r),
+                    ),
+                )
+            }
+        // The page shows in the corners, so the bar reads as a sheet laid on it.
+        drawRect(page)
+        drawPath(shape, bar)
     }
