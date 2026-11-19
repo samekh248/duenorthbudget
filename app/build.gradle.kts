@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.roborazzi)
     alias(libs.plugins.baselineprofile)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -140,6 +141,9 @@ dependencies {
     implementation(libs.work.runtime)
     // Installs the baseline profile on sideloaded APKs too, where no store compiles it ahead of time.
     implementation(libs.profileinstaller)
+    // Lets Gemini and other assistants on Android 16+ call into the budget (AgentAppFunctionService).
+    implementation(libs.appfunctions)
+    ksp(libs.appfunctions.compiler)
     baselineProfile(project(":benchmark"))
     "nonMinifiedReleaseImplementation"(project(":core:samples"))
     "benchmarkReleaseImplementation"(project(":core:samples"))

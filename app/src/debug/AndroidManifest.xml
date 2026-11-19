@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!--
       Compose unit tests host content in ComponentActivity. It must not be a
       launcher activity: that empty activity is what a debug install opens,
       splash then a blank white screen, because it never calls setContent.
+      AGP 9 merges the unit test manifest with ui-test-manifest's exported="true", so this one wins by name.
     -->
     <application>
         <activity
             android:name="androidx.activity.ComponentActivity"
             android:exported="false"
+            tools:replace="android:exported"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />
     </application>
 </manifest>

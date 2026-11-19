@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What an assistant reads about Due North before it calls the functions in BaseAgentAppFunctionService. -->
+<AppFunctionAppMetadata xmlns:appfn="http://schemas.android.com/apk/androidx.appfunctions"
+    appfn:instructions="Due North is an envelope budget (compatible with Actual Budget). Money is given to categories each month; a category's available amount is what is left to spend.
+Operational patterns:
+  - For 'how much is left for X' call getCategoryBalance; for a general check-in call getBudgetOverview.
+  - Names can be partial and any case. When a call fails because a name fits none or several, ask the user which of the listed names they mean.
+  - addTransaction takes a positive amount; set isIncome for money coming in. Confirm the payee and amount with the user first.
+  - Without a category, a new transaction waits in the inbox, which the user files later in the app.
+Constraints:
+  - Everything works on the budget open in the app. If no budget is open, tell the user to open Due North first."
+    appfn:displayDescription="@string/app_function_display_description" />
