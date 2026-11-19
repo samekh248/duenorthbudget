@@ -184,7 +184,7 @@ private fun AssistantBody(
     }
 }
 
-/** The count of what the assistant found, the close out card, and a card for each kind of finding. */
+/** The inbox card, the close out card, and a card for each kind of finding. */
 private fun LazyListScope.assistantCards(
     findings: List<Finding>,
     money: (Long) -> String,
@@ -200,14 +200,6 @@ private fun LazyListScope.assistantCards(
     onToggleInbox: () -> Unit,
 ) {
     val byKind = AssistantReport(findings).byKind()
-    item(key = "count") {
-        BudgetTotal(
-            AssistantCopy.TO_LOOK_AT,
-            "${findings.size + (inbox?.count ?: 0)}",
-            Metro.accent.text,
-            "assistant-count",
-        )
-    }
     // The inbox leads the cards, and opens onto its featured transaction and the queue under it.
     if (inbox != null) {
         item(key = "kind-inbox") {
