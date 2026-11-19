@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One category on a narrow widget's card (no amount slot, so the name keeps the room): a rule (not over the first), the name, budgeted and spent when wide, what is left, and a pill bar when tall. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:id="@+id/row_rule"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/widget_track" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="28dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/row_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:fontFamily="@font/selawik_regular"
+            android:maxLines="1"
+            android:textColor="@color/widget_foreground"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/row_budgeted"
+            android:layout_width="58dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:includeFontPadding="false"
+            android:fontFamily="@font/selawik_regular"
+            android:maxLines="1"
+            android:textColor="@color/widget_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/row_spent"
+            android:layout_width="58dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:includeFontPadding="false"
+            android:fontFamily="@font/selawik_regular"
+            android:maxLines="1"
+            android:textColor="@color/widget_secondary"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/row_amount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+                        android:paddingStart="6dp"
+            android:includeFontPadding="false"
+            android:fontFamily="@font/selawik_semilight"
+            android:maxLines="1"
+            android:textColor="@color/widget_foreground"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/row_amount_over"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/widget_pill_error"
+            android:paddingHorizontal="9dp"
+            android:paddingVertical="1dp"
+            android:includeFontPadding="false"
+            android:fontFamily="@font/selawik_semibold"
+            android:maxLines="1"
+            android:textColor="@color/widget_on_error_container"
+            android:textSize="14sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/row_bar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="5dp"
+        android:layout_marginBottom="3dp"
+        android:max="100"
+        android:progressDrawable="@drawable/widget_bar"
+        android:visibility="gone" />
+
+    <ProgressBar
+        android:id="@+id/row_bar_over"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="5dp"
+        android:layout_marginBottom="3dp"
+        android:max="100"
+        android:progress="100"
+        android:progressDrawable="@drawable/widget_bar_over"
+        android:visibility="gone" />
+</LinearLayout>

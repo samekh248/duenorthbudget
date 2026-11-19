@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One category in a widget one cell tall and wide: the name over its balance on a small rounded card. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_marginHorizontal="4dp"
+    android:layout_weight="1"
+    android:background="@drawable/widget_card"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:paddingHorizontal="10dp"
+    android:paddingVertical="3dp">
+
+    <TextView
+        android:id="@+id/row_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:fontFamily="@font/selawik_regular"
+        android:maxLines="1"
+        android:textColor="@color/widget_secondary"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/row_amount"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:includeFontPadding="false"
+        android:fontFamily="@font/selawik_semilight"
+        android:maxLines="1"
+        android:textColor="@color/widget_foreground"
+        android:textSize="19sp" />
+
+    <TextView
+        android:id="@+id/row_amount_over"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/widget_pill_error"
+        android:paddingHorizontal="9dp"
+        android:paddingVertical="1dp"
+        android:includeFontPadding="false"
+        android:fontFamily="@font/selawik_semibold"
+        android:maxLines="1"
+        android:textColor="@color/widget_on_error_container"
+        android:textSize="16sp"
+        android:visibility="gone" />
+</LinearLayout>

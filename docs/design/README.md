@@ -60,5 +60,13 @@ settings (`SectionSize.PAGE`). A box being typed in uses the `fieldActive`,
 `onFieldActive` and `fieldHint` colors, and warnings use the accent; the red
 `error` color is for figures in the red only.
 
+The home screen's category balance widget (`CategoryWidget` in `app/.../CategoryWidget.kt`) is design B+, chosen on
+2026-11-18: the ledger list, half Metro and half Material 3. It keeps Metro's Selawik type, lowercase names and
+small caps month, on Material's rounded, tinted surface with a days-left chip, rows on a rounded card, pill spent
+bars and a red pill for an overspent balance. It shows more as it grows (`CategoryWidgetPlan`): three bare lines
+one cell tall and narrow, a strip of categories one cell tall and wide, a list from two cells tall, budgeted and
+spent columns when wide, and bars with a total when tall. Its colors are the `widget_*` colors in `values` and
+`values-night`.
+
 The rules that matter are in `.specify/memory/constitution.md` (Principles I
 and II). Fluidity wins when a Metro motion would stutter.
