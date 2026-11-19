@@ -115,6 +115,9 @@ fun MetroAppBar(
     /** The bar's chrome runs down behind these, and its buttons stay above them. */
     windowInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
+    // Remembered ahead of the empty bar's early return, so a screen with no bar between two with one still lets the
+    // last buttons go and the next ones arrive.
+    val slots = rememberAppBarSlots(actions.filter { it.primary })
     // A page with no buttons and no menu shows no bar at all, only keeping its content clear of
     // the system navigation bar.
     if (actions.isEmpty()) {
@@ -135,7 +138,7 @@ fun MetroAppBar(
     }
     val style = Metro.style
     if (style.mobile10) {
-        Mobile10CommandBar(primary, secondary, expanded, onExpandedChange, modifier, windowInsets, host, registration)
+        Mobile10CommandBar(primary, slots, secondary, expanded, onExpandedChange, modifier, windowInsets, host, registration)
         return
     }
     val chrome =
@@ -166,14 +169,21 @@ fun MetroAppBar(
             .animateContentSize(tween(MetroMotion.SHORT_MS, easing = MetroMotion.EaseOut)),
     ) {
         Box(Modifier.fillMaxWidth().heightIn(min = MetroDimens.AppBar)) {
-            Row(
-                Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(MetroDimens.AppBarGap),
-            ) {
-                primary.forEach { action ->
-                    AppBarIcon(action, showLabel = true, rule = action.apart && action != primary.first()) {
-                        onExpandedChange(false)
-                        action.run()
+            // Each slot carries half the gap on either side rather than the row spacing them, so a button easing in
+            // or out takes its gap with it and the row stays centred all the way through.
+            Row(Modifier.align(Alignment.TopCenter).padding(top = 10.dp)) {
+                AppBarSlotRow(slots) { slot ->
+                    val action = slot.action
+                    AppBarIcon(
+                        action,
+                        showLabel = true,
+                        rule = action.apart && action.id != primary.firstOrNull()?.id,
+                        modifier = Modifier.padding(horizontal = MetroDimens.AppBarGap / 2),
+                    ) {
+                        if (!slot.leaving) {
+                            onExpandedChange(false)
+                            action.run()
+                        }
                     }
                 }
             }
@@ -227,6 +237,7 @@ fun MetroAppBar(
 @Composable
 private fun Mobile10CommandBar(
     primary: List<ScreenAction>,
+    slots: List<AppBarSlot>,
     secondary: List<ScreenAction>,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
@@ -250,12 +261,13 @@ private fun Mobile10CommandBar(
             .animateContentSize(tween(MetroMotion.SHORT_MS, easing = MetroMotion.EaseOut)),
     ) {
         Row(Modifier.fillMaxWidth().heightIn(min = Mobile10Dimens.CommandBar), horizontalArrangement = Arrangement.End) {
-            primary.forEach { action ->
+            AppBarSlotRow(slots) { slot ->
+                val action = slot.action
                 Column(
                     Modifier
                         .width(Mobile10Dimens.CommandSlot)
                         .then(
-                            if (action.apart && action != primary.first()) {
+                            if (action.apart && action.id != primary.firstOrNull()?.id) {
                                 val rule = colors.secondary
                                 Modifier.testTag("app-bar-rule-${action.id}").drawBehind {
                                     val inset = 12.dp.toPx()
@@ -276,8 +288,10 @@ private fun Mobile10CommandBar(
                             onClickLabel = action.label,
                             role = Role.Button,
                         ) {
-                            onExpandedChange(false)
-                            action.run()
+                            if (!slot.leaving) {
+                                onExpandedChange(false)
+                                action.run()
+                            }
                         }.semantics {
                             contentDescription = action.label
                             if (action.spinning) stateDescription = "syncing"
@@ -369,12 +383,13 @@ private fun AppBarIcon(
     showLabel: Boolean,
     /** Draws a thin upright rule in the gap before the button, setting it apart; the bar keeps its width. */
     rule: Boolean = false,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val colors = Metro.colors
     val ruleColor = colors.secondary
     Column(
-        Modifier
+        modifier
             .width(MetroDimens.AppBarSlot)
             .then(
                 if (rule) {
