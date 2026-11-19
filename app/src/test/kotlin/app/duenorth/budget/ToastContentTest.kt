@@ -151,7 +151,14 @@ class ToastContentTest {
 
         host.library.setPreference(budgetId, "flags.experimental", "true")
         host.library.setPreference(budgetId, "flags.goalTemplatesEnabled", "true")
+        // On, but with no template anywhere, apply has nothing to fill and says so rather than "0 categories".
         TemplatesHolder(host).apply(overwrite = false)
+        val empty = host.state.value.toast!!
+        assertEquals(ToastKind.Failure, empty.kind)
+        assertEquals(TemplateCopy.NO_TEMPLATES, empty.message)
+
+        // Overwrite, once confirmed, writes and offers undo.
+        TemplatesHolder(host).apply(overwrite = true, confirmed = true)
         val applied = host.state.value.toast!!
         assertEquals(ToastKind.Success, applied.kind)
         assertEquals(ToastCopy.TEMPLATES_APPLIED, applied.title)

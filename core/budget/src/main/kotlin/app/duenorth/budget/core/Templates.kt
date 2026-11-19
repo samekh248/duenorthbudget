@@ -29,6 +29,7 @@ object TemplateCopy {
     const val APPLIED = "templates applied"
     const val ALL_MET = "every target is already met"
     const val NOTHING_TO_BUDGET = "nothing to budget this month"
+    const val NO_TEMPLATES = "no category has a template yet"
 }
 
 data class TemplateError(
@@ -268,8 +269,12 @@ class TemplateEngine(
      * nothing changes.
      */
     fun fill(month: YearMonth): TemplateResult {
-        val errors = categories().flatMap { category -> category.errors.map { TemplateError(category.name, it) } }
+        val categories = categories()
+        val errors = categories.flatMap { category -> category.errors.map { TemplateError(category.name, it) } }
         if (errors.isNotEmpty()) return TemplateResult.Invalid(errors)
+        if (candidates(categories, TemplateSheet(session, today)).all { it.templates.isEmpty() }) {
+            return TemplateResult.Rejected(TemplateCopy.NO_TEMPLATES)
+        }
         val cap = TemplateSheet(session, today).month(month).figures.headerMinor
         if (cap <= 0L) return TemplateResult.Rejected(TemplateCopy.NOTHING_TO_BUDGET)
         val changes = topUp(month, cap)
