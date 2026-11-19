@@ -275,7 +275,9 @@ fun ManageCategoriesScreen(
         if (!reorder) drag.drop()
         val categoryDrag = remember { RowDrag() }
         if (!reorder) categoryDrag.drop()
-        val groupIds = manage.groups.map { it.id }
+        // A drop shows its new order at once, ahead of the page's own rows (see RowDrag.ordered).
+        val groups = drag.ordered(manage.groups, reorder) { it.id }
+        val groupIds = groups.map { it.id }
         Column(Modifier.fillMaxSize().padding(horizontal = MetroDimens.Gutter)) {
             MetroText(EnvelopeCopy.MANAGE, Metro.typography.header)
             if (reorder) {
@@ -291,7 +293,7 @@ fun ManageCategoriesScreen(
             }
             CompositionLocalProvider(LocalFieldSubmit provides { save() }) {
                 LazyColumn(Modifier.weight(1f).padding(top = MetroDimens.Row)) {
-                    manage.groups.forEach { group ->
+                    groups.forEach { group ->
                         val expanded = group.id in open
                         item(key = "manage-group-${group.id}") {
                             val renaming = edit == ManageEdit.Group(group.id)
@@ -313,9 +315,9 @@ fun ManageCategoriesScreen(
                             )
                         }
                         if (expanded) {
-                            val ids = group.categories.map { it.id }
-                            items(group.categories, key = { "manage-cat-${it.id}" }) { category ->
-                                val index = ids.indexOf(category.id)
+                            val categories = categoryDrag.ordered(group.categories, reorder) { it.id }
+                            val ids = categories.map { it.id }
+                            items(categories, key = { "manage-cat-${it.id}" }) { category ->
                                 CategoryLine(
                                     category = category,
                                     renaming = edit == ManageEdit.Category(category.id),
@@ -326,7 +328,8 @@ fun ManageCategoriesScreen(
                                         sheet = ManageSheet.Category(group, category)
                                     },
                                     onTap = onOpenCategory?.let { openCategory -> { openCategory(category.id) } },
-                                    banded = ledgerBanded(index),
+                                    // By the place the row shows in, so bands keep alternating while rows slide.
+                                    banded = ledgerBanded(categoryDrag.slot(category.id, ids)),
                                     modifier = if (reorder) categoryDrag.follow(category.id, ids) else Modifier,
                                     lifted = categoryDrag.dragging == category.id,
                                     handle = if (reorder) categoryDrag.handle(category.id, ids, onPlaceCategory) else null,
