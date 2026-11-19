@@ -1044,6 +1044,16 @@ class BudgetLibrary(
             ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
     }
 
+    /** The templates page's apply: raises every short target from what [month] has to budget, as one undo step ([TemplateEngine.fill]). */
+    fun fillTemplates(
+        budgetId: String,
+        month: YearMonth,
+    ): TemplateResult {
+        if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF)
+        return edit(budgetId, UndoCopy.TEMPLATES) { TemplateEngine(it, clock.today()).fill(month) }
+            ?: TemplateResult.Rejected(ShellCopy.NO_ACCOUNTS)
+    }
+
     /** Tops this month's targets up from at most [cap], priority first, as one undo step ([TemplateEngine.topUp]). */
     fun topUpTemplates(
         budgetId: String,
@@ -1087,8 +1097,9 @@ class BudgetLibrary(
         month: YearMonth,
         overwrite: Boolean,
         budgeted: Map<String, Long>,
+        fill: Boolean = false,
     ): Pair<TemplateResult, Map<String, Long>> {
-        val (result, changes) = previewTemplateChanges(budgetId, month, overwrite, budgeted)
+        val (result, changes) = previewTemplateChanges(budgetId, month, overwrite, budgeted, fill)
         return result to changes.mapValues { it.value.second }
     }
 
@@ -1101,6 +1112,8 @@ class BudgetLibrary(
         month: YearMonth,
         overwrite: Boolean,
         budgeted: Map<String, Long> = emptyMap(),
+        /** Runs [TemplateEngine.fill] (the templates page's apply) instead of Actual's apply; [overwrite] is then ignored. */
+        fill: Boolean = false,
     ): Pair<TemplateResult, Map<String, Pair<Long, Long>>> {
         if (!readFormatPrefs(budgetId).templatesOn) return TemplateResult.Rejected(TemplateCopy.OFF) to emptyMap()
         return serial {
@@ -1125,7 +1138,8 @@ class BudgetLibrary(
                             BudgetEdits.assign(session, SyncSchema.clockFor(session), month.toActualMonth(), id, amount)
                         }
                         before = amounts()
-                        result = TemplateEngine(session, clock.today()).run(month, overwrite, confirmed = true)
+                        val engine = TemplateEngine(session, clock.today())
+                        result = if (fill) engine.fill(month) else engine.run(month, overwrite, confirmed = true)
                         after = amounts()
                         throw PreviewRollback()
                     }

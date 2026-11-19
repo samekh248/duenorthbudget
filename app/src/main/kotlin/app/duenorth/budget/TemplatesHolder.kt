@@ -79,7 +79,7 @@ class TemplatesHolder internal constructor(
         }
     }
 
-    /** Apply fills zero categories; overwrite asks first, then refills every templated category. */
+    /** Apply tops up every target that is short, from what is to budget; overwrite asks first, then refills every templated category. */
     fun apply(
         overwrite: Boolean,
         confirmed: Boolean = false,
@@ -93,7 +93,15 @@ class TemplatesHolder internal constructor(
         val month = host.editorMonth()
         host.mutate { it.copy(templates = it.templates.copy(busy = true, confirm = null)) }
         host.scope.launch {
-            val result = withContext(host.io) { host.library.applyTemplates(budgetId, month, overwrite, confirmed) }
+            // Apply tops up every short target from what is to budget; overwrite is Actual's.
+            val result =
+                withContext(host.io) {
+                    if (overwrite) {
+                        host.library.applyTemplates(budgetId, month, true, confirmed)
+                    } else {
+                        host.library.fillTemplates(budgetId, month)
+                    }
+                }
             // Posted before the page closes, so the toast greets the budget it lands on.
             host.toastTemplates(result)
             when (result) {
@@ -454,7 +462,8 @@ class TemplatesHolder internal constructor(
         val month = edit.month ?: return
         host.mutate { it.copy(templates = it.templates.copy(busy = true, confirm = null)) }
         host.scope.launch {
-            val (result, amounts) = withContext(host.io) { host.library.previewTemplates(budgetId, month, overwrite, edit.budgeted) }
+            val (result, amounts) =
+                withContext(host.io) { host.library.previewTemplates(budgetId, month, overwrite, edit.budgeted, fill = !overwrite) }
             host.mutate { now ->
                 if (result !is TemplateResult.Applied) return@mutate now.copy(templates = now.templates.copy(result = result, busy = false))
                 val categories =

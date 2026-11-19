@@ -212,6 +212,33 @@ class TemplateContentTest {
     }
 
     @Test
+    fun applyTopsUpATargetThatAlreadyHasSomeMoney() {
+        val (model, library) = household("templates-top-up")
+        model.settingsUi.setExperimental(true)
+        model.settingsUi.setGoalTemplates(true)
+        await { model.state.value.formatPrefs.templatesOn }
+        val before =
+            model.state.value.shell!!
+                .category("c-gas")!!
+                .budgetedMinor
+        assertTrue(before > 0L)
+        model.envelopes.openBudget("c-gas")
+        await { model.state.value.templates.note != null }
+        model.templates.saveNote("#template ${before / 100 + 100}")
+        await { model.state.value.undoLabel == UndoCopy.CATEGORY_NOTE }
+        model.templates.open()
+        await { model.state.value.templates.result == TemplateResult.Valid }
+        // Actual's apply skips a category with any money in it; the templates page's apply raises it to its target.
+        model.templates.apply(overwrite = false)
+        await {
+            model.state.value.shell
+                ?.category("c-gas")
+                ?.budgetedMinor == before + 10_000L
+        }
+        assertEquals(UndoCopy.TEMPLATES, library.undoLabel(model.state.value.settings.openBudgetId!!))
+    }
+
+    @Test
     fun tilesShowEachTemplateWhatItAsksAndTheLineThatDoesNotRead() {
         var opened: Int? = null
         compose.setContent {
