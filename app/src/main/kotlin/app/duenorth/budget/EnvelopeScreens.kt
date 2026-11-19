@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CategoryAutomations
 import app.duenorth.budget.core.CategoryMonthPage
@@ -861,7 +863,7 @@ fun CategoryLine(
             if (overPill) {
                 OverPillFigure(available, "category-available-${category.id}")
             } else {
-                LedgerFigure(
+                AvailableFigure(
                     available,
                     if (over) Metro.typography.body.copy(fontWeight = FontWeight.SemiBold) else Metro.typography.body,
                     if (over) Metro.colors.error else Metro.accent.text,
@@ -899,10 +901,12 @@ private fun RowScope.OverPillFigure(
     text: String,
     tag: String,
 ) {
-    Box(Modifier.weight(LEDGER_FIGURE), contentAlignment = Alignment.CenterEnd) {
+    BoxWithConstraints(Modifier.weight(LEDGER_FIGURE), contentAlignment = Alignment.CenterEnd) {
+        val base = Metro.typography.body.copy(fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
         FigureText(
             text,
-            Metro.typography.body.copy(fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End),
+            // The pill's own air comes out of the column, so the figure is measured without it.
+            availableStyle(text, base, maxWidth - OVER_PILL_PAD * 2),
             Modifier
                 .offset(x = OVER_PILL_PAD)
                 .background(Metro.colors.errorContainer, RoundedCornerShape(PillCorner))
@@ -994,6 +998,54 @@ internal fun RowScope.LedgerFigure(
         softWrap = false,
     )
 }
+
+/**
+ * A category's available figure on the budget: the column the eye goes to, so it reads a step larger than budgeted
+ * and spent (owner, 2026-11-19). A figure too wide for its column at that size falls back to the row's size, so it
+ * never cuts off where the other figures would not.
+ */
+@Composable
+internal fun RowScope.AvailableFigure(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    tag: String,
+) {
+    BoxWithConstraints(Modifier.weight(LEDGER_FIGURE), contentAlignment = Alignment.CenterEnd) {
+        val base = style.copy(textAlign = TextAlign.End)
+        FigureText(
+            text,
+            availableStyle(text, base, maxWidth),
+            Modifier.fillMaxWidth().testTag(tag),
+            color = color,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+/** [base] raised by [AVAILABLE_SCALE], or [base] itself when [text] would not fit in [maxWidth] at the larger size. */
+@Composable
+private fun availableStyle(
+    text: String,
+    base: TextStyle,
+    maxWidth: Dp,
+): TextStyle {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    return remember(text, base, maxWidth, density) {
+        val larger =
+            base.copy(
+                fontSize = base.fontSize * AVAILABLE_SCALE,
+                lineHeight = if (base.lineHeight.isSpecified) base.lineHeight * AVAILABLE_SCALE else base.lineHeight,
+            )
+        val width = measurer.measure(text, larger, maxLines = 1, softWrap = false).size.width
+        if (width <= with(density) { maxWidth.toPx() }) larger else base
+    }
+}
+
+/** How much larger the available figure is than the row's other figures: 16 to 18, or 17 to 19 on Windows 10 Mobile. */
+private const val AVAILABLE_SCALE = 1.125f
 
 /**
  * Air above and below a ledger row's name: what centering one line in a touch-target row leaves each side.
