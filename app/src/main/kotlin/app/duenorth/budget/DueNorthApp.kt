@@ -99,10 +99,16 @@ open class DueNorthApplication : Application() {
 class MainActivity : ComponentActivity() {
     private var shellModel: ShellViewModel? = null
 
+    /** A category tapped on the home screen widget, opened once its budget's month is up. */
+    private val widgetCategory = mutableStateOf<WidgetCategory?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val application = application as DueNorthApplication
-        if (savedInstanceState == null) CrashLog.offer(this)
+        if (savedInstanceState == null) {
+            CrashLog.offer(this)
+            widgetCategory.value = WidgetCategory.of(intent)
+        }
         setContent {
             val model: ShellViewModel =
                 viewModel(
@@ -119,6 +125,7 @@ class MainActivity : ComponentActivity() {
                 model.servers.completeOpenId(intent?.dataString)
             }
             ReportBudgetDrawn(model)
+            OpenWidgetCategory(model, widgetCategory)
             // Lets the :benchmark module's UiAutomator find screens by their test tags.
             Box(Modifier.semantics { testTagsAsResourceId = true }) { DueNorthApp(model) }
         }
@@ -128,6 +135,39 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         shellModel?.servers?.completeOpenId(intent.dataString)
+        WidgetCategory.of(intent)?.let { widgetCategory.value = it }
+    }
+}
+
+/** A row tapped on the category widget: its budget, and the category to open. */
+internal data class WidgetCategory(
+    val budgetId: String?,
+    val categoryId: String,
+) {
+    companion object {
+        fun of(intent: Intent?): WidgetCategory? {
+            val category = intent?.getStringExtra(CategoryWidget.EXTRA_CATEGORY) ?: return null
+            return WidgetCategory(intent.getStringExtra(CategoryWidget.EXTRA_BUDGET), category)
+        }
+    }
+}
+
+/**
+ * Opens the widget's category on its budget page once the month is read. A widget for a budget other than the one
+ * open just opens the app, so a tap never switches budgets behind the person's back.
+ */
+@Composable
+private fun OpenWidgetCategory(
+    model: ShellViewModel,
+    pending: androidx.compose.runtime.MutableState<WidgetCategory?>,
+) {
+    val state by model.state.collectAsStateWithLifecycle()
+    val ask = pending.value
+    val openBudget = state.shell?.budgetId
+    LaunchedEffect(ask, openBudget) {
+        if (ask == null || openBudget == null) return@LaunchedEffect
+        if (ask.budgetId == null || ask.budgetId == openBudget) model.envelopes.openBudget(ask.categoryId)
+        pending.value = null
     }
 }
 
@@ -238,6 +278,8 @@ fun DueNorthApp(model: ShellViewModel) {
                         (context.applicationContext as? DueNorthApplication)?.onScreen = false
                         model.onScreenLocked()
                         runCatching { BackgroundSyncWorker.sendUnsent(context) }
+                        // The home screen widgets show what changed while the app was open.
+                        runCatching { CategoryWidget.refreshAll(context) }
                     }
                     else -> Unit
                 }

@@ -2,4 +2,16 @@
 <resources>
     <!-- Matches MetroTheme's dark background. -->
     <color name="launch_background">#000000</color>
+    <!-- The category balance widget on a dark home screen. -->
+    <color name="widget_surface">#1C1217</color>
+    <color name="widget_container">#2B1C23</color>
+    <color name="widget_track">#45303A</color>
+    <color name="widget_foreground">#FFFFFF</color>
+    <color name="widget_secondary">#D7C0CA</color>
+    <color name="widget_chip">#5D1A3C</color>
+    <color name="widget_on_chip">#FFD9E6</color>
+    <color name="widget_accent">#F0389A</color>
+    <color name="widget_error">#FF5C4D</color>
+    <color name="widget_error_container">#93000A</color>
+    <color name="widget_on_error_container">#FFDAD6</color>
 </resources>

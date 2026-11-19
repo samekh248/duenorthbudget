@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Due North Budget</string>
+    <string name="category_widget_label">Category balances</string>
+    <string name="category_widget_description">What is left this month in the categories you choose.</string>
 </resources>

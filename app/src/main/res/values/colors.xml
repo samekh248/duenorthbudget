@@ -3,4 +3,16 @@
     <color name="ic_launcher_background">#B0005E</color>
     <!-- Matches MetroTheme's light background. -->
     <color name="launch_background">#FFFFFF</color>
+    <!-- The category balance widget (CategoryWidget), half Metro and half Material 3: Metro's type and ink on tonal, accent-tinted surfaces. -->
+    <color name="widget_surface">#FFF8FA</color>
+    <color name="widget_container">#F7E8EF</color>
+    <color name="widget_track">#EED6E1</color>
+    <color name="widget_foreground">#000000</color>
+    <color name="widget_secondary">#5C4650</color>
+    <color name="widget_chip">#FFD9E6</color>
+    <color name="widget_on_chip">#5D0031</color>
+    <color name="widget_accent">#B0005E</color>
+    <color name="widget_error">#C41100</color>
+    <color name="widget_error_container">#FFDAD6</color>
+    <color name="widget_on_error_container">#93000A</color>
 </resources>
