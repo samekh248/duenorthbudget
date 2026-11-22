@@ -318,7 +318,20 @@ class PullSyncContentTest {
         assertFalse("a budget kept on the phone has nothing to sync with", shell.pullSync().enabled)
         val server = shell.copy(signedIn = true, cloudFileId = "cloud")
         assertTrue(server.pullSync().enabled)
-        assertFalse(server.copy(route = ShellRoute.Settings).pullSync().enabled)
+        // Every page that shows the budget pulls, as home does; forms and confirmations do not.
+        assertTrue(server.copy(route = ShellRoute.Settings).pullSync().enabled)
+        assertTrue(server.copy(route = ShellRoute.Register("checking")).pullSync().enabled)
+        assertTrue(server.copy(route = ShellRoute.Ledger(null)).pullSync().enabled)
+        assertTrue(server.copy(route = ShellRoute.Payees).pullSync().enabled)
+        assertTrue(server.copy(route = ShellRoute.Schedules).pullSync().enabled)
+        assertTrue(server.copy(route = ShellRoute.ReportPivot(0)).pullSync().enabled)
+        assertFalse(server.copy(route = ShellRoute.AddAccount).pullSync().enabled)
+        assertFalse(server.copy(route = ShellRoute.EditTransaction("checking", null)).pullSync().enabled)
+        assertFalse(server.copy(route = ShellRoute.Reconcile("checking")).pullSync().enabled)
+        // A mode holding a page stops the pull there, as on home.
+        val register = server.copy(route = ShellRoute.Register("checking"))
+        assertFalse(register.copy(registerUi = RegisterUi(selection = emptySet())).pullSync().enabled)
+        assertFalse(server.copy(route = ShellRoute.Payees, payees = PayeesState(mergeTarget = "p")).pullSync().enabled)
         assertFalse(server.copy(accounts = server.accounts.copy(reorder = true)).pullSync().enabled)
         assertFalse(server.copy(locked = true).pullSync().enabled)
         // A finished sync that failed shows; one still running does not.
