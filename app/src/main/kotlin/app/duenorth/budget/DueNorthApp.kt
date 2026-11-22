@@ -26,6 +26,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -423,129 +424,140 @@ fun DueNorthApp(model: ShellViewModel) {
                 LocalFormatPrefs provides state.formatPrefs,
             ) {
                 // Each new page turns in; a route that only updates in place keeps its class and stays put.
-                SectionTitled(SectionTitle.of(state), modifier.turnstileIn(state.route::class)) {
-                    val fill = Modifier.fillMaxSize()
-                    val onImportFile: (String) -> Unit = { accountId ->
-                        importAccountId = accountId
-                        importLauncher.launch("*/*")
-                    }
-                    when (val route = state.route) {
-                        // A pull down past the top of a home page opens the sync panel; it is the only sync on home.
-                        ShellRoute.Home ->
-                            PullSyncPanel(
-                                ui = state.pullSync(),
-                                onSync = model.budgetFiles::syncInbox,
-                                onBankSync = model.bankSync::syncAll,
-                                modifier = fill,
-                                onDetails = model.bankSync::openReport,
-                                onDismissFailure = model.bankSync::dismiss,
-                                // A fresh install's first look at the budget bounces the panel once, so it is found.
-                                peek = peekPending && state.homeSection == ScreenBar.HOME_BUDGET,
-                                onPeeked = {
-                                    peekPending = false
-                                    PullSyncPeek.markDone(context)
-                                },
-                            ) { HomeRoute(state, model, it) }
-                        ShellRoute.Settings -> SettingsRoute(state, model, fill)
-                        is ShellRoute.ExperimentalOffer -> ExperimentalOfferRoute(route, state, model, fill)
-                        is ShellRoute.EncryptionPassword -> EncryptionPasswordRoute(route, state, model, fill)
-                        ShellRoute.Licenses -> LicensesScreen(fill)
-                        is ShellRoute.ConfirmRemoveInstance -> ConfirmRemoveInstanceRoute(route, state, model, fill)
-                        ShellRoute.ConfirmInstanceSwitch -> ConfirmInstanceSwitchRoute(state, model, fill)
-                        ShellRoute.SampleBudgets -> SampleBudgetsRoute(state, model, fill)
-                        ShellRoute.Create -> CreateRoute(state, model, fill)
-                        ShellRoute.Welcome -> WelcomeRoute(state, model, fill)
-                        ShellRoute.OnboardingAddress -> OnboardingAddressRoute(state, model, fill)
-                        ShellRoute.OnboardingSignIn -> OnboardingSignInRoute(state, model, fill)
-                        ShellRoute.OnboardingFiles -> OnboardingFilesRoute(state, model, fill)
-                        ShellRoute.ConfirmReplaceBudget -> ConfirmReplaceBudgetRoute(state, model, fill)
-                        ShellRoute.ConfirmSwitch -> ConfirmSwitchRoute(state, model, fill)
-                        ShellRoute.BankSyncReport -> BankSyncReportRoute(state, model, fill)
-                        ShellRoute.Payees -> PayeesRoute(state, model, fill)
-                        ShellRoute.SavedSplits -> SavedSplitsRoute(state, model, fill)
-                        ShellRoute.Server -> ServerRoute(state, model, fill)
-                        ShellRoute.BudgetPassword -> BudgetPasswordRoute(state, model, fill)
-                        ShellRoute.Conflicts -> ConflictsRoute(state, model, fill)
-                        ShellRoute.ConfirmReplace -> ConfirmReplaceRoute(state, model, fill)
-                        is ShellRoute.Register -> RegisterRoute(route, state, model, onImportFile, fill)
-                        is ShellRoute.ImportPreviewRoute -> ImportFilePreviewRoute(state, model, fill)
-                        is ShellRoute.ImportReviewRoute -> ImportedReviewRoute(state, model, fill)
-                        is ShellRoute.EditTransaction -> EditTransactionRoute(route, state, model, fill)
-                        is ShellRoute.PickCategory -> PickCategoryRoute(state, model, fill)
-                        is ShellRoute.Reconcile -> ReconcileRoute(state, model, fill)
-                        is ShellRoute.ReviewCategory -> ReviewCategoryRoute(state, model, fill)
-                        is ShellRoute.CategoryBudget -> CategoryBudgetRoute(route, state, model, fill)
-                        is ShellRoute.Ledger -> LedgerRoute(route, state, model, fill)
-                        is ShellRoute.MoveCategory -> MoveCategoryRoute(route, state, model, fill)
-                        is ShellRoute.CoverCategory -> CoverCategoryRoute(route, state, model, fill)
-                        ShellRoute.HoldMonth -> HoldMonthRoute(state, model, fill)
-                        is ShellRoute.CloseOut -> CloseOutRoute(state, model, fill)
-                        ShellRoute.StarterCategories ->
-                            StarterCategoriesScreen(
-                                error = state.editError,
-                                onAdd = model.getStarted::addStarterCategories,
+                val page: @Composable (Modifier) -> Unit = { pageModifier ->
+                    SectionTitled(SectionTitle.of(state), pageModifier) {
+                        val fill = Modifier.fillMaxSize()
+                        val onImportFile: (String) -> Unit = { accountId ->
+                            importAccountId = accountId
+                            importLauncher.launch("*/*")
+                        }
+                        when (val route = state.route) {
+                            ShellRoute.Home -> HomeRoute(state, model, fill)
+                            ShellRoute.Settings -> SettingsRoute(state, model, fill)
+                            is ShellRoute.ExperimentalOffer -> ExperimentalOfferRoute(route, state, model, fill)
+                            is ShellRoute.EncryptionPassword -> EncryptionPasswordRoute(route, state, model, fill)
+                            ShellRoute.Licenses -> LicensesScreen(fill)
+                            is ShellRoute.ConfirmRemoveInstance -> ConfirmRemoveInstanceRoute(route, state, model, fill)
+                            ShellRoute.ConfirmInstanceSwitch -> ConfirmInstanceSwitchRoute(state, model, fill)
+                            ShellRoute.SampleBudgets -> SampleBudgetsRoute(state, model, fill)
+                            ShellRoute.Create -> CreateRoute(state, model, fill)
+                            ShellRoute.Welcome -> WelcomeRoute(state, model, fill)
+                            ShellRoute.OnboardingAddress -> OnboardingAddressRoute(state, model, fill)
+                            ShellRoute.OnboardingSignIn -> OnboardingSignInRoute(state, model, fill)
+                            ShellRoute.OnboardingFiles -> OnboardingFilesRoute(state, model, fill)
+                            ShellRoute.ConfirmReplaceBudget -> ConfirmReplaceBudgetRoute(state, model, fill)
+                            ShellRoute.ConfirmSwitch -> ConfirmSwitchRoute(state, model, fill)
+                            ShellRoute.BankSyncReport -> BankSyncReportRoute(state, model, fill)
+                            ShellRoute.Payees -> PayeesRoute(state, model, fill)
+                            ShellRoute.SavedSplits -> SavedSplitsRoute(state, model, fill)
+                            ShellRoute.Server -> ServerRoute(state, model, fill)
+                            ShellRoute.BudgetPassword -> BudgetPasswordRoute(state, model, fill)
+                            ShellRoute.Conflicts -> ConflictsRoute(state, model, fill)
+                            ShellRoute.ConfirmReplace -> ConfirmReplaceRoute(state, model, fill)
+                            is ShellRoute.Register -> RegisterRoute(route, state, model, onImportFile, fill)
+                            is ShellRoute.ImportPreviewRoute -> ImportFilePreviewRoute(state, model, fill)
+                            is ShellRoute.ImportReviewRoute -> ImportedReviewRoute(state, model, fill)
+                            is ShellRoute.EditTransaction -> EditTransactionRoute(route, state, model, fill)
+                            is ShellRoute.PickCategory -> PickCategoryRoute(state, model, fill)
+                            is ShellRoute.Reconcile -> ReconcileRoute(state, model, fill)
+                            is ShellRoute.ReviewCategory -> ReviewCategoryRoute(state, model, fill)
+                            is ShellRoute.CategoryBudget -> CategoryBudgetRoute(route, state, model, fill)
+                            is ShellRoute.Ledger -> LedgerRoute(route, state, model, fill)
+                            is ShellRoute.MoveCategory -> MoveCategoryRoute(route, state, model, fill)
+                            is ShellRoute.CoverCategory -> CoverCategoryRoute(route, state, model, fill)
+                            ShellRoute.HoldMonth -> HoldMonthRoute(state, model, fill)
+                            is ShellRoute.CloseOut -> CloseOutRoute(state, model, fill)
+                            ShellRoute.StarterCategories ->
+                                StarterCategoriesScreen(
+                                    error = state.editError,
+                                    onAdd = model.getStarted::addStarterCategories,
+                                    modifier = fill,
+                                )
+                            ShellRoute.AddAccount ->
+                                AddAccountScreen(error = state.editError, onSave = model.accounts::submitAdd, modifier = fill)
+                            is ShellRoute.EditAccount -> EditAccountRoute(route, state, model, fill)
+                            is ShellRoute.CloseAccount -> CloseAccountRoute(route, state, model, fill)
+                            is ShellRoute.ScheduleEditor -> ScheduleEditorRoute(route, state, model, fill)
+                            ShellRoute.Rules -> RulesScreen(state.rules.list, model.rules::openEditor, fill)
+                            ShellRoute.Schedules -> SchedulesRoute(state, model, fill)
+                            is ShellRoute.ScheduleDetails -> ScheduleDetailsRoute(route, state, model, fill)
+                            ShellRoute.MonthReview -> MonthReviewRoute(state, model, fill)
+                            ShellRoute.NetWorth -> NetWorthRoute(state, model, fill)
+                            is ShellRoute.ReportPivot -> ReportPivotRoute(route, state, model, fill)
+                            is ShellRoute.ReportDrill -> ReportDrillRoute(route, state, model, fill)
+                            is ShellRoute.CashFlowMonth -> CashFlowMonthRoute(route, state, model, fill)
+                            is ShellRoute.BankLink -> BankLinkRoute(route, state, model, fill)
+                            is ShellRoute.TemplateKinds -> TemplateKindsRoute(route, state, model, fill)
+                            is ShellRoute.TemplateEditor -> TemplateEditorRoute(route, state, model, fill)
+                            ShellRoute.Templates -> TemplatesRoute(state, model, fill)
+                            is ShellRoute.RuleEditor -> RuleEditorRoute(route, state, model, fill)
+                            is ShellRoute.ToBudget -> ToBudgetRoute(route, state, model, fill)
+                            ShellRoute.ManageCategories -> ManageCategoriesRoute(state, model, fill)
+                        }
+                        if (state.confirm != null) {
+                            ReconcileWarningScreen(
+                                onChange = model::confirmWrite,
+                                onKeep = model::dismissConfirm,
                                 modifier = fill,
                             )
-                        ShellRoute.AddAccount ->
-                            AddAccountScreen(error = state.editError, onSave = model.accounts::submitAdd, modifier = fill)
-                        is ShellRoute.EditAccount -> EditAccountRoute(route, state, model, fill)
-                        is ShellRoute.CloseAccount -> CloseAccountRoute(route, state, model, fill)
-                        is ShellRoute.ScheduleEditor -> ScheduleEditorRoute(route, state, model, fill)
-                        ShellRoute.Rules -> RulesScreen(state.rules.list, model.rules::openEditor, fill)
-                        ShellRoute.Schedules -> SchedulesRoute(state, model, fill)
-                        is ShellRoute.ScheduleDetails -> ScheduleDetailsRoute(route, state, model, fill)
-                        ShellRoute.MonthReview -> MonthReviewRoute(state, model, fill)
-                        ShellRoute.NetWorth -> NetWorthRoute(state, model, fill)
-                        is ShellRoute.ReportPivot -> ReportPivotRoute(route, state, model, fill)
-                        is ShellRoute.ReportDrill -> ReportDrillRoute(route, state, model, fill)
-                        is ShellRoute.CashFlowMonth -> CashFlowMonthRoute(route, state, model, fill)
-                        is ShellRoute.BankLink -> BankLinkRoute(route, state, model, fill)
-                        is ShellRoute.TemplateKinds -> TemplateKindsRoute(route, state, model, fill)
-                        is ShellRoute.TemplateEditor -> TemplateEditorRoute(route, state, model, fill)
-                        ShellRoute.Templates -> TemplatesRoute(state, model, fill)
-                        is ShellRoute.RuleEditor -> RuleEditorRoute(route, state, model, fill)
-                        is ShellRoute.ToBudget -> ToBudgetRoute(route, state, model, fill)
-                        ShellRoute.ManageCategories -> ManageCategoriesRoute(state, model, fill)
+                        }
+                        val fillConfirm = state.monthUi.fillConfirm
+                        if (fillConfirm != null) {
+                            FillConfirmScreen(
+                                confirm = fillConfirm,
+                                month = state.pinnedMonth ?: state.openMonth,
+                                onConfirm = model.month::confirmFill,
+                                onKeep = model.month::keepFill,
+                                modifier = fill,
+                            )
+                        }
+                        if (state.schedulesUi.duplicateId != null) {
+                            ScheduleDuplicateScreen(
+                                onPostAnyway = model.schedules::confirmDuplicate,
+                                onCancel = model.schedules::cancelDuplicate,
+                                modifier = fill,
+                            )
+                        }
+                        val advanced = state.settingsUi.confirmAdvanced
+                        if (advanced != null) {
+                            ConfirmAdvancedScreen(
+                                kind = advanced,
+                                onConfirm = {
+                                    when (advanced) {
+                                        AdvancedConfirm.Rebuild -> model.settingsUi.confirmRebuild()
+                                        AdvancedConfirm.Repair -> model.settingsUi.confirmRepair()
+                                        AdvancedConfirm.ResetSync -> model.settingsUi.confirmResetSync()
+                                    }
+                                },
+                                onCancel = model.settingsUi::cancelAdvanced,
+                                modifier = fill,
+                            )
+                        }
                     }
-                    if (state.confirm != null) {
-                        ReconcileWarningScreen(
-                            onChange = model::confirmWrite,
-                            onKeep = model::dismissConfirm,
-                            modifier = fill,
-                        )
-                    }
-                    val fillConfirm = state.monthUi.fillConfirm
-                    if (fillConfirm != null) {
-                        FillConfirmScreen(
-                            confirm = fillConfirm,
-                            month = state.pinnedMonth ?: state.openMonth,
-                            onConfirm = model.month::confirmFill,
-                            onKeep = model.month::keepFill,
-                            modifier = fill,
-                        )
-                    }
-                    if (state.schedulesUi.duplicateId != null) {
-                        ScheduleDuplicateScreen(
-                            onPostAnyway = model.schedules::confirmDuplicate,
-                            onCancel = model.schedules::cancelDuplicate,
-                            modifier = fill,
-                        )
-                    }
-                    val advanced = state.settingsUi.confirmAdvanced
-                    if (advanced != null) {
-                        ConfirmAdvancedScreen(
-                            kind = advanced,
-                            onConfirm = {
-                                when (advanced) {
-                                    AdvancedConfirm.Rebuild -> model.settingsUi.confirmRebuild()
-                                    AdvancedConfirm.Repair -> model.settingsUi.confirmRepair()
-                                    AdvancedConfirm.ResetSync -> model.settingsUi.confirmResetSync()
-                                }
+                }
+                val turned = modifier.turnstileIn(state.route::class)
+                // A pull down past the top of home, or of any page that shows the budget, opens the sync panel above
+                // the page and its title; it is the only sync there. Forms, pickers and confirmations keep their drags.
+                if (state.route.pullsToSync()) {
+                    // Each page gets its own panel, so one left open never follows a page change.
+                    key(state.route::class) {
+                        PullSyncPanel(
+                            ui = state.pullSync(),
+                            onSync = model.budgetFiles::syncInbox,
+                            onBankSync = model.bankSync::syncAll,
+                            modifier = turned,
+                            onDetails = model.bankSync::openReport,
+                            onDismissFailure = model.bankSync::dismiss,
+                            // A fresh install's first look at the budget bounces the panel once, so it is found.
+                            peek = peekPending && state.route == ShellRoute.Home && state.homeSection == ScreenBar.HOME_BUDGET,
+                            onPeeked = {
+                                peekPending = false
+                                PullSyncPeek.markDone(context)
                             },
-                            onCancel = model.settingsUi::cancelAdvanced,
-                            modifier = fill,
-                        )
+                        ) { page(it) }
                     }
+                } else {
+                    page(turned)
                 }
                 // The one long-press menu every list row shares, drawn over the page.
                 RowMenu(rowMenu, tag = "row-menu")

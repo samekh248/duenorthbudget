@@ -300,7 +300,7 @@ object ScreenBar {
                     )
                 }
             ShellRoute.Rules -> listOf(spec("add-rule", AppGlyph.Add, ScreenBarCopy.ADD_RULE, ScreenBarCopy.RULE)) + objectTail(undoLabel)
-            // The failed sync's page: dismiss clears the tile. Syncing again is the home pull-down panel's job.
+            // The failed sync's page: dismiss clears the tile. Syncing again is the pull-down panel's job, here as everywhere.
             ShellRoute.BankSyncReport -> listOf(spec("bank-sync-dismiss", AppGlyph.Cancel, BankSyncCopy.DISMISS))
             // Upcoming switches between its list and its calendar; all has nothing to switch.
             ShellRoute.Schedules ->

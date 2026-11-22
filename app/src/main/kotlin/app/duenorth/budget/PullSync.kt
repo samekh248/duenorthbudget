@@ -114,7 +114,7 @@ private const val SYNC_STRETCH = 1.5f
 private const val START_WAIT_MS = 1_500L
 
 /**
- * The home pivot's pull-down sync panel, on every section. With a page's list at its top (or on a page with
+ * The pull-down sync panel, on every home section and every page that [pullsToSync]. With a page's list at its top (or on a page with
  * no list at all), pulling further down
  * draws a panel out from above the page: the last sync's time, and sync now (and bank sync when
  * accounts are linked). Pulling never syncs by itself, so a stray swipe costs nothing: a short
@@ -432,13 +432,54 @@ internal fun PullSyncSheet(
     }
 }
 
-/** The panel's state from the shell's: on only on home, with a server budget open and no mode holding the page. */
+/**
+ * The pages a pull down opens the sync panel on: home and every page that shows the budget, from the register and
+ * the ledger to reports, schedules, payees and settings. Forms, pickers, confirmations, setup and the step-by-step
+ * workflows (reconcile, close out) are left out: their drags and edits are their own, and a sync mid-edit helps no one.
+ */
+internal fun ShellRoute.pullsToSync(): Boolean =
+    when (this) {
+        ShellRoute.Home,
+        ShellRoute.Settings,
+        ShellRoute.Licenses,
+        ShellRoute.Payees,
+        ShellRoute.SavedSplits,
+        ShellRoute.BankSyncReport,
+        ShellRoute.Rules,
+        ShellRoute.Schedules,
+        ShellRoute.Templates,
+        ShellRoute.MonthReview,
+        ShellRoute.NetWorth,
+        is ShellRoute.Register,
+        is ShellRoute.Ledger,
+        is ShellRoute.ReviewCategory,
+        is ShellRoute.ScheduleDetails,
+        is ShellRoute.ReportPivot,
+        is ShellRoute.ReportDrill,
+        is ShellRoute.CashFlowMonth,
+        -> true
+        else -> false
+    }
+
+/** A mode or question holding the page, which a pull must not interrupt: the budget's edit, select, reorder, search, merge. */
+private fun ShellUiState.modeOpen(): Boolean =
+    // A question drawn over the page (a reconciled change, a fill, a duplicate, an advanced step) holds it too.
+    confirm != null || monthUi.fillConfirm != null || schedulesUi.duplicateId != null || settingsUi.confirmAdvanced != null ||
+        when (route) {
+            ShellRoute.Home -> budgetEdit != null || inbox.selection != null || accounts.reorder
+            is ShellRoute.Register, is ShellRoute.Ledger ->
+                registerUi.selection != null || registerUi.search != null || registerUi.filterOpen
+            ShellRoute.Payees -> payees.mergeTarget != null
+            else -> false
+        }
+
+/** The panel's state from the shell's: on every page that [pullsToSync], with a server budget open and no mode holding it. */
 internal fun ShellUiState.pullSync(): PullSyncUi {
     val server = shell != null && !locked && signedIn && !cloudFileId.isNullOrBlank()
-    val modeOpen = budgetEdit != null || inbox.selection != null || accounts.reorder
+    val modeOpen = modeOpen()
     val failure = bankSync.panel?.takeIf { !it.running }
     return PullSyncUi(
-        enabled = (server || failure != null) && shell != null && !locked && route == ShellRoute.Home && !modeOpen,
+        enabled = (server || failure != null) && shell != null && !locked && route.pullsToSync() && !modeOpen,
         canSync = server,
         failure = failure,
         status = syncStatus,
