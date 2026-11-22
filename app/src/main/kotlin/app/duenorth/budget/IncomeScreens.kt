@@ -142,7 +142,7 @@ fun IncomeCategoryLine(
             Spacer(Modifier.weight(LEDGER_FIGURE))
         }
         Spacer(Modifier.weight(LEDGER_FIGURE))
-        LedgerFigure(
+        AvailableFigure(
             received,
             Metro.typography.body,
             Metro.accent.text,
