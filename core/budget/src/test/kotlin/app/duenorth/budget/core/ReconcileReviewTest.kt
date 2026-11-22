@@ -35,6 +35,28 @@ class ReconcileReviewTest {
     }
 
     @Test
+    fun registerHeaderClearedMatchesWhatReconcileChecksAgainst() {
+        db { session, register ->
+            register.save(draft("a", amount = 100))
+            session.exec("UPDATE transactions SET reconciled = 1 WHERE id = 'a'")
+            register.save(draft("b", amount = 200))
+            register.save(draft("c", amount = 400))
+            session.exec("UPDATE transactions SET cleared = 0 WHERE id IN ('a', 'c')")
+            val page = register.read("checking")!!
+            val reconcile = ReconcileBook(session)
+            val started = reconcile.start("checking", "3.00", "2026-10-07") as ReconcileStartResult.Started
+            // Reconciled counts as cleared, as it does when reconciling.
+            assertEquals(300L, page.clearedMinor)
+            assertEquals(400L, page.unclearedMinor)
+            assertEquals(page.balanceMinor, page.clearedMinor + page.unclearedMinor)
+            assertEquals(started.page.clearedTotalMinor, page.clearedMinor)
+            assertEquals(0L, started.page.differenceMinor)
+            reconcile.toggleCleared("checking", "c")
+            assertEquals(reconcile.read("checking")!!.clearedTotalMinor, register.read("checking")!!.clearedMinor)
+        }
+    }
+
+    @Test
     fun reconcileCancelRestoresClearedWithoutChangingReconciled() {
         db { session, register ->
             register.save(draft("a", amount = 100))

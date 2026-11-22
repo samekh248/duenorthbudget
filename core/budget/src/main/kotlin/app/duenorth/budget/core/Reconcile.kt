@@ -456,19 +456,7 @@ class ReconcileBook(
         )
     }
 
-    private fun clearedTotal(accountId: String): Long =
-        session
-            .query(
-                """
-                SELECT COALESCE(SUM(t.amount), 0) AS total
-                FROM transactions t
-                WHERE t.acct = ?
-                    AND $ALIVE
-                    AND (IFNULL(t.reconciled, 0) = 1 OR IFNULL(t.cleared, 0) = 1)
-                """.trimIndent(),
-                listOf(accountId),
-            ).first()
-            .long("total")
+    private fun clearedTotal(accountId: String): Long = clearedTotal(session, accountId)
 
     private fun snapshot(accountId: String): Map<String, ReconcileBaselineEntry> =
         session
@@ -583,6 +571,27 @@ class ReconcileBook(
                 )
             )
             """
+
+        /**
+         * What the account's cleared and reconciled transactions add up to: the figure a statement is
+         * reconciled against, and the register header's "cleared".
+         */
+        fun clearedTotal(
+            session: SqlSession,
+            accountId: String,
+        ): Long =
+            session
+                .query(
+                    """
+                    SELECT COALESCE(SUM(t.amount), 0) AS total
+                    FROM transactions t
+                    WHERE t.acct = ?
+                        AND $ALIVE
+                        AND (IFNULL(t.reconciled, 0) = 1 OR IFNULL(t.cleared, 0) = 1)
+                    """.trimIndent(),
+                    listOf(accountId),
+                ).first()
+                .long("total")
 
         fun sessionKey(accountId: String): String = "dueNorthReconcile:$accountId"
 

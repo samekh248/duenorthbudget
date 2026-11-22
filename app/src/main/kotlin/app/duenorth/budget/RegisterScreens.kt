@@ -3,8 +3,11 @@ package app.duenorth.budget
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -133,6 +136,7 @@ fun RegisterScreen(
             amountTag = "register-balance",
             modifier = Modifier.padding(top = MetroDimens.Gutter),
         )
+        ClearedTotals(page)
         if (selection != null) {
             MetroText(
                 "${selection.size} ${RegisterCopy.SELECTED}",
@@ -191,6 +195,42 @@ fun RegisterScreen(
                 onFocused = onFocused,
             )
         }
+    }
+}
+
+/**
+ * Cleared and uncleared under the balance, smaller and in the page's secondary ink so the balance
+ * stays the figure that reads first. Cleared is reconcile's own figure: what a statement is checked
+ * against. The two wrap onto separate lines when the text is large.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ClearedTotals(page: RegisterPage) {
+    val options = formatOptions()
+    FlowRow(
+        Modifier.padding(top = MetroDimens.Gutter / 2),
+        horizontalArrangement = Arrangement.spacedBy(MetroDimens.Grid),
+        verticalArrangement = Arrangement.spacedBy(MetroDimens.Gutter / 2),
+    ) {
+        ClearedFigure(RegisterCopy.CLEARED, MoneyFormat.format(page.clearedMinor, page.currency, options), "register-cleared")
+        ClearedFigure(RegisterCopy.UNCLEARED, MoneyFormat.format(page.unclearedMinor, page.currency, options), "register-uncleared")
+    }
+}
+
+@Composable
+private fun ClearedFigure(
+    label: String,
+    amount: String,
+    tag: String,
+) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        MetroText(label, Metro.typography.caption, color = Metro.colors.secondary)
+        FigureText(
+            amount,
+            Metro.typography.body,
+            Modifier.padding(start = MetroDimens.Gutter / 2).testTag(tag),
+            color = Metro.colors.foreground,
+        )
     }
 }
 
