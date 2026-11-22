@@ -94,7 +94,7 @@ class ImportHolder internal constructor(
                         accountId,
                         settings.serverAddress,
                         host.sync.syncToken(),
-                        host.bankSyncTransport,
+                        host.bankSyncTransport.forFile(runCatching { host.sync.cloudFileId(budgetId) }.getOrNull()),
                         java.time.LocalDate.now(),
                     )
                 }

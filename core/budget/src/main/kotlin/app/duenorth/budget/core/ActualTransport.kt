@@ -86,6 +86,27 @@ interface ActualTransport {
         path: String,
         body: JsonObject,
     ): JsonElement = throw SyncNetworkException(IOException("bank providers are not supported"))
+
+    /**
+     * [provider] for one budget: [fileId] goes in `X-Actual-File-Id`, which Actual 26.11 uses to pick that budget's
+     * own SimpleFIN or Pluggy.ai credentials (and to store a secret for it). Servers before that ignore it.
+     */
+    fun provider(
+        address: String,
+        token: String,
+        path: String,
+        body: JsonObject,
+        fileId: String?,
+    ): JsonElement = provider(address, token, path, body)
+
+    /**
+     * Ends [token]'s session on the server (`POST /account/logout`, Actual 26.11). Best-effort: an older server, or
+     * no network, leaves it as it was, and signing out on the phone goes ahead either way.
+     */
+    fun logout(
+        address: String,
+        token: String,
+    ) {}
 }
 
 class SyncAuthException(
@@ -130,6 +151,9 @@ class DownloadTracker {
         received = 0
     }
 }
+
+/** Sign-out waits this long, at most, for the server to end the session. */
+private const val LOGOUT_TIMEOUT_MS = 5_000
 
 object SyncCopy {
     const val ADDRESS_FAILED = "the address could not be reached"
@@ -180,6 +204,23 @@ class HttpActualTransport : ActualTransport {
                 ?.contentOrNull
         if (response.code != 200 || token.isNullOrBlank()) throw SyncAuthException(SyncCopy.SIGN_IN_FAILED)
         return token
+    }
+
+    override fun logout(
+        address: String,
+        token: String,
+    ) {
+        val body = buildJsonObject { put("token", token) }.toString()
+        runCatching {
+            send(
+                "$address/account/logout",
+                "POST",
+                token = token,
+                contentType = "application/json",
+                body = body.toByteArray(Charsets.UTF_8),
+                timeoutMs = LOGOUT_TIMEOUT_MS,
+            )
+        }
     }
 
     override fun loginMethods(address: String): List<String> {
@@ -343,6 +384,14 @@ class HttpActualTransport : ActualTransport {
         token: String,
         path: String,
         body: JsonObject,
+    ): JsonElement = provider(address, token, path, body, fileId = null)
+
+    override fun provider(
+        address: String,
+        token: String,
+        path: String,
+        body: JsonObject,
+        fileId: String?,
     ): JsonElement {
         val response =
             send(
@@ -351,8 +400,13 @@ class HttpActualTransport : ActualTransport {
                 token,
                 contentType = "application/json",
                 body = body.toString().toByteArray(Charsets.UTF_8),
+                headers = if (fileId.isNullOrBlank()) emptyMap() else mapOf("X-Actual-File-Id" to fileId),
             )
-        if (response.code == 401 || response.code == 403) throw SyncAuthException(SyncCopy.SIGN_IN_AGAIN)
+        if (response.code == 401) throw SyncAuthException(SyncCopy.SIGN_IN_AGAIN)
+        if (response.code == 403) {
+            val reason = runCatching { jsonObject(response.bytes).string("reason") }.getOrNull()
+            throw BankAccessCopy.of(reason)?.let { BankLinkException(it) } ?: SyncAuthException(SyncCopy.SIGN_IN_AGAIN)
+        }
         if (response.code != 200) throw BankLinkException(BankLinkCopy.UNREACHABLE)
         val root = runCatching { jsonObject(response.bytes) }.getOrNull() ?: throw BankLinkException(BankLinkCopy.UNREACHABLE)
         if (root.string("status") != "ok") throw BankLinkException(root.string("reason") ?: BankLinkCopy.UNREACHABLE)
@@ -383,6 +437,7 @@ class HttpActualTransport : ActualTransport {
         body: ByteArray?,
         headers: Map<String, String> = emptyMap(),
         onProgress: ((Long, Long) -> Unit)? = null,
+        timeoutMs: Int? = null,
     ): HttpBytes {
         val connection =
             try {
@@ -390,8 +445,8 @@ class HttpActualTransport : ActualTransport {
                     requestMethod = method
                     instanceFollowRedirects = false
                     useCaches = false
-                    connectTimeout = 10_000
-                    readTimeout = 60_000
+                    connectTimeout = timeoutMs ?: 10_000
+                    readTimeout = timeoutMs ?: 60_000
                     if (token != null) setRequestProperty("X-ACTUAL-TOKEN", token)
                     if (contentType != null) setRequestProperty("Content-Type", contentType)
                     headers.forEach { (key, value) -> setRequestProperty(key, value) }

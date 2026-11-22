@@ -57,6 +57,12 @@ interface BankSyncTransport {
                     BankFetch(emptyList(), null, error)
                 }
         }
+
+    /**
+     * This transport for the budget whose server copy is [fileId], so Actual 26.11 fetches with that budget's own
+     * bank credentials when it has some. Transports that don't talk to a server return themselves.
+     */
+    fun forFile(fileId: String?): BankSyncTransport = this
 }
 
 /**
@@ -71,8 +77,14 @@ data class BankFetch(
     val since: Int? = null,
 )
 
-class HttpBankSyncTransport : BankSyncTransport {
+class HttpBankSyncTransport(
+    /** The budget's server file id, sent as `X-Actual-File-Id`; null leaves the header out. */
+    private val fileId: String? = null,
+) : BankSyncTransport {
     private val json = Json { ignoreUnknownKeys = true }
+
+    override fun forFile(fileId: String?): BankSyncTransport =
+        if (fileId == this.fileId) this else HttpBankSyncTransport(fileId?.takeIf { it.isNotBlank() })
 
     override fun fetchTransactions(
         serverAddress: String,
@@ -200,12 +212,18 @@ class HttpBankSyncTransport : BankSyncTransport {
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("X-ACTUAL-TOKEN", token)
+            fileId?.let { connection.setRequestProperty("X-Actual-File-Id", it) }
             connection.doOutput = true
             connection.outputStream.use { it.write(body) }
             val code = connection.responseCode
             val stream = if (code >= 400) connection.errorStream else connection.inputStream
             val bytes = stream?.readBytes() ?: ByteArray(0)
-            if (code == 401 || code == 403) throw BankSyncException(SyncCopy.SIGN_IN_AGAIN, BankSyncFix.SIGN_IN)
+            if (code == 401) throw BankSyncException(SyncCopy.SIGN_IN_AGAIN, BankSyncFix.SIGN_IN)
+            if (code == 403) {
+                val reason = runCatching { json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject.string("reason") }.getOrNull()
+                throw BankAccessCopy.of(reason)?.let { BankSyncException(it) }
+                    ?: BankSyncException(SyncCopy.SIGN_IN_AGAIN, BankSyncFix.SIGN_IN)
+            }
             if (code != 200) throw BankSyncException(ImportCopy.FETCH_FAILED)
             val reply = json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject
             // Actual answers `{"status":"ok","data":{...}}`, and a bank error comes back inside `data`.
@@ -350,6 +368,21 @@ enum class BankSyncFix {
 
     /** The budget server, not SimpleFIN, turned the phone away: signing in again mends it, not SimpleFIN. */
     SIGN_IN,
+}
+
+/** What a 403 from the server's bank bridge means, by its `reason`; null for one that means signing in again. */
+object BankAccessCopy {
+    const val NOT_ADMIN = "only the server's admin can change the server-wide bank settings"
+    const val FILE_DENIED = "this budget isn't shared with you on the server any more"
+    const val FORBIDDEN = "the server didn't allow that"
+
+    fun of(reason: String?): String? =
+        when (reason) {
+            "not-admin" -> NOT_ADMIN
+            "file-access-denied" -> FILE_DENIED
+            "forbidden" -> FORBIDDEN
+            else -> null
+        }
 }
 
 /** The `error_code`s Actual's server sends back from `/simplefin/transactions`, in the app's words. */
@@ -671,6 +704,8 @@ class BankLinkClient(
     private val transport: ActualTransport,
     private val address: String,
     private val token: String,
+    /** The open budget's server file id: Actual 26.11 keeps SimpleFIN and Pluggy.ai credentials per budget by it. */
+    private val fileId: String? = null,
 ) {
     /** The providers the server reports as configured. */
     fun configured(): List<BankProvider> =
@@ -682,11 +717,31 @@ class BankLinkClient(
     /**
      * Sends the SimpleFIN setup token to the server and keeps no copy. The access key claimed from an
      * earlier token is cleared first, as Actual's reset does, so the server claims this one.
+     *
+     * Where it goes follows desktop Actual 26.11: to this budget when the budget already has its own SimpleFIN
+     * token, otherwise server-wide; and to this budget when the server only lets its admin change server-wide ones.
      */
     fun saveSimpleFinToken(value: String) {
-        call("secret", JsonObject(mapOf("name" to JsonPrimitive("simplefin_accessKey"), "value" to JsonNull)))
-        call("secret", JsonObject(mapOf("name" to JsonPrimitive("simplefin_token"), "value" to JsonPrimitive(value.trim()))))
+        val perBudget = fileId != null && simpleFinSource() == SOURCE_PER_BUDGET
+        try {
+            saveSimpleFinSecrets(value, perBudget)
+        } catch (error: BankLinkException) {
+            if (perBudget || fileId == null || error.message != BankAccessCopy.NOT_ADMIN) throw error
+            saveSimpleFinSecrets(value, perBudget = true)
+        }
     }
+
+    private fun saveSimpleFinSecrets(
+        value: String,
+        perBudget: Boolean,
+    ) {
+        call("secret", JsonObject(mapOf("name" to JsonPrimitive("simplefin_accessKey"), "value" to JsonNull)), perBudget)
+        call("secret", JsonObject(mapOf("name" to JsonPrimitive("simplefin_token"), "value" to JsonPrimitive(value.trim()))), perBudget)
+    }
+
+    /** `per-budget-file`, `global` or null, as Actual 26.11's `simplefin/status` reports; null from older servers. */
+    private fun simpleFinSource(): String? =
+        runCatching { (call("simplefin/status", JsonObject(emptyMap())) as? JsonObject)?.text("source") }.getOrNull()
 
     fun accounts(provider: BankProvider): List<ExternalAccount> {
         require(provider != BankProvider.GOCARDLESS) { "GoCardless accounts come from a requisition" }
@@ -740,12 +795,17 @@ class BankLinkClient(
         }
     }
 
+    /**
+     * One provider call. Every one carries the budget's file id except a `secret` save meant for the whole server
+     * ([perBudget] false), since the header is what makes a secret the budget's own.
+     */
     private fun call(
         path: String,
         body: JsonObject,
+        perBudget: Boolean = true,
     ): JsonElement =
         try {
-            transport.provider(address, token, path, body)
+            transport.provider(address, token, path, body, fileId.takeIf { perBudget })
         } catch (error: SyncNetworkException) {
             throw BankLinkException(BankLinkCopy.UNREACHABLE)
         }
@@ -768,6 +828,8 @@ class BankLinkClient(
             ?.setScale(0, java.math.RoundingMode.HALF_UP)
             ?.toLong()
 }
+
+private const val SOURCE_PER_BUDGET = "per-budget-file"
 
 sealed interface BankLinkResult {
     data object Saved : BankLinkResult

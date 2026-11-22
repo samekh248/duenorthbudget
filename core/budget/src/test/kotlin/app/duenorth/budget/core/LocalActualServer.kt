@@ -62,6 +62,29 @@ class LocalActualServer(
     /** Every `POST /secret`, by name. */
     val secrets: MutableMap<String, String> = java.util.concurrent.ConcurrentHashMap()
 
+    /** The `X-Actual-File-Id` each bank provider call carried, in the same order as [providerCalls]; null when none. */
+    val providerFileIds: MutableList<String?> = java.util.Collections.synchronizedList(mutableListOf())
+
+    /** Secrets stored for one budget (Actual 26.11), keyed `fileId/name`. */
+    val fileSecrets: MutableMap<String, String> = java.util.concurrent.ConcurrentHashMap()
+
+    /** What `simplefin/status` reports as `source`, as Actual 26.11 does; null leaves it out, as older servers do. */
+    var simpleFinSource: String? = null
+
+    /** When true, a server-wide `POST /secret` is refused with 403 `not-admin`, as for a user who isn't the admin. */
+    var secretsAdminOnly: Boolean = false
+
+    /** Budgets the signed-in user can no longer reach: a provider call naming one gets 403 `file-access-denied`. */
+    val deniedFiles: MutableSet<String> =
+        java.util.concurrent.ConcurrentHashMap
+            .newKeySet()
+
+    /** Tokens sent to `POST /account/logout`. */
+    val logouts: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+
+    /** When false, `/account/logout` is missing (404), like a server before 26.11. */
+    var logoutRoute: Boolean = true
+
     private val json = Json { ignoreUnknownKeys = true }
     private val clock = SyncClock("SERVER0000000001")
     private val files = LinkedHashMap<String, ServerFile>()
@@ -205,6 +228,7 @@ class LocalActualServer(
             method == "GET" && path == "/account/needs-bootstrap" && bootstrapRoute -> needsBootstrap(exchange)
             method == "GET" && path == "/account/login-methods" -> loginMethods(exchange)
             method == "POST" && path == "/account/login" -> login(exchange)
+            method == "POST" && path == "/account/logout" && logoutRoute -> logout(exchange)
             method == "GET" && path == openIdCallbackPath -> openIdCallback(exchange)
             method == "GET" && path == "/sync/list-user-files" -> list(exchange)
             method == "GET" && path == "/sync/download-user-file" -> download(exchange)
@@ -232,17 +256,31 @@ class LocalActualServer(
                         .toString(Charsets.UTF_8)
                         .ifBlank { "{}" },
                 ).jsonObject
+        val fileId = exchange.requestHeaders.getFirst("X-Actual-File-Id")
         providerCalls += path to body.toString()
+        providerFileIds += fileId
+        if (fileId != null && fileId in deniedFiles) {
+            exchange.respond(403, """{"status":"error","reason":"file-access-denied"}""".toByteArray(), "application/json")
+            return
+        }
         val data =
             when {
                 path == "/secret" -> {
+                    if (fileId == null && secretsAdminOnly) {
+                        exchange.respond(403, """{"status":"error","reason":"not-admin"}""".toByteArray(), "application/json")
+                        return
+                    }
                     val name = body["name"]?.jsonPrimitive?.content.orEmpty()
                     // A null value clears the secret, as Actual's reset sends.
                     val value = body["value"]?.jsonPrimitive?.contentOrNull
-                    if (value == null) secrets.remove(name) else secrets[name] = value
+                    val store = if (fileId == null) secrets else fileSecrets
+                    val key = if (fileId == null) name else "$fileId/$name"
+                    if (value == null) store.remove(key) else store[key] = value
                     if (name == "simplefin_token") configured["simplefin"] = true
                     null
                 }
+                path == "/simplefin/status" && simpleFinSource != null ->
+                    """{"configured":${configured["simplefin"] == true},"source":"$simpleFinSource"}"""
                 path.endsWith("/status") -> """{"configured":${configured[path.split('/')[1]] == true}}"""
                 else ->
                     providerData[path] ?: run {
@@ -300,6 +338,12 @@ class LocalActualServer(
                 put("data", buildJsonObject { put("token", token) })
             }.toString()
         exchange.respond(200, text.toByteArray(), "application/json")
+    }
+
+    private fun logout(exchange: HttpExchange) {
+        val body = json.parseToJsonElement(exchange.requestBody.readBytes().toString(Charsets.UTF_8)).jsonObject
+        logouts += body["token"]?.jsonPrimitive?.content.orEmpty()
+        exchange.respond(200, """{"status":"ok","data":{}}""".toByteArray(), "application/json")
     }
 
     private fun openIdCallback(exchange: HttpExchange) {
