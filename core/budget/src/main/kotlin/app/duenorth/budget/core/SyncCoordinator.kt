@@ -248,6 +248,13 @@ class SyncCoordinator(
     fun activateOffline(instanceId: String): Boolean = makeActive(instanceId)
 
     fun removeInstance(instanceId: String) {
+        val address =
+            library
+                .settings()
+                .instances
+                .firstOrNull { it.id == instanceId }
+                ?.address
+        tokenFor(instanceId)?.let { token -> if (address != null) revoke(address, token) }
         secrets.remove(tokenKey(instanceId))
         val wasActive = library.settings().activeInstanceId == instanceId
         library.removeInstance(instanceId)
@@ -258,8 +265,19 @@ class SyncCoordinator(
     }
 
     fun signOut() {
+        val token = syncToken()
+        val address = activeAddress()
+        if (token != null && address != null) revoke(address, token)
         clearActiveToken()
         remoteFiles = emptyList()
+    }
+
+    /** Ends the session on the server too (Actual 26.11 keeps one per sign-in); offline or older servers skip it. */
+    private fun revoke(
+        address: String,
+        token: String,
+    ) {
+        runCatching { transport.logout(address, token) }
     }
 
     fun unlock(
@@ -444,7 +462,8 @@ class SyncCoordinator(
         if (!canSyncUnattended(budgetId)) return null
         val token = syncToken() ?: return null
         val address = activeAddress() ?: return null
-        val summary = library.syncBankAccounts(budgetId, address, token, bankTransport, dates.today(), now(), onAccount, onFailure)
+        val transport = bankTransport.forFile(cloudFileId(budgetId))
+        val summary = library.syncBankAccounts(budgetId, address, token, transport, dates.today(), now(), onAccount, onFailure)
         // Kept until the next bank sync, so one that failed in the background still shows when the app opens.
         summary?.let { runCatching { keepBankFailures(budgetId, it.failures) } }
         return summary
@@ -908,8 +927,12 @@ class SyncCoordinator(
     fun bankClient(): BankLinkClient? {
         val token = syncToken() ?: return null
         val address = activeAddress() ?: return null
-        return BankLinkClient(transport, address, token)
+        val fileId = library.settings().openBudgetId?.let { runCatching { cloudFileId(it) }.getOrNull() }
+        return BankLinkClient(transport, address, token, fileId)
     }
+
+    /** [budgetId]'s file id on the server, or null when it was never uploaded or downloaded. */
+    fun cloudFileId(budgetId: String): String? = state(budgetId, "cloudFileId")?.takeIf { it.isNotBlank() }
 
     /** Runs a provider call, turning network and auth failures into a reason to show. */
     fun <T> bankCall(block: (BankLinkClient) -> T): Result<T> {
