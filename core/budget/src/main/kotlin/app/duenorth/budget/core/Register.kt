@@ -250,6 +250,7 @@ class RegisterBook(
             rows = rows,
             categories = categories(),
             accounts = accounts(),
+            clearedMinor = ReconcileBook.clearedTotal(session, accountId),
             matches = MatchFinder.find(session, accountId),
             suggestions = CategorySuggester(session).index(),
         )

@@ -43,6 +43,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -126,13 +128,7 @@ fun RegisterScreen(
             .padding(horizontal = MetroDimens.Gutter),
     ) {
         MetroText(page.account.name, Metro.typography.header, maxLines = 2)
-        BudgetTotal(
-            label = if (owed) "${ShellCopy.BALANCE} ${RegisterCopy.OWED}" else ShellCopy.BALANCE,
-            amount = MoneyFormat.format(page.balanceMinor, page.currency, formatOptions()),
-            amountColor = Metro.accent.text,
-            amountTag = "register-balance",
-            modifier = Modifier.padding(top = MetroDimens.Gutter),
-        )
+        BalanceHeader(page, owed)
         if (selection != null) {
             MetroText(
                 "${selection.size} ${RegisterCopy.SELECTED}",
@@ -193,6 +189,89 @@ fun RegisterScreen(
         }
     }
 }
+
+/**
+ * Cleared, uncleared and the balance on one row. Cleared leads, large and on the accent: it is
+ * reconcile's own figure, what a statement is checked against. Uncleared and the balance follow,
+ * smaller, with the balance at the far end. When the text is too large for one row, cleared takes
+ * its own line over the other two.
+ */
+@Composable
+private fun BalanceHeader(
+    page: RegisterPage,
+    owed: Boolean,
+) {
+    val options = formatOptions()
+    Layout(
+        content = {
+            BudgetTotal(
+                label = RegisterCopy.CLEARED,
+                amount = MoneyFormat.format(page.clearedMinor, page.currency, options),
+                amountColor = Metro.accent.text,
+                amountTag = "register-cleared",
+            )
+            SecondaryTotal(RegisterCopy.UNCLEARED, MoneyFormat.format(page.unclearedMinor, page.currency, options), "register-uncleared")
+            SecondaryTotal(
+                if (owed) "${ShellCopy.BALANCE} ${RegisterCopy.OWED}" else ShellCopy.BALANCE,
+                MoneyFormat.format(page.balanceMinor, page.currency, options),
+                "register-balance",
+                alignEnd = true,
+            )
+        },
+        modifier = Modifier.fillMaxWidth().padding(top = MetroDimens.Gutter),
+    ) { measurables, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val placeables = measurables.map { it.measure(loose) }
+        val width = constraints.maxWidth
+        val gap = MetroDimens.Grid.roundToPx()
+
+        // One row when all three fit; otherwise cleared on its own line over uncleared and balance.
+        fun fits(vararg ps: Placeable) = ps.sumOf { it.width } + gap * (ps.size - 1) <= width
+        val (cleared, uncleared, balance) = placeables
+        val lines =
+            when {
+                fits(cleared, uncleared, balance) -> listOf(placeables)
+                fits(uncleared, balance) -> listOf(listOf(cleared), listOf(uncleared, balance))
+                else -> listOf(listOf(cleared), listOf(uncleared), listOf(balance))
+            }
+        val lineGap = (MetroDimens.Gutter / 2).roundToPx()
+        val heights = lines.map { line -> line.maxOf { it.height } }
+        layout(width, heights.sum() + lineGap * (lines.size - 1)) {
+            var y = 0
+            lines.forEachIndexed { i, line ->
+                val spare = width - line.sumOf { it.width }
+                val step = if (line.size > 1) spare / (line.size - 1) else 0
+                // The balance keeps to the end edge, even on a line of its own.
+                var x = if (line.size == 1 && line.first() === balance) spare else 0
+                line.forEach { p ->
+                    p.place(x, y + heights[i] - p.height)
+                    x += p.width + step
+                }
+                y += heights[i] + lineGap
+            }
+        }
+    }
+}
+
+/** A smaller total beside cleared: caption over a body-size figure in plain ink. */
+@Composable
+private fun SecondaryTotal(
+    label: String,
+    amount: String,
+    tag: String,
+    alignEnd: Boolean = false,
+) {
+    Column(
+        Modifier.padding(bottom = SECONDARY_BASELINE_NUDGE),
+        horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start,
+    ) {
+        MetroText(label, Metro.typography.caption, color = Metro.colors.secondary)
+        FigureText(amount, Metro.typography.body, Modifier.testTag(tag), color = Metro.colors.foreground)
+    }
+}
+
+/** Lifts a smaller figure so it sits on cleared's baseline rather than the bottom of its line box. */
+private val SECONDARY_BASELINE_NUDGE = 4.dp
 
 /**
  * The register's search, under the balance: a box that opens focused with the keyboard up, then

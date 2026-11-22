@@ -23,6 +23,7 @@ object RegisterCopy {
     const val SELECTED = "selected"
     const val CLEARED = "cleared"
     const val NOT_CLEARED = "not cleared"
+    const val UNCLEARED = "uncleared"
     const val LOCKED = "locked"
     const val PENDING = "pending"
     const val PENDING_NOTE = "from the bank, not posted yet"
@@ -103,11 +104,19 @@ data class RegisterPage(
     val rows: List<RegisterRow>,
     val categories: List<CategoryChoice>,
     val accounts: List<AccountChoice>,
+    /**
+     * What the cleared and reconciled transactions add up to: the same figure reconcile compares a
+     * statement against. The register reads it with reconcile's own query.
+     */
+    val clearedMinor: Long = rows.filter { it.cleared || it.reconciled }.sumOf { it.amountMinor },
     /** Possible matches in this account, shown above the rows until matched or called not a match. */
     val matches: List<MatchPair> = emptyList(),
     /** What the transaction form's category list suggests first, by payee. */
     val suggestions: CategorySuggestions = CategorySuggestions.EMPTY,
 ) {
+    /** What is not cleared yet, pending included; with [clearedMinor] it makes up the balance. */
+    val unclearedMinor: Long get() = balanceMinor - clearedMinor
+
     fun matching(payeeQuery: String): List<RegisterRow> {
         val query = payeeQuery.trim()
         if (query.isEmpty()) return rows

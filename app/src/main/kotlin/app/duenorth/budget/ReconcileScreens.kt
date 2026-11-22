@@ -97,7 +97,8 @@ fun ReconcileRegisterScreen(
         register.rows.map { row ->
             marks[row.id]?.let { row.copy(cleared = it.cleared, reconciled = it.reconciled) } ?: row
         }
-    val clearedBalance = register.rows.filter { it.cleared || it.reconciled }.sumOf { it.amountMinor }
+    // The same cleared figure the register header shows and reconcile checks the statement against.
+    val clearedBalance = register.clearedMinor
     var balance by rememberSaveable(register.account.id) { mutableStateOf(prefs.editSignedAmount(clearedBalance, decimals)) }
     var date by rememberSaveable(register.account.id) { mutableIntStateOf(today) }
     var picking by remember { mutableStateOf<Int?>(null) }

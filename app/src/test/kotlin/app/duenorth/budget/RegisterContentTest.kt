@@ -16,6 +16,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -90,6 +91,27 @@ class RegisterContentTest {
         compose.onNodeWithTag("register-day-20261007", useUnmergedTree = true).assertTextEquals("oct 7")
         compose.onNodeWithTag("register-balance").assertIsDisplayed()
         compose.onNodeWithText("balance ${RegisterCopy.OWED}").assertIsDisplayed()
+    }
+
+    @Test
+    fun clearedLeadsThenUnclearedThenBalance() {
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    RegisterScreen(
+                        page = sample(balance = -4_000).copy(clearedMinor = -2_500),
+                        onGesture = {},
+                        onOpen = {},
+                        onAdd = {},
+                        onReconcile = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText(RegisterCopy.CLEARED).assertIsDisplayed()
+        compose.onNodeWithText(RegisterCopy.UNCLEARED).assertIsDisplayed()
+        compose.onNodeWithTag("register-cleared", useUnmergedTree = true).assertTextContains("25.00", substring = true)
+        compose.onNodeWithTag("register-uncleared", useUnmergedTree = true).assertTextContains("15.00", substring = true)
     }
 
     // Pending rows start folded under their own heading, which opens and folds them; locked rows read as locked.
@@ -787,7 +809,7 @@ class RegisterContentTest {
         }
         compose.onNodeWithTag("register-day-20261007", useUnmergedTree = true).assertTextEquals("oct 7")
         compose.onAllNodesWithText("-$12,40").onFirst().assertIsDisplayed()
-        compose.onNodeWithText("-$1.234,56").assertIsDisplayed()
+        compose.onNodeWithTag("register-balance").assertTextEquals("-$1.234,56")
     }
 
     @Test
