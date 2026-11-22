@@ -94,7 +94,7 @@ class RegisterContentTest {
     }
 
     @Test
-    fun clearedAndUnclearedSitUnderTheBalance() {
+    fun clearedLeadsThenUnclearedThenBalance() {
         compose.setContent {
             MetroTheme {
                 Box(Modifier.width(390.dp).height(640.dp)) {
