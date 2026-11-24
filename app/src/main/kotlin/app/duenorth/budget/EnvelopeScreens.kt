@@ -808,6 +808,8 @@ fun CategoryLine(
      * an empty track until templates give the category a goal, so the rows line up.
      */
     showGoal: Boolean = LocalFormatPrefs.current.templatesOn,
+    /** Where an overspent row's tap goes when the budget can cover it; null opens the page as any row does. */
+    onCover: ((String) -> Unit)? = null,
 ) {
     val money = shell.currency
     // While a month loads, the bar keeps its place as an empty track.
@@ -824,12 +826,14 @@ fun CategoryLine(
     val overLine =
         if (over) {
             val by = MoneyFormat.format(-category.availableMinor, money, formatOptions)
-            // A tap opens the category's page, whose bar offers cover; tracking budgets have nothing to cover from.
+            // A tap goes straight to cover; tracking budgets have nothing to cover from, so theirs opens the page.
             if (shell.mode == BudgetMode.TRACKING) EnvelopeCopy.overBy(by) else EnvelopeCopy.overByCover(by)
         } else {
             null
         }
     // The columns' headings sit above the list, out of TalkBack's reach, so the row names each figure itself.
+    val canCover = over && shell.mode != BudgetMode.TRACKING
+    val onTap: ((String) -> Unit)? = onOpen?.let { open -> if (canCover && onCover != null) onCover else open }
     val spoken = Spoken.categoryLine(category.name, budgeted, spent, available, overLine, category.hidden)
     Column(
         modifier
@@ -841,7 +845,7 @@ fun CategoryLine(
                 } else {
                     Modifier.ledgerFill(if (banded) ledgerBand else Color.Transparent)
                 },
-            ).then(if (onOpen != null) Modifier.rowPress({ onOpen(category.id) }) { category(category.id) } else Modifier)
+            ).then(if (onTap != null) Modifier.rowPress({ onTap(category.id) }) { category(category.id) } else Modifier)
             .testTag("category-${category.id}"),
     ) {
         Row(

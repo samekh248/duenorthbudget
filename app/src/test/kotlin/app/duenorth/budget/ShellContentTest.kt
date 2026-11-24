@@ -336,6 +336,54 @@ class ShellContentTest {
     }
 
     @Test
+    fun tappingAnOverspentRowOpensCoverAndOtherRowsOpenTheirPage() {
+        val food = CategoryRow("c-food", "Groceries", 20_000L, 28_000L, -8_000L, false)
+        val rent = CategoryRow("c-rent", "Rent", 50_000L, 50_000L, 0L, false)
+        val group = GroupRow("g", "Food", -8_000L, listOf(food, rent))
+        val opened = mutableListOf<String>()
+        val covered = mutableListOf<String>()
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    BudgetSection(
+                        sample().copy(groups = listOf(group), bufferedMinor = 0L),
+                        onListGesture = {},
+                        onCategory = { opened += it },
+                        onCover = { covered += it },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("category-c-food").performClick()
+        compose.onNodeWithTag("category-c-rent").performClick()
+        assertEquals(listOf("c-food"), covered)
+        assertEquals(listOf("c-rent"), opened)
+    }
+
+    @Test
+    fun trackingBudgetsOpenAnOverspentRowsPage() {
+        val food = CategoryRow("c-food", "Groceries", 20_000L, 28_000L, -8_000L, false)
+        val group = GroupRow("g", "Food", -8_000L, listOf(food))
+        val opened = mutableListOf<String>()
+        val covered = mutableListOf<String>()
+        compose.setContent {
+            MetroTheme {
+                Box(Modifier.width(390.dp).height(640.dp)) {
+                    BudgetSection(
+                        sample().copy(groups = listOf(group), mode = BudgetMode.TRACKING),
+                        onListGesture = {},
+                        onCategory = { opened += it },
+                        onCover = { covered += it },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("category-c-food").performClick()
+        assertEquals(listOf("c-food"), opened)
+        assertTrue(covered.isEmpty())
+    }
+
+    @Test
     fun trackingBudgetsFlagWithoutCover() {
         val food = CategoryRow("c-food", "Groceries", 20_000L, 28_000L, -8_000L, false)
         val group = GroupRow("g", "Food", -8_000L, listOf(food))

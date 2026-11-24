@@ -113,6 +113,8 @@ fun HomePivot(
     modifier: Modifier = Modifier,
     onSelectMonth: (YearMonth) -> Unit = {},
     onBudgetCategory: ((String) -> Unit)? = null,
+    /** An overspent category's tap on the budget: cover it rather than open its page. */
+    onCoverCategory: ((String) -> Unit)? = null,
     formatOptions: FormatOptions = formatOptions(),
     onToBudget: (() -> Unit)? = null,
     notice: String? = null,
@@ -253,6 +255,7 @@ fun HomePivot(
                                     onListGesture = { listGesture = it },
                                     modifier = Modifier.weight(1f).testTag(if (stale) "budget-month-loading" else "budget-month"),
                                     onCategory = onBudgetCategory.takeUnless { stale },
+                                    onCover = onCoverCategory.takeUnless { stale },
                                     formatOptions = formatOptions,
                                     onToBudget = onToBudget.takeUnless { stale },
                                     notice = notice,
@@ -459,6 +462,7 @@ fun BudgetSection(
     onListGesture: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onCategory: ((String) -> Unit)? = null,
+    onCover: ((String) -> Unit)? = null,
     formatOptions: FormatOptions = formatOptions(),
     onToBudget: (() -> Unit)? = null,
     notice: String? = null,
@@ -665,7 +669,9 @@ fun BudgetSection(
                     shell.groups.forEach { group ->
                         item(key = group.id) {
                             LedgerGroup(arrivalModifier(group.id, arrivals), { GroupLine(group, shell, formatOptions = formatOptions) }) {
-                                group.categories.forEach { CategoryLine(it, shell, onCategory, formatOptions = formatOptions) }
+                                group.categories.forEach {
+                                    CategoryLine(it, shell, onCategory, onCover = onCover, formatOptions = formatOptions)
+                                }
                             }
                             GroupGap()
                         }
@@ -696,6 +702,7 @@ fun BudgetSection(
                             onCategory,
                             formatOptions = formatOptions,
                             banded = ledgerBanded(position.getValue(category.id)),
+                            onCover = onCover,
                         )
                     }
                     item(key = "gap-${group.id}") { GroupGap() }
