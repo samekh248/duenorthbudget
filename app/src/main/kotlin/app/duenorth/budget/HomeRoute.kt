@@ -65,8 +65,6 @@ internal fun HomeRoute(
         modifier = modifier,
         onSelectMonth = model::selectOpenMonth,
         onBudgetCategory = if (state.shell == null) null else model.envelopes::openBudget,
-        // An overspent row's tap goes straight to cover, as its "tap to cover" line says.
-        onCoverCategory = if (state.shell == null) null else model.envelopes::openCover,
         // Tapping to budget opens edit mode; in edit mode it opens the breakdown.
         onToBudget = if (state.shell == null) null else model.budgetEdit::start,
         showAhead = state.freeAfterPlansOn,

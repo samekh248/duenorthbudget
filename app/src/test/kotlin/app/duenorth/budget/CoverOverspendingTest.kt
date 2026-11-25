@@ -1,10 +1,15 @@
 package app.duenorth.budget
 
+import app.duenorth.budget.core.AssistantCopy
 import app.duenorth.budget.core.BudgetClock
 import app.duenorth.budget.core.BudgetLibrary
 import app.duenorth.budget.core.BudgetMode
 import app.duenorth.budget.core.CreateResult
 import app.duenorth.budget.core.EnvelopeCopy
+import app.duenorth.budget.core.Finding
+import app.duenorth.budget.core.FindingAction
+import app.duenorth.budget.core.FindingKind
+import app.duenorth.budget.core.FindingSure
 import app.duenorth.budget.core.HttpActualTransport
 import app.duenorth.budget.core.MemorySecretStore
 import app.duenorth.budget.core.MockBudgets
@@ -100,6 +105,25 @@ class CoverOverspendingTest {
         model.back()
         model.envelopes.openBudget("c-food")
         assertFalse(ScreenBar.overspent(model.state.value))
+    }
+
+    @Test
+    fun theAssistantsBudgetMoreOpensCoverForAnOverspentCategory() {
+        val model = overspentHousehold("assistant")
+        val finding =
+            Finding(
+                key = "overspent:c-gas",
+                kind = FindingKind.OVERSPENT,
+                sure = FindingSure.HIGH,
+                headline = "",
+                sides = emptyList(),
+                reasons = emptyList(),
+                actions = listOf(FindingAction.CoverCategory("c-gas")),
+                accountId = "",
+            )
+        assertEquals(AssistantCopy.BUDGET_MORE, finding.actions.first().label)
+        model.assistant.act(finding, finding.actions.first())
+        assertEquals(ShellRoute.CoverCategory("c-gas"), model.state.value.route)
     }
 
     private fun ShellViewModel.available(id: String) =
