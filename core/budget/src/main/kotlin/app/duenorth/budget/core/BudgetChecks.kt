@@ -46,7 +46,8 @@ internal object BudgetChecks {
                     headline = AssistantCopy.overspent(row.name),
                     sides = emptyList(),
                     reasons = emptyList(),
-                    actions = listOf(FindingAction.BudgetCategory(row.id), FindingAction.Dismiss(AssistantCopy.LATER)),
+                    // Budget more goes straight to cover, where the money can come from another category or to budget.
+                    actions = listOf(FindingAction.CoverCategory(row.id), FindingAction.Dismiss(AssistantCopy.LATER)),
                     accountId = "",
                     figures =
                         listOf(

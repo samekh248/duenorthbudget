@@ -348,6 +348,13 @@ sealed interface FindingAction {
         override val label = AssistantCopy.BUDGET_MORE
     }
 
+    /** Opens cover overspending for an overspent category, to budget more into it from another one or to budget. */
+    data class CoverCategory(
+        val categoryId: String,
+    ) : FindingAction {
+        override val label = AssistantCopy.BUDGET_MORE
+    }
+
     /** Opens hold for next month, for money this month does not need. */
     data object HoldForNext : FindingAction {
         override val label = AssistantCopy.HOLD

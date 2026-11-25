@@ -112,6 +112,7 @@ class AssistantHolder internal constructor(
                 return
             }
             is FindingAction.BudgetCategory -> return envelopes.openBudget(action.categoryId)
+            is FindingAction.CoverCategory -> return envelopes.openCover(action.categoryId)
             FindingAction.HoldForNext -> return envelopes.showHold()
             FindingAction.OpenSchedules -> return schedules.open()
             FindingAction.SyncBank -> {
@@ -176,6 +177,7 @@ class AssistantHolder internal constructor(
                             is FindingAction.Reconcile,
                             FindingAction.SyncBank,
                             is FindingAction.BudgetCategory,
+                            is FindingAction.CoverCategory,
                             FindingAction.HoldForNext,
                             FindingAction.OpenSchedules,
                             -> WriteResult.Saved

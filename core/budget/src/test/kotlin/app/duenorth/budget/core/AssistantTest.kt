@@ -256,7 +256,7 @@ class AssistantTest {
             val budget = readAll(session).findings.filter { it.kind.group == FindingGroup.BUDGET }
             val overspent = budget.single()
             assertEquals(FindingKind.OVERSPENT, overspent.kind)
-            assertEquals(FindingAction.BudgetCategory("c-dining"), overspent.actions.first())
+            assertEquals(FindingAction.CoverCategory("c-dining"), overspent.actions.first())
             assertEquals(FindingFigure(AssistantCopy.AVAILABLE, -5420), overspent.figures.last())
             assertEquals("overspent:202610|c-dining|-5420", overspent.key)
 
